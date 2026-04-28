@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-28T10:00:25.924Z",
+  "generated_at": "2026-04-28T14:00:05.044Z",
   "state": "open",
   "include_archived": false,
   "include_forks": false,
@@ -8,10 +8,10 @@
   "recent_activity_hours": 24,
   "totals": {
     "repos_scanned": 21,
-    "repos_with_items": 3,
-    "total_items": 7,
-    "total_issues": 4,
-    "total_pull_requests": 3,
+    "repos_with_items": 2,
+    "total_items": 5,
+    "total_issues": 3,
+    "total_pull_requests": 2,
     "repos_with_star_changes": 1,
     "repos_with_star_gains": 1
   },
@@ -35,19 +35,7 @@
       "archived": false,
       "fork": false,
       "default_branch": "main",
-      "stars": 43,
-      "issues": 1,
-      "pull_requests": 1,
-      "total": 2
-    },
-    {
-      "full_name": "rcarmo/piclaw-addons",
-      "html_url": "https://github.com/rcarmo/piclaw-addons",
-      "private": false,
-      "archived": false,
-      "fork": false,
-      "default_branch": "main",
-      "stars": 1,
+      "stars": 44,
       "issues": 1,
       "pull_requests": 0,
       "total": 1
@@ -67,7 +55,7 @@
       "url": "https://github.com/rcarmo/piclaw/pull/474",
       "author": "luisfcorreia",
       "created_at": "2026-04-28T09:38:08Z",
-      "updated_at": "2026-04-28T09:38:08Z",
+      "updated_at": "2026-04-28T12:52:49Z",
       "labels": [],
       "assignees": [],
       "body_preview": "(tested working, might have bugs)",
@@ -115,26 +103,6 @@
       "body_preview": "Hello o/ Could you add SmolBSD to the test matrix? https://github.com/NetBSDfr/smolBSD It is a minimal NetBSD system with very fast boot times (~10ms in best c…"
     },
     {
-      "repo": "rcarmo/pve-microvm",
-      "repo_url": "https://github.com/rcarmo/pve-microvm",
-      "repo_private": false,
-      "repo_archived": false,
-      "type": "pull_request",
-      "number": 4,
-      "title": "Fix download link for pve-microvm installation",
-      "state": "open",
-      "draft": false,
-      "url": "https://github.com/rcarmo/pve-microvm/pull/4",
-      "author": "HeMan",
-      "created_at": "2026-04-27T19:26:51Z",
-      "updated_at": "2026-04-27T19:26:51Z",
-      "labels": [],
-      "assignees": [],
-      "body_preview": "",
-      "head_ref": "patch-1",
-      "base_ref": "main"
-    },
-    {
       "repo": "rcarmo/piclaw",
       "repo_url": "https://github.com/rcarmo/piclaw",
       "repo_private": false,
@@ -171,26 +139,6 @@
       "labels": [],
       "assignees": [],
       "body_preview": "### Problem When installing an extension addon via the web Settings UI, `handleInstallAddon` runs `bun add --force <spec>` which creates a full `node_modules` …"
-    },
-    {
-      "repo": "rcarmo/piclaw-addons",
-      "repo_url": "https://github.com/rcarmo/piclaw-addons",
-      "repo_private": false,
-      "repo_archived": false,
-      "type": "issue",
-      "number": 4,
-      "title": "Hero buttons vertically misaligned on catalog site",
-      "state": "open",
-      "draft": false,
-      "url": "https://github.com/rcarmo/piclaw-addons/issues/4",
-      "author": "cjnova",
-      "created_at": "2026-04-27T13:40:12Z",
-      "updated_at": "2026-04-27T13:40:12Z",
-      "labels": [
-        "bug"
-      ],
-      "assignees": [],
-      "body_preview": "On the catalog site at https://rcarmo.github.io/piclaw-addons/, the two action buttons (\"View on GitHub\" and \"↓ Packages\") in the hero section are vertically m…"
     }
   ]
 }

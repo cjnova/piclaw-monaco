@@ -26,6 +26,9 @@ function flushPerfLog() {
     _perfLog.length = 0;
 }
 
+// Module-level settings data cache — survives dialog close/reopen.
+let _settingsDataCache: Record<string, unknown> | null = null;
+
 perf('module-eval-start');
 import { html, useState, useEffect, useCallback, useRef } from '../vendor/preact-htm.js';
 import { BodyPortal } from './body-portal.js';
@@ -129,7 +132,7 @@ const BUILTIN_SECTIONS = [
 function SettingsDialogContent({ onClose }) {
     perf('SettingsDialogContent-render-start');
     const [activeSection, setActiveSection] = useState('general');
-    const [settingsData, setSettingsData] = useState(null);
+    const [settingsData, setSettingsData] = useState(_settingsDataCache);
     const [statusMessage, setStatusMessage] = useState(null);
     const [filter, setFilter] = useState('');
     const [, forceUpdate] = useState(0);
@@ -159,7 +162,10 @@ function SettingsDialogContent({ onClose }) {
     }, []);
 
     useEffect(() => {
-        fetch('/agent/settings-data').then(r => r.json()).then(setSettingsData).catch(() => setSettingsData({}));
+        fetch('/agent/settings-data').then(r => r.json()).then(data => {
+            _settingsDataCache = data;
+            setSettingsData(data);
+        }).catch(() => setSettingsData({}));
     }, []);
 
     useEffect(() => {
