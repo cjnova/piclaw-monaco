@@ -54,12 +54,10 @@ export function SettingsDialogLoader() {
             setShowSpinner(true);
             ensureModule()
                 .then(() => {
+                    // Set a flag so the SettingsDialog knows to open on mount
+                    (window as any).__piclawSettingsOpenRequested = true;
                     setLoaded(true);
                     setShowSpinner(false);
-                    // Re-fire so the now-mounted SettingsDialog catches it
-                    requestAnimationFrame(() => {
-                        window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
-                    });
                 })
                 .catch(() => setShowSpinner(false));
         };

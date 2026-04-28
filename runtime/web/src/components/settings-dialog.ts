@@ -341,6 +341,13 @@ export function SettingsDialog() {
         window.addEventListener('piclaw:open-settings', handler);
         return () => window.removeEventListener('piclaw:open-settings', handler);
     }, []);
+    // Also check a global flag in case the event fired before we mounted
+    useEffect(() => {
+        if ((window as any).__piclawSettingsOpenRequested) {
+            (window as any).__piclawSettingsOpenRequested = false;
+            setOpen(true);
+        }
+    }, []);
     if (!open) return null;
     return html`<${BodyPortal} className="settings-portal"><${SettingsDialogContent} onClose=${() => setOpen(false)} /><//>`;
 }
