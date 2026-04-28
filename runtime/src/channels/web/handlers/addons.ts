@@ -2,12 +2,17 @@
  * web/handlers/addons.ts — Backend add-on management endpoints.
  *
  * GET  /agent/addons           — fetch one or more catalogs + local install state
- * POST /agent/addons/install   — install an addon by slug (package-first via bun add)
- * POST /agent/addons/uninstall — uninstall an addon by slug (package-first via bun remove)
+ * POST /agent/addons/install   — install an addon by slug
+ * POST /agent/addons/uninstall — uninstall an addon by slug
  *
- * Preferred flow: install a real package spec from the catalog (npm/tarball/etc).
- * Legacy fallback: download a package directory from GitHub raw URLs when a package
- * spec is unavailable or package install fails.
+ * IMPORTANT: first-party piclaw add-ons must install from public GitHub-hosted
+ * tarball URLs (the catalog's install.spec), never from npmjs.org and never from
+ * authenticated GitHub Packages registry entries. GitHub Packages npm reads still
+ * require auth and caused regressions in add-on install/remove flows.
+ *
+ * Preferred flow: install from the catalog's public tarball URL, or fall back to
+ * direct file download from the repo when a catalog entry is legacy/incomplete.
+ * Public npm registry installs are a last-resort fallback for third-party catalogs.
  */
 
 import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, mkdirSync, unlinkSync, writeFileSync, renameSync } from "fs";
@@ -341,20 +346,18 @@ async function fetchMergedCatalog(catalogUrls: string[]): Promise<{ catalog: Cat
 export function resolveAddonInstallSpec(addon: Pick<CatalogAddon, "name" | "version" | "install">): { kind: string; spec: string; piSource?: string; scopedName?: string } {
   const explicitSpec = addon.install?.spec?.trim();
   if (explicitSpec) {
-    // Extract the package name (possibly scoped) from the spec, stripping @version
-    const scopedName = explicitSpec.replace(/@[^@/]+$/, "");
     return {
-      kind: addon.install?.kind?.trim() || "package",
+      kind: addon.install?.kind?.trim() || "tarball",
       spec: explicitSpec,
       piSource: addon.install?.piSource?.trim() || undefined,
-      scopedName: scopedName !== addon.name ? scopedName : undefined,
     };
   }
-  const version = addon.version?.trim();
+  // Deliberately do NOT synthesize npm package specs for first-party add-ons.
+  // If a catalog entry is missing install metadata we use direct repo download,
+  // not npm/GitHub Packages auth.
   return {
-    kind: "npm",
-    spec: version ? `${addon.name}@${version}` : addon.name,
-    piSource: version ? `npm:${addon.name}@${version}` : `npm:${addon.name}`,
+    kind: "direct-download",
+    spec: addon.name,
   };
 }
 
@@ -475,6 +478,43 @@ function cleanupAddonDependencyRecord(addonsDir: string, addonName: string): { c
     return { cleaned: true };
   } catch (error) {
     return { cleaned: false, error: String((error as { message?: string })?.message || error) };
+  }
+}
+
+function setAddonDependencyRecord(addonsDir: string, addonName: string, spec: string): { updated: boolean; error?: string } {
+  const pkgJsonPath = join(addonsDir, 'package.json');
+  try {
+    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+    if (!pkg.dependencies) pkg.dependencies = {};
+    if (pkg.dependencies[addonName] === spec) return { updated: false };
+    pkg.dependencies[addonName] = spec;
+    writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2));
+    return { updated: true };
+  } catch (error) {
+    return { updated: false, error: String((error as { message?: string })?.message || error) };
+  }
+}
+
+function normalizeCatalogDependencySpecs(addonsDir: string, catalogAddons: CatalogAddon[]): { updated: number; errors: string[] } {
+  const pkgJsonPath = join(addonsDir, 'package.json');
+  if (!existsSync(pkgJsonPath)) return { updated: 0, errors: [] };
+  try {
+    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+    if (!pkg.dependencies || typeof pkg.dependencies !== 'object') return { updated: 0, errors: [] };
+    let updated = 0;
+    for (const addon of catalogAddons) {
+      if (!addon?.name || !(addon.name in pkg.dependencies)) continue;
+      const plan = resolveAddonInstallSpec(addon);
+      // First-party catalog entries should always use public tarball URLs in package.json.
+      if (plan.kind !== 'tarball' || !/^https?:\/\//.test(plan.spec)) continue;
+      if (pkg.dependencies[addon.name] === plan.spec) continue;
+      pkg.dependencies[addon.name] = plan.spec;
+      updated++;
+    }
+    if (updated > 0) writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2));
+    return { updated, errors: [] };
+  } catch (error) {
+    return { updated: 0, errors: [String((error as { message?: string })?.message || error)] };
   }
 }
 
@@ -625,6 +665,7 @@ export async function handleInstallAddon(
 
   const addonsDir = ensureAddonsDir();
   removeNodeModulesSymlinkIfPresent(addonsDir);
+  if (catalog?.addons?.length) normalizeCatalogDependencySpecs(addonsDir, catalog.addons);
   const destDir = join(addonsDir, "node_modules", addon.name);
   const addonPath = addon.path || `addons/${slug}`;
   const installPlan = resolveAddonInstallSpec(addon);
@@ -647,13 +688,10 @@ export async function handleInstallAddon(
           downloaded++;
         }
 
-        const pkgJsonPath = join(addonsDir, "package.json");
-        try {
-          const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
-          if (!pkg.dependencies) pkg.dependencies = {};
-          pkg.dependencies[addon.name] = addon.version || "*";
-          writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2));
-        } catch (e) { void e; }
+        const dependencySpec = installPlan.kind === 'tarball' && /^https?:\/\//.test(installPlan.spec)
+          ? installPlan.spec
+          : (addon.version || "*");
+        setAddonDependencyRecord(addonsDir, addon.name, dependencySpec);
 
         const addonPkg = join(stagingDir, "package.json");
         if (existsSync(addonPkg)) {
@@ -683,8 +721,8 @@ export async function handleInstallAddon(
       }
     }
 
-    // Fallback: try bun add for addons published to a public npm registry.
-    // This only works for packages on npmjs.org (not GitHub Packages).
+    // Last resort: try bun add for third-party catalogs that intentionally point
+    // at a public npm registry. Do not use this path for first-party piclaw-addons.
     addonLog.info("No repo files found; falling back to bun add", {
       operation: "addons.install.bun_add_fallback",
       slug,
@@ -741,6 +779,11 @@ export async function handleUninstallAddon(
   if (!addon) return json({ error: `Add-on "${slug}" not found in catalog` }, 404);
 
   const addonsDir = ensureAddonsDir();
+  if (catalog?.addons?.length) normalizeCatalogDependencySpecs(addonsDir, catalog.addons);
+  const uninstallPlan = resolveAddonInstallSpec(addon);
+  if (uninstallPlan.kind === 'tarball' && /^https?:\/\//.test(uninstallPlan.spec)) {
+    setAddonDependencyRecord(addonsDir, addon.name, uninstallPlan.spec);
+  }
   const destDir = join(addonsDir, "node_modules", addon.name);
 
   try {

@@ -127,12 +127,17 @@ Panes self-register on import. The dialog discovers them via `getRegisteredSetti
 
 ### Install Flow
 
+> **Important:** first-party `piclaw-addons` entries must use **public GitHub-hosted tarball URLs** in the catalog (`install.kind = "tarball"`, `install.spec = https://rcarmo.github.io/...tgz`).
+> Do **not** route installs through npmjs.org, and do **not** depend on authenticated GitHub Packages reads for runtime install/remove.
+
 1. Backend fetches `catalog.json`
-2. Resolves the add-on's package install spec from the catalog (`install.spec`)
-3. Runs `bun add --force <spec>` in `.pi/addons/`
-4. Checks installed version from `.pi/addons/node_modules/<name>/package.json`
-5. Returns success message; restart required to load the extension
-6. If package install is unavailable or fails for a legacy/unpublished entry, backend falls back to direct package-directory download from GitHub and runs `bun install` inside that add-on directory
+2. Resolves the add-on's install spec from the catalog (`install.spec`)
+3. Prefers public GitHub tarball / direct-download install paths
+4. Stores the resolved public tarball URL in the local add-on dependency record so later remove/upgrade operations never need npm registry resolution
+5. Checks installed version from `.pi/extensions/node_modules/<name>/package.json`
+6. Returns success message; restart required to load the extension
+7. If catalog install metadata is missing for a legacy entry, backend falls back to direct package-directory download from GitHub and runs `bun install` inside that add-on directory
+8. `bun add` is a last-resort fallback only for third-party catalogs that intentionally point at a public npm registry
 
 ### Add-on Manifest Format
 
@@ -172,7 +177,7 @@ Machine-readable catalog at `rcarmo/piclaw-addons/catalog.json` (v2):
   "addons": [
     {
       "slug": "autoresearch",
-      "name": "piclaw-addon-autoresearch",
+      "name": "@rcarmo/piclaw-addon-autoresearch",
       "version": "0.1.0",
       "type": "extension",
       "description": "...",
@@ -180,14 +185,15 @@ Machine-readable catalog at `rcarmo/piclaw-addons/catalog.json` (v2):
       "tags": ["experiments"],
       "skills": ["autoresearch-create"],
       "install": {
-        "kind": "npm",
-        "spec": "piclaw-addon-autoresearch@0.1.0",
-        "piSource": "npm:piclaw-addon-autoresearch@0.1.0"
+        "kind": "tarball",
+        "spec": "https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-autoresearch-0.1.0.tgz"
       }
     }
   ]
 }
 ```
+
+This is deliberate: **public GitHub Pages tarball URLs are the supported first-party install format.** Do not switch the catalog back to npm package specs.
 
 ## Turn Outcome Rendering
 
