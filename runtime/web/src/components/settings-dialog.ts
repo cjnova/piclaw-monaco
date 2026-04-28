@@ -129,7 +129,7 @@ const BUILTIN_SECTIONS = [
     { id: 'addons', label: 'Add-ons', icon: iconAddons, searchable: true, placeholder: 'Filter add-ons…', order: 90 },
 ];
 
-function SettingsDialogContent({ onClose }) {
+export function SettingsDialogContent({ onClose }) {
     perf('SettingsDialogContent-render-start');
     const [activeSection, setActiveSection] = useState('general');
     const [settingsData, setSettingsData] = useState(_settingsDataCache);
