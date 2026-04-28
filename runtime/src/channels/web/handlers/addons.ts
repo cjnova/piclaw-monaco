@@ -74,6 +74,14 @@ interface InstalledAddonWebEntry {
   url: string;
 }
 
+interface SlashCommandInvoker {
+  applySlashCommand(chatJid: string, rawText: string): Promise<{
+    status: string;
+    message?: string;
+    messages?: Array<{ text?: string; customType?: string }>;
+  }>;
+}
+
 function getWorkspaceDir(): string {
   return process.env.PICLAW_WORKSPACE || WORKSPACE_DIR;
 }
@@ -599,6 +607,64 @@ export async function handleGetAddonWebEntries(
   json: (body: unknown, status?: number) => Response,
 ): Promise<Response> {
   return json({ entries: getInstalledAddonWebEntries() });
+}
+
+function parseAddonConfigApiPath(pathname: string): { addonId: string } | null {
+  const match = /^\/agent\/addons\/api\/([^/]+)\/config$/.exec(pathname);
+  if (!match) return null;
+  const addonId = decodeURIComponent(match[1] || '').trim();
+  return addonId ? { addonId } : null;
+}
+
+function parseAddonCommandJsonPayload(
+  addonId: string,
+  result: { message?: string; messages?: Array<{ text?: string; customType?: string }> },
+): unknown {
+  const candidates = [
+    ...(Array.isArray(result.messages) ? result.messages : [])
+      .filter((message) => message?.customType === addonId)
+      .map((message) => message?.text || ''),
+    result.message || '',
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      continue;
+    }
+  }
+  throw new Error(`Add-on ${addonId} did not return valid JSON.`);
+}
+
+export async function handleAddonConfigApiRequest(
+  req: Request,
+  pathname: string,
+  json: (body: unknown, status?: number) => Response,
+  agentPool: SlashCommandInvoker,
+  chatJid = 'web:default',
+): Promise<Response | null> {
+  const parsed = parseAddonConfigApiPath(pathname);
+  if (!parsed) return null;
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405);
+  }
+
+  const slashCommand = req.method === 'GET'
+    ? `/${parsed.addonId}-config-get`
+    : `/${parsed.addonId}-config-set ${JSON.stringify(await req.json().catch(() => ({})))}`;
+
+  const result = await agentPool.applySlashCommand(chatJid, slashCommand);
+  if (result.status !== 'success') {
+    const message = String(result.message || 'Add-on command failed');
+    return json({ error: message }, /unknown extension command/i.test(message) ? 404 : 500);
+  }
+
+  try {
+    return json(parseAddonCommandJsonPayload(parsed.addonId, result));
+  } catch (error) {
+    return json({ error: String((error as Error)?.message || error) }, 502);
+  }
 }
 
 export async function handleAddonAssetRequest(

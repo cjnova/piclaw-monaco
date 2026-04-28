@@ -7,6 +7,7 @@ import { withTempWorkspaceEnv } from '../helpers.js';
 import {
   getInstalledAddonWebEntries,
   handleAddonAssetRequest,
+  handleAddonConfigApiRequest,
   handleGetAddons,
   handleRestartAddonRuntime,
   isAddonFsLockError,
@@ -291,6 +292,61 @@ test('isAddonFsLockError matches common Windows lock errors', () => {
   expect(isAddonFsLockError(busy)).toBe(true);
   expect(isAddonFsLockError(new Error('Access is denied'))).toBe(true);
   expect(isAddonFsLockError(new Error('plain failure'))).toBe(false);
+});
+
+test('handleAddonConfigApiRequest maps GET config requests to addon slash commands', async () => {
+  const invocations: Array<{ chatJid: string; rawText: string }> = [];
+  const res = await handleAddonConfigApiRequest(
+    new Request('https://example.test/agent/addons/api/observability/config'),
+    '/agent/addons/api/observability/config',
+    (body, status = 200) => new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+    {
+      async applySlashCommand(chatJid: string, rawText: string) {
+        invocations.push({ chatJid, rawText });
+        return {
+          status: 'success',
+          message: '{"enabled":true}',
+          messages: [{ customType: 'observability', text: '{"enabled":true}' }],
+        };
+      },
+    },
+    'web:test',
+  );
+  expect(res?.status).toBe(200);
+  expect(await res?.json()).toEqual({ enabled: true });
+  expect(invocations).toEqual([{ chatJid: 'web:test', rawText: '/observability-config-get' }]);
+});
+
+test('handleAddonConfigApiRequest maps POST config requests to addon slash commands', async () => {
+  const invocations: Array<{ chatJid: string; rawText: string }> = [];
+  const res = await handleAddonConfigApiRequest(
+    new Request('https://example.test/agent/addons/api/observability/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false, graphite_port: 2004 }),
+    }),
+    '/agent/addons/api/observability/config',
+    (body, status = 200) => new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+    {
+      async applySlashCommand(chatJid: string, rawText: string) {
+        invocations.push({ chatJid, rawText });
+        return {
+          status: 'success',
+          messages: [{ customType: 'observability', text: '{"ok":true,"config":{"enabled":false,"graphite_port":2004}}' }],
+        };
+      },
+    },
+    'web:test',
+  );
+  expect(res?.status).toBe(200);
+  expect(await res?.json()).toEqual({ ok: true, config: { enabled: false, graphite_port: 2004 } });
+  expect(invocations).toEqual([{ chatJid: 'web:test', rawText: '/observability-config-set {"enabled":false,"graphite_port":2004}' }]);
 });
 
 test('handleRestartAddonRuntime returns success and schedules graceful restart', async () => {

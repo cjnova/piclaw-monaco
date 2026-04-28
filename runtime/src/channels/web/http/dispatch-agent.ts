@@ -12,6 +12,7 @@ import { TOOLSETS } from "../../../extensions/tool-activation.js";
 import { getToolCapability } from "../../../extensions/tool-capabilities.js";
 import {
   handleAddonAssetRequest,
+  handleAddonConfigApiRequest,
   handleGetAddons,
   handleGetAddonWebEntries,
   handleInstallAddon,
@@ -520,6 +521,11 @@ export async function handleAgentRoutes(
 
   if ((req.method === "GET" || req.method === "HEAD") && pathname.startsWith("/agent/addons/assets/")) {
     return await handleAddonAssetRequest(req, pathname);
+  }
+
+  if ((req.method === 'GET' || req.method === 'POST') && pathname.startsWith('/agent/addons/api/')) {
+    const chatJid = url.searchParams.get('chat_jid')?.trim() || 'web:default';
+    return await handleAddonConfigApiRequest(req, pathname, (body, status) => channel.json(body, status), channel.agentPool, chatJid);
   }
 
   const route = EXACT_AGENT_ROUTES.find((candidate) => candidate.method === req.method && candidate.path === pathname);
