@@ -5,11 +5,26 @@
  * Section components live in ./settings/*.ts submodules.
  * Extension panes register via ./settings/pane-registry.ts.
  */
+
+// ── Performance logging ─────────────────────────────────────────────────────
+const _perfLog = [];
+function perf(label) { _perfLog.push({ ts: performance.now(), label }); }
+function flushPerfLog() {
+    if (!_perfLog.length) return;
+    const first = _perfLog[0].ts;
+    const lines = _perfLog.map(e => `+${(e.ts - first).toFixed(1)}ms ${e.label}`);
+    console.info('[settings-dialog perf]\n' + lines.join('\n'));
+    try { window.__piclawSettingsPerfLog = lines; } catch {}
+    _perfLog.length = 0;
+}
+
+perf('module-eval-start');
 import { html, useState, useEffect, useCallback, useRef } from '../vendor/preact-htm.js';
 import { BodyPortal } from './body-portal.js';
 import { getRegisteredSettingsPanes } from './settings/pane-registry.js';
 // General is statically imported — it's always the first visible section.
 import { GeneralSection } from './settings/general.js';
+perf('imports-done');
 
 type SettingsSectionComponent = unknown;
 type BuiltinSectionId = 'general' | 'sessions' | 'workspace' | 'providers' | 'models' | 'theme' | 'quick-actions' | 'keychain' | 'tools' | 'addons';
@@ -121,6 +136,7 @@ const BUILTIN_SECTIONS = [
 ];
 
 function SettingsDialogContent({ onClose }) {
+    perf('SettingsDialogContent-render-start');
     const [activeSection, setActiveSection] = useState('general');
     const [settingsData, setSettingsData] = useState(null);
     const [statusMessage, setStatusMessage] = useState(null);
@@ -132,6 +148,11 @@ function SettingsDialogContent({ onClose }) {
     const [layoutMode, setLayoutMode] = useState({ compact: false, narrow: false });
     const filterRef = useRef(null);
     const dialogRef = useRef(null);
+
+    useEffect(() => {
+        perf('SettingsDialogContent-mounted');
+        flushPerfLog();
+    }, []);
 
     useEffect(() => {
         const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -288,6 +309,7 @@ function SettingsDialogContent({ onClose }) {
     };
 
     const showRootLoading = !activeMeta;
+    perf('SettingsDialogContent-render-end');
 
     return html`
         <div class="settings-dialog-backdrop" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>

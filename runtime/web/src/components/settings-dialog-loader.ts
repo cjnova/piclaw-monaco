@@ -40,9 +40,11 @@ function loadSettingsDialogModule(): Promise<SettingsDialogModule> {
 
     settingsDialogLoading = true;
     notifySettingsDialogSubscribers();
+    const t0 = performance.now();
 
     settingsDialogModulePromise = import('./settings-dialog.js')
         .then((mod) => {
+            console.info(`[settings-loader] import resolved in ${(performance.now() - t0).toFixed(1)}ms`);
             settingsDialogModuleCache = mod;
             settingsDialogLoading = false;
             settingsDialogModulePromise = null;
