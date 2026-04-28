@@ -1047,6 +1047,7 @@ export class SSEClient {
             'extension_ui_status',
             'extension_ui_working',
             'extension_ui_working_indicator',
+            'extension_ui_working_visible',
             'extension_ui_widget',
             'extension_ui_title',
             'extension_ui_editor_text',

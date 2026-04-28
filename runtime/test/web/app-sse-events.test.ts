@@ -213,7 +213,7 @@ test('handleAppSseEvent clears extension working state when the turn completes',
     content: 'done',
   }, state.deps);
 
-  expect(state.getExtensionWorkingState()).toEqual({ message: null, indicator: null });
+  expect(state.getExtensionWorkingState()).toEqual({ message: null, indicator: null, visible: true });
 });
 
 test('handleAppSseEvent removes followup rows on removal events and schedules queue refresh', () => {

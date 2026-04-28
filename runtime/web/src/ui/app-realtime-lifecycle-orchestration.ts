@@ -301,7 +301,7 @@ export function useRealtimeLifecycleOrchestration(options: UseRealtimeLifecycleO
       setAgentDraft({ text: '', totalLines: 0 });
       setAgentPlan('');
       setAgentThought({ text: '', totalLines: 0 });
-      setExtensionWorkingState({ message: null, indicator: null });
+      setExtensionWorkingState({ message: null, indicator: null, visible: true });
       setPendingRequest(null);
     };
     api.finalize = () => finalizeStalledResponse();

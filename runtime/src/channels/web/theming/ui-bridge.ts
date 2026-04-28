@@ -293,7 +293,9 @@ export class UiBridge {
       getToolsExpanded: () => false,
       setToolsExpanded: () => {},
       setHiddenThinkingLabel: () => {},
-      setWorkingVisible: () => {},
+      setWorkingVisible: (visible) => {
+        this.channel.broadcastEvent("extension_ui_working_visible", { chat_jid: chatJid, visible: Boolean(visible) });
+      },
       addAutocompleteProvider: () => {},
     };
   }

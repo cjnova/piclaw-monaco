@@ -83,16 +83,18 @@ test('resolveExtensionUiWorkingIndicator maps default, hidden, and custom indica
 });
 
 test('applyExtensionUiWorkingState merges working messages and indicator updates', () => {
-  const empty = { message: null, indicator: null };
+  const empty = { message: null, indicator: null, visible: true };
 
   expect(applyExtensionUiWorkingState(empty, 'extension_ui_working', { message: 'Compacting context…' })).toEqual({
     message: 'Compacting context…',
     indicator: null,
+    visible: true,
   });
 
   expect(applyExtensionUiWorkingState({
     message: 'Compacting context…',
     indicator: null,
+    visible: true,
   }, 'extension_ui_working_indicator', { frames: ['⠋', '⠙'], interval_ms: 90 })).toEqual({
     message: 'Compacting context…',
     indicator: {
@@ -100,6 +102,7 @@ test('applyExtensionUiWorkingState merges working messages and indicator updates
       frames: ['⠋', '⠙'],
       intervalMs: 90,
     },
+    visible: true,
   });
 
   expect(applyExtensionUiWorkingState({
@@ -109,6 +112,7 @@ test('applyExtensionUiWorkingState merges working messages and indicator updates
       frames: ['⠋'],
       intervalMs: 100,
     },
+    visible: true,
   }, 'extension_ui_working', {})).toEqual({
     message: null,
     indicator: {
@@ -116,6 +120,7 @@ test('applyExtensionUiWorkingState merges working messages and indicator updates
       frames: ['⠋'],
       intervalMs: 100,
     },
+    visible: true,
   });
 
   expect(applyExtensionUiWorkingState(empty, 'extension_ui_notify', { message: 'ignore me' })).toBeUndefined();
@@ -150,6 +155,7 @@ test('applyExtensionUiWorkingState clears working state on turn end (done)', () 
   const active = {
     message: 'Compacting context…',
     indicator: { mode: 'custom' as const, frames: ['⠋', '⠙'], intervalMs: 90 },
+    visible: true,
   };
 
   // done/error status events are NOT extension_ui_* events — they go through
@@ -164,6 +170,7 @@ test('applyExtensionUiWorkingState does not handle non-extension-ui events', () 
   const active = {
     message: 'Working…',
     indicator: { mode: 'default' as const, frames: [], intervalMs: null },
+    visible: true,
   };
   // These events should return undefined — state is cleared elsewhere
   const nonUiEvents = [
@@ -179,6 +186,40 @@ test('applyExtensionUiWorkingState does not handle non-extension-ui events', () 
 test('extension_ui_status does not update working state', () => {
   // setStatus() fires extension_ui_status — it should dispatch as a browser
   // event only, not mutate extensionWorkingState (treated as secondary text).
-  const state = { message: null, indicator: null };
+  const state = { message: null, indicator: null, visible: true };
   expect(applyExtensionUiWorkingState(state, 'extension_ui_status', { text: 'SSH connected' })).toBeUndefined();
+});
+
+// ---------------------------------------------------------------------------
+// setWorkingVisible tests (Pass B — 0.70.3+ API)
+// ---------------------------------------------------------------------------
+
+test('applyExtensionUiWorkingState handles extension_ui_working_visible', () => {
+  const visible = { message: 'Working…', indicator: null, visible: true };
+
+  // Hide
+  const hidden = applyExtensionUiWorkingState(visible, 'extension_ui_working_visible', { visible: false });
+  expect(hidden).toEqual({ message: 'Working…', indicator: null, visible: false });
+
+  // Show again
+  const shown = applyExtensionUiWorkingState(hidden!, 'extension_ui_working_visible', { visible: true });
+  expect(shown).toEqual({ message: 'Working…', indicator: null, visible: true });
+
+  // No-op when already hidden
+  expect(applyExtensionUiWorkingState(hidden!, 'extension_ui_working_visible', { visible: false })).toBeUndefined();
+
+  // No-op when already visible
+  expect(applyExtensionUiWorkingState(visible, 'extension_ui_working_visible', { visible: true })).toBeUndefined();
+});
+
+test('applyExtensionUiWorkingState preserves visible through message and indicator updates', () => {
+  const hiddenState = { message: null, indicator: null, visible: false };
+
+  // Message update preserves visible: false
+  const withMessage = applyExtensionUiWorkingState(hiddenState, 'extension_ui_working', { message: 'Compacting…' });
+  expect(withMessage).toEqual({ message: 'Compacting…', indicator: null, visible: false });
+
+  // Indicator update preserves visible: false
+  const withIndicator = applyExtensionUiWorkingState(hiddenState, 'extension_ui_working_indicator', { frames: ['●'] });
+  expect(withIndicator?.visible).toBe(false);
 });

@@ -326,6 +326,44 @@ describe("smart-compaction", () => {
     ).not.toContain("/c.ts");
   });
 
+  it("compresses top-level file clusters even when one outlier breaks the global prefix", async () => {
+    (completeSimple as any).mockResolvedValueOnce({
+      content: [{ type: "text", text: "## Goal\nTest\n\n## Constraints\n## Progress\n### Done\n### In Progress\n### Blocked\n## Key Decisions\n## Next Steps\n## Critical Context" }],
+      stopReason: "end",
+    });
+
+    const prep = makePreparation(60, {
+      fileOps: {
+        read: new Set([
+          "piclaw/runtime/src/agent-control/handlers/login.ts",
+          "piclaw/runtime/src/channels/web/http/dispatch-agent.ts",
+          "piclaw/runtime/test/agent-control/agent-control-handlers.test.ts",
+          "piclaw/runtime/test/scripts/check-import-boundaries.test.ts",
+          "piclaw/runtime/web/src/components/settings/providers.ts",
+          "piclaw/scripts/check-import-boundaries.test.ts",
+          "tmp/pr474-dispatch.patch",
+        ]),
+        written: new Set<string>(),
+        edited: new Set<string>(),
+      },
+    });
+
+    const result = await handler!(
+      {
+        preparation: prep,
+        branchEntries: [],
+        signal: new AbortController().signal,
+      },
+      makeCtx(),
+    );
+
+    const readFilesBlock = result.compaction.summary.split("<read-files>")[1].split("</read-files>")[0];
+    expect(readFilesBlock).toContain("base: piclaw/");
+    expect(readFilesBlock).toContain("runtime/src/agent-control/handlers/login.ts");
+    expect(readFilesBlock).toContain("tmp/pr474-dispatch.patch");
+    expect(readFilesBlock).not.toContain("piclaw/runtime/src/agent-control/handlers/login.ts");
+  });
+
   it("falls through on LLM error", async () => {
     (completeSimple as any).mockResolvedValueOnce({
       content: [],

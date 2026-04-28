@@ -80,7 +80,7 @@ export function useMainAppSurfaceState(options: {
   const [contextUsage, setContextUsage] = useState<any>(null);
   const [extensionStatusPanels, setExtensionStatusPanels] = useState(() => new Map());
   const [pendingExtensionPanelActions, setPendingExtensionPanelActions] = useState(() => new Set());
-  const [extensionWorkingState, setExtensionWorkingState] = useState(() => ({ message: null, indicator: null }));
+  const [extensionWorkingState, setExtensionWorkingState] = useState(() => ({ message: null, indicator: null, visible: true }));
   const [followupQueueItems, setFollowupQueueItems] = useState<any[]>([]);
   const [isAgentTurnActive, setIsAgentTurnActive] = useState(false);
   const [btwSession, setBtwSession] = useState(() => loadStoredBtwSession());
