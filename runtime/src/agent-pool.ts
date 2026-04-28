@@ -71,7 +71,8 @@ import {
 import { registerExtensionKvStore } from "./extension-kv-registry.js";
 import { setSshToolHandlers } from "./extensions/ssh.js";
 import { applyLiveSshConfig, clearLiveSshConfig, hasLiveChatSshSession, resolveSshCoreConfigFromChatConfig } from "./extensions/ssh-core.js";
-import { createLogger } from "./utils/logger.js";
+import { getKeychainEntry } from "./secure/keychain.js";
+import { addLogSink, createLogger, removeLogSink } from "./utils/logger.js";
 
 const log = createLogger("agent-pool");
 
@@ -88,6 +89,19 @@ export interface AgentPoolRecoveryInstrumentationSnapshot {
   attemptsTotal: number;
   recoveredRuns: number;
   exhaustedRuns: number;
+}
+
+interface RuntimeInteropBridge {
+  getExtensionKvStore?: () => {
+    get<T = unknown>(extensionId: string, key: string, scope?: string, scopeKey?: string): T | null;
+    set(extensionId: string, key: string, value: unknown, scope?: string, scopeKey?: string): void;
+    delete(extensionId: string, key: string, scope?: string, scopeKey?: string): boolean;
+    list(extensionId: string, prefix?: string, scope?: string, scopeKey?: string): string[];
+    clear(extensionId: string, scope?: string, scopeKey?: string): number;
+  };
+  addLogSink?: typeof addLogSink;
+  removeLogSink?: typeof removeLogSink;
+  getKeychainEntry?: typeof getKeychainEntry;
 }
 
 export interface AgentPoolMemoryInstrumentationSnapshot {
@@ -246,6 +260,17 @@ export class AgentPool {
       query: extensionKvQuery,
       clear: extensionKvClear,
     });
+    const runtimeInterop = ((globalThis as { __piclawRuntimeInterop?: RuntimeInteropBridge }).__piclawRuntimeInterop ||= {});
+    runtimeInterop.getExtensionKvStore = () => ({
+      get: extensionKvGet,
+      set: extensionKvSet,
+      delete: extensionKvDelete,
+      list: extensionKvList,
+      clear: extensionKvClear,
+    });
+    runtimeInterop.addLogSink = addLogSink;
+    runtimeInterop.removeLogSink = removeLogSink;
+    runtimeInterop.getKeychainEntry = getKeychainEntry;
     try { migrateProxmoxPortainerToKv(); } catch (e) { void e; /* migration is best-effort */ }
     mkdirSync(SESSIONS_DIR, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
