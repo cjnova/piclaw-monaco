@@ -69,14 +69,8 @@ function subscribeSettingsDialogLoader(callback: (snapshot: LoaderSnapshot) => v
 function requestOpenSettingsDialog(): void {
     settingsDialogPendingOpen = true;
     notifySettingsDialogSubscribers();
-    // Double-raf ensures the loading shell actually paints before the heavy
-    // module evaluation blocks the main thread.
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            loadSettingsDialogModule().catch((error) => {
-                console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
-            });
-        });
+    loadSettingsDialogModule().catch((error) => {
+        console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
     });
 }
 

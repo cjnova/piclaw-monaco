@@ -8,6 +8,8 @@
 import { html, useState, useEffect, useCallback, useRef } from '../vendor/preact-htm.js';
 import { BodyPortal } from './body-portal.js';
 import { getRegisteredSettingsPanes } from './settings/pane-registry.js';
+// General is statically imported — it's always the first visible section.
+import { GeneralSection } from './settings/general.js';
 
 type SettingsSectionComponent = unknown;
 type BuiltinSectionId = 'general' | 'sessions' | 'workspace' | 'providers' | 'models' | 'theme' | 'quick-actions' | 'keychain' | 'tools' | 'addons';
@@ -17,8 +19,11 @@ const builtinSectionLoadPromiseCache = new Map<BuiltinSectionId, Promise<Setting
 let extensionSettingsPanesReady = false;
 let extensionSettingsPanesPromise: Promise<void> | null = null;
 
+// General is pre-cached; everything else loads on demand when the user clicks the nav.
+builtinSectionComponentCache.set('general', GeneralSection);
+
 const BUILTIN_SECTION_LOADERS: Record<BuiltinSectionId, () => Promise<SettingsSectionComponent>> = {
-    general: () => import('./settings/general.js').then(mod => mod.GeneralSection),
+    general: () => Promise.resolve(GeneralSection),
     sessions: () => import('./settings/sessions.js').then(mod => mod.SessionsSection),
     workspace: () => import('./settings/workspace.js').then(mod => mod.WorkspaceSection),
     providers: () => import('./settings/providers.js').then(mod => mod.ProvidersSection),
@@ -30,6 +35,7 @@ const BUILTIN_SECTION_LOADERS: Record<BuiltinSectionId, () => Promise<SettingsSe
     addons: () => import('./settings/addons.js').then(mod => mod.AddonsSection),
 };
 
+// Extension panes are loaded lazily only when the user opens those sections.
 const EXTENSION_SETTINGS_PANE_LOADERS = [
     () => import('./settings/editor-settings.js'),
     () => import('./settings/kanban-settings.js'),
@@ -134,18 +140,25 @@ function SettingsDialogContent({ onClose }) {
     }, [onClose]);
 
     useEffect(() => {
-        // Defer extension pane loading so the dialog shell renders first
-        const timer = setTimeout(() => {
-            ensureExtensionSettingsPanesLoaded()
-                .then(() => {
-                    setExtensionPanesLoaded(true);
-                    forceUpdate(n => n + 1);
-                })
-                .catch((error) => {
-                    console.error('[settings-dialog] Failed to register extension settings panes.', error);
-                });
-        }, 0);
-        return () => clearTimeout(timer);
+        // Extension panes load in the background after the dialog is visible.
+        // Use double-rAF to guarantee the shell + General section paint first.
+        let cancelled = false;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (cancelled) return;
+                ensureExtensionSettingsPanesLoaded()
+                    .then(() => {
+                        if (!cancelled) {
+                            setExtensionPanesLoaded(true);
+                            forceUpdate(n => n + 1);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('[settings-dialog] Failed to register extension settings panes.', error);
+                    });
+            });
+        });
+        return () => { cancelled = true; };
     }, []);
 
     // Re-render when extension panes register
@@ -274,7 +287,7 @@ function SettingsDialogContent({ onClose }) {
         }
     };
 
-    const showRootLoading = settingsData === null || !activeMeta;
+    const showRootLoading = !activeMeta;
 
     return html`
         <div class="settings-dialog-backdrop" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
