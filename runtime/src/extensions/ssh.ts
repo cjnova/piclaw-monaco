@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 import { getChatJid } from "../core/chat-context.js";
 import { registerToolStatusHintProvider } from "../tool-status-hints.js";

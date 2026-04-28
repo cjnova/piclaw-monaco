@@ -1,7 +1,7 @@
 /**
  * internal-tools – registers list_tools for quick tool discovery.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type {
   AgentToolResult,
   ExtensionAPI,

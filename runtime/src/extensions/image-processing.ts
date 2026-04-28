@@ -6,7 +6,7 @@
  *
  * Preserves transparency by default. Outputs go to the workspace.
  */
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type {
   AgentToolResult,
   ExtensionAPI,

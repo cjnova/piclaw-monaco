@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { registerToolStatusHintProvider } from "../../../src/tool-status-hints.js";
 import { createRequire } from "node:module";
 import { dirname, extname, resolve, basename, join } from "node:path";

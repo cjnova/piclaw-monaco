@@ -13,7 +13,7 @@
  * lose the agent's response.
  */
 
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { markPendingShutdown } from "../runtime/shutdown-registry.js";
 import { createLogger } from "../utils/logger.js";

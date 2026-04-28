@@ -4,7 +4,7 @@
  * The agent always provides the HTML. The widget runs in a sandboxed iframe.
  * Interactive widgets get `window.piclawWidget` with bridge methods.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { getChatJid } from "../core/chat-context.js";
 import { createGeneratedWidgetBlock } from "../channels/web/dashboard-widget.js";

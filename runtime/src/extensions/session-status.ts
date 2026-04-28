@@ -14,7 +14,7 @@
  */
 
 import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 // ── Session isolation setting ────────────────────────────────────
 

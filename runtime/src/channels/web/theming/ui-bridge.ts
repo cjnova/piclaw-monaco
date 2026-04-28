@@ -293,6 +293,8 @@ export class UiBridge {
       getToolsExpanded: () => false,
       setToolsExpanded: () => {},
       setHiddenThinkingLabel: () => {},
+      setWorkingVisible: () => {},
+      addAutocompleteProvider: () => {},
     };
   }
 

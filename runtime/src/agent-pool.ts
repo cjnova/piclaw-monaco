@@ -282,7 +282,7 @@ export class AgentPool {
 
   private applyRateLimitRetryDefaults(): void {
     const settingsManager = this.settingsManager as SettingsManager & {
-      getRetrySettings?: () => { enabled: boolean; maxRetries: number; baseDelayMs: number; maxDelayMs: number };
+      getRetrySettings?: () => { enabled: boolean; maxRetries: number; baseDelayMs: number };
     };
     if (typeof settingsManager.getRetrySettings !== "function") return;
     const originalGetRetrySettings = settingsManager.getRetrySettings.bind(settingsManager);
