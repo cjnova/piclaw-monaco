@@ -86,8 +86,12 @@ export function SettingsDialogLoader() {
     useEffect(() => subscribeSettingsDialogLoader(setSnapshot), []);
     useEffect(() => {
         const handleOpenSettings = () => {
+            settingsDialogPendingOpen = true;
+            notifySettingsDialogSubscribers();
             if (!settingsDialogModuleCache) {
-                requestOpenSettingsDialog();
+                loadSettingsDialogModule().catch((error) => {
+                    console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
+                });
             }
         };
         window.addEventListener('piclaw:open-settings', handleOpenSettings);
