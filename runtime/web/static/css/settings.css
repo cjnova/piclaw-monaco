@@ -862,13 +862,9 @@
 }
 
 .settings-loading-pane {
-    min-height: 200px;
+    min-height: 160px;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 12px;
 }
 
 .settings-dialog-backdrop-loader {
@@ -2016,11 +2012,4 @@
     font-size: 0.82em;
     color: var(--error-color, #e55);
     width: 100%;
-}
-
-/* Large spinner for section loading */
-.settings-spinner-lg {
-    width: 28px !important;
-    height: 28px !important;
-    border-width: 3px !important;
 }
