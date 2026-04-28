@@ -14,6 +14,7 @@ export interface ExtensionUiWorkingIndicatorState {
 export interface ExtensionUiWorkingState {
   message: string | null;
   indicator: ExtensionUiWorkingIndicatorState | null;
+  visible: boolean;
 }
 
 export interface StatusPanelWidgetEventContext {
@@ -83,10 +84,17 @@ export function applyExtensionUiWorkingState(
   eventType: string | null | undefined,
   payload: Record<string, unknown> | null | undefined,
 ): ExtensionUiWorkingState | undefined {
+  if (eventType === 'extension_ui_working_visible') {
+    const visible = payload?.visible !== false;
+    if (visible === previous.visible) return undefined;
+    return { ...previous, visible };
+  }
+
   if (eventType === 'extension_ui_working') {
     return {
       message: typeof payload?.message === 'string' && payload.message.trim() ? payload.message.trim() : null,
       indicator: previous.indicator,
+      visible: previous.visible,
     };
   }
 
@@ -95,6 +103,7 @@ export function applyExtensionUiWorkingState(
   return {
     message: previous.message,
     indicator,
+    visible: previous.visible,
   };
 }
 

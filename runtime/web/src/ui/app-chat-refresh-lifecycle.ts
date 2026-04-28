@@ -283,7 +283,7 @@ export function useChatRefreshLifecycle(options: UseChatRefreshLifecycleOptions)
     setActiveModelUsage(null);
     setHasLoadedAgentModels(false);
     setAgentModelsPayload(null);
-    setExtensionWorkingState({ message: null, indicator: null });
+    setExtensionWorkingState({ message: null, indicator: null, visible: true });
 
     // Restore the last known context usage for this chat from localStorage
     // so the context indicator shows immediately without waiting for the API.

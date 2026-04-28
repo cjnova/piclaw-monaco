@@ -162,6 +162,16 @@ export function isComposeSubmitAbortMode(mode) {
 }
 
 export function resolveComposeExtensionWorkingDisplay(workingState, frameIndex = 0) {
+    // Extension can hide the entire working loader row via setWorkingVisible(false)
+    if (workingState?.visible === false) {
+        return {
+            visible: false,
+            title: '',
+            indicatorText: null,
+            animateDot: false,
+        };
+    }
+
     const message = typeof workingState?.message === 'string' && workingState.message.trim()
         ? workingState.message.trim()
         : null;

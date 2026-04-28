@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-28T18:00:33.672Z",
+  "generated_at": "2026-04-28T22:00:04.952Z",
   "state": "open",
   "include_archived": false,
   "include_forks": false,
@@ -9,9 +9,9 @@
   "totals": {
     "repos_scanned": 21,
     "repos_with_items": 3,
-    "total_items": 5,
-    "total_issues": 4,
-    "total_pull_requests": 1,
+    "total_items": 3,
+    "total_issues": 3,
+    "total_pull_requests": 0,
     "repos_with_star_changes": 1,
     "repos_with_star_gains": 1
   },
@@ -24,9 +24,9 @@
       "fork": false,
       "default_branch": "main",
       "stars": 597,
-      "issues": 2,
-      "pull_requests": 1,
-      "total": 3
+      "issues": 1,
+      "pull_requests": 0,
+      "total": 1
     },
     {
       "full_name": "rcarmo/piclaw-addons",
@@ -94,28 +94,6 @@
       "body_preview": "### Problem When installing an extension addon via the web Settings UI, `handleInstallAddon` runs `bun add --force <spec>` which creates a full `node_modules` …"
     },
     {
-      "repo": "rcarmo/piclaw",
-      "repo_url": "https://github.com/rcarmo/piclaw",
-      "repo_private": false,
-      "repo_archived": false,
-      "type": "issue",
-      "number": 381,
-      "title": "Adopt pi-coding-agent 0.70.x and apply Piclaw-side follow-ups",
-      "state": "open",
-      "draft": false,
-      "url": "https://github.com/rcarmo/piclaw/issues/381",
-      "author": "piclaw-bot",
-      "created_at": "2026-04-23T15:56:50Z",
-      "updated_at": "2026-04-28T07:46:31Z",
-      "labels": [
-        "area:extensions",
-        "area:runtime",
-        "priority:high"
-      ],
-      "assignees": [],
-      "body_preview": "# Adopt pi-coding-agent 0.70.x and apply Piclaw-side follow-ups ## Summary Piclaw is still pinned to `@mariozechner/pi-coding-agent@0.67.6`, while upstream has…"
-    },
-    {
       "repo": "rcarmo/pve-microvm",
       "repo_url": "https://github.com/rcarmo/pve-microvm",
       "repo_private": false,
@@ -132,26 +110,6 @@
       "labels": [],
       "assignees": [],
       "body_preview": "Hello o/ Could you add SmolBSD to the test matrix? https://github.com/NetBSDfr/smolBSD It is a minimal NetBSD system with very fast boot times (~10ms in best c…"
-    },
-    {
-      "repo": "rcarmo/piclaw",
-      "repo_url": "https://github.com/rcarmo/piclaw",
-      "repo_private": false,
-      "repo_archived": false,
-      "type": "pull_request",
-      "number": 457,
-      "title": "[codex] Fix provider setup card spacing",
-      "state": "open",
-      "draft": true,
-      "url": "https://github.com/rcarmo/piclaw/pull/457",
-      "author": "CodeEagle",
-      "created_at": "2026-04-27T10:24:52Z",
-      "updated_at": "2026-04-27T18:41:31Z",
-      "labels": [],
-      "assignees": [],
-      "body_preview": "## Summary - keep provider card headers and expanded setup forms on separate rows - make the expanded setup pane fill the card width so it no longer collides w…",
-      "head_ref": "codex/fix-provider-setup-spacing",
-      "base_ref": "main"
     }
   ]
 }

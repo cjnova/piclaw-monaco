@@ -259,7 +259,7 @@ export function handleAppSseEvent(
     setAgentDraft({ text: '', totalLines: 0 });
     setAgentPlan('');
     setAgentThought({ text: '', totalLines: 0 });
-    setExtensionWorkingState({ message: null, indicator: null });
+    setExtensionWorkingState({ message: null, indicator: null, visible: true });
     setPendingRequest(null);
     pendingRequestRef.current = null;
     clearAgentRunState();
@@ -346,7 +346,7 @@ export function handleAppSseEvent(
       setAgentDraft({ text: '', totalLines: 0 });
       setAgentPlan('');
       setAgentThought({ text: '', totalLines: 0 });
-      setExtensionWorkingState({ message: null, indicator: null });
+      setExtensionWorkingState({ message: null, indicator: null, visible: true });
       setPendingRequest(null);
       if (data.type === 'error') {
         setAgentStatus({ type: 'error', title: data.title || 'Agent error' });
@@ -560,7 +560,7 @@ export function handleAppSseEvent(
   const onMainTimeline = isMainTimelineView(viewStateRef.current);
   if (eventType === 'agent_response') {
     if (!isCurrentChatEvent) return;
-    setExtensionWorkingState({ message: null, indicator: null });
+    setExtensionWorkingState({ message: null, indicator: null, visible: true });
     removeStalledPost();
     lastAgentResponseRef.current = {
       post: data,

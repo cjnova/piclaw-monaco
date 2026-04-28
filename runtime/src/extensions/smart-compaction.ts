@@ -140,38 +140,46 @@ const JUNK_PATH_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Compress a list of file paths by factoring out the longest common prefix
- * and grouping by directory. Saves tokens when paths share deep prefixes.
- *
- * Example:
- *   /workspace/piclaw/runtime/web/src/ui/app.ts
- *   /workspace/piclaw/runtime/web/src/ui/theme.ts
- *   /workspace/piclaw/runtime/web/src/components/post.ts
- *   /workspace/piclaw/runtime/test/web/app.test.ts
- * →
- *   base: /workspace/piclaw/runtime/
- *   web/src/ui/: app.ts, theme.ts
- *   web/src/components/: post.ts
- *   test/web/: app.test.ts
+ * Find the longest common directory prefix for a set of paths.
+ * Returns a prefix ending in `/`, or an empty string when no shared
+ * directory prefix exists.
  */
-function compressFilePaths(paths: string[]): string {
-  if (paths.length === 0) return "(none)";
-  if (paths.length <= 3) return paths.join("\n");
-
-  // Find longest common prefix ending at a /
+function findCommonDirectoryPrefix(paths: string[]): string {
+  if (paths.length === 0) return "";
   let prefix = paths[0];
   for (let i = 1; i < paths.length; i++) {
     while (!paths[i].startsWith(prefix)) {
       const slash = prefix.lastIndexOf("/", prefix.length - 2);
-      if (slash < 0) { prefix = ""; break; }
+      if (slash < 0) return "";
       prefix = prefix.slice(0, slash + 1);
     }
-    if (!prefix) break;
   }
+  return prefix;
+}
 
-  // Group by directory relative to prefix
+/**
+ * Group paths by their top-level root so unrelated outliers (`tmp/...`)
+ * do not destroy compression for the main cluster (`piclaw/...`).
+ */
+function topLevelPathKey(path: string): string {
+  if (!path.includes("/")) return "";
+  if (path.startsWith("/")) {
+    const trimmed = path.slice(1);
+    const slash = trimmed.indexOf("/");
+    return slash >= 0 ? `/${trimmed.slice(0, slash + 1)}` : path;
+  }
+  const slash = path.indexOf("/");
+  return slash >= 0 ? path.slice(0, slash + 1) : "";
+}
+
+/** Render a single compressed path cluster. */
+function renderCompressedPathCluster(paths: string[]): string {
+  if (paths.length === 0) return "(none)";
+  const sorted = [...paths].sort();
+  const prefix = findCommonDirectoryPrefix(sorted);
+
   const groups = new Map<string, string[]>();
-  for (const p of paths) {
+  for (const p of sorted) {
     const rel = prefix ? p.slice(prefix.length) : p;
     const lastSlash = rel.lastIndexOf("/");
     const dir = lastSlash >= 0 ? rel.slice(0, lastSlash + 1) : "";
@@ -188,6 +196,50 @@ function compressFilePaths(paths: string[]): string {
     } else {
       lines.push(`${dir || "./"}: ${files.join(", ")}`);
     }
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Compress a list of file paths by factoring out common prefixes and,
+ * when needed, compressing multiple top-level clusters independently.
+ *
+ * Example:
+ *   piclaw/runtime/web/src/ui/app.ts
+ *   piclaw/runtime/web/src/ui/theme.ts
+ *   piclaw/runtime/test/web/app.test.ts
+ *   tmp/report.patch
+ * →
+ *   base: piclaw/runtime/
+ *   web/src/ui/: app.ts, theme.ts
+ *   test/web/: app.test.ts
+ *   tmp/report.patch
+ */
+function compressFilePaths(paths: string[]): string {
+  if (paths.length === 0) return "(none)";
+  const uniqueSorted = [...new Set(paths)].sort();
+  if (uniqueSorted.length <= 3) return uniqueSorted.join("\n");
+
+  const globalPrefix = findCommonDirectoryPrefix(uniqueSorted);
+  if (globalPrefix) return renderCompressedPathCluster(uniqueSorted);
+
+  const clusters = new Map<string, string[]>();
+  for (const path of uniqueSorted) {
+    const key = topLevelPathKey(path);
+    if (!clusters.has(key)) clusters.set(key, []);
+    clusters.get(key)!.push(path);
+  }
+
+  if (clusters.size <= 1) return renderCompressedPathCluster(uniqueSorted);
+
+  const lines: string[] = [];
+  for (const key of [...clusters.keys()].sort()) {
+    const cluster = clusters.get(key)!;
+    if (cluster.length === 1) {
+      lines.push(cluster[0]);
+      continue;
+    }
+    lines.push(renderCompressedPathCluster(cluster));
   }
   return lines.join("\n");
 }

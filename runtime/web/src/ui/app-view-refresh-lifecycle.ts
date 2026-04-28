@@ -29,7 +29,7 @@ export function resetExtensionPanelStateForChat(options: {
 
   setExtensionStatusPanels(new Map());
   setPendingExtensionPanelActions(new Set());
-  setExtensionWorkingState({ message: null, indicator: null });
+  setExtensionWorkingState({ message: null, indicator: null, visible: true });
 }
 
 export function hydrateThreadStateAfterTimelineLoad(options: {

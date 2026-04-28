@@ -192,7 +192,7 @@ export function composeMainAppLifecycleCompositionOptions(options: UseMainAppOrc
     // state (working message + indicator) which the stall finalizer doesn't
     // reach through the normal SSE done/error path.
     finalizeStalledResponse: () => {
-      setters.setExtensionWorkingState({ message: null, indicator: null });
+      setters.setExtensionWorkingState({ message: null, indicator: null, visible: true });
       interaction.recoveryCallbacks.finalizeStalledResponse();
     },
     connectionStatus: shellState.connectionStatus,
