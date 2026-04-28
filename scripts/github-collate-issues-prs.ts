@@ -1040,4 +1040,6 @@ async function main(): Promise<void> {
   }, null, 2));
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}
