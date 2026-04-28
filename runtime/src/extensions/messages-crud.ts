@@ -1,7 +1,7 @@
 /**
  * messages-crud – unified message CRUD tool for internal agent operations.
  */
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 
 import {

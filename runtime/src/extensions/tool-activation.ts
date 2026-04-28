@@ -3,7 +3,7 @@
  * enable specific tools on demand.
  */
 import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { getToolActivationConfig } from "../core/config.js";
 import { getToolCapability } from "./tool-capabilities.js";
 

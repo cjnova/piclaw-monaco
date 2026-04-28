@@ -5,7 +5,7 @@
  * message through the normal inbound-message path for the target chat so queue
  * semantics, follow-up handling, and agent execution remain unchanged.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { getChatJid } from "../core/chat-context.js";
 

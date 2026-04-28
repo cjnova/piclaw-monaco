@@ -1,7 +1,7 @@
 /**
  * sql-introspect – registers a read-only SQL tool for database introspection.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 
 import { getDb } from "../db.js";
