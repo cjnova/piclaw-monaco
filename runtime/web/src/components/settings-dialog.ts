@@ -81,7 +81,7 @@ function ensureExtensionSettingsPanesLoaded() {
 function renderSectionLoading(label = 'Loading…') {
     return html`
         <div class="settings-loading settings-loading-pane" role="status" aria-live="polite">
-            <span class="settings-spinner"></span>
+            <span class="settings-spinner settings-spinner-lg"></span>
             <span>${label}</span>
         </div>
     `;
