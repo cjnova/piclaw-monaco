@@ -53,6 +53,7 @@ import { exitProcess } from "./exit-process.js";
 import { imageProcessing } from "./image-processing.js";
 import { remotePair } from "./remote-pair.js";
 import { sessionStatus } from "./session-status.js";
+import { providerResponseDiagnostics } from "./provider-response-diagnostics.js";
 
 /** Build the built-in extension factory list used for session creation. */
 export function createBuiltinExtensionFactories(options?: {
@@ -81,6 +82,7 @@ export function createBuiltinExtensionFactories(options?: {
     imageProcessing,
     remotePair,
     sessionStatus,
+    providerResponseDiagnostics,
   ];
 }
 
