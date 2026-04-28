@@ -134,14 +134,18 @@ function SettingsDialogContent({ onClose }) {
     }, [onClose]);
 
     useEffect(() => {
-        ensureExtensionSettingsPanesLoaded()
-            .then(() => {
-                setExtensionPanesLoaded(true);
-                forceUpdate(n => n + 1);
-            })
-            .catch((error) => {
-                console.error('[settings-dialog] Failed to register extension settings panes.', error);
-            });
+        // Defer extension pane loading so the dialog shell renders first
+        const timer = setTimeout(() => {
+            ensureExtensionSettingsPanesLoaded()
+                .then(() => {
+                    setExtensionPanesLoaded(true);
+                    forceUpdate(n => n + 1);
+                })
+                .catch((error) => {
+                    console.error('[settings-dialog] Failed to register extension settings panes.', error);
+                });
+        }, 0);
+        return () => clearTimeout(timer);
     }, []);
 
     // Re-render when extension panes register

@@ -69,9 +69,13 @@ function subscribeSettingsDialogLoader(callback: (snapshot: LoaderSnapshot) => v
 function requestOpenSettingsDialog(): void {
     settingsDialogPendingOpen = true;
     notifySettingsDialogSubscribers();
-    loadSettingsDialogModule().catch((error) => {
-        console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
-    });
+    // Defer the heavy module load to the next frame so the loading shell
+    // renders first and the user sees immediate feedback.
+    setTimeout(() => {
+        loadSettingsDialogModule().catch((error) => {
+            console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
+        });
+    }, 0);
 }
 
 export function openSettingsDialog() {
