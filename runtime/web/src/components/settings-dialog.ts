@@ -39,8 +39,6 @@ type BuiltinSectionId = 'general' | 'sessions' | 'workspace' | 'providers' | 'mo
 
 const builtinSectionComponentCache = new Map<BuiltinSectionId, SettingsSectionComponent>();
 const builtinSectionLoadPromiseCache = new Map<BuiltinSectionId, Promise<SettingsSectionComponent>>();
-let extensionSettingsPanesReady = false;
-let extensionSettingsPanesPromise: Promise<void> | null = null;
 
 // General is pre-cached; everything else loads on demand when the user clicks the nav.
 builtinSectionComponentCache.set('general', GeneralSection);
@@ -59,12 +57,14 @@ const BUILTIN_SECTION_LOADERS: Record<BuiltinSectionId, () => Promise<SettingsSe
 };
 
 // Extension panes are loaded lazily only when the user opens those sections.
-const EXTENSION_SETTINGS_PANE_LOADERS = [
-    () => import('./settings/editor-settings.js'),
-    () => import('./settings/kanban-settings.js'),
-    () => import('./settings/mindmap-settings.js'),
-    () => import('./settings/developer-settings.js'),
-];
+// Extension pane loaders — each loads ONE module on demand, not all at once.
+const EXTENSION_SETTINGS_PANE_LOADERS_MAP: Record<string, () => Promise<void>> = {
+    'editor-settings': () => import('./settings/editor-settings.js').then(() => {}),
+    'kanban-settings': () => import('./settings/kanban-settings.js').then(() => {}),
+    'mindmap-settings': () => import('./settings/mindmap-settings.js').then(() => {}),
+    'developer': () => import('./settings/developer-settings.js').then(() => {}),
+};
+const loadedExtensionPanes = new Set<string>();
 
 function loadBuiltinSection(id) {
     const cached = builtinSectionComponentCache.get(id);
@@ -88,24 +88,7 @@ function loadBuiltinSection(id) {
     return promise;
 }
 
-function ensureExtensionSettingsPanesLoaded() {
-    if (extensionSettingsPanesReady) return Promise.resolve();
-    if (extensionSettingsPanesPromise) return extensionSettingsPanesPromise;
-
-    extensionSettingsPanesPromise = Promise.all(
-        EXTENSION_SETTINGS_PANE_LOADERS.map((load) => load()),
-    )
-        .then(() => {
-            extensionSettingsPanesReady = true;
-            extensionSettingsPanesPromise = null;
-        })
-        .catch((error) => {
-            extensionSettingsPanesPromise = null;
-            throw error;
-        });
-
-    return extensionSettingsPanesPromise;
-}
+// Extension panes are loaded individually on demand — see the nav click handler.
 
 function renderSectionLoading(label = 'Loading…') {
     return html`
@@ -151,8 +134,8 @@ function SettingsDialogContent({ onClose }) {
     const [filter, setFilter] = useState('');
     const [, forceUpdate] = useState(0);
     const [builtinSectionComponents, setBuiltinSectionComponents] = useState(() => Object.fromEntries(builtinSectionComponentCache.entries()));
-    const [loadingSectionId, setLoadingSectionId] = useState('general');
-    const [extensionPanesLoaded, setExtensionPanesLoaded] = useState(extensionSettingsPanesReady);
+    const [loadingSectionId, setLoadingSectionId] = useState(null);
+
     const [layoutMode, setLayoutMode] = useState({ compact: false, narrow: false });
     const filterRef = useRef(null);
     const dialogRef = useRef(null);
@@ -167,28 +150,6 @@ function SettingsDialogContent({ onClose }) {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [onClose]);
-
-    useEffect(() => {
-        // Extension panes load in the background after the dialog is visible.
-        // Use double-rAF to guarantee the shell + General section paint first.
-        let cancelled = false;
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (cancelled) return;
-                ensureExtensionSettingsPanesLoaded()
-                    .then(() => {
-                        if (!cancelled) {
-                            setExtensionPanesLoaded(true);
-                            forceUpdate(n => n + 1);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('[settings-dialog] Failed to register extension settings panes.', error);
-                    });
-            });
-        });
-        return () => { cancelled = true; };
-    }, []);
 
     // Re-render when extension panes register
     useEffect(() => {
@@ -227,7 +188,7 @@ function SettingsDialogContent({ onClose }) {
         return () => window.removeEventListener('resize', updateLayoutMode);
     }, []);
 
-    const extensionPanes = extensionPanesLoaded ? getRegisteredSettingsPanes() : [];
+    const extensionPanes = getRegisteredSettingsPanes();
     const allSections = [
         ...BUILTIN_SECTIONS,
         ...extensionPanes.map(p => ({
@@ -283,6 +244,12 @@ function SettingsDialogContent({ onClose }) {
     const switchSection = useCallback((id) => {
         setActiveSection(id);
         setFilter('');
+        // Lazy-load extension pane module if not yet loaded
+        const extLoader = EXTENSION_SETTINGS_PANE_LOADERS_MAP[id];
+        if (extLoader && !loadedExtensionPanes.has(id)) {
+            loadedExtensionPanes.add(id);
+            extLoader().then(() => forceUpdate(n => n + 1)).catch(() => {});
+        }
     }, []);
 
     const mergeSettingsData = useCallback((patch) => {
