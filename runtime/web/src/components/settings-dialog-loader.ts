@@ -69,13 +69,15 @@ function subscribeSettingsDialogLoader(callback: (snapshot: LoaderSnapshot) => v
 function requestOpenSettingsDialog(): void {
     settingsDialogPendingOpen = true;
     notifySettingsDialogSubscribers();
-    // Defer the heavy module load to the next frame so the loading shell
-    // renders first and the user sees immediate feedback.
-    setTimeout(() => {
-        loadSettingsDialogModule().catch((error) => {
-            console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
+    // Double-raf ensures the loading shell actually paints before the heavy
+    // module evaluation blocks the main thread.
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            loadSettingsDialogModule().catch((error) => {
+                console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
+            });
         });
-    }, 0);
+    });
 }
 
 export function openSettingsDialog() {
