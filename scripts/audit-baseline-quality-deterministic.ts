@@ -275,6 +275,7 @@ const groupDefinitions: GroupDefinition[] = [
         "extension-routes.test.ts",
         "oobe-instance-state.test.ts",
         "post-handler-resume.test.ts",
+        "dispatch-agent-provider-settings.test.ts",
         "manifest.test.ts",
         "server-lifecycle-gateway-service.test.ts",
         "sse-hub.test.ts",
@@ -344,7 +345,7 @@ const groupDefinitions: GroupDefinition[] = [
     id: "extensions",
     label: "extensions",
     notes: "Built-in tools, skills, adaptive cards, workspace search, and compaction helpers.",
-    match: (relativePath) => relativePath.startsWith("extensions/"),
+    match: (relativePath) => relativePath.startsWith("extensions/") || relativePath.startsWith("addons/"),
   },
   {
     id: "runtime",

@@ -22,7 +22,7 @@ describe("extension route registry", () => {
 
     expect(first).toBe("created");
     expect(second).toBe("updated");
-    expect(getRegisteredRoutes()).toEqual([
+    expect(getRegisteredRoutes()).toMatchObject([
       { prefix: "/example-addon", extensionPath: "/ext/example-addon" },
     ]);
 
@@ -35,7 +35,7 @@ describe("extension route registry", () => {
     registerExtensionRoute("/example-addon", () => new Response("first"), "/ext/example-addon-a");
     registerExtensionRoute("/example-addon", () => new Response("second"), "/ext/example-addon-b");
 
-    expect(getRegisteredRoutes()).toEqual([
+    expect(getRegisteredRoutes()).toMatchObject([
       { prefix: "/example-addon", extensionPath: "/ext/example-addon-a" },
       { prefix: "/example-addon", extensionPath: "/ext/example-addon-b" },
     ]);

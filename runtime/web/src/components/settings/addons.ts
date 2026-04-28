@@ -105,7 +105,7 @@ export function AddonsSection({ setStatus, filter = '' }) {
                             setStatus?.('Restart complete \u2014 add-ons refreshed.', 'success');
                             return;
                         }
-                    } catch { /* backend not ready yet */ }
+                    } catch (e) { void e; /* backend not ready yet */ }
                 }
                 setBusy(null);
                 setStatus?.('Backend did not return in time. Reload the page manually.', 'warning');

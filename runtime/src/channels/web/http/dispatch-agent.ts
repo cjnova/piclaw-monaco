@@ -465,7 +465,7 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
             try {
               const { readFileSync } = await import("node:fs");
               expectedKey = readFileSync(keyFile, "utf8").trim();
-            } catch { /* ignore */ }
+            } catch (e) { void e; }
           }
           if (!expectedKey) {
             return channel.json({ error: "Keychain master key not configured on server." }, 500);

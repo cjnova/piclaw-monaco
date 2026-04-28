@@ -100,7 +100,7 @@ export async function initializeAppShellRuntime(): Promise<void> {
       const preactHtm = await import('../vendor/preact-htm.js');
       (runtimeWindow as any).__piclawPreactHtm = preactHtm;
       (runtimeWindow as any).__piclawPreact = preactHtm;
-    } catch { /* best effort */ }
+    } catch (e) { void e; /* best effort */ }
   }
   registerAppPaneExtensions();
   await loadInstalledAddonWebEntries(runtimeWindow);

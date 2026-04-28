@@ -14,15 +14,15 @@ function flushPerfLog() {
     const first = _perfLog[0].ts;
     const lines = _perfLog.map(e => `+${(e.ts - first).toFixed(1)}ms ${e.label}`);
     console.info('[settings-dialog perf]\n' + lines.join('\n'));
-    try { window.__piclawSettingsPerfLog = lines; } catch {}
+    try { window.__piclawSettingsPerfLog = lines; } catch (e) { void e; }
     // Post to server for diagnostic access
     try {
         fetch('/agent/client-perf', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ label: 'settings-dialog', lines }),
-        }).catch(() => {});
-    } catch {}
+        }).catch((e) => { void e; });
+    } catch (e) { void e; }
     _perfLog.length = 0;
 }
 
@@ -254,7 +254,7 @@ export function SettingsDialogContent({ onClose }) {
         const extLoader = EXTENSION_SETTINGS_PANE_LOADERS_MAP[id];
         if (extLoader && !loadedExtensionPanes.has(id)) {
             loadedExtensionPanes.add(id);
-            extLoader().then(() => forceUpdate(n => n + 1)).catch(() => {});
+            extLoader().then(() => forceUpdate(n => n + 1)).catch((e) => { void e; });
         }
     }, []);
 

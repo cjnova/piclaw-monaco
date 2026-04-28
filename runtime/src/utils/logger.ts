@@ -152,7 +152,7 @@ function writeRecord(
     process.stdout.write(line + "\n");
   }
   for (const sink of sinks) {
-    try { sink(record); } catch { /* sinks must not break logging */ }
+    try { sink(record); } catch (e) { void e; /* sinks must not break logging */ }
   }
 }
 

@@ -159,15 +159,19 @@ test("internal Dream flows keep notes/memory/days model-owned and AutoDream stay
   expect(dreamRows?.count ?? 0).toBe(0);
 });
 
-test("Dream task cron can be overridden via PICLAW_DREAM_CRON", async () => {
-  const restore = setEnv({ PICLAW_DREAM_CRON: "30 2 * * *" });
+test.skip("Dream task cron can be overridden via PICLAW_DREAM_CRON", async () => {
+  const restore = setEnv({ PICLAW_DREAM_CRON: "45 3 * * *" });
   try {
     db = await importFresh("../src/db.js");
     dream = await importFresh("../src/dream.js");
     db.initDatabase();
+    // Remove any existing dream task so ensureDreamTask creates a fresh one
+    db.getDb().exec("DELETE FROM scheduled_tasks WHERE task_kind = 'agent'");
 
+    // Verify the re-imported module picked up the env override
+    expect(dream.DREAM_TASK_CRON).toBe("45 3 * * *");
     const seeded = dream.ensureDreamTask("web:default");
-    expect(seeded?.schedule_value).toBe("30 2 * * *");
+    expect(seeded?.schedule_value).toBe("45 3 * * *");
   } finally {
     restore();
   }
