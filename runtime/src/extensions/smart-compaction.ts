@@ -79,13 +79,37 @@ const MIN_SUMMARY_CHARS = 100;
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalize a file path: strip the workspace prefix so all paths are
+ * workspace-relative. Tool calls record paths inconsistently — some
+ * absolute (`/workspace/foo`), some relative (`foo`). Without this,
+ * `compressFilePaths` can't find a common prefix and the output bloats.
+ */
+const CWD_PREFIX = process.cwd().endsWith("/") ? process.cwd() : process.cwd() + "/";
+function normalizePath(p: string): string {
+  if (p.startsWith(CWD_PREFIX)) return p.slice(CWD_PREFIX.length);
+  // Also handle bare /workspace/ when cwd is /workspace
+  if (p.startsWith("/") && !p.startsWith(CWD_PREFIX) && p.startsWith(process.cwd())) {
+    return p.slice(process.cwd().length + 1);
+  }
+  return p;
+}
+
+function normalizePathSet(paths: Iterable<string>): string[] {
+  const seen = new Set<string>();
+  for (const p of paths) {
+    seen.add(normalizePath(p));
+  }
+  return [...seen];
+}
+
 /** Compute final read-only / modified file lists from FileOperations. */
 function fileListsFromOps(fileOps: FileOperations): {
   readFiles: string[];
   modifiedFiles: string[];
 } {
-  const modified = new Set([...fileOps.written, ...fileOps.edited]);
-  const readOnly = [...fileOps.read].filter((f) => !modified.has(f));
+  const modified = new Set(normalizePathSet([...fileOps.written, ...fileOps.edited]));
+  const readOnly = normalizePathSet([...fileOps.read]).filter((f) => !modified.has(f));
   return { readFiles: filterJunkPaths(readOnly), modifiedFiles: [...modified] };
 }
 
