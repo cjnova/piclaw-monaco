@@ -74,6 +74,7 @@ export const exitProcess: ExtensionFactory = (pi: ExtensionAPI) => {
           other_active_sessions: otherActive,
           reason,
         },
+        terminate: true,
       } satisfies AgentToolResult<Record<string, unknown>>;
     },
   });
