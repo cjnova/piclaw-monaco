@@ -604,11 +604,12 @@
 }
 
 .settings-addon-actions {
-    text-align: right;
+    position: absolute;
+    top: 10px;
+    right: 12px;
     white-space: nowrap;
     display: flex;
     gap: 6px;
-    justify-content: flex-end;
 }
 
 .settings-addon-btn {
@@ -1147,6 +1148,7 @@
     padding: 10px 12px;
     background: var(--bg-primary);
     transition: border-color 0.15s;
+    position: relative;
 }
 
 .settings-addon-card:hover {

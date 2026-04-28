@@ -184,10 +184,6 @@ export function AddonsSection({ setStatus, filter = '' }) {
                             <span class="settings-addon-version">${a.installed ? (a.installedVersion || '?') : (a.version || '')}</span>
                             ${a.installKind && html`<span class="settings-tag">${a.installKind}</span>`}
                             ${a.hasUpdate && html`<span class="settings-tag settings-tag-skill">\u2191 ${a.version}</span>`}
-                        </div>
-                        <div class="settings-addon-card-body">${a.description}</div>
-                        <div class="settings-addon-card-footer">
-                            <div class="settings-addon-tags">${(a.tags || []).map(t => html`<span class="settings-tag">${t}</span>`)}${(a.skills || []).map(s => html`<span class="settings-tag settings-tag-skill">\ud83d\udcdd ${s}</span>`)}</div>
                             <div class="settings-addon-actions">
                                 ${a.installed ? html`
                                     ${a.hasUpdate && html`<button class="settings-addon-btn settings-addon-btn-upgrade" disabled=${Boolean(busy)} onClick=${() => installAddon(a.slug)}>${busySlug === a.slug ? '\u2026' : 'Update'}</button>`}
@@ -196,6 +192,10 @@ export function AddonsSection({ setStatus, filter = '' }) {
                                     <button class="settings-addon-btn settings-addon-btn-install" disabled=${Boolean(busy)} onClick=${() => installAddon(a.slug)}>${busySlug === a.slug ? '\u2026' : 'Install'}</button>
                                 `}
                             </div>
+                        </div>
+                        <div class="settings-addon-card-body">${a.description}</div>
+                        <div class="settings-addon-card-footer">
+                            <div class="settings-addon-tags">${(a.tags || []).map(t => html`<span class="settings-tag">${t}</span>`)}${(a.skills || []).map(s => html`<span class="settings-tag settings-tag-skill">\ud83d\udcdd ${s}</span>`)}</div>
                         </div>
                     </div>
                 `; })}
