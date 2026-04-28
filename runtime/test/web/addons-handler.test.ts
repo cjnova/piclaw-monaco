@@ -9,6 +9,7 @@ import {
   handleAddonAssetRequest,
   handleAddonConfigApiRequest,
   handleGetAddons,
+  handleInstallAddon,
   handleRestartAddonRuntime,
   isAddonFsLockError,
   mergeCatalogs,
@@ -16,6 +17,7 @@ import {
   removeAddonDirRobustly,
   resolveAddonInstallSpec,
   resolveRequestedCatalogUrls,
+  setAddonInstallTestHooksForTests,
   WEB_RESTART_DELAY_MS,
 } from '../../src/channels/web/handlers/addons.js';
 
@@ -142,6 +144,87 @@ test('handleGetAddons merges add-ons from multiple catalog URLs', async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('handleInstallAddon prefers public tarball install before GitHub API fallback', async () => {
+  await withTempWorkspaceEnv('piclaw-addon-install-tarball-', {}, async (workspace) => {
+    const originalFetch = globalThis.fetch;
+    const bunCalls: Array<{ args: string[]; cwd: string }> = [];
+    let repoTreeCalls = 0;
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('catalog-observability.json')) {
+        return new Response(JSON.stringify({
+          source: 'catalog-observability',
+          addons: [{
+            slug: 'observability',
+            name: '@rcarmo/piclaw-addon-observability',
+            version: '0.1.2',
+            description: 'obs',
+            path: 'addons/observability',
+            install: {
+              kind: 'tarball',
+              spec: 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz',
+            },
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (href.includes('rcarmo/piclaw-addons/main/catalog.json')) {
+        return new Response(JSON.stringify({ source: 'default', addons: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    setAddonInstallTestHooksForTests({
+      async runBunCommand(args, cwd) {
+        bunCalls.push({ args, cwd });
+        if (args.join(' ') === 'bun add --force https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz') {
+          const addonDir = join(cwd, 'node_modules', '@rcarmo', 'piclaw-addon-observability');
+          mkdirSync(addonDir, { recursive: true });
+          writeFileSync(join(addonDir, 'package.json'), JSON.stringify({
+            name: '@rcarmo/piclaw-addon-observability',
+            version: '0.1.2',
+          }, null, 2));
+          return { ok: true, exitCode: 0, stdout: 'installed', stderr: '' };
+        }
+        return { ok: false, exitCode: 1, stdout: '', stderr: 'unexpected bun command' };
+      },
+      async fetchAddonFileTree() {
+        repoTreeCalls += 1;
+        return [];
+      },
+    });
+
+    try {
+      const res = await handleInstallAddon(
+        new Request('https://example.test/agent/addons/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: 'observability' }),
+        }),
+        (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+        new URL('https://example.test/agent/addons/install?catalog_url=https://example.com/catalog-observability.json'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: true,
+        slug: 'observability',
+        installedVersion: '0.1.2',
+        installKind: 'tarball',
+      }));
+      expect(repoTreeCalls).toBe(0);
+      expect(bunCalls).toHaveLength(1);
+      expect(bunCalls[0]).toEqual({
+        args: ['bun', 'add', '--force', 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz'],
+        cwd: join(workspace.workspace, '.pi', 'extensions'),
+      });
+    } finally {
+      setAddonInstallTestHooksForTests(null);
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 
 test('getInstalledAddonWebEntries discovers addon browser entrypoints', async () => {

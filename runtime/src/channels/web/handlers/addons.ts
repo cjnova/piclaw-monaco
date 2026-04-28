@@ -33,6 +33,19 @@ export const WEB_RESTART_DELAY_MS = 150;
 
 const catalogCache = new Map<string, { data: unknown; ts: number }>();
 
+type BunCommandResult = { ok: boolean; exitCode: number; stdout: string; stderr: string };
+type AddonInstallTestHooks = {
+  runBunCommand?: (args: string[], cwd: string) => Promise<BunCommandResult>;
+  fetchAddonFileTree?: (addonPath: string, owner?: string, repo?: string, branch?: string) => Promise<string[]>;
+  downloadFile?: (repoPath: string, destPath: string, owner?: string, repo?: string, branch?: string) => Promise<void>;
+};
+
+let addonInstallTestHooks: AddonInstallTestHooks | null = null;
+
+export function setAddonInstallTestHooksForTests(hooks: AddonInstallTestHooks | null): void {
+  addonInstallTestHooks = hooks;
+}
+
 interface CatalogAddonInstall {
   kind?: string;
   spec?: string;
@@ -369,7 +382,7 @@ export function resolveAddonInstallSpec(addon: Pick<CatalogAddon, "name" | "vers
   };
 }
 
-async function runBunCommand(args: string[], cwd: string): Promise<{ ok: boolean; exitCode: number; stdout: string; stderr: string }> {
+async function runBunCommand(args: string[], cwd: string): Promise<BunCommandResult> {
   try {
     const proc = Bun.spawn(args, {
       cwd,
@@ -735,11 +748,45 @@ export async function handleInstallAddon(
   const destDir = join(addonsDir, "node_modules", addon.name);
   const addonPath = addon.path || `addons/${slug}`;
   const installPlan = resolveAddonInstallSpec(addon);
+  const installPlanIsPublicTarball = installPlan.kind === 'tarball' && /^https?:\/\//.test(installPlan.spec);
 
   try {
-    // Primary path: download the addon directly from the catalog repo.
-    // This works for all addons without needing registry auth.
-    const files = await fetchAddonFileTree(addonPath);
+    // First choice for first-party add-ons: install directly from the public
+    // GitHub Pages tarball URL in the catalog. This avoids GitHub API rate
+    // limits and keeps install/update independent from repo-tree fetches.
+    if (installPlanIsPublicTarball) {
+      addonLog.info("Installing add-on from public tarball URL", {
+        operation: "addons.install.tarball",
+        slug,
+        spec: installPlan.spec,
+      });
+      const tarballInstall = await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "add", "--force", installPlan.spec], addonsDir);
+      if (tarballInstall.ok) {
+        setAddonDependencyRecord(addonsDir, addon.name, installPlan.spec);
+        const installedVersion = getInstalledVersion(addon.name);
+        return json({
+          ok: true,
+          slug,
+          name: addon.name,
+          installedVersion,
+          installKind: installPlan.kind,
+          installSpec: installPlan.spec,
+          message: `Installed ${addon.name}@${installedVersion || addon.version || "?"} via public tarball. Restart required to load.`,
+        });
+      }
+      addonLog.warn("Public tarball install failed; falling back to direct repo download", {
+        operation: "addons.install.tarball_fallback",
+        slug,
+        spec: installPlan.spec,
+        stderr: tarballInstall.stderr || undefined,
+        stdout: tarballInstall.stdout || undefined,
+        exitCode: tarballInstall.exitCode,
+      });
+    }
+
+    // Fallback path: download the addon directly from the catalog repo.
+    // Used for legacy/incomplete catalog entries or when tarball install fails.
+    const files = await (addonInstallTestHooks?.fetchAddonFileTree || fetchAddonFileTree)(addonPath);
     if (files.length > 0) {
       const stagingRoot = join(addonsDir, '.staging');
       const stagingDir = join(stagingRoot, `${addon.name}-${Date.now()}`);
@@ -750,7 +797,7 @@ export async function handleInstallAddon(
         for (const filePath of files) {
           const relativePath = filePath.slice(addonPath.length + 1);
           if (!relativePath) continue;
-          await downloadFile(filePath, join(stagingDir, relativePath));
+          await (addonInstallTestHooks?.downloadFile || downloadFile)(filePath, join(stagingDir, relativePath));
           downloaded++;
         }
 
@@ -761,7 +808,7 @@ export async function handleInstallAddon(
 
         const addonPkg = join(stagingDir, "package.json");
         if (existsSync(addonPkg)) {
-          await runBunCommand(["bun", "install", "--force"], stagingDir);
+          await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "install", "--force"], stagingDir);
         }
 
         const cleanup = await removeAddonDirRobustly(destDir, addonsDir);
@@ -783,7 +830,7 @@ export async function handleInstallAddon(
       } finally {
         try {
           if (existsSync(stagingDir)) rmSync(stagingDir, { recursive: true, force: true });
-        } catch { /* staging cleanup is best-effort */ }
+        } catch (e) { void e; /* staging cleanup is best-effort */ }
       }
     }
 
@@ -794,7 +841,7 @@ export async function handleInstallAddon(
       slug,
       spec: installPlan.spec,
     });
-    const packageInstall = await runBunCommand(["bun", "add", "--force", installPlan.spec], addonsDir);
+    const packageInstall = await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "add", "--force", installPlan.spec], addonsDir);
     if (packageInstall.ok) {
       const lookupName = installPlan.scopedName || addon.name;
       const installedVersion = getInstalledVersion(lookupName);
