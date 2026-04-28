@@ -869,7 +869,7 @@
 
 .settings-dialog-backdrop-loader {
     z-index: 2399;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .settings-dialog-loading-shell {
@@ -880,9 +880,15 @@
 
 .settings-loading-shell-body {
     justify-content: center;
-    padding: 28px;
+    padding: 32px;
     color: var(--text-primary);
     font-weight: 600;
+    font-size: 0.95em;
+}
+.settings-loading-shell-body .settings-spinner {
+    width: 22px;
+    height: 22px;
+    border-width: 2.5px;
 }
 
 /* ── Status bar (bottom of dialog) ──────────────────────────── */
