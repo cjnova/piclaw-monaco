@@ -88,20 +88,6 @@ function ensureAddonsDir(): string {
       dependencies: {},
     }, null, 2));
   }
-  // Ensure .npmrc routes @rcarmo scoped packages to GitHub Packages.
-  // The token is read from the GITHUB_PICLAW_BOT_PAT env var (keychain-injected).
-  const npmrcPath = join(addonsDir, ".npmrc");
-  const ghToken = process.env.GITHUB_PICLAW_BOT_PAT || process.env.GITHUB_TOKEN || "";
-  if (ghToken) {
-    const npmrc = [
-      "@rcarmo:registry=https://npm.pkg.github.com",
-      `//npm.pkg.github.com/:_authToken=\${GITHUB_PICLAW_BOT_PAT}`,
-    ].join("\n") + "\n";
-    try {
-      const existing = existsSync(npmrcPath) ? readFileSync(npmrcPath, "utf-8") : "";
-      if (existing !== npmrc) writeFileSync(npmrcPath, npmrc);
-    } catch { /* best effort */ }
-  }
   return addonsDir;
 }
 

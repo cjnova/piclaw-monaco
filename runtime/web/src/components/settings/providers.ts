@@ -2,6 +2,15 @@
 import { html, useState, useCallback } from '../../vendor/preact-htm.js';
 import { sendAgentMessage } from '../../api.js';
 
+function formatAuthTypeLabel(authType) {
+    switch (authType) {
+        case 'oauth': return 'OAuth';
+        case 'api_key': return 'API key';
+        case 'custom': return 'Configured';
+        default: return 'Configured';
+    }
+}
+
 export function ProvidersSection({ providers, setStatus }) {
     const [busy, setBusy] = useState(null);
     const [expandedProvider, setExpandedProvider] = useState(null);
@@ -93,7 +102,7 @@ export function ProvidersSection({ providers, setStatus }) {
                         <div class="settings-provider-card-header" onClick=${() => !p.configured && toggle(p.id)}>
                             <strong>${p.name}</strong>
                             <span class="settings-provider-id">${p.id}</span>
-                            ${p.configured && html`<span class="settings-tag settings-tag-skill">${p.authType || 'configured'}</span>`}
+                            ${p.configured && html`<span class="settings-tag settings-tag-skill">${formatAuthTypeLabel(p.authType)}</span>`}
                             <div class="settings-provider-card-meta">
                                 ${p.hasOAuth && html`<span class="settings-tag">OAuth</span>`}
                                 ${p.hasApiKey && html`<span class="settings-tag">API Key</span>`}
