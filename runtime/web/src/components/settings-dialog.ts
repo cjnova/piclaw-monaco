@@ -334,12 +334,8 @@ function SettingsDialogContent({ onClose }) {
     `;
 }
 
-export function SettingsDialog({ initialOpen = false } = {}) {
-    const [open, setOpen] = useState(Boolean(initialOpen));
-    // Respond to initialOpen becoming true after mount (e.g. lazy-load race)
-    useEffect(() => {
-        if (initialOpen && !open) setOpen(true);
-    }, [initialOpen]);
+export function SettingsDialog() {
+    const [open, setOpen] = useState(false);
     useEffect(() => {
         const handler = () => setOpen(true);
         window.addEventListener('piclaw:open-settings', handler);

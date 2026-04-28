@@ -1,121 +1,89 @@
 // @ts-nocheck
+/**
+ * settings-dialog-loader.ts — Lazy-loads the settings dialog module on first open.
+ * After load, the SettingsDialog manages its own open/close state via the
+ * 'piclaw:open-settings' custom event.
+ */
 import { html, useEffect, useState } from '../vendor/preact-htm.js';
 
 type SettingsDialogModule = typeof import('./settings-dialog.js');
 
-type LoaderSnapshot = {
-    loaded: boolean;
-    loading: boolean;
-    pendingOpen: boolean;
-};
+let settingsDialogModule: SettingsDialogModule | null = null;
+let loadPromise: Promise<SettingsDialogModule> | null = null;
 
-let settingsDialogModuleCache: SettingsDialogModule | null = null;
-let settingsDialogModulePromise: Promise<SettingsDialogModule> | null = null;
-let settingsDialogPendingOpen = false;
-let settingsDialogLoading = false;
-const settingsDialogSubscribers = new Set<(snapshot: LoaderSnapshot) => void>();
-
-function getLoaderSnapshot(): LoaderSnapshot {
-    return {
-        loaded: Boolean(settingsDialogModuleCache),
-        loading: settingsDialogLoading,
-        pendingOpen: settingsDialogPendingOpen,
-    };
-}
-
-function notifySettingsDialogSubscribers(): void {
-    const snapshot = getLoaderSnapshot();
-    for (const subscriber of settingsDialogSubscribers) {
-        try {
-            subscriber(snapshot);
-        } catch (error) {
-            console.debug('[settings-dialog-loader] Failed to notify subscriber.', error);
-        }
-    }
-}
-
-function loadSettingsDialogModule(): Promise<SettingsDialogModule> {
-    if (settingsDialogModuleCache) return Promise.resolve(settingsDialogModuleCache);
-    if (settingsDialogModulePromise) return settingsDialogModulePromise;
-
-    settingsDialogLoading = true;
-    notifySettingsDialogSubscribers();
+function ensureModule(): Promise<SettingsDialogModule> {
+    if (settingsDialogModule) return Promise.resolve(settingsDialogModule);
+    if (loadPromise) return loadPromise;
     const t0 = performance.now();
-
-    settingsDialogModulePromise = import('./settings-dialog.js')
-        .then((mod) => {
-            console.info(`[settings-loader] import resolved in ${(performance.now() - t0).toFixed(1)}ms`);
-            settingsDialogModuleCache = mod;
-            settingsDialogLoading = false;
-            settingsDialogModulePromise = null;
-            notifySettingsDialogSubscribers();
-            return mod;
-        })
-        .catch((error) => {
-            settingsDialogLoading = false;
-            settingsDialogModulePromise = null;
-            settingsDialogPendingOpen = false;
-            notifySettingsDialogSubscribers();
-            throw error;
-        });
-
-    return settingsDialogModulePromise;
-}
-
-function subscribeSettingsDialogLoader(callback: (snapshot: LoaderSnapshot) => void): () => void {
-    settingsDialogSubscribers.add(callback);
-    callback(getLoaderSnapshot());
-    return () => settingsDialogSubscribers.delete(callback);
-}
-
-function requestOpenSettingsDialog(): void {
-    settingsDialogPendingOpen = true;
-    notifySettingsDialogSubscribers();
-    loadSettingsDialogModule().catch((error) => {
-        console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
+    loadPromise = import('./settings-dialog.js').then((mod) => {
+        console.info(`[settings-loader] import resolved in ${(performance.now() - t0).toFixed(1)}ms`);
+        settingsDialogModule = mod;
+        loadPromise = null;
+        return mod;
+    }).catch((error) => {
+        loadPromise = null;
+        throw error;
     });
+    return loadPromise;
 }
 
 export function openSettingsDialog() {
     window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
 }
 
+export function preloadSettingsDialog(): Promise<SettingsDialogModule> {
+    return ensureModule();
+}
+
+/**
+ * Loader component. Once the module is loaded, it stays loaded and
+ * SettingsDialog handles its own visibility via the custom event.
+ */
 export function SettingsDialogLoader() {
-    const [snapshot, setSnapshot] = useState(getLoaderSnapshot);
+    const [loaded, setLoaded] = useState(!!settingsDialogModule);
+    const [showSpinner, setShowSpinner] = useState(false);
 
-    useEffect(() => subscribeSettingsDialogLoader(setSnapshot), []);
     useEffect(() => {
-        const handleOpenSettings = () => {
-            settingsDialogPendingOpen = true;
-            notifySettingsDialogSubscribers();
-            if (!settingsDialogModuleCache) {
-                loadSettingsDialogModule().catch((error) => {
-                    console.error('[settings-dialog-loader] Failed to lazy-load settings dialog.', error);
-                });
+        if (loaded) return;
+        // On first 'piclaw:open-settings', load the module
+        const handleOpen = () => {
+            if (settingsDialogModule) {
+                setLoaded(true);
+                return;
             }
+            setShowSpinner(true);
+            ensureModule()
+                .then(() => {
+                    setLoaded(true);
+                    setShowSpinner(false);
+                    // Re-fire so the now-mounted SettingsDialog catches it
+                    requestAnimationFrame(() => {
+                        window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
+                    });
+                })
+                .catch(() => setShowSpinner(false));
         };
-        window.addEventListener('piclaw:open-settings', handleOpenSettings);
-        return () => window.removeEventListener('piclaw:open-settings', handleOpenSettings);
-    }, []);
+        window.addEventListener('piclaw:open-settings', handleOpen);
+        return () => window.removeEventListener('piclaw:open-settings', handleOpen);
+    }, [loaded]);
 
-    const showLoadingOverlay = !snapshot.loaded && (snapshot.pendingOpen || snapshot.loading);
-    const LoadedDialog = settingsDialogModuleCache?.SettingsDialog || null;
-
-    return html`
-        ${showLoadingOverlay && html`
-            <div class="settings-dialog-backdrop settings-dialog-backdrop-loader" aria-live="polite" aria-busy="true">
-                <div class="settings-dialog settings-dialog-loading-shell" role="status" aria-label="Loading settings">
+    if (!loaded) {
+        if (!showSpinner) return null;
+        return html`
+            <div class="settings-dialog-backdrop settings-dialog-backdrop-loader" aria-live="polite">
+                <div class="settings-dialog settings-dialog-loading-shell" role="status">
                     <div class="settings-loading-shell-body">
                         <span class="settings-spinner"></span>
                         <span>Loading settings…</span>
                     </div>
                 </div>
             </div>
-        `}
-        ${LoadedDialog && html`<${LoadedDialog} initialOpen=${snapshot.pendingOpen} />`}
-    `;
-}
+        `;
+    }
 
-export function preloadSettingsDialog(): Promise<SettingsDialogModule> {
-    return loadSettingsDialogModule();
+    // Module loaded — render SettingsDialog permanently.
+    // It manages its own open/close state internally.
+    const Comp = settingsDialogModule?.SettingsDialog;
+    if (!Comp) return null;
+    return html`<${Comp} />`;
 }
