@@ -435,12 +435,66 @@ function toDisplayDate(value: string): string {
   return `${String(parsed.getUTCFullYear())}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}-${String(parsed.getUTCDate()).padStart(2, "0")}`;
 }
 
-function buildSparklineSvg(points: HistorySnapshot[], title: string, width = 640, height = 180): string {
+const SPARKLINE_SVG_STYLE = [
+  `<style>`,
+  `  :root {`,
+  `    color-scheme: light dark;`,
+  `    --chart-bg: #ffffff;`,
+  `    --chart-panel: #f8fafc;`,
+  `    --chart-title: #0f172a;`,
+  `    --chart-muted: #475569;`,
+  `    --chart-subtle: #64748b;`,
+  `    --chart-grid: #cbd5e1;`,
+  `    --chart-line: #0284c7;`,
+  `    --chart-line-fill: rgba(14, 165, 233, 0.12);`,
+  `    --chart-point-fill: #ffffff;`,
+  `    --chart-point-stroke: #0ea5e9;`,
+  `    --chart-positive: #15803d;`,
+  `    --chart-negative: #b91c1c;`,
+  `    --chart-neutral: #475569;`,
+  `  }`,
+  `  @media (prefers-color-scheme: dark) {`,
+  `    :root {`,
+  `      --chart-bg: #0b1020;`,
+  `      --chart-panel: #111827;`,
+  `      --chart-title: #e2e8f0;`,
+  `      --chart-muted: #9ca3af;`,
+  `      --chart-subtle: #94a3b8;`,
+  `      --chart-grid: #1f2937;`,
+  `      --chart-line: #38bdf8;`,
+  `      --chart-line-fill: rgba(56, 189, 248, 0.12);`,
+  `      --chart-point-fill: #f8fafc;`,
+  `      --chart-point-stroke: #0ea5e9;`,
+  `      --chart-positive: #22c55e;`,
+  `      --chart-negative: #f87171;`,
+  `      --chart-neutral: #9ca3af;`,
+  `    }`,
+  `  }`,
+  `  .chart-bg { fill: var(--chart-bg); }`,
+  `  .chart-panel { fill: var(--chart-panel); }`,
+  `  .chart-title { fill: var(--chart-title); font-family: system-ui,-apple-system,Segoe UI,sans-serif; font-size: 13px; }`,
+  `  .chart-grid { stroke: var(--chart-grid); stroke-width: 1; }`,
+  `  .chart-axis { fill: var(--chart-muted); font-size: 11px; font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }`,
+  `  .chart-date { fill: var(--chart-subtle); font-size: 10px; font-family: system-ui,-apple-system,Segoe UI,sans-serif; }`,
+  `  .chart-line { fill: none; stroke: var(--chart-line); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }`,
+  `  .chart-area { fill: var(--chart-line-fill); stroke: none; }`,
+  `  .chart-point { fill: var(--chart-point-fill); stroke: var(--chart-point-stroke); stroke-width: 1.5; }`,
+  `  .chart-delta { font-size: 11px; font-family: system-ui,-apple-system,Segoe UI,sans-serif; }`,
+  `  .chart-delta.positive { fill: var(--chart-positive); }`,
+  `  .chart-delta.negative { fill: var(--chart-negative); }`,
+  `  .chart-delta.neutral { fill: var(--chart-neutral); }`,
+  `  .chart-empty { fill: var(--chart-subtle); font-size: 14px; font-family: system-ui,-apple-system,Segoe UI,sans-serif; }`,
+  `</style>`,
+].join("");
+
+export function buildSparklineSvg(points: HistorySnapshot[], title: string, width = 640, height = 180): string {
   if (points.length === 0) {
     return [
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-      `<rect x="0" y="0" width="${width}" height="${height}" fill="#0b1020"/>`,
-      `<text x="${width / 2}" y="${height / 2}" fill="#94a3b8" text-anchor="middle" font-size="14" font-family="system-ui,-apple-system,Segoe UI,sans-serif">No history yet</text>`,
+      `<title>${escapeXml(title)}</title>`,
+      SPARKLINE_SVG_STYLE,
+      `<rect class="chart-bg" x="0" y="0" width="${width}" height="${height}" rx="12"/>`,
+      `<text class="chart-empty" x="${width / 2}" y="${height / 2}" text-anchor="middle">No history yet</text>`,
       `</svg>`,
     ].join("");
   }
@@ -471,13 +525,16 @@ function buildSparklineSvg(points: HistorySnapshot[], title: string, width = 640
 
   const last = points[points.length - 1];
   const first = points[0];
+  const trendDelta = (last?.stars ?? 0) - (first?.stars ?? 0);
+  const trendClass = trendDelta > 0 ? "positive" : trendDelta < 0 ? "negative" : "neutral";
 
   const lines: string[] = [];
   lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
   lines.push(`<title>${escapeXml(title)}</title>`);
-  lines.push(`<rect x="0" y="0" width="${width}" height="${height}" rx="12" fill="#0b1020"/>`);
-  lines.push(`<rect x="${left}" y="${top}" width="${chartW}" height="${chartH}" fill="#111827"/>`);
-  lines.push(`<text x="${left}" y="${18}" fill="#e2e8f0" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="13">${escapeXml(title)} • ${last.stars}★</text>`);
+  lines.push(SPARKLINE_SVG_STYLE);
+  lines.push(`<rect class="chart-bg" x="0" y="0" width="${width}" height="${height}" rx="12"/>`);
+  lines.push(`<rect class="chart-panel" x="${left}" y="${top}" width="${chartW}" height="${chartH}" rx="8"/>`);
+  lines.push(`<text class="chart-title" x="${left}" y="${18}">${escapeXml(title)} • ${last.stars}★</text>`);
 
   // Grid & axis labels
   const minTick = minY;
@@ -487,35 +544,32 @@ function buildSparklineSvg(points: HistorySnapshot[], title: string, width = 640
   for (const tickValue of ticks) {
     const y = top + (tickValue - maxTick) * (chartH / (maxY - minY || 1)) * -1;
     const label = Math.round(tickValue).toString();
-    lines.push(`<line x1="${left}" y1="${y.toFixed(2)}" x2="${width - right}" y2="${y.toFixed(2)}" stroke="#1f2937" stroke-width="1" />`);
-    lines.push(`<text x="${left - 6}" y="${(y + 4).toFixed(2)}" fill="#9ca3af" text-anchor="end" font-size="11" font-family="monospace">${escapeXml(label)}</text>`);
+    lines.push(`<line class="chart-grid" x1="${left}" y1="${y.toFixed(2)}" x2="${width - right}" y2="${y.toFixed(2)}" />`);
+    lines.push(`<text class="chart-axis" x="${left - 6}" y="${(y + 4).toFixed(2)}" text-anchor="end">${escapeXml(label)}</text>`);
   }
 
-  lines.push(`<path d="${path}" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`);
-  const baseY = mapY(Math.max(minY, minY));
-  lines.push(`<path d="${path} L ${mapX(points.length - 1).toFixed(2)} ${baseY.toFixed(2)} L ${mapX(0).toFixed(2)} ${baseY.toFixed(2)} Z" fill="#38bdf80f" stroke="none"/>`);
+  const baseY = mapY(minY);
+  lines.push(`<path class="chart-area" d="${path} L ${mapX(points.length - 1).toFixed(2)} ${baseY.toFixed(2)} L ${mapX(0).toFixed(2)} ${baseY.toFixed(2)} Z"/>`);
+  lines.push(`<path class="chart-line" d="${path}"/>`);
 
   for (let index = 0; index < points.length; index += 1) {
     if (index % 2 === 1 && index !== points.length - 1) continue;
     const point = points[index];
     const x = mapX(index).toFixed(2);
     const y = mapY(point.stars).toFixed(2);
-    lines.push(`<circle cx="${x}" cy="${y}" r="3" fill="#f8fafc" stroke="#0ea5e9" stroke-width="1.5" />`);
+    lines.push(`<circle class="chart-point" cx="${x}" cy="${y}" r="3" />`);
   }
 
-  lines.push(`<text x="${left}" y="${height - 10}" fill="#94a3b8" font-size="10" font-family="system-ui,-apple-system,Segoe UI,sans-serif">${escapeXml(labels[0] || "")}</text>`);
-  lines.push(`<text x="${width - right}" y="${height - 10}" text-anchor="end" fill="#94a3b8" font-size="10" font-family="system-ui,-apple-system,Segoe UI,sans-serif">${escapeXml(labels[labels.length - 1] || "")}</text>`);
+  lines.push(`<text class="chart-date" x="${left}" y="${height - 10}">${escapeXml(labels[0] || "")}</text>`);
+  lines.push(`<text class="chart-date" x="${width - right}" y="${height - 10}" text-anchor="end">${escapeXml(labels[labels.length - 1] || "")}</text>`);
   if (first && last) {
-    const from = first.stars;
-    const to = last.stars;
-    const delta = to - from;
-    lines.push(`<text x="${width - right}" y="${22}" text-anchor="end" fill="#22c55e" font-size="11" font-family="system-ui,-apple-system,Segoe UI,sans-serif">${delta >= 0 ? "+" : ""}${delta.toLocaleString()}★ in ${labels.length - 1} step${labels.length - 2 === 1 ? "" : "s"}</text>`);
+    lines.push(`<text class="chart-delta ${trendClass}" x="${width - right}" y="${22}" text-anchor="end">${trendDelta >= 0 ? "+" : ""}${trendDelta.toLocaleString()}★ in ${labels.length - 1} step${labels.length - 2 === 1 ? "" : "s"}</text>`);
   }
   lines.push("</svg>");
   return lines.join("");
 }
 
-function svgDataUrl(svg: string): string {
+export function svgDataUrl(svg: string): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 

@@ -154,6 +154,11 @@ export function installAddonWebApi(runtimeWindow: (Window & typeof globalThis) |
   (runtimeWindow as any).__piclaw_registerSettingsPane = api.registerSettingsPane;
   (runtimeWindow as any).__piclaw_registerStandaloneTabUrlResolver = api.registerStandaloneTabUrlResolver;
   (runtimeWindow as any).__piclaw_registerAttachmentPreview = api.registerAttachmentPreview;
+  // Aliases used by addons (observability, cheapskate, sample-addon)
+  (runtimeWindow as any).__piclawSettingsPaneRegistry = {
+    registerSettingsPane: api.registerSettingsPane,
+    notifySettingsPanesChanged: () => runtimeWindow?.dispatchEvent?.(new CustomEvent('piclaw:settings-panes-changed')),
+  };
   addonWebApiInstalled = true;
   return api;
 }

@@ -94,6 +94,13 @@ export async function initializeAppShellRuntime(): Promise<void> {
   configureMarked(markedInstance);
   installBrowserNoiseFilters(runtimeWindow);
   installAddonWebApi(runtimeWindow);
+  // Expose preact/htm globals for addon web entries (they can't import from the bundle)
+  if (runtimeWindow) {
+    try {
+      const preactHtm = await import('../vendor/preact-htm.js');
+      (runtimeWindow as any).__piclawPreactHtm = preactHtm;
+    } catch { /* best effort */ }
+  }
   registerAppPaneExtensions();
   await loadInstalledAddonWebEntries(runtimeWindow);
   registerAppServiceWorker(runtimeWindow);
