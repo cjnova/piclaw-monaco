@@ -508,6 +508,23 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
       }
     },
   },
+  {
+    method: "POST",
+    path: "/agent/client-perf",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const label = typeof body.label === "string" ? body.label : "unknown";
+        const lines = Array.isArray(body.lines) ? body.lines.filter((l: unknown) => typeof l === "string") : [];
+        const { createLogger } = await import("../../../utils/logger.js");
+        const log = createLogger("web.client-perf");
+        log.info(`Client perf: ${label}`, { label, lines });
+        return channel.json({ ok: true });
+      } catch {
+        return channel.json({ ok: true });
+      }
+    },
+  },
 ];
 
 /**

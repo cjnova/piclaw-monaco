@@ -15,6 +15,14 @@ function flushPerfLog() {
     const lines = _perfLog.map(e => `+${(e.ts - first).toFixed(1)}ms ${e.label}`);
     console.info('[settings-dialog perf]\n' + lines.join('\n'));
     try { window.__piclawSettingsPerfLog = lines; } catch {}
+    // Post to server for diagnostic access
+    try {
+        fetch('/agent/client-perf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: 'settings-dialog', lines }),
+        }).catch(() => {});
+    } catch {}
     _perfLog.length = 0;
 }
 
