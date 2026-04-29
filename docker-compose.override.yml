@@ -1,0 +1,6 @@
+services:
+  piclaw-monaco:
+    volumes:
+      - ./runtime:/app/runtime
+      - ./notes:/workspace/notes
+      - ./workitems:/workspace/workitems
