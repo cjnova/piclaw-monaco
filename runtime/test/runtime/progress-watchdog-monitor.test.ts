@@ -1,13 +1,14 @@
 import { expect, test } from 'bun:test';
 
 import {
-  evaluatePersistedProgressWatchdogState,
+  evaluateProgressWatchdogSnapshot,
   parseProgressWatchdogMonitorArgs,
+  parseProgressWatchdogSnapshotLine,
 } from '../../src/runtime/progress-watchdog-monitor.js';
 
-test('evaluatePersistedProgressWatchdogState returns a stalled entry when heartbeat age exceeds timeout', () => {
+test('evaluateProgressWatchdogSnapshot returns a stalled entry when heartbeat age exceeds timeout', () => {
   const now = Date.now();
-  const evaluation = evaluatePersistedProgressWatchdogState({
+  const evaluation = evaluateProgressWatchdogSnapshot({
     pid: 123,
     updatedAt: new Date(now).toISOString(),
     timeoutMs: 30_000,
@@ -28,9 +29,9 @@ test('evaluatePersistedProgressWatchdogState returns a stalled entry when heartb
   }));
 });
 
-test('evaluatePersistedProgressWatchdogState ignores empty or shutting-down state', () => {
-  expect(evaluatePersistedProgressWatchdogState(null).stalledEntry).toBeNull();
-  expect(evaluatePersistedProgressWatchdogState({
+test('evaluateProgressWatchdogSnapshot ignores empty or shutting-down state', () => {
+  expect(evaluateProgressWatchdogSnapshot(null).stalledEntry).toBeNull();
+  expect(evaluateProgressWatchdogSnapshot({
     pid: 123,
     updatedAt: new Date().toISOString(),
     timeoutMs: 30_000,
@@ -39,16 +40,29 @@ test('evaluatePersistedProgressWatchdogState ignores empty or shutting-down stat
   }).stalledEntry).toBeNull();
 });
 
-test('parseProgressWatchdogMonitorArgs reads explicit state path and parent pid', () => {
+test('parseProgressWatchdogSnapshotLine reads newline-delimited heartbeat payloads', () => {
+  expect(parseProgressWatchdogSnapshotLine(JSON.stringify({
+    pid: 321,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    timeoutMs: 45_000,
+    shuttingDown: false,
+    entries: [{ chatJid: 'web:test', phase: 'prompt', startedAt: 1, lastProgressAt: 2 }],
+  }))).toEqual(expect.objectContaining({
+    pid: 321,
+    timeoutMs: 45_000,
+    entries: [expect.objectContaining({ chatJid: 'web:test', phase: 'prompt' })],
+  }));
+  expect(parseProgressWatchdogSnapshotLine('{bad json')).toBeNull();
+});
+
+test('parseProgressWatchdogMonitorArgs reads explicit parent pid and timing overrides', () => {
   const parsed = parseProgressWatchdogMonitorArgs([
-    '--state', '/tmp/progress-watchdog.json',
     '--parent-pid', '4321',
     '--scan-ms', '1500',
     '--grace-ms', '7000',
   ]);
 
   expect(parsed).toEqual({
-    statePath: '/tmp/progress-watchdog.json',
     parentPid: 4321,
     scanMs: 1500,
     graceMs: 7000,
