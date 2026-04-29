@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 import '../helpers.js';
 import { withTempWorkspaceEnv } from '../helpers.js';
@@ -20,6 +20,23 @@ import {
   setAddonInstallTestHooksForTests,
   WEB_RESTART_DELAY_MS,
 } from '../../src/channels/web/handlers/addons.js';
+
+function createAddonTarball(baseDir: string, fileName: string, files: Record<string, string>): string {
+  const sourceDir = join(baseDir, `${fileName}-src`);
+  const tarballPath = join(baseDir, fileName);
+  mkdirSync(sourceDir, { recursive: true });
+  for (const [relativePath, content] of Object.entries(files)) {
+    const fullPath = join(sourceDir, relativePath);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
+  const packed = Bun.spawnSync(['tar', 'czf', tarballPath, '-C', sourceDir, '.'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  expect(packed.exitCode).toBe(0);
+  return tarballPath;
+}
 
 test('parseCatalogUrlList normalizes newline and comma separated URLs', () => {
   expect(parseCatalogUrlList([
@@ -83,12 +100,12 @@ test('resolveAddonInstallSpec prefers explicit public tarball install spec', () 
   });
 });
 
-test('resolveAddonInstallSpec falls back to direct-download when catalog install metadata is missing', () => {
+test('resolveAddonInstallSpec falls back to package spec when catalog install metadata is missing', () => {
   expect(resolveAddonInstallSpec({
     name: '@rcarmo/piclaw-addon-eml-viewer',
     version: '1.2.3',
   })).toEqual({
-    kind: 'direct-download',
+    kind: 'package',
     spec: '@rcarmo/piclaw-addon-eml-viewer',
   });
 });
@@ -146,11 +163,19 @@ test('handleGetAddons merges add-ons from multiple catalog URLs', async () => {
   }
 });
 
-test('handleInstallAddon prefers public tarball install before GitHub API fallback', async () => {
+test('handleInstallAddon installs public tarball addons without repo-tree fallback', async () => {
   await withTempWorkspaceEnv('piclaw-addon-install-tarball-', {}, async (workspace) => {
     const originalFetch = globalThis.fetch;
     const bunCalls: Array<{ args: string[]; cwd: string }> = [];
-    let repoTreeCalls = 0;
+    const tarballPath = createAddonTarball(workspace.workspace, 'piclaw-addon-observability-0.1.2.tgz', {
+      'package.json': JSON.stringify({
+        name: '@rcarmo/piclaw-addon-observability',
+        version: '0.1.2',
+        dependencies: { zod: '^3.25.0' },
+        pi: { extensions: ['index.ts'] },
+      }, null, 2),
+      'index.ts': 'export default function observability() {}\n',
+    });
 
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const href = String(input);
@@ -162,7 +187,6 @@ test('handleInstallAddon prefers public tarball install before GitHub API fallba
             name: '@rcarmo/piclaw-addon-observability',
             version: '0.1.2',
             description: 'obs',
-            path: 'addons/observability',
             install: {
               kind: 'tarball',
               spec: 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz',
@@ -179,20 +203,12 @@ test('handleInstallAddon prefers public tarball install before GitHub API fallba
     setAddonInstallTestHooksForTests({
       async runBunCommand(args, cwd) {
         bunCalls.push({ args, cwd });
-        if (args.join(' ') === 'bun add --force https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz') {
-          const addonDir = join(cwd, 'node_modules', '@rcarmo', 'piclaw-addon-observability');
-          mkdirSync(addonDir, { recursive: true });
-          writeFileSync(join(addonDir, 'package.json'), JSON.stringify({
-            name: '@rcarmo/piclaw-addon-observability',
-            version: '0.1.2',
-          }, null, 2));
-          return { ok: true, exitCode: 0, stdout: 'installed', stderr: '' };
-        }
-        return { ok: false, exitCode: 1, stdout: '', stderr: 'unexpected bun command' };
+        return args.join(' ') === 'bun install --force'
+          ? { ok: true, exitCode: 0, stdout: 'installed', stderr: '' }
+          : { ok: false, exitCode: 1, stdout: '', stderr: 'unexpected bun command' };
       },
-      async fetchAddonFileTree() {
-        repoTreeCalls += 1;
-        return [];
+      async downloadUrlToFile(_url, destPath) {
+        writeFileSync(destPath, readFileSync(tarballPath));
       },
     });
 
@@ -214,10 +230,218 @@ test('handleInstallAddon prefers public tarball install before GitHub API fallba
         installedVersion: '0.1.2',
         installKind: 'tarball',
       }));
-      expect(repoTreeCalls).toBe(0);
+      expect(bunCalls).toHaveLength(1);
+      expect(bunCalls[0]?.args).toEqual(['bun', 'install', '--force']);
+      expect(bunCalls[0]?.cwd).toContain(join('.pi', 'extensions', '.staging'));
+      expect(JSON.parse(readFileSync(join(workspace.workspace, '.pi', 'extensions', 'package.json'), 'utf8')).dependencies).toEqual({
+        '@rcarmo/piclaw-addon-observability': 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz',
+      });
+    } finally {
+      setAddonInstallTestHooksForTests(null);
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+
+test('handleInstallAddon installs peer-only tarball addons without bun install', async () => {
+  await withTempWorkspaceEnv('piclaw-addon-install-peer-tarball-', {}, async (workspace) => {
+    const originalFetch = globalThis.fetch;
+    const bunCalls: Array<{ args: string[]; cwd: string }> = [];
+    const packageJson = {
+      name: '@rcarmo/piclaw-addon-peerless',
+      version: '0.2.0',
+      peerDependencies: { '@mariozechner/pi-coding-agent': '*' },
+      pi: { extensions: ['index.ts'] },
+    };
+    const tarballPath = createAddonTarball(workspace.workspace, 'piclaw-addon-peerless-0.2.0.tgz', {
+      'package.json': JSON.stringify(packageJson, null, 2),
+      'index.ts': 'export const peerless = true;\n',
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('catalog-peerless.json')) {
+        return new Response(JSON.stringify({
+          source: 'catalog-peerless',
+          addons: [{
+            slug: 'peerless',
+            name: '@rcarmo/piclaw-addon-peerless',
+            version: '0.2.0',
+            description: 'peer only',
+            install: {
+              kind: 'tarball',
+              spec: 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-peerless-0.2.0.tgz',
+            },
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (href.includes('rcarmo/piclaw-addons/main/catalog.json')) {
+        return new Response(JSON.stringify({ source: 'default', addons: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    setAddonInstallTestHooksForTests({
+      async runBunCommand(args, cwd) {
+        bunCalls.push({ args, cwd });
+        return { ok: false, exitCode: 1, stdout: '', stderr: 'bun install should be skipped for peer-only addons' };
+      },
+      async downloadUrlToFile(_url, destPath) {
+        writeFileSync(destPath, readFileSync(tarballPath));
+      },
+    });
+
+    try {
+      const res = await handleInstallAddon(
+        new Request('https://example.test/agent/addons/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: 'peerless' }),
+        }),
+        (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+        new URL('https://example.test/agent/addons/install?catalog_url=https://example.com/catalog-peerless.json'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: true,
+        slug: 'peerless',
+        installedVersion: '0.2.0',
+        installKind: 'tarball',
+      }));
+      expect(bunCalls).toHaveLength(0);
+      expect(lstatSync(join(workspace.workspace, '.pi', 'extensions', 'node_modules', '@rcarmo', 'piclaw-addon-peerless', 'node_modules')).isSymbolicLink()).toBe(true);
+      expect(JSON.parse(readFileSync(join(workspace.workspace, '.pi', 'extensions', 'package.json'), 'utf8')).dependencies).toEqual({
+        '@rcarmo/piclaw-addon-peerless': 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-peerless-0.2.0.tgz',
+      });
+    } finally {
+      setAddonInstallTestHooksForTests(null);
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+
+test('handleInstallAddon rejects legacy direct-download specs', async () => {
+  await withTempWorkspaceEnv('piclaw-addon-install-direct-download-', {}, async () => {
+    const originalFetch = globalThis.fetch;
+    const bunCalls: Array<{ args: string[]; cwd: string }> = [];
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('catalog-direct-download.json')) {
+        return new Response(JSON.stringify({
+          source: 'catalog-direct-download',
+          addons: [{
+            slug: 'legacy-direct',
+            name: '@rcarmo/piclaw-addon-legacy-direct',
+            version: '0.4.0',
+            description: 'legacy direct download',
+            install: {
+              kind: 'direct-download',
+              spec: '@rcarmo/piclaw-addon-legacy-direct',
+            },
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (href.includes('rcarmo/piclaw-addons/main/catalog.json')) {
+        return new Response(JSON.stringify({ source: 'default', addons: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    setAddonInstallTestHooksForTests({
+      async runBunCommand(args, cwd) {
+        bunCalls.push({ args, cwd });
+        return { ok: false, exitCode: 1, stdout: '', stderr: 'bun add should not run for rejected direct-download specs' };
+      },
+    });
+
+    try {
+      const res = await handleInstallAddon(
+        new Request('https://example.test/agent/addons/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: 'legacy-direct' }),
+        }),
+        (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+        new URL('https://example.test/agent/addons/install?catalog_url=https://example.com/catalog-direct-download.json'),
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: 'Catalog add-on installs must provide a tarball URL or package spec. Direct repo downloads are no longer supported.',
+      });
+      expect(bunCalls).toHaveLength(0);
+    } finally {
+      setAddonInstallTestHooksForTests(null);
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+test('handleInstallAddon falls back to bun add when catalog install metadata is missing', async () => {
+  await withTempWorkspaceEnv('piclaw-addon-install-package-', {}, async (workspace) => {
+    const originalFetch = globalThis.fetch;
+    const bunCalls: Array<{ args: string[]; cwd: string }> = [];
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('catalog-package.json')) {
+        return new Response(JSON.stringify({
+          source: 'catalog-package',
+          addons: [{
+            slug: 'direct-peerless',
+            name: '@rcarmo/piclaw-addon-direct-peerless',
+            version: '0.3.0',
+            description: 'package fallback',
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (href.includes('rcarmo/piclaw-addons/main/catalog.json')) {
+        return new Response(JSON.stringify({ source: 'default', addons: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    setAddonInstallTestHooksForTests({
+      async runBunCommand(args, cwd) {
+        bunCalls.push({ args, cwd });
+        if (args.join(' ') === 'bun add --force @rcarmo/piclaw-addon-direct-peerless') {
+          const addonDir = join(cwd, 'node_modules', '@rcarmo', 'piclaw-addon-direct-peerless');
+          mkdirSync(addonDir, { recursive: true });
+          writeFileSync(join(addonDir, 'package.json'), JSON.stringify({
+            name: '@rcarmo/piclaw-addon-direct-peerless',
+            version: '0.3.0',
+          }, null, 2));
+          return { ok: true, exitCode: 0, stdout: 'installed', stderr: '' };
+        }
+        return { ok: false, exitCode: 1, stdout: '', stderr: 'unexpected bun command' };
+      },
+    });
+
+    try {
+      const res = await handleInstallAddon(
+        new Request('https://example.test/agent/addons/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: 'direct-peerless' }),
+        }),
+        (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+        new URL('https://example.test/agent/addons/install?catalog_url=https://example.com/catalog-package.json'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(expect.objectContaining({
+        ok: true,
+        slug: 'direct-peerless',
+        installedVersion: '0.3.0',
+        installKind: 'package',
+      }));
       expect(bunCalls).toHaveLength(1);
       expect(bunCalls[0]).toEqual({
-        args: ['bun', 'add', '--force', 'https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-observability-0.1.2.tgz'],
+        args: ['bun', 'add', '--force', '@rcarmo/piclaw-addon-direct-peerless'],
         cwd: join(workspace.workspace, '.pi', 'extensions'),
       });
     } finally {

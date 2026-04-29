@@ -10,12 +10,12 @@
  * authenticated GitHub Packages registry entries. GitHub Packages npm reads still
  * require auth and caused regressions in add-on install/remove flows.
  *
- * Preferred flow: install from the catalog's public tarball URL, or fall back to
- * direct file download from the repo when a catalog entry is legacy/incomplete.
- * Public npm registry installs are a last-resort fallback for third-party catalogs.
+ * Preferred flow: install from the catalog's public tarball URL.
+ * Repo-tree / GitHub API fallback is intentionally unsupported now.
+ * Explicit non-tarball package specs remain available for third-party catalogs.
  */
 
-import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, mkdirSync, unlinkSync, writeFileSync, renameSync } from "fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, mkdirSync, unlinkSync, writeFileSync, renameSync, symlinkSync } from "fs";
 import { join, dirname, extname, resolve } from "path";
 import { WORKSPACE_DIR } from "../../../core/config.js";
 import { requestGracefulShutdown } from "../../../runtime/shutdown-registry.js";
@@ -23,12 +23,7 @@ import { createLogger } from "../../../utils/logger.js";
 
 const DEFAULT_CATALOG_URL = "https://raw.githubusercontent.com/rcarmo/piclaw-addons/main/catalog.json";
 const DEFAULT_CATALOG_URLS = [DEFAULT_CATALOG_URL] as const;
-const DEFAULT_REPO_OWNER = "rcarmo";
-const DEFAULT_REPO_NAME = "piclaw-addons";
-const DEFAULT_REPO_BRANCH = "main";
 const CATALOG_CACHE_MS = 5 * 60 * 1000;
-const GITHUB_RAW_BASE = "https://raw.githubusercontent.com";
-const GITHUB_API_BASE = "https://api.github.com";
 export const WEB_RESTART_DELAY_MS = 150;
 
 const catalogCache = new Map<string, { data: unknown; ts: number }>();
@@ -36,8 +31,7 @@ const catalogCache = new Map<string, { data: unknown; ts: number }>();
 type BunCommandResult = { ok: boolean; exitCode: number; stdout: string; stderr: string };
 type AddonInstallTestHooks = {
   runBunCommand?: (args: string[], cwd: string) => Promise<BunCommandResult>;
-  fetchAddonFileTree?: (addonPath: string, owner?: string, repo?: string, branch?: string) => Promise<string[]>;
-  downloadFile?: (repoPath: string, destPath: string, owner?: string, repo?: string, branch?: string) => Promise<void>;
+  downloadUrlToFile?: (url: string, destPath: string) => Promise<void>;
 };
 
 let addonInstallTestHooks: AddonInstallTestHooks | null = null;
@@ -72,7 +66,10 @@ interface CatalogData {
 
 interface AddonPackageManifest {
   name?: string;
+  version?: string;
   main?: string;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
   pi?: {
     extensions?: string[];
     web?: {
@@ -139,6 +136,51 @@ function removeNodeModulesSymlinkIfPresent(addonsDir: string): void {
   } catch (e) {
     // Not found or inaccessible — nothing to remove.
     void e;
+  }
+}
+
+function ensureWritableAddonsNodeModulesDir(addonsDir: string): void {
+  removeNodeModulesSymlinkIfPresent(addonsDir);
+  mkdirSync(join(addonsDir, "node_modules"), { recursive: true });
+}
+
+function readAddonManifest(manifestPath: string): AddonPackageManifest | null {
+  try {
+    if (!existsSync(manifestPath)) return null;
+    return JSON.parse(readFileSync(manifestPath, "utf-8")) as AddonPackageManifest;
+  } catch {
+    return null;
+  }
+}
+
+function hasAddonRuntimeDependencies(manifest: AddonPackageManifest | null | undefined): boolean {
+  const dependencies = manifest?.dependencies;
+  return !!dependencies && typeof dependencies === "object" && Object.keys(dependencies).length > 0;
+}
+
+function findBundledNodeModulesDir(startDir = __dirname): string | null {
+  let dir = startDir;
+  for (let i = 0; i < 10; i++) {
+    const candidate = join(dir, "node_modules");
+    if (existsSync(join(candidate, "@mariozechner", "pi-ai"))) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  const globalCandidate = "/usr/local/lib/bun/install/global/node_modules";
+  return existsSync(join(globalCandidate, "@mariozechner", "pi-ai")) ? globalCandidate : null;
+}
+
+function linkBundledNodeModulesIntoAddon(addonDir: string): void {
+  const bundledNodeModulesDir = findBundledNodeModulesDir();
+  if (!bundledNodeModulesDir) return;
+  const addonNodeModulesDir = join(addonDir, "node_modules");
+  if (existsSync(addonNodeModulesDir)) return;
+  try {
+    symlinkSync(bundledNodeModulesDir, addonNodeModulesDir);
+  } catch (error) {
+    void error;
   }
 }
 
@@ -364,7 +406,7 @@ async function fetchMergedCatalog(catalogUrls: string[]): Promise<{ catalog: Cat
   };
 }
 
-export function resolveAddonInstallSpec(addon: Pick<CatalogAddon, "name" | "version" | "install">): { kind: string; spec: string; piSource?: string; scopedName?: string } {
+export function resolveAddonInstallSpec(addon: Pick<CatalogAddon, "name" | "version" | "install">): { kind: string; spec: string; piSource?: string } {
   const explicitSpec = addon.install?.spec?.trim();
   if (explicitSpec) {
     return {
@@ -373,11 +415,11 @@ export function resolveAddonInstallSpec(addon: Pick<CatalogAddon, "name" | "vers
       piSource: addon.install?.piSource?.trim() || undefined,
     };
   }
-  // Deliberately do NOT synthesize npm package specs for first-party add-ons.
-  // If a catalog entry is missing install metadata we use direct repo download,
-  // not npm/GitHub Packages auth.
+  // Catalogs should provide an explicit install spec. If they do not, surface the
+  // package name as a best-effort bun add target rather than falling back to any
+  // repo-tree or GitHub API download path.
   return {
-    kind: "direct-download",
+    kind: "package",
     spec: addon.name,
   };
 }
@@ -548,41 +590,88 @@ function describeAddonOperationFailure(action: 'install' | 'uninstall', error: u
   return message;
 }
 
-/** Fetch the file tree for an addon path via GitHub Contents API (legacy fallback). */
-async function fetchAddonFileTree(
-  addonPath: string,
-  owner = DEFAULT_REPO_OWNER,
-  repo = DEFAULT_REPO_NAME,
-  branch = DEFAULT_REPO_BRANCH,
-): Promise<string[]> {
-  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
-  const resp = await fetch(url, {
-    signal: AbortSignal.timeout(15000),
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
-  const data = await resp.json() as { tree: Array<{ path: string; type: string }> };
-  const prefix = addonPath.endsWith("/") ? addonPath : `${addonPath}/`;
-  return data.tree
-    .filter(entry => entry.type === "blob" && entry.path.startsWith(prefix))
-    .map(entry => entry.path);
-}
-
-/** Download a single file from GitHub raw and write to disk (legacy fallback). */
-async function downloadFile(
-  repoPath: string,
-  destPath: string,
-  owner = DEFAULT_REPO_OWNER,
-  repo = DEFAULT_REPO_NAME,
-  branch = DEFAULT_REPO_BRANCH,
-): Promise<void> {
-  const url = `${GITHUB_RAW_BASE}/${owner}/${repo}/${branch}/${repoPath}`;
+async function downloadUrlToFile(url: string, destPath: string): Promise<void> {
   const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  if (!resp.ok) throw new Error(`Failed to download ${repoPath}: ${resp.status}`);
+  if (!resp.ok) throw new Error(`Failed to download ${url}: ${resp.status}`);
   const data = new Uint8Array(await resp.arrayBuffer());
   const dir = dirname(destPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(destPath, data);
+}
+
+function resolveExtractedAddonRoot(stagingDir: string): string {
+  if (existsSync(join(stagingDir, "package.json"))) return stagingDir;
+
+  const npmPackRoot = join(stagingDir, "package");
+  if (existsSync(join(npmPackRoot, "package.json"))) return npmPackRoot;
+
+  for (const entry of readdirSync(stagingDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const candidate = join(stagingDir, entry.name);
+    if (existsSync(join(candidate, "package.json"))) return candidate;
+  }
+
+  throw new Error("Downloaded tarball did not contain a package.json at its root");
+}
+
+async function extractTarballToDir(archivePath: string, destDir: string): Promise<void> {
+  const result = await runBunCommand(["tar", "xzf", archivePath, "-C", destDir], getWorkspaceDir());
+  if (result.ok) return;
+  const detail = result.stderr || result.stdout || `tar exited ${result.exitCode}`;
+  throw new Error(`Failed to extract add-on tarball: ${detail}`);
+}
+
+async function installAddonFromTarball(
+  addonsDir: string,
+  destDir: string,
+  addon: CatalogAddon,
+  installPlan: { kind: string; spec: string },
+): Promise<{ installedVersion: string | null; warning?: string; peerOnly: boolean }> {
+  const stagingRoot = join(addonsDir, ".staging");
+  const stagingLeaf = `${addon.name.replace(/[\\/]+/g, "__")}-${Date.now()}`;
+  const stagingDir = join(stagingRoot, stagingLeaf);
+  const archivePath = join(stagingRoot, `${stagingLeaf}.tgz`);
+  mkdirSync(stagingRoot, { recursive: true });
+  mkdirSync(stagingDir, { recursive: true });
+
+  try {
+    await (addonInstallTestHooks?.downloadUrlToFile || downloadUrlToFile)(installPlan.spec, archivePath);
+    await extractTarballToDir(archivePath, stagingDir);
+
+    const installRoot = resolveExtractedAddonRoot(stagingDir);
+    const manifest = readAddonManifest(join(installRoot, "package.json"));
+    if (!manifest?.name) throw new Error("Downloaded tarball did not contain a valid package.json");
+    if (manifest.name !== addon.name) {
+      throw new Error(`Downloaded tarball package mismatch: expected ${addon.name}, got ${manifest.name}`);
+    }
+
+    const peerOnly = !hasAddonRuntimeDependencies(manifest);
+    if (!peerOnly) {
+      const nestedInstall = await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "install", "--force"], installRoot);
+      if (!nestedInstall.ok) {
+        const detail = nestedInstall.stderr || nestedInstall.stdout || `bun install exited ${nestedInstall.exitCode}`;
+        throw new Error(`Add-on dependency install failed: ${detail}`);
+      }
+    }
+
+    ensureWritableAddonsNodeModulesDir(addonsDir);
+    const cleanup = await removeAddonDirRobustly(destDir, addonsDir);
+    mkdirSync(dirname(destDir), { recursive: true });
+    renameSync(installRoot, destDir);
+    if (peerOnly) linkBundledNodeModulesIntoAddon(destDir);
+    setAddonDependencyRecord(addonsDir, addon.name, installPlan.spec);
+
+    return {
+      installedVersion: getInstalledVersion(addon.name),
+      ...(cleanup.deferred ? { warning: "Existing files were moved aside for cleanup on restart." } : {}),
+      peerOnly,
+    };
+  } finally {
+    try {
+      if (existsSync(archivePath)) rmSync(archivePath, { force: true });
+      if (existsSync(stagingDir)) rmSync(stagingDir, { recursive: true, force: true });
+    } catch (e) { void e; /* staging cleanup is best-effort */ }
+  }
 }
 
 export async function handleGetAddons(
@@ -743,108 +832,47 @@ export async function handleInstallAddon(
   if (!addon) return json({ error: `Add-on "${slug}" not found in catalog` }, 404);
 
   const addonsDir = ensureAddonsDir();
-  removeNodeModulesSymlinkIfPresent(addonsDir);
   if (catalog?.addons?.length) normalizeCatalogDependencySpecs(addonsDir, catalog.addons);
   const destDir = join(addonsDir, "node_modules", addon.name);
-  const addonPath = addon.path || `addons/${slug}`;
   const installPlan = resolveAddonInstallSpec(addon);
-  const installPlanIsPublicTarball = installPlan.kind === 'tarball' && /^https?:\/\//.test(installPlan.spec);
+  const installPlanIsTarballUrl = installPlan.kind === 'tarball' && /^https?:\/\//.test(installPlan.spec);
 
   try {
-    // First choice for first-party add-ons: install directly from the public
-    // GitHub Pages tarball URL in the catalog. This avoids GitHub API rate
-    // limits and keeps install/update independent from repo-tree fetches.
-    if (installPlanIsPublicTarball) {
+    if (installPlanIsTarballUrl) {
       addonLog.info("Installing add-on from public tarball URL", {
         operation: "addons.install.tarball",
         slug,
         spec: installPlan.spec,
       });
-      const tarballInstall = await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "add", "--force", installPlan.spec], addonsDir);
-      if (tarballInstall.ok) {
-        setAddonDependencyRecord(addonsDir, addon.name, installPlan.spec);
-        const installedVersion = getInstalledVersion(addon.name);
-        return json({
-          ok: true,
-          slug,
-          name: addon.name,
-          installedVersion,
-          installKind: installPlan.kind,
-          installSpec: installPlan.spec,
-          message: `Installed ${addon.name}@${installedVersion || addon.version || "?"} via public tarball. Restart required to load.`,
-        });
-      }
-      addonLog.warn("Public tarball install failed; falling back to direct repo download", {
-        operation: "addons.install.tarball_fallback",
+      const tarballInstall = await installAddonFromTarball(addonsDir, destDir, addon, installPlan);
+      return json({
+        ok: true,
         slug,
-        spec: installPlan.spec,
-        stderr: tarballInstall.stderr || undefined,
-        stdout: tarballInstall.stdout || undefined,
-        exitCode: tarballInstall.exitCode,
+        name: addon.name,
+        installedVersion: tarballInstall.installedVersion,
+        installKind: installPlan.kind,
+        installSpec: installPlan.spec,
+        message: tarballInstall.peerOnly
+          ? `Installed ${addon.name}@${tarballInstall.installedVersion || addon.version || "?"} via public tarball without installing redundant peer dependencies. Restart required to load.`
+          : `Installed ${addon.name}@${tarballInstall.installedVersion || addon.version || "?"} via public tarball. Restart required to load.`,
+        ...(tarballInstall.warning ? { warning: tarballInstall.warning } : {}),
       });
     }
 
-    // Fallback path: download the addon directly from the catalog repo.
-    // Used for legacy/incomplete catalog entries or when tarball install fails.
-    const files = await (addonInstallTestHooks?.fetchAddonFileTree || fetchAddonFileTree)(addonPath);
-    if (files.length > 0) {
-      const stagingRoot = join(addonsDir, '.staging');
-      const stagingDir = join(stagingRoot, `${addon.name}-${Date.now()}`);
-      mkdirSync(stagingDir, { recursive: true });
-
-      let downloaded = 0;
-      try {
-        for (const filePath of files) {
-          const relativePath = filePath.slice(addonPath.length + 1);
-          if (!relativePath) continue;
-          await (addonInstallTestHooks?.downloadFile || downloadFile)(filePath, join(stagingDir, relativePath));
-          downloaded++;
-        }
-
-        const dependencySpec = installPlan.kind === 'tarball' && /^https?:\/\//.test(installPlan.spec)
-          ? installPlan.spec
-          : (addon.version || "*");
-        setAddonDependencyRecord(addonsDir, addon.name, dependencySpec);
-
-        const addonPkg = join(stagingDir, "package.json");
-        if (existsSync(addonPkg)) {
-          await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "install", "--force"], stagingDir);
-        }
-
-        const cleanup = await removeAddonDirRobustly(destDir, addonsDir);
-        mkdirSync(dirname(destDir), { recursive: true });
-        renameSync(stagingDir, destDir);
-
-        const installedVersion = getInstalledVersion(addon.name);
-        return json({
-          ok: true,
-          slug,
-          name: addon.name,
-          installedVersion,
-          filesDownloaded: downloaded,
-          installKind: "direct-download",
-          installSpec: installPlan.spec,
-          message: `Installed ${addon.name}@${installedVersion || addon.version || "?"} from catalog. Restart required to load.`,
-          ...(cleanup.deferred ? { warning: "Existing files were moved aside for cleanup on restart." } : {}),
-        });
-      } finally {
-        try {
-          if (existsSync(stagingDir)) rmSync(stagingDir, { recursive: true, force: true });
-        } catch (e) { void e; /* staging cleanup is best-effort */ }
-      }
+    if (installPlan.kind === 'direct-download') {
+      return json({ error: 'Catalog add-on installs must provide a tarball URL or package spec. Direct repo downloads are no longer supported.' }, 400);
     }
 
-    // Last resort: try bun add for third-party catalogs that intentionally point
-    // at a public npm registry. Do not use this path for first-party piclaw-addons.
-    addonLog.info("No repo files found; falling back to bun add", {
-      operation: "addons.install.bun_add_fallback",
+    addonLog.info("Installing add-on via explicit package spec", {
+      operation: "addons.install.bun_add",
       slug,
       spec: installPlan.spec,
+      installKind: installPlan.kind,
     });
+    ensureWritableAddonsNodeModulesDir(addonsDir);
     const packageInstall = await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "add", "--force", installPlan.spec], addonsDir);
     if (packageInstall.ok) {
-      const lookupName = installPlan.scopedName || addon.name;
-      const installedVersion = getInstalledVersion(lookupName);
+      const installedVersion = getInstalledVersion(addon.name);
       return json({
         ok: true,
         slug,
