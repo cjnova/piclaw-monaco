@@ -141,12 +141,12 @@ export function App() {
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
                   title={terminalMaximized.value ? "Restore" : "Maximize"}><i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} style={{ fontSize: "14px" }} /></span>
                 <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
-                  onClick={() => { window.open("/terminal.html", "_blank"); }}
+                  onClick={() => { window.open("/static/terminal.html", "_blank"); }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
                   title="Open in new tab"><i className="codicon codicon-link-external" style={{ fontSize: "14px" }} /></span>
                 <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
-                  onClick={() => { window.open("/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); }}
+                  onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
                   title="Pop out to window"><i className="codicon codicon-multiple-windows" style={{ fontSize: "14px" }} /></span>
