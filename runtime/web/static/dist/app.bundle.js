@@ -21,240 +21,240 @@
   var w = [];
   var _ = /acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i;
   var g = Array.isArray;
-  function m(n2, l3) {
-    for (var u4 in l3) n2[u4] = l3[u4];
-    return n2;
+  function m(n3, l5) {
+    for (var u5 in l5) n3[u5] = l5[u5];
+    return n3;
   }
-  function b(n2) {
-    n2 && n2.parentNode && n2.parentNode.removeChild(n2);
+  function b(n3) {
+    n3 && n3.parentNode && n3.parentNode.removeChild(n3);
   }
-  function k(l3, u4, t3) {
-    var i4, r3, o3, e3 = {};
-    for (o3 in u4) "key" == o3 ? i4 = u4[o3] : "ref" == o3 ? r3 = u4[o3] : e3[o3] = u4[o3];
-    if (arguments.length > 2 && (e3.children = arguments.length > 3 ? n.call(arguments, 2) : t3), "function" == typeof l3 && null != l3.defaultProps) for (o3 in l3.defaultProps) void 0 === e3[o3] && (e3[o3] = l3.defaultProps[o3]);
-    return x(l3, e3, i4, r3, null);
+  function k(l5, u5, t4) {
+    var i5, r4, o4, e4 = {};
+    for (o4 in u5) "key" == o4 ? i5 = u5[o4] : "ref" == o4 ? r4 = u5[o4] : e4[o4] = u5[o4];
+    if (arguments.length > 2 && (e4.children = arguments.length > 3 ? n.call(arguments, 2) : t4), "function" == typeof l5 && null != l5.defaultProps) for (o4 in l5.defaultProps) void 0 === e4[o4] && (e4[o4] = l5.defaultProps[o4]);
+    return x(l5, e4, i5, r4, null);
   }
-  function x(n2, t3, i4, r3, o3) {
-    var e3 = { type: n2, props: t3, key: i4, ref: r3, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: null == o3 ? ++u : o3, __i: -1, __u: 0 };
-    return null == o3 && null != l.vnode && l.vnode(e3), e3;
+  function x(n3, t4, i5, r4, o4) {
+    var e4 = { type: n3, props: t4, key: i5, ref: r4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: null == o4 ? ++u : o4, __i: -1, __u: 0 };
+    return null == o4 && null != l.vnode && l.vnode(e4), e4;
   }
-  function S(n2) {
-    return n2.children;
+  function S(n3) {
+    return n3.children;
   }
-  function C(n2, l3) {
-    this.props = n2, this.context = l3;
+  function C(n3, l5) {
+    this.props = n3, this.context = l5;
   }
-  function $(n2, l3) {
-    if (null == l3) return n2.__ ? $(n2.__, n2.__i + 1) : null;
-    for (var u4; l3 < n2.__k.length; l3++) if (null != (u4 = n2.__k[l3]) && null != u4.__e) return u4.__e;
-    return "function" == typeof n2.type ? $(n2) : null;
+  function $(n3, l5) {
+    if (null == l5) return n3.__ ? $(n3.__, n3.__i + 1) : null;
+    for (var u5; l5 < n3.__k.length; l5++) if (null != (u5 = n3.__k[l5]) && null != u5.__e) return u5.__e;
+    return "function" == typeof n3.type ? $(n3) : null;
   }
-  function I(n2) {
-    if (n2.__P && n2.__d) {
-      var u4 = n2.__v, t3 = u4.__e, i4 = [], r3 = [], o3 = m({}, u4);
-      o3.__v = u4.__v + 1, l.vnode && l.vnode(o3), q(n2.__P, o3, u4, n2.__n, n2.__P.namespaceURI, 32 & u4.__u ? [t3] : null, i4, null == t3 ? $(u4) : t3, !!(32 & u4.__u), r3), o3.__v = u4.__v, o3.__.__k[o3.__i] = o3, D(i4, o3, r3), u4.__e = u4.__ = null, o3.__e != t3 && P(o3);
+  function I(n3) {
+    if (n3.__P && n3.__d) {
+      var u5 = n3.__v, t4 = u5.__e, i5 = [], r4 = [], o4 = m({}, u5);
+      o4.__v = u5.__v + 1, l.vnode && l.vnode(o4), q(n3.__P, o4, u5, n3.__n, n3.__P.namespaceURI, 32 & u5.__u ? [t4] : null, i5, null == t4 ? $(u5) : t4, !!(32 & u5.__u), r4), o4.__v = u5.__v, o4.__.__k[o4.__i] = o4, D(i5, o4, r4), u5.__e = u5.__ = null, o4.__e != t4 && P(o4);
     }
   }
-  function P(n2) {
-    if (null != (n2 = n2.__) && null != n2.__c) return n2.__e = n2.__c.base = null, n2.__k.some(function(l3) {
-      if (null != l3 && null != l3.__e) return n2.__e = n2.__c.base = l3.__e;
-    }), P(n2);
+  function P(n3) {
+    if (null != (n3 = n3.__) && null != n3.__c) return n3.__e = n3.__c.base = null, n3.__k.some(function(l5) {
+      if (null != l5 && null != l5.__e) return n3.__e = n3.__c.base = l5.__e;
+    }), P(n3);
   }
-  function A(n2) {
-    (!n2.__d && (n2.__d = true) && i.push(n2) && !H.__r++ || r != l.debounceRendering) && ((r = l.debounceRendering) || o)(H);
+  function A(n3) {
+    (!n3.__d && (n3.__d = true) && i.push(n3) && !H.__r++ || r != l.debounceRendering) && ((r = l.debounceRendering) || o)(H);
   }
   function H() {
     try {
-      for (var n2, l3 = 1; i.length; ) i.length > l3 && i.sort(e), n2 = i.shift(), l3 = i.length, I(n2);
+      for (var n3, l5 = 1; i.length; ) i.length > l5 && i.sort(e), n3 = i.shift(), l5 = i.length, I(n3);
     } finally {
       i.length = H.__r = 0;
     }
   }
-  function L(n2, l3, u4, t3, i4, r3, o3, e3, f4, c3, s3) {
-    var a3, h3, p3, v3, y3, _2, g2, m3 = t3 && t3.__k || w, b2 = l3.length;
-    for (f4 = T(u4, l3, m3, f4, b2), a3 = 0; a3 < b2; a3++) null != (p3 = u4.__k[a3]) && (h3 = -1 != p3.__i && m3[p3.__i] || d, p3.__i = a3, _2 = q(n2, p3, h3, i4, r3, o3, e3, f4, c3, s3), v3 = p3.__e, p3.ref && h3.ref != p3.ref && (h3.ref && J(h3.ref, null, p3), s3.push(p3.ref, p3.__c || v3, p3)), null == y3 && null != v3 && (y3 = v3), (g2 = !!(4 & p3.__u)) || h3.__k === p3.__k ? (f4 = j(p3, f4, n2, g2), g2 && h3.__e && (h3.__e = null)) : "function" == typeof p3.type && void 0 !== _2 ? f4 = _2 : v3 && (f4 = v3.nextSibling), p3.__u &= -7);
-    return u4.__e = y3, f4;
+  function L(n3, l5, u5, t4, i5, r4, o4, e4, f5, c4, s4) {
+    var a4, h5, p5, v4, y5, _4, g4, m5 = t4 && t4.__k || w, b4 = l5.length;
+    for (f5 = T(u5, l5, m5, f5, b4), a4 = 0; a4 < b4; a4++) null != (p5 = u5.__k[a4]) && (h5 = -1 != p5.__i && m5[p5.__i] || d, p5.__i = a4, _4 = q(n3, p5, h5, i5, r4, o4, e4, f5, c4, s4), v4 = p5.__e, p5.ref && h5.ref != p5.ref && (h5.ref && J(h5.ref, null, p5), s4.push(p5.ref, p5.__c || v4, p5)), null == y5 && null != v4 && (y5 = v4), (g4 = !!(4 & p5.__u)) || h5.__k === p5.__k ? (f5 = j(p5, f5, n3, g4), g4 && h5.__e && (h5.__e = null)) : "function" == typeof p5.type && void 0 !== _4 ? f5 = _4 : v4 && (f5 = v4.nextSibling), p5.__u &= -7);
+    return u5.__e = y5, f5;
   }
-  function T(n2, l3, u4, t3, i4) {
-    var r3, o3, e3, f4, c3, s3 = u4.length, a3 = s3, h3 = 0;
-    for (n2.__k = new Array(i4), r3 = 0; r3 < i4; r3++) null != (o3 = l3[r3]) && "boolean" != typeof o3 && "function" != typeof o3 ? ("string" == typeof o3 || "number" == typeof o3 || "bigint" == typeof o3 || o3.constructor == String ? o3 = n2.__k[r3] = x(null, o3, null, null, null) : g(o3) ? o3 = n2.__k[r3] = x(S, { children: o3 }, null, null, null) : void 0 === o3.constructor && o3.__b > 0 ? o3 = n2.__k[r3] = x(o3.type, o3.props, o3.key, o3.ref ? o3.ref : null, o3.__v) : n2.__k[r3] = o3, f4 = r3 + h3, o3.__ = n2, o3.__b = n2.__b + 1, e3 = null, -1 != (c3 = o3.__i = O(o3, u4, f4, a3)) && (a3--, (e3 = u4[c3]) && (e3.__u |= 2)), null == e3 || null == e3.__v ? (-1 == c3 && (i4 > s3 ? h3-- : i4 < s3 && h3++), "function" != typeof o3.type && (o3.__u |= 4)) : c3 != f4 && (c3 == f4 - 1 ? h3-- : c3 == f4 + 1 ? h3++ : (c3 > f4 ? h3-- : h3++, o3.__u |= 4))) : n2.__k[r3] = null;
-    if (a3) for (r3 = 0; r3 < s3; r3++) null != (e3 = u4[r3]) && 0 == (2 & e3.__u) && (e3.__e == t3 && (t3 = $(e3)), K(e3, e3));
-    return t3;
+  function T(n3, l5, u5, t4, i5) {
+    var r4, o4, e4, f5, c4, s4 = u5.length, a4 = s4, h5 = 0;
+    for (n3.__k = new Array(i5), r4 = 0; r4 < i5; r4++) null != (o4 = l5[r4]) && "boolean" != typeof o4 && "function" != typeof o4 ? ("string" == typeof o4 || "number" == typeof o4 || "bigint" == typeof o4 || o4.constructor == String ? o4 = n3.__k[r4] = x(null, o4, null, null, null) : g(o4) ? o4 = n3.__k[r4] = x(S, { children: o4 }, null, null, null) : void 0 === o4.constructor && o4.__b > 0 ? o4 = n3.__k[r4] = x(o4.type, o4.props, o4.key, o4.ref ? o4.ref : null, o4.__v) : n3.__k[r4] = o4, f5 = r4 + h5, o4.__ = n3, o4.__b = n3.__b + 1, e4 = null, -1 != (c4 = o4.__i = O(o4, u5, f5, a4)) && (a4--, (e4 = u5[c4]) && (e4.__u |= 2)), null == e4 || null == e4.__v ? (-1 == c4 && (i5 > s4 ? h5-- : i5 < s4 && h5++), "function" != typeof o4.type && (o4.__u |= 4)) : c4 != f5 && (c4 == f5 - 1 ? h5-- : c4 == f5 + 1 ? h5++ : (c4 > f5 ? h5-- : h5++, o4.__u |= 4))) : n3.__k[r4] = null;
+    if (a4) for (r4 = 0; r4 < s4; r4++) null != (e4 = u5[r4]) && 0 == (2 & e4.__u) && (e4.__e == t4 && (t4 = $(e4)), K(e4, e4));
+    return t4;
   }
-  function j(n2, l3, u4, t3) {
-    var i4, r3;
-    if ("function" == typeof n2.type) {
-      for (i4 = n2.__k, r3 = 0; i4 && r3 < i4.length; r3++) i4[r3] && (i4[r3].__ = n2, l3 = j(i4[r3], l3, u4, t3));
-      return l3;
+  function j(n3, l5, u5, t4) {
+    var i5, r4;
+    if ("function" == typeof n3.type) {
+      for (i5 = n3.__k, r4 = 0; i5 && r4 < i5.length; r4++) i5[r4] && (i5[r4].__ = n3, l5 = j(i5[r4], l5, u5, t4));
+      return l5;
     }
-    n2.__e != l3 && (t3 && (l3 && n2.type && !l3.parentNode && (l3 = $(n2)), u4.insertBefore(n2.__e, l3 || null)), l3 = n2.__e);
+    n3.__e != l5 && (t4 && (l5 && n3.type && !l5.parentNode && (l5 = $(n3)), u5.insertBefore(n3.__e, l5 || null)), l5 = n3.__e);
     do {
-      l3 = l3 && l3.nextSibling;
-    } while (null != l3 && 8 == l3.nodeType);
-    return l3;
+      l5 = l5 && l5.nextSibling;
+    } while (null != l5 && 8 == l5.nodeType);
+    return l5;
   }
-  function O(n2, l3, u4, t3) {
-    var i4, r3, o3, e3 = n2.key, f4 = n2.type, c3 = l3[u4], s3 = null != c3 && 0 == (2 & c3.__u);
-    if (null === c3 && null == e3 || s3 && e3 == c3.key && f4 == c3.type) return u4;
-    if (t3 > (s3 ? 1 : 0)) {
-      for (i4 = u4 - 1, r3 = u4 + 1; i4 >= 0 || r3 < l3.length; ) if (null != (c3 = l3[o3 = i4 >= 0 ? i4-- : r3++]) && 0 == (2 & c3.__u) && e3 == c3.key && f4 == c3.type) return o3;
+  function O(n3, l5, u5, t4) {
+    var i5, r4, o4, e4 = n3.key, f5 = n3.type, c4 = l5[u5], s4 = null != c4 && 0 == (2 & c4.__u);
+    if (null === c4 && null == e4 || s4 && e4 == c4.key && f5 == c4.type) return u5;
+    if (t4 > (s4 ? 1 : 0)) {
+      for (i5 = u5 - 1, r4 = u5 + 1; i5 >= 0 || r4 < l5.length; ) if (null != (c4 = l5[o4 = i5 >= 0 ? i5-- : r4++]) && 0 == (2 & c4.__u) && e4 == c4.key && f5 == c4.type) return o4;
     }
     return -1;
   }
-  function z(n2, l3, u4) {
-    "-" == l3[0] ? n2.setProperty(l3, null == u4 ? "" : u4) : n2[l3] = null == u4 ? "" : "number" != typeof u4 || _.test(l3) ? u4 : u4 + "px";
+  function z(n3, l5, u5) {
+    "-" == l5[0] ? n3.setProperty(l5, null == u5 ? "" : u5) : n3[l5] = null == u5 ? "" : "number" != typeof u5 || _.test(l5) ? u5 : u5 + "px";
   }
-  function N(n2, l3, u4, t3, i4) {
-    var r3, o3;
-    n: if ("style" == l3) if ("string" == typeof u4) n2.style.cssText = u4;
+  function N(n3, l5, u5, t4, i5) {
+    var r4, o4;
+    n: if ("style" == l5) if ("string" == typeof u5) n3.style.cssText = u5;
     else {
-      if ("string" == typeof t3 && (n2.style.cssText = t3 = ""), t3) for (l3 in t3) u4 && l3 in u4 || z(n2.style, l3, "");
-      if (u4) for (l3 in u4) t3 && u4[l3] == t3[l3] || z(n2.style, l3, u4[l3]);
+      if ("string" == typeof t4 && (n3.style.cssText = t4 = ""), t4) for (l5 in t4) u5 && l5 in u5 || z(n3.style, l5, "");
+      if (u5) for (l5 in u5) t4 && u5[l5] == t4[l5] || z(n3.style, l5, u5[l5]);
     }
-    else if ("o" == l3[0] && "n" == l3[1]) r3 = l3 != (l3 = l3.replace(a, "$1")), o3 = l3.toLowerCase(), l3 = o3 in n2 || "onFocusOut" == l3 || "onFocusIn" == l3 ? o3.slice(2) : l3.slice(2), n2.l || (n2.l = {}), n2.l[l3 + r3] = u4, u4 ? t3 ? u4[s] = t3[s] : (u4[s] = h, n2.addEventListener(l3, r3 ? v : p, r3)) : n2.removeEventListener(l3, r3 ? v : p, r3);
+    else if ("o" == l5[0] && "n" == l5[1]) r4 = l5 != (l5 = l5.replace(a, "$1")), o4 = l5.toLowerCase(), l5 = o4 in n3 || "onFocusOut" == l5 || "onFocusIn" == l5 ? o4.slice(2) : l5.slice(2), n3.l || (n3.l = {}), n3.l[l5 + r4] = u5, u5 ? t4 ? u5[s] = t4[s] : (u5[s] = h, n3.addEventListener(l5, r4 ? v : p, r4)) : n3.removeEventListener(l5, r4 ? v : p, r4);
     else {
-      if ("http://www.w3.org/2000/svg" == i4) l3 = l3.replace(/xlink(H|:h)/, "h").replace(/sName$/, "s");
-      else if ("width" != l3 && "height" != l3 && "href" != l3 && "list" != l3 && "form" != l3 && "tabIndex" != l3 && "download" != l3 && "rowSpan" != l3 && "colSpan" != l3 && "role" != l3 && "popover" != l3 && l3 in n2) try {
-        n2[l3] = null == u4 ? "" : u4;
+      if ("http://www.w3.org/2000/svg" == i5) l5 = l5.replace(/xlink(H|:h)/, "h").replace(/sName$/, "s");
+      else if ("width" != l5 && "height" != l5 && "href" != l5 && "list" != l5 && "form" != l5 && "tabIndex" != l5 && "download" != l5 && "rowSpan" != l5 && "colSpan" != l5 && "role" != l5 && "popover" != l5 && l5 in n3) try {
+        n3[l5] = null == u5 ? "" : u5;
         break n;
-      } catch (n3) {
+      } catch (n4) {
       }
-      "function" == typeof u4 || (null == u4 || false === u4 && "-" != l3[4] ? n2.removeAttribute(l3) : n2.setAttribute(l3, "popover" == l3 && 1 == u4 ? "" : u4));
+      "function" == typeof u5 || (null == u5 || false === u5 && "-" != l5[4] ? n3.removeAttribute(l5) : n3.setAttribute(l5, "popover" == l5 && 1 == u5 ? "" : u5));
     }
   }
-  function V(n2) {
-    return function(u4) {
+  function V(n3) {
+    return function(u5) {
       if (this.l) {
-        var t3 = this.l[u4.type + n2];
-        if (null == u4[c]) u4[c] = h++;
-        else if (u4[c] < t3[s]) return;
-        return t3(l.event ? l.event(u4) : u4);
+        var t4 = this.l[u5.type + n3];
+        if (null == u5[c]) u5[c] = h++;
+        else if (u5[c] < t4[s]) return;
+        return t4(l.event ? l.event(u5) : u5);
       }
     };
   }
-  function q(n2, u4, t3, i4, r3, o3, e3, f4, c3, s3) {
-    var a3, h3, p3, v3, y3, d3, _2, k3, x2, M, $2, I2, P2, A2, H2, T3 = u4.type;
-    if (void 0 !== u4.constructor) return null;
-    128 & t3.__u && (c3 = !!(32 & t3.__u), o3 = [f4 = u4.__e = t3.__e]), (a3 = l.__b) && a3(u4);
+  function q(n3, u5, t4, i5, r4, o4, e4, f5, c4, s4) {
+    var a4, h5, p5, v4, y5, d4, _4, k4, x3, M2, $2, I2, P2, A4, H2, T3 = u5.type;
+    if (void 0 !== u5.constructor) return null;
+    128 & t4.__u && (c4 = !!(32 & t4.__u), o4 = [f5 = u5.__e = t4.__e]), (a4 = l.__b) && a4(u5);
     n: if ("function" == typeof T3) try {
-      if (k3 = u4.props, x2 = T3.prototype && T3.prototype.render, M = (a3 = T3.contextType) && i4[a3.__c], $2 = a3 ? M ? M.props.value : a3.__ : i4, t3.__c ? _2 = (h3 = u4.__c = t3.__c).__ = h3.__E : (x2 ? u4.__c = h3 = new T3(k3, $2) : (u4.__c = h3 = new C(k3, $2), h3.constructor = T3, h3.render = Q), M && M.sub(h3), h3.state || (h3.state = {}), h3.__n = i4, p3 = h3.__d = true, h3.__h = [], h3._sb = []), x2 && null == h3.__s && (h3.__s = h3.state), x2 && null != T3.getDerivedStateFromProps && (h3.__s == h3.state && (h3.__s = m({}, h3.__s)), m(h3.__s, T3.getDerivedStateFromProps(k3, h3.__s))), v3 = h3.props, y3 = h3.state, h3.__v = u4, p3) x2 && null == T3.getDerivedStateFromProps && null != h3.componentWillMount && h3.componentWillMount(), x2 && null != h3.componentDidMount && h3.__h.push(h3.componentDidMount);
+      if (k4 = u5.props, x3 = T3.prototype && T3.prototype.render, M2 = (a4 = T3.contextType) && i5[a4.__c], $2 = a4 ? M2 ? M2.props.value : a4.__ : i5, t4.__c ? _4 = (h5 = u5.__c = t4.__c).__ = h5.__E : (x3 ? u5.__c = h5 = new T3(k4, $2) : (u5.__c = h5 = new C(k4, $2), h5.constructor = T3, h5.render = Q), M2 && M2.sub(h5), h5.state || (h5.state = {}), h5.__n = i5, p5 = h5.__d = true, h5.__h = [], h5._sb = []), x3 && null == h5.__s && (h5.__s = h5.state), x3 && null != T3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = m({}, h5.__s)), m(h5.__s, T3.getDerivedStateFromProps(k4, h5.__s))), v4 = h5.props, y5 = h5.state, h5.__v = u5, p5) x3 && null == T3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), x3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
       else {
-        if (x2 && null == T3.getDerivedStateFromProps && k3 !== v3 && null != h3.componentWillReceiveProps && h3.componentWillReceiveProps(k3, $2), u4.__v == t3.__v || !h3.__e && null != h3.shouldComponentUpdate && false === h3.shouldComponentUpdate(k3, h3.__s, $2)) {
-          u4.__v != t3.__v && (h3.props = k3, h3.state = h3.__s, h3.__d = false), u4.__e = t3.__e, u4.__k = t3.__k, u4.__k.some(function(n3) {
-            n3 && (n3.__ = u4);
-          }), w.push.apply(h3.__h, h3._sb), h3._sb = [], h3.__h.length && e3.push(h3);
+        if (x3 && null == T3.getDerivedStateFromProps && k4 !== v4 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(k4, $2), u5.__v == t4.__v || !h5.__e && null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(k4, h5.__s, $2)) {
+          u5.__v != t4.__v && (h5.props = k4, h5.state = h5.__s, h5.__d = false), u5.__e = t4.__e, u5.__k = t4.__k, u5.__k.some(function(n4) {
+            n4 && (n4.__ = u5);
+          }), w.push.apply(h5.__h, h5._sb), h5._sb = [], h5.__h.length && e4.push(h5);
           break n;
         }
-        null != h3.componentWillUpdate && h3.componentWillUpdate(k3, h3.__s, $2), x2 && null != h3.componentDidUpdate && h3.__h.push(function() {
-          h3.componentDidUpdate(v3, y3, d3);
+        null != h5.componentWillUpdate && h5.componentWillUpdate(k4, h5.__s, $2), x3 && null != h5.componentDidUpdate && h5.__h.push(function() {
+          h5.componentDidUpdate(v4, y5, d4);
         });
       }
-      if (h3.context = $2, h3.props = k3, h3.__P = n2, h3.__e = false, I2 = l.__r, P2 = 0, x2) h3.state = h3.__s, h3.__d = false, I2 && I2(u4), a3 = h3.render(h3.props, h3.state, h3.context), w.push.apply(h3.__h, h3._sb), h3._sb = [];
+      if (h5.context = $2, h5.props = k4, h5.__P = n3, h5.__e = false, I2 = l.__r, P2 = 0, x3) h5.state = h5.__s, h5.__d = false, I2 && I2(u5), a4 = h5.render(h5.props, h5.state, h5.context), w.push.apply(h5.__h, h5._sb), h5._sb = [];
       else do {
-        h3.__d = false, I2 && I2(u4), a3 = h3.render(h3.props, h3.state, h3.context), h3.state = h3.__s;
-      } while (h3.__d && ++P2 < 25);
-      h3.state = h3.__s, null != h3.getChildContext && (i4 = m(m({}, i4), h3.getChildContext())), x2 && !p3 && null != h3.getSnapshotBeforeUpdate && (d3 = h3.getSnapshotBeforeUpdate(v3, y3)), A2 = null != a3 && a3.type === S && null == a3.key ? E(a3.props.children) : a3, f4 = L(n2, g(A2) ? A2 : [A2], u4, t3, i4, r3, o3, e3, f4, c3, s3), h3.base = u4.__e, u4.__u &= -161, h3.__h.length && e3.push(h3), _2 && (h3.__E = h3.__ = null);
-    } catch (n3) {
-      if (u4.__v = null, c3 || null != o3) if (n3.then) {
-        for (u4.__u |= c3 ? 160 : 128; f4 && 8 == f4.nodeType && f4.nextSibling; ) f4 = f4.nextSibling;
-        o3[o3.indexOf(f4)] = null, u4.__e = f4;
+        h5.__d = false, I2 && I2(u5), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
+      } while (h5.__d && ++P2 < 25);
+      h5.state = h5.__s, null != h5.getChildContext && (i5 = m(m({}, i5), h5.getChildContext())), x3 && !p5 && null != h5.getSnapshotBeforeUpdate && (d4 = h5.getSnapshotBeforeUpdate(v4, y5)), A4 = null != a4 && a4.type === S && null == a4.key ? E(a4.props.children) : a4, f5 = L(n3, g(A4) ? A4 : [A4], u5, t4, i5, r4, o4, e4, f5, c4, s4), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), _4 && (h5.__E = h5.__ = null);
+    } catch (n4) {
+      if (u5.__v = null, c4 || null != o4) if (n4.then) {
+        for (u5.__u |= c4 ? 160 : 128; f5 && 8 == f5.nodeType && f5.nextSibling; ) f5 = f5.nextSibling;
+        o4[o4.indexOf(f5)] = null, u5.__e = f5;
       } else {
-        for (H2 = o3.length; H2--; ) b(o3[H2]);
-        B(u4);
+        for (H2 = o4.length; H2--; ) b(o4[H2]);
+        B(u5);
       }
-      else u4.__e = t3.__e, u4.__k = t3.__k, n3.then || B(u4);
-      l.__e(n3, u4, t3);
+      else u5.__e = t4.__e, u5.__k = t4.__k, n4.then || B(u5);
+      l.__e(n4, u5, t4);
     }
-    else null == o3 && u4.__v == t3.__v ? (u4.__k = t3.__k, u4.__e = t3.__e) : f4 = u4.__e = G(t3.__e, u4, t3, i4, r3, o3, e3, c3, s3);
-    return (a3 = l.diffed) && a3(u4), 128 & u4.__u ? void 0 : f4;
+    else null == o4 && u5.__v == t4.__v ? (u5.__k = t4.__k, u5.__e = t4.__e) : f5 = u5.__e = G(t4.__e, u5, t4, i5, r4, o4, e4, c4, s4);
+    return (a4 = l.diffed) && a4(u5), 128 & u5.__u ? void 0 : f5;
   }
-  function B(n2) {
-    n2 && (n2.__c && (n2.__c.__e = true), n2.__k && n2.__k.some(B));
+  function B(n3) {
+    n3 && (n3.__c && (n3.__c.__e = true), n3.__k && n3.__k.some(B));
   }
-  function D(n2, u4, t3) {
-    for (var i4 = 0; i4 < t3.length; i4++) J(t3[i4], t3[++i4], t3[++i4]);
-    l.__c && l.__c(u4, n2), n2.some(function(u5) {
+  function D(n3, u5, t4) {
+    for (var i5 = 0; i5 < t4.length; i5++) J(t4[i5], t4[++i5], t4[++i5]);
+    l.__c && l.__c(u5, n3), n3.some(function(u6) {
       try {
-        n2 = u5.__h, u5.__h = [], n2.some(function(n3) {
-          n3.call(u5);
+        n3 = u6.__h, u6.__h = [], n3.some(function(n4) {
+          n4.call(u6);
         });
-      } catch (n3) {
-        l.__e(n3, u5.__v);
+      } catch (n4) {
+        l.__e(n4, u6.__v);
       }
     });
   }
-  function E(n2) {
-    return "object" != typeof n2 || null == n2 || n2.__b > 0 ? n2 : g(n2) ? n2.map(E) : m({}, n2);
+  function E(n3) {
+    return "object" != typeof n3 || null == n3 || n3.__b > 0 ? n3 : g(n3) ? n3.map(E) : m({}, n3);
   }
-  function G(u4, t3, i4, r3, o3, e3, f4, c3, s3) {
-    var a3, h3, p3, v3, y3, w3, _2, m3 = i4.props || d, k3 = t3.props, x2 = t3.type;
-    if ("svg" == x2 ? o3 = "http://www.w3.org/2000/svg" : "math" == x2 ? o3 = "http://www.w3.org/1998/Math/MathML" : o3 || (o3 = "http://www.w3.org/1999/xhtml"), null != e3) {
-      for (a3 = 0; a3 < e3.length; a3++) if ((y3 = e3[a3]) && "setAttribute" in y3 == !!x2 && (x2 ? y3.localName == x2 : 3 == y3.nodeType)) {
-        u4 = y3, e3[a3] = null;
+  function G(u5, t4, i5, r4, o4, e4, f5, c4, s4) {
+    var a4, h5, p5, v4, y5, w4, _4, m5 = i5.props || d, k4 = t4.props, x3 = t4.type;
+    if ("svg" == x3 ? o4 = "http://www.w3.org/2000/svg" : "math" == x3 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
+      for (a4 = 0; a4 < e4.length; a4++) if ((y5 = e4[a4]) && "setAttribute" in y5 == !!x3 && (x3 ? y5.localName == x3 : 3 == y5.nodeType)) {
+        u5 = y5, e4[a4] = null;
         break;
       }
     }
-    if (null == u4) {
-      if (null == x2) return document.createTextNode(k3);
-      u4 = document.createElementNS(o3, x2, k3.is && k3), c3 && (l.__m && l.__m(t3, e3), c3 = false), e3 = null;
+    if (null == u5) {
+      if (null == x3) return document.createTextNode(k4);
+      u5 = document.createElementNS(o4, x3, k4.is && k4), c4 && (l.__m && l.__m(t4, e4), c4 = false), e4 = null;
     }
-    if (null == x2) m3 === k3 || c3 && u4.data == k3 || (u4.data = k3);
+    if (null == x3) m5 === k4 || c4 && u5.data == k4 || (u5.data = k4);
     else {
-      if (e3 = e3 && n.call(u4.childNodes), !c3 && null != e3) for (m3 = {}, a3 = 0; a3 < u4.attributes.length; a3++) m3[(y3 = u4.attributes[a3]).name] = y3.value;
-      for (a3 in m3) y3 = m3[a3], "dangerouslySetInnerHTML" == a3 ? p3 = y3 : "children" == a3 || a3 in k3 || "value" == a3 && "defaultValue" in k3 || "checked" == a3 && "defaultChecked" in k3 || N(u4, a3, null, y3, o3);
-      for (a3 in k3) y3 = k3[a3], "children" == a3 ? v3 = y3 : "dangerouslySetInnerHTML" == a3 ? h3 = y3 : "value" == a3 ? w3 = y3 : "checked" == a3 ? _2 = y3 : c3 && "function" != typeof y3 || m3[a3] === y3 || N(u4, a3, y3, m3[a3], o3);
-      if (h3) c3 || p3 && (h3.__html == p3.__html || h3.__html == u4.innerHTML) || (u4.innerHTML = h3.__html), t3.__k = [];
-      else if (p3 && (u4.innerHTML = ""), L("template" == t3.type ? u4.content : u4, g(v3) ? v3 : [v3], t3, i4, r3, "foreignObject" == x2 ? "http://www.w3.org/1999/xhtml" : o3, e3, f4, e3 ? e3[0] : i4.__k && $(i4, 0), c3, s3), null != e3) for (a3 = e3.length; a3--; ) b(e3[a3]);
-      c3 || (a3 = "value", "progress" == x2 && null == w3 ? u4.removeAttribute("value") : null != w3 && (w3 !== u4[a3] || "progress" == x2 && !w3 || "option" == x2 && w3 != m3[a3]) && N(u4, a3, w3, m3[a3], o3), a3 = "checked", null != _2 && _2 != u4[a3] && N(u4, a3, _2, m3[a3], o3));
+      if (e4 = e4 && n.call(u5.childNodes), !c4 && null != e4) for (m5 = {}, a4 = 0; a4 < u5.attributes.length; a4++) m5[(y5 = u5.attributes[a4]).name] = y5.value;
+      for (a4 in m5) y5 = m5[a4], "dangerouslySetInnerHTML" == a4 ? p5 = y5 : "children" == a4 || a4 in k4 || "value" == a4 && "defaultValue" in k4 || "checked" == a4 && "defaultChecked" in k4 || N(u5, a4, null, y5, o4);
+      for (a4 in k4) y5 = k4[a4], "children" == a4 ? v4 = y5 : "dangerouslySetInnerHTML" == a4 ? h5 = y5 : "value" == a4 ? w4 = y5 : "checked" == a4 ? _4 = y5 : c4 && "function" != typeof y5 || m5[a4] === y5 || N(u5, a4, y5, m5[a4], o4);
+      if (h5) c4 || p5 && (h5.__html == p5.__html || h5.__html == u5.innerHTML) || (u5.innerHTML = h5.__html), t4.__k = [];
+      else if (p5 && (u5.innerHTML = ""), L("template" == t4.type ? u5.content : u5, g(v4) ? v4 : [v4], t4, i5, r4, "foreignObject" == x3 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && $(i5, 0), c4, s4), null != e4) for (a4 = e4.length; a4--; ) b(e4[a4]);
+      c4 || (a4 = "value", "progress" == x3 && null == w4 ? u5.removeAttribute("value") : null != w4 && (w4 !== u5[a4] || "progress" == x3 && !w4 || "option" == x3 && w4 != m5[a4]) && N(u5, a4, w4, m5[a4], o4), a4 = "checked", null != _4 && _4 != u5[a4] && N(u5, a4, _4, m5[a4], o4));
     }
-    return u4;
+    return u5;
   }
-  function J(n2, u4, t3) {
+  function J(n3, u5, t4) {
     try {
-      if ("function" == typeof n2) {
-        var i4 = "function" == typeof n2.__u;
-        i4 && n2.__u(), i4 && null == u4 || (n2.__u = n2(u4));
-      } else n2.current = u4;
-    } catch (n3) {
-      l.__e(n3, t3);
+      if ("function" == typeof n3) {
+        var i5 = "function" == typeof n3.__u;
+        i5 && n3.__u(), i5 && null == u5 || (n3.__u = n3(u5));
+      } else n3.current = u5;
+    } catch (n4) {
+      l.__e(n4, t4);
     }
   }
-  function K(n2, u4, t3) {
-    var i4, r3;
-    if (l.unmount && l.unmount(n2), (i4 = n2.ref) && (i4.current && i4.current != n2.__e || J(i4, null, u4)), null != (i4 = n2.__c)) {
-      if (i4.componentWillUnmount) try {
-        i4.componentWillUnmount();
-      } catch (n3) {
-        l.__e(n3, u4);
+  function K(n3, u5, t4) {
+    var i5, r4;
+    if (l.unmount && l.unmount(n3), (i5 = n3.ref) && (i5.current && i5.current != n3.__e || J(i5, null, u5)), null != (i5 = n3.__c)) {
+      if (i5.componentWillUnmount) try {
+        i5.componentWillUnmount();
+      } catch (n4) {
+        l.__e(n4, u5);
       }
-      i4.base = i4.__P = null;
+      i5.base = i5.__P = null;
     }
-    if (i4 = n2.__k) for (r3 = 0; r3 < i4.length; r3++) i4[r3] && K(i4[r3], u4, t3 || "function" != typeof n2.type);
-    t3 || b(n2.__e), n2.__c = n2.__ = n2.__e = void 0;
+    if (i5 = n3.__k) for (r4 = 0; r4 < i5.length; r4++) i5[r4] && K(i5[r4], u5, t4 || "function" != typeof n3.type);
+    t4 || b(n3.__e), n3.__c = n3.__ = n3.__e = void 0;
   }
-  function Q(n2, l3, u4) {
-    return this.constructor(n2, u4);
+  function Q(n3, l5, u5) {
+    return this.constructor(n3, u5);
   }
-  function R(u4, t3, i4) {
-    var r3, o3, e3, f4;
-    t3 == document && (t3 = document.documentElement), l.__ && l.__(u4, t3), o3 = (r3 = "function" == typeof i4) ? null : i4 && i4.__k || t3.__k, e3 = [], f4 = [], q(t3, u4 = (!r3 && i4 || t3).__k = k(S, null, [u4]), o3 || d, d, t3.namespaceURI, !r3 && i4 ? [i4] : o3 ? null : t3.firstChild ? n.call(t3.childNodes) : null, e3, !r3 && i4 ? i4 : o3 ? o3.__e : t3.firstChild, r3, f4), D(e3, u4, f4);
+  function R(u5, t4, i5) {
+    var r4, o4, e4, f5;
+    t4 == document && (t4 = document.documentElement), l.__ && l.__(u5, t4), o4 = (r4 = "function" == typeof i5) ? null : i5 && i5.__k || t4.__k, e4 = [], f5 = [], q(t4, u5 = (!r4 && i5 || t4).__k = k(S, null, [u5]), o4 || d, d, t4.namespaceURI, !r4 && i5 ? [i5] : o4 ? null : t4.firstChild ? n.call(t4.childNodes) : null, e4, !r4 && i5 ? i5 : o4 ? o4.__e : t4.firstChild, r4, f5), D(e4, u5, f5);
   }
-  n = w.slice, l = { __e: function(n2, l3, u4, t3) {
-    for (var i4, r3, o3; l3 = l3.__; ) if ((i4 = l3.__c) && !i4.__) try {
-      if ((r3 = i4.constructor) && null != r3.getDerivedStateFromError && (i4.setState(r3.getDerivedStateFromError(n2)), o3 = i4.__d), null != i4.componentDidCatch && (i4.componentDidCatch(n2, t3 || {}), o3 = i4.__d), o3) return i4.__E = i4;
-    } catch (l4) {
-      n2 = l4;
+  n = w.slice, l = { __e: function(n3, l5, u5, t4) {
+    for (var i5, r4, o4; l5 = l5.__; ) if ((i5 = l5.__c) && !i5.__) try {
+      if ((r4 = i5.constructor) && null != r4.getDerivedStateFromError && (i5.setState(r4.getDerivedStateFromError(n3)), o4 = i5.__d), null != i5.componentDidCatch && (i5.componentDidCatch(n3, t4 || {}), o4 = i5.__d), o4) return i5.__E = i5;
+    } catch (l6) {
+      n3 = l6;
     }
-    throw n2;
-  } }, u = 0, t = function(n2) {
-    return null != n2 && void 0 === n2.constructor;
-  }, C.prototype.setState = function(n2, l3) {
-    var u4;
-    u4 = null != this.__s && this.__s != this.state ? this.__s : this.__s = m({}, this.state), "function" == typeof n2 && (n2 = n2(m({}, u4), this.props)), n2 && m(u4, n2), null != n2 && this.__v && (l3 && this._sb.push(l3), A(this));
-  }, C.prototype.forceUpdate = function(n2) {
-    this.__v && (this.__e = true, n2 && this.__h.push(n2), A(this));
-  }, C.prototype.render = S, i = [], o = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, e = function(n2, l3) {
-    return n2.__v.__b - l3.__v.__b;
+    throw n3;
+  } }, u = 0, t = function(n3) {
+    return null != n3 && void 0 === n3.constructor;
+  }, C.prototype.setState = function(n3, l5) {
+    var u5;
+    u5 = null != this.__s && this.__s != this.state ? this.__s : this.__s = m({}, this.state), "function" == typeof n3 && (n3 = n3(m({}, u5), this.props)), n3 && m(u5, n3), null != n3 && this.__v && (l5 && this._sb.push(l5), A(this));
+  }, C.prototype.forceUpdate = function(n3) {
+    this.__v && (this.__e = true, n3 && this.__h.push(n3), A(this));
+  }, C.prototype.render = S, i = [], o = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, e = function(n3, l5) {
+    return n3.__v.__b - l5.__v.__b;
   }, H.__r = 0, f = Math.random().toString(8), c = "__d" + f, s = "__a" + f, a = /(PointerCapture)$|Capture$/i, h = 0, p = V(false), v = V(true), y = 0;
 
   // node_modules/preact/hooks/dist/hooks.module.js
@@ -271,127 +271,727 @@
   var l2 = c2.__c;
   var m2 = c2.unmount;
   var s2 = c2.__;
-  function p2(n2, t3) {
-    c2.__h && c2.__h(r2, n2, o2 || t3), o2 = 0;
-    var u4 = r2.__H || (r2.__H = { __: [], __h: [] });
-    return n2 >= u4.__.length && u4.__.push({}), u4.__[n2];
+  function p2(n3, t4) {
+    c2.__h && c2.__h(r2, n3, o2 || t4), o2 = 0;
+    var u5 = r2.__H || (r2.__H = { __: [], __h: [] });
+    return n3 >= u5.__.length && u5.__.push({}), u5.__[n3];
   }
-  function d2(n2) {
-    return o2 = 1, h2(D2, n2);
+  function d2(n3) {
+    return o2 = 1, h2(D2, n3);
   }
-  function h2(n2, u4, i4) {
-    var o3 = p2(t2++, 2);
-    if (o3.t = n2, !o3.__c && (o3.__ = [i4 ? i4(u4) : D2(void 0, u4), function(n3) {
-      var t3 = o3.__N ? o3.__N[0] : o3.__[0], r3 = o3.t(t3, n3);
-      t3 !== r3 && (o3.__N = [r3, o3.__[1]], o3.__c.setState({}));
-    }], o3.__c = r2, !r2.__f)) {
-      var f4 = function(n3, t3, r3) {
-        if (!o3.__c.__H) return true;
-        var u5 = o3.__c.__H.__.filter(function(n4) {
-          return n4.__c;
+  function h2(n3, u5, i5) {
+    var o4 = p2(t2++, 2);
+    if (o4.t = n3, !o4.__c && (o4.__ = [i5 ? i5(u5) : D2(void 0, u5), function(n4) {
+      var t4 = o4.__N ? o4.__N[0] : o4.__[0], r4 = o4.t(t4, n4);
+      t4 !== r4 && (o4.__N = [r4, o4.__[1]], o4.__c.setState({}));
+    }], o4.__c = r2, !r2.__f)) {
+      var f5 = function(n4, t4, r4) {
+        if (!o4.__c.__H) return true;
+        var u6 = o4.__c.__H.__.filter(function(n5) {
+          return n5.__c;
         });
-        if (u5.every(function(n4) {
-          return !n4.__N;
-        })) return !c3 || c3.call(this, n3, t3, r3);
-        var i5 = o3.__c.props !== n3;
-        return u5.some(function(n4) {
-          if (n4.__N) {
-            var t4 = n4.__[0];
-            n4.__ = n4.__N, n4.__N = void 0, t4 !== n4.__[0] && (i5 = true);
+        if (u6.every(function(n5) {
+          return !n5.__N;
+        })) return !c4 || c4.call(this, n4, t4, r4);
+        var i6 = o4.__c.props !== n4;
+        return u6.some(function(n5) {
+          if (n5.__N) {
+            var t5 = n5.__[0];
+            n5.__ = n5.__N, n5.__N = void 0, t5 !== n5.__[0] && (i6 = true);
           }
-        }), c3 && c3.call(this, n3, t3, r3) || i5;
+        }), c4 && c4.call(this, n4, t4, r4) || i6;
       };
       r2.__f = true;
-      var c3 = r2.shouldComponentUpdate, e3 = r2.componentWillUpdate;
-      r2.componentWillUpdate = function(n3, t3, r3) {
+      var c4 = r2.shouldComponentUpdate, e4 = r2.componentWillUpdate;
+      r2.componentWillUpdate = function(n4, t4, r4) {
         if (this.__e) {
-          var u5 = c3;
-          c3 = void 0, f4(n3, t3, r3), c3 = u5;
+          var u6 = c4;
+          c4 = void 0, f5(n4, t4, r4), c4 = u6;
         }
-        e3 && e3.call(this, n3, t3, r3);
-      }, r2.shouldComponentUpdate = f4;
+        e4 && e4.call(this, n4, t4, r4);
+      }, r2.shouldComponentUpdate = f5;
     }
-    return o3.__N || o3.__;
+    return o4.__N || o4.__;
   }
-  function y2(n2, u4) {
-    var i4 = p2(t2++, 3);
-    !c2.__s && C2(i4.__H, u4) && (i4.__ = n2, i4.u = u4, r2.__H.__h.push(i4));
+  function y2(n3, u5) {
+    var i5 = p2(t2++, 3);
+    !c2.__s && C2(i5.__H, u5) && (i5.__ = n3, i5.u = u5, r2.__H.__h.push(i5));
   }
-  function T2(n2, r3) {
-    var u4 = p2(t2++, 7);
-    return C2(u4.__H, r3) && (u4.__ = n2(), u4.__H = r3, u4.__h = n2), u4.__;
+  function T2(n3, r4) {
+    var u5 = p2(t2++, 7);
+    return C2(u5.__H, r4) && (u5.__ = n3(), u5.__H = r4, u5.__h = n3), u5.__;
   }
   function j2() {
-    for (var n2; n2 = f2.shift(); ) {
-      var t3 = n2.__H;
-      if (n2.__P && t3) try {
-        t3.__h.some(z2), t3.__h.some(B2), t3.__h = [];
-      } catch (r3) {
-        t3.__h = [], c2.__e(r3, n2.__v);
+    for (var n3; n3 = f2.shift(); ) {
+      var t4 = n3.__H;
+      if (n3.__P && t4) try {
+        t4.__h.some(z2), t4.__h.some(B2), t4.__h = [];
+      } catch (r4) {
+        t4.__h = [], c2.__e(r4, n3.__v);
       }
     }
   }
-  c2.__b = function(n2) {
-    r2 = null, e2 && e2(n2);
-  }, c2.__ = function(n2, t3) {
-    n2 && t3.__k && t3.__k.__m && (n2.__m = t3.__k.__m), s2 && s2(n2, t3);
-  }, c2.__r = function(n2) {
-    a2 && a2(n2), t2 = 0;
-    var i4 = (r2 = n2.__c).__H;
-    i4 && (u2 === r2 ? (i4.__h = [], r2.__h = [], i4.__.some(function(n3) {
-      n3.__N && (n3.__ = n3.__N), n3.u = n3.__N = void 0;
-    })) : (i4.__h.some(z2), i4.__h.some(B2), i4.__h = [], t2 = 0)), u2 = r2;
-  }, c2.diffed = function(n2) {
-    v2 && v2(n2);
-    var t3 = n2.__c;
-    t3 && t3.__H && (t3.__H.__h.length && (1 !== f2.push(t3) && i2 === c2.requestAnimationFrame || ((i2 = c2.requestAnimationFrame) || w2)(j2)), t3.__H.__.some(function(n3) {
-      n3.u && (n3.__H = n3.u), n3.u = void 0;
+  c2.__b = function(n3) {
+    r2 = null, e2 && e2(n3);
+  }, c2.__ = function(n3, t4) {
+    n3 && t4.__k && t4.__k.__m && (n3.__m = t4.__k.__m), s2 && s2(n3, t4);
+  }, c2.__r = function(n3) {
+    a2 && a2(n3), t2 = 0;
+    var i5 = (r2 = n3.__c).__H;
+    i5 && (u2 === r2 ? (i5.__h = [], r2.__h = [], i5.__.some(function(n4) {
+      n4.__N && (n4.__ = n4.__N), n4.u = n4.__N = void 0;
+    })) : (i5.__h.some(z2), i5.__h.some(B2), i5.__h = [], t2 = 0)), u2 = r2;
+  }, c2.diffed = function(n3) {
+    v2 && v2(n3);
+    var t4 = n3.__c;
+    t4 && t4.__H && (t4.__H.__h.length && (1 !== f2.push(t4) && i2 === c2.requestAnimationFrame || ((i2 = c2.requestAnimationFrame) || w2)(j2)), t4.__H.__.some(function(n4) {
+      n4.u && (n4.__H = n4.u), n4.u = void 0;
     })), u2 = r2 = null;
-  }, c2.__c = function(n2, t3) {
-    t3.some(function(n3) {
+  }, c2.__c = function(n3, t4) {
+    t4.some(function(n4) {
       try {
-        n3.__h.some(z2), n3.__h = n3.__h.filter(function(n4) {
-          return !n4.__ || B2(n4);
+        n4.__h.some(z2), n4.__h = n4.__h.filter(function(n5) {
+          return !n5.__ || B2(n5);
         });
-      } catch (r3) {
-        t3.some(function(n4) {
-          n4.__h && (n4.__h = []);
-        }), t3 = [], c2.__e(r3, n3.__v);
+      } catch (r4) {
+        t4.some(function(n5) {
+          n5.__h && (n5.__h = []);
+        }), t4 = [], c2.__e(r4, n4.__v);
       }
-    }), l2 && l2(n2, t3);
-  }, c2.unmount = function(n2) {
-    m2 && m2(n2);
-    var t3, r3 = n2.__c;
-    r3 && r3.__H && (r3.__H.__.some(function(n3) {
+    }), l2 && l2(n3, t4);
+  }, c2.unmount = function(n3) {
+    m2 && m2(n3);
+    var t4, r4 = n3.__c;
+    r4 && r4.__H && (r4.__H.__.some(function(n4) {
       try {
-        z2(n3);
-      } catch (n4) {
-        t3 = n4;
+        z2(n4);
+      } catch (n5) {
+        t4 = n5;
       }
-    }), r3.__H = void 0, t3 && c2.__e(t3, r3.__v));
+    }), r4.__H = void 0, t4 && c2.__e(t4, r4.__v));
   };
   var k2 = "function" == typeof requestAnimationFrame;
-  function w2(n2) {
-    var t3, r3 = function() {
-      clearTimeout(u4), k2 && cancelAnimationFrame(t3), setTimeout(n2);
-    }, u4 = setTimeout(r3, 35);
-    k2 && (t3 = requestAnimationFrame(r3));
+  function w2(n3) {
+    var t4, r4 = function() {
+      clearTimeout(u5), k2 && cancelAnimationFrame(t4), setTimeout(n3);
+    }, u5 = setTimeout(r4, 35);
+    k2 && (t4 = requestAnimationFrame(r4));
   }
-  function z2(n2) {
-    var t3 = r2, u4 = n2.__c;
-    "function" == typeof u4 && (n2.__c = void 0, u4()), r2 = t3;
+  function z2(n3) {
+    var t4 = r2, u5 = n3.__c;
+    "function" == typeof u5 && (n3.__c = void 0, u5()), r2 = t4;
   }
-  function B2(n2) {
-    var t3 = r2;
-    n2.__c = n2.__(), r2 = t3;
+  function B2(n3) {
+    var t4 = r2;
+    n3.__c = n3.__(), r2 = t4;
   }
-  function C2(n2, t3) {
-    return !n2 || n2.length !== t3.length || t3.some(function(t4, r3) {
-      return t4 !== n2[r3];
+  function C2(n3, t4) {
+    return !n3 || n3.length !== t4.length || t4.some(function(t5, r4) {
+      return t5 !== n3[r4];
     });
   }
-  function D2(n2, t3) {
-    return "function" == typeof t3 ? t3(n2) : t3;
+  function D2(n3, t4) {
+    return "function" == typeof t4 ? t4(n3) : t4;
+  }
+
+  // node_modules/@preact/signals-core/dist/signals-core.module.js
+  var i3 = Symbol.for("preact-signals");
+  function t3() {
+    if (!(s3 > 1)) {
+      var i5, t4 = false;
+      !function() {
+        var i6 = c3;
+        c3 = void 0;
+        while (void 0 !== i6) {
+          if (i6.S.v === i6.v) i6.S.i = i6.i;
+          i6 = i6.o;
+        }
+      }();
+      while (void 0 !== h3) {
+        var n3 = h3;
+        h3 = void 0;
+        v3++;
+        while (void 0 !== n3) {
+          var r4 = n3.u;
+          n3.u = void 0;
+          n3.f &= -3;
+          if (!(8 & n3.f) && w3(n3)) try {
+            n3.c();
+          } catch (n4) {
+            if (!t4) {
+              i5 = n4;
+              t4 = true;
+            }
+          }
+          n3 = r4;
+        }
+      }
+      v3 = 0;
+      s3--;
+      if (t4) throw i5;
+    } else s3--;
+  }
+  function n2(i5) {
+    if (s3 > 0) return i5();
+    e3 = ++u3;
+    s3++;
+    try {
+      return i5();
+    } finally {
+      t3();
+    }
+  }
+  var r3 = void 0;
+  function o3(i5) {
+    var t4 = r3;
+    r3 = void 0;
+    try {
+      return i5();
+    } finally {
+      r3 = t4;
+    }
+  }
+  var f3;
+  var h3 = void 0;
+  var s3 = 0;
+  var v3 = 0;
+  var u3 = 0;
+  var e3 = 0;
+  var c3 = void 0;
+  var d3 = 0;
+  function a3(i5) {
+    if (void 0 !== r3) {
+      var t4 = i5.n;
+      if (void 0 === t4 || t4.t !== r3) {
+        t4 = { i: 0, S: i5, p: r3.s, n: void 0, t: r3, e: void 0, x: void 0, r: t4 };
+        if (void 0 !== r3.s) r3.s.n = t4;
+        r3.s = t4;
+        i5.n = t4;
+        if (32 & r3.f) i5.S(t4);
+        return t4;
+      } else if (-1 === t4.i) {
+        t4.i = 0;
+        if (void 0 !== t4.n) {
+          t4.n.p = t4.p;
+          if (void 0 !== t4.p) t4.p.n = t4.n;
+          t4.p = r3.s;
+          t4.n = void 0;
+          r3.s.n = t4;
+          r3.s = t4;
+        }
+        return t4;
+      }
+    }
+  }
+  function l3(i5, t4) {
+    this.v = i5;
+    this.i = 0;
+    this.n = void 0;
+    this.t = void 0;
+    this.l = 0;
+    this.W = null == t4 ? void 0 : t4.watched;
+    this.Z = null == t4 ? void 0 : t4.unwatched;
+    this.name = null == t4 ? void 0 : t4.name;
+  }
+  l3.prototype.brand = i3;
+  l3.prototype.h = function() {
+    return true;
+  };
+  l3.prototype.S = function(i5) {
+    var t4 = this, n3 = this.t;
+    if (n3 !== i5 && void 0 === i5.e) {
+      i5.x = n3;
+      this.t = i5;
+      if (void 0 !== n3) n3.e = i5;
+      else o3(function() {
+        var i6;
+        null == (i6 = t4.W) || i6.call(t4);
+      });
+    }
+  };
+  l3.prototype.U = function(i5) {
+    var t4 = this;
+    if (void 0 !== this.t) {
+      var n3 = i5.e, r4 = i5.x;
+      if (void 0 !== n3) {
+        n3.x = r4;
+        i5.e = void 0;
+      }
+      if (void 0 !== r4) {
+        r4.e = n3;
+        i5.x = void 0;
+      }
+      if (i5 === this.t) {
+        this.t = r4;
+        if (void 0 === r4) o3(function() {
+          var i6;
+          null == (i6 = t4.Z) || i6.call(t4);
+        });
+      }
+    }
+  };
+  l3.prototype.subscribe = function(i5) {
+    var t4 = this;
+    return j3(function() {
+      var n3 = t4.value, o4 = r3;
+      r3 = void 0;
+      try {
+        i5(n3);
+      } finally {
+        r3 = o4;
+      }
+    }, { name: "sub" });
+  };
+  l3.prototype.valueOf = function() {
+    return this.value;
+  };
+  l3.prototype.toString = function() {
+    return this.value + "";
+  };
+  l3.prototype.toJSON = function() {
+    return this.value;
+  };
+  l3.prototype.peek = function() {
+    var i5 = r3;
+    r3 = void 0;
+    try {
+      return this.value;
+    } finally {
+      r3 = i5;
+    }
+  };
+  Object.defineProperty(l3.prototype, "value", { get: function() {
+    var i5 = a3(this);
+    if (void 0 !== i5) i5.i = this.i;
+    return this.v;
+  }, set: function(i5) {
+    if (i5 !== this.v) {
+      if (v3 > 100) throw new Error("Cycle detected");
+      !function(i6) {
+        if (0 !== s3 && 0 === v3) {
+          if (i6.l !== e3) {
+            i6.l = e3;
+            c3 = { S: i6, v: i6.v, i: i6.i, o: c3 };
+          }
+        }
+      }(this);
+      this.v = i5;
+      this.i++;
+      d3++;
+      s3++;
+      try {
+        for (var n3 = this.t; void 0 !== n3; n3 = n3.x) n3.t.N();
+      } finally {
+        t3();
+      }
+    }
+  } });
+  function y3(i5, t4) {
+    return new l3(i5, t4);
+  }
+  function w3(i5) {
+    for (var t4 = i5.s; void 0 !== t4; t4 = t4.n) if (t4.S.i !== t4.i || !t4.S.h() || t4.S.i !== t4.i) return true;
+    return false;
+  }
+  function _2(i5) {
+    for (var t4 = i5.s; void 0 !== t4; t4 = t4.n) {
+      var n3 = t4.S.n;
+      if (void 0 !== n3) t4.r = n3;
+      t4.S.n = t4;
+      t4.i = -1;
+      if (void 0 === t4.n) {
+        i5.s = t4;
+        break;
+      }
+    }
+  }
+  function b2(i5) {
+    var t4 = i5.s, n3 = void 0;
+    while (void 0 !== t4) {
+      var r4 = t4.p;
+      if (-1 === t4.i) {
+        t4.S.U(t4);
+        if (void 0 !== r4) r4.n = t4.n;
+        if (void 0 !== t4.n) t4.n.p = r4;
+      } else n3 = t4;
+      t4.S.n = t4.r;
+      if (void 0 !== t4.r) t4.r = void 0;
+      t4 = r4;
+    }
+    i5.s = n3;
+  }
+  function p3(i5, t4) {
+    l3.call(this, void 0);
+    this.x = i5;
+    this.s = void 0;
+    this.g = d3 - 1;
+    this.f = 4;
+    this.W = null == t4 ? void 0 : t4.watched;
+    this.Z = null == t4 ? void 0 : t4.unwatched;
+    this.name = null == t4 ? void 0 : t4.name;
+  }
+  p3.prototype = new l3();
+  p3.prototype.h = function() {
+    this.f &= -3;
+    if (1 & this.f) return false;
+    if (32 == (36 & this.f)) return true;
+    this.f &= -5;
+    if (this.g === d3) return true;
+    this.g = d3;
+    this.f |= 1;
+    if (this.i > 0 && !w3(this)) {
+      this.f &= -2;
+      return true;
+    }
+    var i5 = r3;
+    try {
+      _2(this);
+      r3 = this;
+      var t4 = this.x();
+      if (16 & this.f || this.v !== t4 || 0 === this.i) {
+        this.v = t4;
+        this.f &= -17;
+        this.i++;
+      }
+    } catch (i6) {
+      this.v = i6;
+      this.f |= 16;
+      this.i++;
+    }
+    r3 = i5;
+    b2(this);
+    this.f &= -2;
+    return true;
+  };
+  p3.prototype.S = function(i5) {
+    if (void 0 === this.t) {
+      this.f |= 36;
+      for (var t4 = this.s; void 0 !== t4; t4 = t4.n) t4.S.S(t4);
+    }
+    l3.prototype.S.call(this, i5);
+  };
+  p3.prototype.U = function(i5) {
+    if (void 0 !== this.t) {
+      l3.prototype.U.call(this, i5);
+      if (void 0 === this.t) {
+        this.f &= -33;
+        for (var t4 = this.s; void 0 !== t4; t4 = t4.n) t4.S.U(t4);
+      }
+    }
+  };
+  p3.prototype.N = function() {
+    if (!(2 & this.f)) {
+      this.f |= 6;
+      for (var i5 = this.t; void 0 !== i5; i5 = i5.x) i5.t.N();
+    }
+  };
+  Object.defineProperty(p3.prototype, "value", { get: function() {
+    if (1 & this.f) throw new Error("Cycle detected");
+    var i5 = a3(this);
+    this.h();
+    if (void 0 !== i5) i5.i = this.i;
+    if (16 & this.f) throw this.v;
+    return this.v;
+  } });
+  function g2(i5, t4) {
+    return new p3(i5, t4);
+  }
+  function S2(i5) {
+    var n3 = i5.m;
+    i5.m = void 0;
+    if ("function" == typeof n3) {
+      s3++;
+      var o4 = r3;
+      r3 = void 0;
+      try {
+        n3();
+      } catch (t4) {
+        i5.f &= -2;
+        i5.f |= 8;
+        m3(i5);
+        throw t4;
+      } finally {
+        r3 = o4;
+        t3();
+      }
+    }
+  }
+  function m3(i5) {
+    for (var t4 = i5.s; void 0 !== t4; t4 = t4.n) t4.S.U(t4);
+    i5.x = void 0;
+    i5.s = void 0;
+    S2(i5);
+  }
+  function x2(i5) {
+    if (r3 !== this) throw new Error("Out-of-order effect");
+    b2(this);
+    r3 = i5;
+    this.f &= -2;
+    if (8 & this.f) m3(this);
+    t3();
+  }
+  function E2(i5, t4) {
+    this.x = i5;
+    this.m = void 0;
+    this.s = void 0;
+    this.u = void 0;
+    this.f = 32;
+    this.name = null == t4 ? void 0 : t4.name;
+    if (f3) f3.push(this);
+  }
+  E2.prototype.c = function() {
+    var i5 = this.S();
+    try {
+      if (8 & this.f) return;
+      if (void 0 === this.x) return;
+      var t4 = this.x();
+      if ("function" == typeof t4) this.m = t4;
+    } finally {
+      i5();
+    }
+  };
+  E2.prototype.S = function() {
+    if (1 & this.f) throw new Error("Cycle detected");
+    this.f |= 1;
+    this.f &= -9;
+    S2(this);
+    _2(this);
+    s3++;
+    var i5 = r3;
+    r3 = this;
+    return x2.bind(this, i5);
+  };
+  E2.prototype.N = function() {
+    if (!(2 & this.f)) {
+      this.f |= 2;
+      this.u = h3;
+      h3 = this;
+    }
+  };
+  E2.prototype.d = function() {
+    this.f |= 8;
+    if (!(1 & this.f)) m3(this);
+  };
+  E2.prototype.dispose = function() {
+    this.d();
+  };
+  function j3(i5, t4) {
+    var n3 = new E2(i5, t4);
+    try {
+      n3.c();
+    } catch (i6) {
+      n3.d();
+      throw i6;
+    }
+    var r4 = n3.d.bind(n3);
+    r4[Symbol.dispose] = r4;
+    return r4;
+  }
+
+  // node_modules/@preact/signals/dist/signals.module.js
+  var h4;
+  var l4;
+  var p4;
+  var m4 = "undefined" != typeof window && !!window.__PREACT_SIGNALS_DEVTOOLS__;
+  var _3 = [];
+  j3(function() {
+    h4 = this.N;
+  })();
+  function g3(i5, t4) {
+    l[i5] = t4.bind(null, l[i5] || function() {
+    });
+  }
+  function y4(i5) {
+    if (p4) p4();
+    p4 = i5 && i5.S();
+  }
+  function b3(i5) {
+    var n3 = this, r4 = i5.data, o4 = useSignal(r4);
+    o4.value = r4;
+    var e4 = T2(function() {
+      var i6 = n3, r5 = n3.__v;
+      while (r5 = r5.__) if (r5.__c) {
+        r5.__c.__$f |= 4;
+        break;
+      }
+      var f5 = g2(function() {
+        var i7 = o4.value.value;
+        return 0 === i7 ? 0 : true === i7 ? "" : i7 || "";
+      }), e5 = g2(function() {
+        return !Array.isArray(f5.value) && !t(f5.value);
+      }), u6 = j3(function() {
+        this.N = M;
+        if (e5.value) {
+          var n4 = f5.value;
+          if (i6.__v && i6.__v.__e && 3 === i6.__v.__e.nodeType) i6.__v.__e.data = n4;
+        }
+      }), c5 = n3.__$u.d;
+      n3.__$u.d = function() {
+        u6();
+        c5.call(this);
+      };
+      return [e5, f5];
+    }, []), u5 = e4[0], c4 = e4[1];
+    return u5.value ? c4.peek() : c4.value;
+  }
+  b3.displayName = "ReactiveTextNode";
+  Object.defineProperties(l3.prototype, { constructor: { configurable: true, value: void 0 }, type: { configurable: true, value: b3 }, props: { configurable: true, get: function() {
+    return { data: this };
+  } }, __b: { configurable: true, value: 1 } });
+  g3("__b", function(i5, n3) {
+    if (m4 && "function" == typeof n3.type) window.__PREACT_SIGNALS_DEVTOOLS__.exitComponent();
+    if ("string" == typeof n3.type) {
+      var t4, r4 = n3.props;
+      for (var f5 in r4) if ("children" !== f5) {
+        var o4 = r4[f5];
+        if (o4 instanceof l3) {
+          if (!t4) n3.__np = t4 = {};
+          t4[f5] = o4;
+          r4[f5] = o4.peek();
+        }
+      }
+    }
+    i5(n3);
+  });
+  g3("__r", function(i5, n3) {
+    if (m4 && "function" == typeof n3.type) window.__PREACT_SIGNALS_DEVTOOLS__.enterComponent(n3);
+    if (n3.type !== S) {
+      y4();
+      var t4, f5 = n3.__c;
+      if (f5) {
+        f5.__$f &= -2;
+        if (void 0 === (t4 = f5.__$u)) f5.__$u = t4 = function(i6) {
+          var n4;
+          j3(function() {
+            n4 = this;
+          });
+          n4.c = function() {
+            f5.__$f |= 1;
+            f5.setState({});
+          };
+          return n4;
+        }();
+      }
+      l4 = f5;
+      y4(t4);
+    }
+    i5(n3);
+  });
+  g3("__e", function(i5, n3, t4, r4) {
+    if (m4) window.__PREACT_SIGNALS_DEVTOOLS__.exitComponent();
+    y4();
+    l4 = void 0;
+    i5(n3, t4, r4);
+  });
+  g3("diffed", function(i5, n3) {
+    if (m4 && "function" == typeof n3.type) window.__PREACT_SIGNALS_DEVTOOLS__.exitComponent();
+    y4();
+    l4 = void 0;
+    var t4;
+    if ("string" == typeof n3.type && (t4 = n3.__e)) {
+      var r4 = n3.__np, f5 = n3.props;
+      if (r4) {
+        var o4 = t4.U;
+        if (o4) for (var e4 in o4) {
+          var u5 = o4[e4];
+          if (void 0 !== u5 && !(e4 in r4)) {
+            u5.d();
+            o4[e4] = void 0;
+          }
+        }
+        else {
+          o4 = {};
+          t4.U = o4;
+        }
+        for (var a4 in r4) {
+          var c4 = o4[a4], v4 = r4[a4];
+          if (void 0 === c4) {
+            c4 = k3(t4, a4, v4, f5);
+            o4[a4] = c4;
+          } else c4.o(v4, f5);
+        }
+      }
+    }
+    i5(n3);
+  });
+  function k3(i5, n3, t4, r4) {
+    var f5 = n3 in i5 && void 0 === i5.ownerSVGElement, o4 = y3(t4);
+    return { o: function(i6, n4) {
+      o4.value = i6;
+      r4 = n4;
+    }, d: j3(function() {
+      this.N = M;
+      var t5 = o4.value.value;
+      if (r4[n3] !== t5) {
+        r4[n3] = t5;
+        if (f5) i5[n3] = t5;
+        else if (null != t5 && (false !== t5 || "-" === n3[4])) i5.setAttribute(n3, t5);
+        else i5.removeAttribute(n3);
+      }
+    }) };
+  }
+  g3("unmount", function(i5, n3) {
+    if ("string" == typeof n3.type) {
+      var t4 = n3.__e;
+      if (t4) {
+        var r4 = t4.U;
+        if (r4) {
+          t4.U = void 0;
+          for (var f5 in r4) {
+            var o4 = r4[f5];
+            if (o4) o4.d();
+          }
+        }
+      }
+    } else {
+      var e4 = n3.__c;
+      if (e4) {
+        var u5 = e4.__$u;
+        if (u5) {
+          e4.__$u = void 0;
+          u5.d();
+        }
+      }
+    }
+    i5(n3);
+  });
+  g3("__h", function(i5, n3, t4, r4) {
+    if (r4 < 3 || 9 === r4) n3.__$f |= 2;
+    i5(n3, t4, r4);
+  });
+  C.prototype.shouldComponentUpdate = function(i5, n3) {
+    var t4 = this.__$u, r4 = t4 && void 0 !== t4.s;
+    for (var f5 in n3) return true;
+    if (this.__f || "boolean" == typeof this.u && true === this.u) {
+      var o4 = 2 & this.__$f;
+      if (!(r4 || o4 || 4 & this.__$f)) return true;
+      if (1 & this.__$f) return true;
+    } else {
+      if (!(r4 || 4 & this.__$f)) return true;
+      if (3 & this.__$f) return true;
+    }
+    for (var e4 in i5) if ("__source" !== e4 && i5[e4] !== this.props[e4]) return true;
+    for (var u5 in this.props) if (!(u5 in i5)) return true;
+    return false;
+  };
+  function useSignal(i5, n3) {
+    return d2(function() {
+      return y3(i5, n3);
+    })[0];
+  }
+  var A3 = function(i5) {
+    queueMicrotask(function() {
+      queueMicrotask(i5);
+    });
+  };
+  function F() {
+    n2(function() {
+      var i5;
+      while (i5 = _3.shift()) h4.call(i5);
+    });
+  }
+  function M() {
+    if (1 === _3.push(this)) (l.requestAnimationFrame || A3)(F);
   }
 
   // runtime/web/frontend/src/api/websocket.ts
@@ -498,20 +1098,20 @@
   };
 
   // node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
-  var f3 = 0;
-  var i3 = Array.isArray;
-  function u3(e3, t3, n2, o3, i4, u4) {
-    t3 || (t3 = {});
-    var a3, c3, p3 = t3;
-    if ("ref" in p3) for (c3 in p3 = {}, t3) "ref" == c3 ? a3 = t3[c3] : p3[c3] = t3[c3];
-    var l3 = { type: e3, props: p3, key: n2, ref: a3, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f3, __i: -1, __u: 0, __source: i4, __self: u4 };
-    if ("function" == typeof e3 && (a3 = e3.defaultProps)) for (c3 in a3) void 0 === p3[c3] && (p3[c3] = a3[c3]);
-    return l.vnode && l.vnode(l3), l3;
+  var f4 = 0;
+  var i4 = Array.isArray;
+  function u4(e4, t4, n3, o4, i5, u5) {
+    t4 || (t4 = {});
+    var a4, c4, p5 = t4;
+    if ("ref" in p5) for (c4 in p5 = {}, t4) "ref" == c4 ? a4 = t4[c4] : p5[c4] = t4[c4];
+    var l5 = { type: e4, props: p5, key: n3, ref: a4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f4, __i: -1, __u: 0, __source: i5, __self: u5 };
+    if ("function" == typeof e4 && (a4 = e4.defaultProps)) for (c4 in a4) void 0 === p5[c4] && (p5[c4] = a4[c4]);
+    return l.vnode && l.vnode(l5), l5;
   }
 
   // runtime/web/frontend/src/components/Icon.tsx
   function Icon({ name, size = 16, className = "" }) {
-    return /* @__PURE__ */ u3(
+    return /* @__PURE__ */ u4(
       "i",
       {
         className: `codicon codicon-${name} ${className}`,
@@ -520,64 +1120,74 @@
     );
   }
 
-  // runtime/web/frontend/src/App.tsx
-  var items = [
-    { name: "files", label: "Explorer" },
-    { name: "search", label: "Search" },
-    { name: "extensions", label: "Extensions" },
-    { name: "hubot", label: "Agent" }
+  // runtime/web/frontend/src/components/ActivityBar.tsx
+  var PANELS = [
+    { id: "files", icon: "files", label: "Explorer" },
+    { id: "search", icon: "search", label: "Search" },
+    { id: "extensions", icon: "extensions", label: "Extensions" },
+    { id: "agent", icon: "hubot", label: "Agent" },
+    { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
+  function ActivityBar({ activePanel, onPanelChange }) {
+    return /* @__PURE__ */ u4("nav", { className: "activity-bar", "aria-label": "Activity bar", children: PANELS.map((panel) => {
+      const active = panel.id === activePanel;
+      return /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          className: `activity-bar__button ${active ? "is-active" : ""} ${panel.alignBottom ? "is-bottom" : ""}`,
+          title: panel.label,
+          "aria-label": panel.label,
+          "aria-pressed": active,
+          onClick: () => onPanelChange(panel.id),
+          children: /* @__PURE__ */ u4(Icon, { name: panel.icon, size: 24, className: "activity-bar__icon" })
+        },
+        panel.id
+      );
+    }) });
+  }
+
+  // runtime/web/frontend/src/App.tsx
   function App() {
-    const [connectionStatus, setConnectionStatus] = d2("disconnected");
+    const connectionStatus = useSignal("disconnected");
+    const activePanel = useSignal("agent");
     const websocket = T2(() => new WebSocketManager(), []);
     y2(() => {
-      const unsubscribe = websocket.onStatusChange(setConnectionStatus);
+      const unsubscribe = websocket.onStatusChange((status) => {
+        connectionStatus.value = status;
+      });
       websocket.connect();
       return () => {
         unsubscribe();
         websocket.disconnect();
       };
-    }, [websocket]);
-    const connected = connectionStatus === "connected";
-    return /* @__PURE__ */ u3(
-      "div",
-      {
-        style: {
-          background: "#1e1e2e",
-          color: "#ffffff",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Inter, system-ui, sans-serif",
-          fontSize: "18px",
-          height: "100vh",
-          gap: "24px"
-        },
-        children: [
-          /* @__PURE__ */ u3("div", { style: { display: "flex", alignItems: "center", gap: "12px" }, children: [
-            /* @__PURE__ */ u3(
-              "span",
-              {
-                "aria-label": connected ? "connected" : "disconnected",
-                style: {
-                  backgroundColor: connected ? "#22c55e" : "#ef4444",
-                  borderRadius: "9999px",
-                  display: "inline-block",
-                  height: "12px",
-                  width: "12px"
-                }
-              }
-            ),
-            /* @__PURE__ */ u3("span", { children: connected ? "Connected to PiClaw" : "Disconnected" })
-          ] }),
-          /* @__PURE__ */ u3("div", { style: { display: "flex", gap: "20px", fontSize: "14px" }, children: items.map((item) => /* @__PURE__ */ u3("div", { style: { display: "flex", alignItems: "center", gap: "6px" }, children: [
-            /* @__PURE__ */ u3(Icon, { name: item.name, size: 20 }),
-            /* @__PURE__ */ u3("span", { children: item.label })
-          ] }, item.name)) })
-        ]
-      }
-    );
+    }, [connectionStatus, websocket]);
+    const connected = connectionStatus.value === "connected";
+    return /* @__PURE__ */ u4("div", { className: "shell-root", children: [
+      /* @__PURE__ */ u4(
+        ActivityBar,
+        {
+          activePanel: activePanel.value,
+          onPanelChange: (id) => {
+            activePanel.value = id;
+          }
+        }
+      ),
+      /* @__PURE__ */ u4("main", { className: "shell-content", "aria-live": "polite", children: [
+        /* @__PURE__ */ u4("header", { className: "shell-status", children: [
+          /* @__PURE__ */ u4(
+            "span",
+            {
+              className: `shell-status__dot ${connected ? "is-connected" : "is-disconnected"}`,
+              "aria-label": connected ? "connected" : "disconnected",
+              title: connected ? "Connected" : "Disconnected"
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
+        ] }),
+        /* @__PURE__ */ u4("section", { className: "shell-panel-placeholder", children: /* @__PURE__ */ u4("h1", { children: activePanel.value }) })
+      ] })
+    ] });
   }
 
   // runtime/web/frontend/src/index.tsx
@@ -585,6 +1195,6 @@
   if (!root) {
     throw new Error("Missing #app root element");
   }
-  R(/* @__PURE__ */ u3(App, {}), root);
+  R(/* @__PURE__ */ u4(App, {}), root);
 })();
 //# sourceMappingURL=app.bundle.js.map
