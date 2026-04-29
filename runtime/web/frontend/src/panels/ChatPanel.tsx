@@ -65,7 +65,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
-    }).catch((err) => console.warn("[chat] send failed:", err));
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.user_message) {
+          window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
+        }
+      })
+      .catch((err) => console.warn("[chat] send failed:", err));
   };
 
   const pages = extensionPages.value;

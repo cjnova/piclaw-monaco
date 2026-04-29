@@ -8384,7 +8384,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          setMessages(data.interactions ?? []);
+          const raw = data.interactions ?? data.posts ?? [];
+          const parsed = raw.map((p6) => ({
+            id: p6.id,
+            type: p6.type ?? p6.data?.type === "user_message" ? "user" : "agent",
+            content: p6.content ?? p6.data?.content ?? "",
+            content_blocks: p6.content_blocks ?? p6.data?.content_blocks,
+            created_at: p6.created_at ?? p6.timestamp ?? "",
+            data: p6.data
+          }));
+          setMessages(parsed);
           setHasMore(data.has_more ?? false);
           setConnected(true);
           setTimeout(() => scrollToBottom(true), 50);
@@ -8399,7 +8408,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       sseRef.current = es;
       es.addEventListener("new_post", (e5) => {
         try {
-          const interaction = JSON.parse(e5.data);
+          const raw = JSON.parse(e5.data);
+          const interaction = {
+            id: raw.id,
+            type: raw.type ?? (raw.data?.type === "user_message" ? "user" : "agent"),
+            content: raw.content ?? raw.data?.content ?? "",
+            content_blocks: raw.content_blocks ?? raw.data?.content_blocks,
+            created_at: raw.created_at ?? raw.timestamp ?? "",
+            data: raw.data
+          };
           setMessages((prev) => {
             if (prev.some((m6) => m6.id === interaction.id)) return prev;
             return [...prev, interaction];
@@ -8436,6 +8453,19 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         es.close();
         sseRef.current = null;
       };
+    }, [scrollToBottom]);
+    y2(() => {
+      const handler = (e5) => {
+        const msg = e5.detail;
+        if (!msg?.id) return;
+        setMessages((prev) => {
+          if (prev.some((m6) => m6.id === msg.id)) return prev;
+          return [...prev, { id: msg.id, type: "user", content: msg.data?.content ?? "", created_at: msg.timestamp, data: msg.data }];
+        });
+        scrollToBottom();
+      };
+      window.addEventListener("piclaw:new-message", handler);
+      return () => window.removeEventListener("piclaw:new-message", handler);
     }, [scrollToBottom]);
     y2(() => {
       const el = listRef.current;
@@ -8547,6 +8577,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content })
+      }).then((res) => res.json()).then((data) => {
+        if (data?.user_message) {
+          window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
+        }
       }).catch((err) => console.warn("[chat] send failed:", err));
     };
     const pages = extensionPages.value;

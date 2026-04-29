@@ -219,8 +219,17 @@ export function MessageList() {
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: TimelineResponse = await res.json();
-        setMessages(data.interactions ?? []);
+        const data = await res.json();
+        const raw = data.interactions ?? data.posts ?? [];
+        const parsed: Interaction[] = raw.map((p: Record<string, unknown>) => ({
+          id: p.id as number,
+          type: (p.type ?? (p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent") as "user" | "agent",
+          content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
+          content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
+          created_at: (p.created_at ?? p.timestamp ?? "") as string,
+          data: p.data as Record<string, unknown> | undefined,
+        }));
+        setMessages(parsed);
         setHasMore(data.has_more ?? false);
         setConnected(true);
         // Scroll to bottom after first load
@@ -239,7 +248,15 @@ export function MessageList() {
 
     es.addEventListener("new_post", (e: MessageEvent) => {
       try {
-        const interaction: Interaction = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const interaction: Interaction = {
+          id: raw.id,
+          type: raw.type ?? (raw.data?.type === "user_message" ? "user" : "agent"),
+          content: raw.content ?? raw.data?.content ?? "",
+          content_blocks: raw.content_blocks ?? raw.data?.content_blocks,
+          created_at: raw.created_at ?? raw.timestamp ?? "",
+          data: raw.data,
+        };
         setMessages((prev) => {
           // Avoid duplicates
           if (prev.some((m) => m.id === interaction.id)) return prev;
@@ -286,6 +303,21 @@ export function MessageList() {
       es.close();
       sseRef.current = null;
     };
+  }, [scrollToBottom]);
+
+  // Listen for optimistic user messages from compose box
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent).detail;
+      if (!msg?.id) return;
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, { id: msg.id, type: "user", content: msg.data?.content ?? "", created_at: msg.timestamp, data: msg.data }];
+      });
+      scrollToBottom();
+    };
+    window.addEventListener("piclaw:new-message", handler);
+    return () => window.removeEventListener("piclaw:new-message", handler);
   }, [scrollToBottom]);
 
   // Detect manual scroll
