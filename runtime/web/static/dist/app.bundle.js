@@ -5916,6 +5916,129 @@ For tests, pass a Ghostty instance directly:
     ] });
   }
 
+  // runtime/web/frontend/src/panels/SearchPanel.tsx
+  function formatTime(ts) {
+    if (!ts) return "";
+    try {
+      const d5 = new Date(ts);
+      return d5.toLocaleString(void 0, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch {
+      return ts;
+    }
+  }
+  function getSnippet(result) {
+    return result.text ?? result.content ?? "";
+  }
+  function getTimestamp(result) {
+    return result.created_at ?? result.timestamp ?? "";
+  }
+  function SearchPanel() {
+    const [query, setQuery] = d2("");
+    const [results, setResults] = d2([]);
+    const [status, setStatus] = d2("idle");
+    const debounceRef = A2(null);
+    const abortRef = A2(null);
+    const doSearch = q2(async (q4) => {
+      if (!q4.trim()) {
+        setResults([]);
+        setStatus("idle");
+        return;
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStatus("loading");
+      try {
+        const url = `/search?q=${encodeURIComponent(q4)}&limit=50&offset=0&scope=all`;
+        const res = await fetch(url, {
+          credentials: "same-origin",
+          signal: controller.signal
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const items = data.results ?? data.messages ?? data.items ?? [];
+        setResults(items);
+        setStatus("done");
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setResults([]);
+        setStatus("error");
+      }
+    }, []);
+    const handleInput = (e5) => {
+      const val = e5.target.value;
+      setQuery(val);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        doSearch(val);
+      }, 300);
+    };
+    y2(() => {
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (abortRef.current) abortRef.current.abort();
+      };
+    }, []);
+    const renderBody = () => {
+      if (!query.trim()) {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: "Type to search messages" });
+      }
+      if (status === "loading") {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: "Searching\u2026" });
+      }
+      if (status === "error") {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty search-panel__empty--error", children: "Search failed. Try again." });
+      }
+      if (results.length === 0) {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: [
+          "No results for \u201C",
+          query,
+          "\u201D"
+        ] });
+      }
+      return /* @__PURE__ */ u4("ul", { className: "search-panel__results", children: results.map((r4) => /* @__PURE__ */ u4(
+        "li",
+        {
+          className: "search-panel__item",
+          "data-message-id": r4.id,
+          onClick: () => {
+            console.log("[search] navigate to message:", r4.id);
+          },
+          children: [
+            /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) }),
+            getTimestamp(r4) && /* @__PURE__ */ u4("span", { className: "search-panel__item-time", children: formatTime(getTimestamp(r4)) })
+          ]
+        },
+        r4.id
+      )) });
+    };
+    return /* @__PURE__ */ u4("div", { className: "search-panel", children: [
+      /* @__PURE__ */ u4("div", { className: "search-panel__input-wrapper", children: [
+        /* @__PURE__ */ u4("span", { className: "search-panel__icon", "aria-hidden": "true", children: "\u{1F50D}" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "text",
+            className: "search-panel__input",
+            placeholder: "Search messages\u2026",
+            value: query,
+            onInput: handleInput,
+            spellcheck: false,
+            autocomplete: "off"
+          }
+        )
+      ] }),
+      renderBody()
+    ] });
+  }
+
   // runtime/web/frontend/src/panels/PanelRouter.tsx
   function PanelRouter({ activePanel }) {
     switch (activePanel) {
@@ -5923,7 +6046,7 @@ For tests, pass a Ghostty instance directly:
       case "files":
         return /* @__PURE__ */ u4(WorkspacePanel, {});
       case "search":
-        return /* @__PURE__ */ u4(Placeholder, { text: "Search input and results" });
+        return /* @__PURE__ */ u4(SearchPanel, {});
       case "extensions":
         return /* @__PURE__ */ u4(Placeholder, { text: "Installed addons list" });
       case "agent":

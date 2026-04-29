@@ -1,4 +1,5 @@
 import { WorkspacePanel } from "./WorkspacePanel";
+import { SearchPanel } from "./SearchPanel";
 
 interface PanelRouterProps {
   activePanel: string;
@@ -10,7 +11,7 @@ export function PanelRouter({ activePanel }: PanelRouterProps) {
     case "files":
       return <WorkspacePanel />;
     case "search":
-      return <Placeholder text="Search input and results" />;
+      return <SearchPanel />;
     case "extensions":
       return <Placeholder text="Installed addons list" />;
     case "agent":
