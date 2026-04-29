@@ -257,7 +257,11 @@ export function TerminalComponent() {
     return () => {
       mountedRef.current = false;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      if (ws) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // Send clear command so terminal is clean on next open
+        ws.send(JSON.stringify({ type: "input", data: "clear\n" }));
+        ws.close();
+      } else if (ws) {
         ws.close();
       }
       if (terminal) {
@@ -270,57 +274,24 @@ export function TerminalComponent() {
   const showOverlay = connStatus !== "connected";
 
   return (
-    <div
-      style={{
-        flex: 1,
-        overflow: "hidden",
-        background: "#11111b",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        minHeight: 0,
-      }}
-    >
+    <div className="terminal__outer">
       {/* Terminal canvas container — always rendered so open() has a DOM target */}
       <div
         ref={containerRef}
-        style={{
-          flex: 1,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          width: "100%",
-          height: "100%",
-          minHeight: 0,
-        }}
+        className="terminal__canvas"
       />
       {/* Status overlay — shown while connecting/erroring */}
       {showOverlay && (
         <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(17,17,27,0.88)",
-            color: connStatus === "error" ? "#f38ba8" : "#cdd6f4",
-            gap: "8px",
-            fontSize: "13px",
-            fontFamily: "monospace",
-            pointerEvents: "none",
-          }}
+          className={`terminal__overlay${connStatus === "error" ? " terminal__overlay--error" : ""}`}
         >
           {connStatus === "connecting" && (
-            <span style={{ opacity: 0.7 }}>Connecting to terminal...</span>
+            <span className="terminal__overlay-connecting">Connecting to terminal...</span>
           )}
           {(connStatus === "error" || connStatus === "retrying") && (
             <>
-              <span style={{ color: "#f38ba8" }}>⚠ {errorMsg || "Terminal connection error"}</span>
-              <span style={{ opacity: 0.5, fontSize: "11px" }}>Retrying automatically...</span>
+              <span className="terminal__overlay-error">⚠ {errorMsg || "Terminal connection error"}</span>
+              <span className="terminal__overlay-retry">Retrying automatically...</span>
             </>
           )}
         </div>

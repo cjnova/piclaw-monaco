@@ -50,6 +50,25 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const theme = useMemo(() => (mode === "dark" ? DARK_THEME : LIGHT_THEME), [mode]);
 
+  // Sync CSS custom properties so CSS-var-based rules track JS theme changes
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--bg", theme.bg);
+    root.style.setProperty("--bg-sidebar", theme.bgSidebar);
+    root.style.setProperty("--bg-terminal", theme.bgTerminal);
+    root.style.setProperty("--bg-status", theme.bgStatus);
+    root.style.setProperty("--border", theme.border);
+    root.style.setProperty("--text", theme.text);
+    root.style.setProperty("--text-muted", theme.textMuted);
+    root.style.setProperty("--accent", theme.accent);
+    root.style.setProperty("--success", theme.success);
+    root.style.setProperty("--error", theme.error);
+    root.style.setProperty("--handle", theme.handle);
+    root.style.setProperty("--handle-hover", theme.handleHover);
+    root.style.setProperty("--input-bg", theme.inputBg);
+    root.style.setProperty("--input-border", theme.inputBorder);
+  }, [theme]);
+
   const control: ThemeControl = useMemo(() => ({ mode, setMode, toggleMode }), [mode]);
 
   return (

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { commandRegistry } from "../services";
-import { useTheme } from "../theme/ThemeProvider";
 
 interface CommandPaletteProps {
   visible: boolean;
@@ -38,7 +37,6 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
 };
 
 export function CommandPalette({ visible, onClose, onCommand }: CommandPaletteProps) {
-  const theme = useTheme();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
@@ -240,11 +238,6 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
     <div className="command-palette-backdrop" onClick={onClose}>
       <div
         className="command-palette"
-        style={{
-          background: theme.bg,
-          border: `1px solid ${theme.inputBorder}`,
-          boxShadow: "0 18px 48px rgba(0, 0, 0, 0.35)",
-        }}
         onClick={(event) => event.stopPropagation()}
       >
         <input
@@ -252,32 +245,22 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
           className="command-palette__input"
           placeholder="Type a command..."
           value={query}
-          style={{
-            borderBottom: `1px solid ${theme.border}`,
-            color: theme.text,
-          }}
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
         {copiedLabel && (
-          <div style={{
-            padding: "4px 12px",
-            fontSize: "11px",
-            color: "#a6e3a1",
-            background: "rgba(166,227,161,0.08)",
-            borderBottom: `1px solid ${theme.border}`,
-          }}>
+          <div className="command-palette__copied">
             Copied to clipboard: <strong>{copiedLabel}</strong>
           </div>
         )}
         <ul ref={listRef} className="command-palette__results" role="listbox" aria-label="Commands">
           {results.map((command, index) => {
-            const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? theme.textMuted;
+            const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
             return (
               <li
                 key={command.id}
                 className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                style={{ background: index === selectedIndex ? theme.border : "transparent" }}
+                style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   if (command.handler) {
@@ -288,40 +271,27 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
                   onClose();
                 }}
               >
-                <span style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                  <span className="command-palette__label" style={{ color: theme.text }}>{command.label}</span>
+                <span className="command-palette__row-content">
+                  <span className="command-palette__label">{command.label}</span>
                   {command.description && (
-                    <span
-                      style={{
-                        color: "#a6adc8",
-                        fontSize: "11px",
-                        marginTop: "1px",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <span className="command-palette__description">
                       {command.description}
                     </span>
                   )}
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                <span className="command-palette__row-meta">
                   <span
+                    className="command-palette__badge"
                     style={{
-                      fontSize: "10px",
-                      padding: "1px 5px",
-                      borderRadius: "3px",
                       background: `${badgeColor}22`,
                       color: badgeColor,
                       border: `1px solid ${badgeColor}44`,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
                     }}
                   >
                     {command.category}
                   </span>
                   {command.keybinding && (
-                    <span className="command-palette__keybinding" style={{ color: "#9399b2" }}>
+                    <span className="command-palette__keybinding command-palette__keybinding--static">
                       {command.keybinding}
                     </span>
                   )}
@@ -330,7 +300,7 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
             );
           })}
           {results.length === 0 && (
-            <li className="command-palette__empty" style={{ color: theme.textMuted }}>
+            <li className="command-palette__empty">
               No matching commands
             </li>
           )}

@@ -10,10 +10,9 @@ import { ModelContextBar } from "./components/ModelContextBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { PanelRouter, ChatPanel } from "./panels";
 import { commandRegistry } from "./services";
-import { ThemeProvider, useTheme, useThemeControl } from "./theme/ThemeProvider";
+import { ThemeProvider, useThemeControl } from "./theme/ThemeProvider";
 
 function AppContent() {
-  const theme = useTheme();
   const themeControl = useThemeControl();
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
   const activePanel = useSignal("explorer");
@@ -176,21 +175,26 @@ function AppContent() {
   const sbWidth = sidebarCollapsed.value ? 0 : sidebarWidth.value;
 
   return (
-    <div style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: theme.bg, color: theme.text }}>
+    <div className="app-layout">
       <ActivityBar activePanel={activePanel.value} onPanelChange={handlePanelChange} />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-        <div style={{ flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }}>
-          <div style={{ width: `${sbWidth}px`, minWidth: sidebarCollapsed.value ? 0 : 150, maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5), overflow: "hidden", transition: "width 0.15s ease", flexShrink: 0 }}>
+      <div className="app-layout__main">
+        <div className="app-layout__content-area">
+          <div
+            className="app-layout__sidebar-wrapper"
+            style={{
+              width: `${sbWidth}px`,
+              minWidth: sidebarCollapsed.value ? 0 : 150,
+              maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5),
+            }}
+          >
             <Sidebar title={PANEL_NAMES[activePanel.value] || activePanel.value}>
               <PanelRouter activePanel={activePanel.value} />
             </Sidebar>
           </div>
           {!sidebarCollapsed.value && (
             <div
-              style={{ width: "4px", cursor: "col-resize", background: theme.handle, flexShrink: 0, transition: "background 0.15s" }}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.background = theme.handleHover; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.background = theme.handle; }}
+              className="app-layout__resize-handle"
               onMouseDown={(e) => {
                 e.preventDefault();
                 const startX = e.clientX;
@@ -211,60 +215,73 @@ function AppContent() {
               }}
             />
           )}
-          <div style={{ flex: 1, overflow: "hidden", minWidth: 0, height: "100%" }}>
+          <div className="app-layout__panel">
             <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
           </div>
         </div>
 
         {terminalVisible.value && (
-          <div style={{ height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: theme.bgTerminal }}>
-            <div style={{ height: "4px", cursor: "row-resize", background: theme.handle, flexShrink: 0 }}
+          <div className="app-layout__terminal" style={{ height: tH }}>
+            <div
+              className="app-layout__term-drag-handle"
               onMouseDown={onTermDragStart}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.background = theme.handleHover; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.background = theme.handle; }} />
-            <div style={{ height: "32px", background: theme.bgSidebar, borderBottom: `1px solid ${theme.border}`, display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }}>
-              <span style={{ fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }}>Terminal</span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }}>
-                <span style={{ cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" }}
+            />
+            <div className="terminal__header">
+              <span className="terminal__title">Terminal</span>
+              <div className="terminal__actions">
+                <span
+                  className="terminal__btn"
                   onClick={() => { terminalMaximized.value = !terminalMaximized.value; }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
-                  title={terminalMaximized.value ? "Restore" : "Maximize"}><i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} style={{ fontSize: "14px" }} /></span>
-                <span style={{ cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" }}
+                  title={terminalMaximized.value ? "Restore" : "Maximize"}
+                >
+                  <i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} />
+                </span>
+                <span
+                  className="terminal__btn"
                   onClick={() => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
-                  title="Open in new tab"><i className="codicon codicon-link-external" style={{ fontSize: "14px" }} /></span>
-                <span style={{ cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" }}
+                  title="Open in new tab"
+                >
+                  <i className="codicon codicon-link-external" />
+                </span>
+                <span
+                  className="terminal__btn"
                   onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
-                  title="Pop out to window"><i className="codicon codicon-multiple-windows" style={{ fontSize: "14px" }} /></span>
-                <span style={{ cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" }}
+                  title="Pop out to window"
+                >
+                  <i className="codicon codicon-multiple-windows" />
+                </span>
+                <span
+                  className="terminal__btn"
                   onClick={() => { terminalVisible.value = false; terminalMaximized.value = false; }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
-                  title="Close (Ctrl+`)">&#x2715;</span>
+                  title="Close (Ctrl+`)"
+                >
+                  &#x2715;
+                </span>
               </div>
             </div>
             <TerminalComponent />
           </div>
         )}
 
-        <div style={{ height: "32px", display: "flex", alignItems: "center", padding: "0 14px", background: theme.bgStatus, borderTop: `1px solid ${theme.border}`, fontSize: "13px", flexShrink: 0, gap: "14px" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: connected ? theme.success : theme.error }} />
-            <span style={{ color: theme.textMuted }}>{connected ? "Connected" : "Disconnected"}</span>
+        <div className="app-layout__status-bar">
+          <span className="status-bar__conn">
+            <span
+              className="status-bar__conn-dot"
+              style={{ background: connected ? "var(--success)" : "var(--error)" }}
+            />
+            <span className="status-bar__conn-text">{connected ? "Connected" : "Disconnected"}</span>
           </span>
           <ModelContextBar />
-          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+          <span className="status-bar__right">
             <SystemStats />
             {!terminalVisible.value && (
-              <span style={{ cursor: "pointer", color: "#ffffff", background: "#1e66a8", padding: "2px 10px", borderRadius: "3px", fontWeight: 500 }}
+              <span
+                className="status-bar__terminal-btn"
                 onClick={() => { terminalVisible.value = true; }}
-                onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = "1"; }}
-                title="Open Terminal (Ctrl+`)">Terminal</span>
+                title="Open Terminal (Ctrl+`)"
+              >
+                Terminal
+              </span>
             )}
           </span>
         </div>

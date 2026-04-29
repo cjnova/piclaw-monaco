@@ -1156,46 +1156,6 @@
     }
   };
 
-  // runtime/web/frontend/src/theme/theme.ts
-  var DARK_THEME = {
-    bg: "#1e1e2e",
-    bgSidebar: "#181825",
-    bgTerminal: "#11111b",
-    bgStatus: "#181825",
-    border: "#313244",
-    text: "#cdd6f4",
-    textMuted: "#9399b2",
-    accent: "#89b4fa",
-    success: "#a6e3a1",
-    error: "#f38ba8",
-    handleHover: "#89b4fa",
-    handle: "#313244",
-    inputBg: "#11111b",
-    inputBorder: "#45475a"
-  };
-  var LIGHT_THEME = {
-    bg: "#f3f3f3",
-    bgSidebar: "#e8e8e8",
-    bgTerminal: "#1e1e2e",
-    bgStatus: "#dcdcdc",
-    border: "#c8c8c8",
-    text: "#1a1a1a",
-    textMuted: "#4a4a4a",
-    accent: "#0078d4",
-    success: "#16a34a",
-    error: "#d32f2f",
-    handleHover: "#0078d4",
-    handle: "#c8c8c8",
-    inputBg: "#ffffff",
-    inputBorder: "#c8c8c8"
-  };
-  function getSystemTheme() {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return "dark";
-    }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-
   // node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
   var f4 = 0;
   var i4 = Array.isArray;
@@ -1206,48 +1166,6 @@
     var l6 = { type: e5, props: p6, key: n4, ref: a4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f4, __i: -1, __u: 0, __source: i6, __self: u6 };
     if ("function" == typeof e5 && (a4 = e5.defaultProps)) for (c4 in a4) void 0 === p6[c4] && (p6[c4] = a4[c4]);
     return l.vnode && l.vnode(l6), l6;
-  }
-
-  // runtime/web/frontend/src/theme/ThemeProvider.tsx
-  var ThemeContext = X(DARK_THEME);
-  var ThemeControlContext = X({
-    mode: "dark",
-    setMode: () => {
-    },
-    toggleMode: () => {
-    }
-  });
-  function ThemeProvider({ children }) {
-    const [mode, setModeState] = d2(getSystemTheme());
-    const [manualOverride, setManualOverride] = d2(false);
-    y2(() => {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const onChange = (event) => {
-        if (!manualOverride) {
-          setModeState(event.matches ? "dark" : "light");
-        }
-      };
-      setModeState(mediaQuery.matches ? "dark" : "light");
-      mediaQuery.addEventListener("change", onChange);
-      return () => mediaQuery.removeEventListener("change", onChange);
-    }, [manualOverride]);
-    const setMode = (newMode) => {
-      setManualOverride(true);
-      setModeState(newMode);
-    };
-    const toggleMode = () => {
-      setManualOverride(true);
-      setModeState((prev) => prev === "dark" ? "light" : "dark");
-    };
-    const theme = T2(() => mode === "dark" ? DARK_THEME : LIGHT_THEME, [mode]);
-    const control = T2(() => ({ mode, setMode, toggleMode }), [mode]);
-    return /* @__PURE__ */ u4(ThemeControlContext.Provider, { value: control, children: /* @__PURE__ */ u4(ThemeContext.Provider, { value: theme, children }) });
-  }
-  function useTheme() {
-    return x2(ThemeContext);
-  }
-  function useThemeControl() {
-    return x2(ThemeControlContext);
   }
 
   // runtime/web/frontend/src/components/Icon.tsx
@@ -1270,16 +1188,11 @@
     { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
   function ActivityBar({ activePanel, onPanelChange }) {
-    const theme = useTheme();
     return /* @__PURE__ */ u4(
       "nav",
       {
         className: "activity-bar",
         "aria-label": "Activity bar",
-        style: {
-          background: theme.bgSidebar,
-          borderRight: `1px solid ${theme.border}`
-        },
         children: PANELS.map((panel) => {
           const active = panel.id === activePanel;
           return /* @__PURE__ */ u4(
@@ -1287,23 +1200,9 @@
             {
               type: "button",
               className: `activity-bar__button ${active ? "is-active" : ""} ${"alignBottom" in panel && panel.alignBottom ? "is-bottom" : ""}`,
-              style: {
-                color: active ? theme.text : theme.textMuted,
-                borderLeftColor: active ? theme.accent : "transparent"
-              },
               title: panel.label,
               "aria-label": panel.label,
               "aria-pressed": active,
-              onMouseEnter: (e5) => {
-                if (!active) {
-                  e5.currentTarget.style.color = theme.text;
-                }
-              },
-              onMouseLeave: (e5) => {
-                if (!active) {
-                  e5.currentTarget.style.color = theme.textMuted;
-                }
-              },
               onClick: () => onPanelChange(panel.id),
               children: /* @__PURE__ */ u4(Icon, { name: panel.icon, size: 24, className: "activity-bar__icon" })
             },
@@ -5287,7 +5186,10 @@ For tests, pass a Ghostty instance directly:
       return () => {
         mountedRef.current = false;
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-        if (ws) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "input", data: "clear\n" }));
+          ws.close();
+        } else if (ws) {
           ws.close();
         }
         if (terminal) {
@@ -5297,89 +5199,38 @@ For tests, pass a Ghostty instance directly:
       };
     }, []);
     const showOverlay = connStatus !== "connected";
-    return /* @__PURE__ */ u4(
-      "div",
-      {
-        style: {
-          flex: 1,
-          overflow: "hidden",
-          background: "#11111b",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          minHeight: 0
-        },
-        children: [
-          /* @__PURE__ */ u4(
-            "div",
-            {
-              ref: containerRef,
-              style: {
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                width: "100%",
-                height: "100%",
-                minHeight: 0
-              }
-            }
-          ),
-          showOverlay && /* @__PURE__ */ u4(
-            "div",
-            {
-              style: {
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(17,17,27,0.88)",
-                color: connStatus === "error" ? "#f38ba8" : "#cdd6f4",
-                gap: "8px",
-                fontSize: "13px",
-                fontFamily: "monospace",
-                pointerEvents: "none"
-              },
-              children: [
-                connStatus === "connecting" && /* @__PURE__ */ u4("span", { style: { opacity: 0.7 }, children: "Connecting to terminal..." }),
-                (connStatus === "error" || connStatus === "retrying") && /* @__PURE__ */ u4(S, { children: [
-                  /* @__PURE__ */ u4("span", { style: { color: "#f38ba8" }, children: [
-                    "\u26A0 ",
-                    errorMsg || "Terminal connection error"
-                  ] }),
-                  /* @__PURE__ */ u4("span", { style: { opacity: 0.5, fontSize: "11px" }, children: "Retrying automatically..." })
-                ] })
-              ]
-            }
-          )
-        ]
-      }
-    );
+    return /* @__PURE__ */ u4("div", { className: "terminal__outer", children: [
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          ref: containerRef,
+          className: "terminal__canvas"
+        }
+      ),
+      showOverlay && /* @__PURE__ */ u4(
+        "div",
+        {
+          className: `terminal__overlay${connStatus === "error" ? " terminal__overlay--error" : ""}`,
+          children: [
+            connStatus === "connecting" && /* @__PURE__ */ u4("span", { className: "terminal__overlay-connecting", children: "Connecting to terminal..." }),
+            (connStatus === "error" || connStatus === "retrying") && /* @__PURE__ */ u4(S, { children: [
+              /* @__PURE__ */ u4("span", { className: "terminal__overlay-error", children: [
+                "\u26A0 ",
+                errorMsg || "Terminal connection error"
+              ] }),
+              /* @__PURE__ */ u4("span", { className: "terminal__overlay-retry", children: "Retrying automatically..." })
+            ] })
+          ]
+        }
+      )
+    ] });
   }
 
   // runtime/web/frontend/src/components/Sidebar.tsx
   function Sidebar({ title, children }) {
-    const theme = useTheme();
-    return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: theme.bgSidebar }, children: [
-      /* @__PURE__ */ u4(
-        "header",
-        {
-          style: {
-            height: "35px",
-            display: "flex",
-            alignItems: "center",
-            padding: "0 12px",
-            borderBottom: `1px solid ${theme.border}`,
-            flexShrink: 0
-          },
-          children: /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: title.toUpperCase() })
-        }
-      ),
-      /* @__PURE__ */ u4("div", { className: "sidebar__content", style: { flex: 1, minHeight: 0, overflow: "hidden" }, children })
+    return /* @__PURE__ */ u4("aside", { className: "sidebar", children: [
+      /* @__PURE__ */ u4("header", { className: "sidebar__header", children: /* @__PURE__ */ u4("span", { className: "sidebar__title", children: title.toUpperCase() }) }),
+      /* @__PURE__ */ u4("div", { className: "sidebar__content", children })
     ] });
   }
 
@@ -5393,14 +5244,29 @@ For tests, pass a Ghostty instance directly:
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
   }
-  function formatStats(stats) {
-    if (!stats) return "CPU --  RAM --  RSS --  SWP --";
+  function StatsDisplay({ stats }) {
+    if (!stats) return /* @__PURE__ */ u4("span", { className: "sys-stats", children: "CPU -- RAM -- RSS -- SWP --" });
     const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
     const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
-    return `CPU ${stats.cpu_percent}%  RAM ${stats.ram_percent}%  RSS ${rssMb}M  SWP ${swp}`;
+    return /* @__PURE__ */ u4("span", { className: "sys-stats", children: [
+      /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "CPU" }),
+      " ",
+      stats.cpu_percent,
+      "%",
+      /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "RAM" }),
+      " ",
+      stats.ram_percent,
+      "%",
+      /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "RSS" }),
+      " ",
+      rssMb,
+      "M",
+      /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "SWP" }),
+      " ",
+      swp
+    ] });
   }
   function SystemStats() {
-    const theme = useTheme();
     const clockText = useSignal(formatClock(/* @__PURE__ */ new Date()));
     const stats = useSignal(null);
     y2(() => {
@@ -5434,21 +5300,11 @@ For tests, pass a Ghostty instance directly:
       const interval = setInterval(fetchStats, 1e4);
       return () => clearInterval(interval);
     }, [stats]);
-    return /* @__PURE__ */ u4(
-      "span",
-      {
-        style: {
-          color: theme.textMuted,
-          fontSize: "13px",
-          whiteSpace: "nowrap"
-        },
-        children: [
-          formatStats(stats.value),
-          "\xA0\xA0\u2014\xA0\xA0",
-          clockText.value
-        ]
-      }
-    );
+    return /* @__PURE__ */ u4("span", { className: "sys-stats-bar", children: [
+      /* @__PURE__ */ u4(StatsDisplay, { stats: stats.value }),
+      "\xA0\xA0\u2014\xA0\xA0",
+      clockText.value
+    ] });
   }
 
   // runtime/web/frontend/src/components/ModelContextBar.tsx
@@ -5469,12 +5325,12 @@ For tests, pass a Ghostty instance directly:
     return /* @__PURE__ */ u4(
       "span",
       {
-        style: { display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" },
+        className: "context-ring",
         onClick,
         title: `Context: ${tokensK}/${totalK} (${p6.toFixed(0)}%) \u2014 click to compact`,
         children: [
-          /* @__PURE__ */ u4("svg", { width: "12", height: "12", viewBox: "0 0 12 12", style: { flexShrink: 0 }, children: /* @__PURE__ */ u4("circle", { cx: "6", cy: "6", r: "5", fill: color, opacity: "0.9" }) }),
-          /* @__PURE__ */ u4("span", { style: { fontSize: "11px", opacity: 0.9 }, children: [
+          /* @__PURE__ */ u4("svg", { width: "12", height: "12", viewBox: "0 0 12 12", children: /* @__PURE__ */ u4("circle", { cx: "6", cy: "6", r: "5", fill: color, opacity: "0.9" }) }),
+          /* @__PURE__ */ u4("span", { className: "context-ring__label", children: [
             tokensK,
             "/",
             totalK
@@ -5484,7 +5340,6 @@ For tests, pass a Ghostty instance directly:
     );
   }
   function ModelContextBar() {
-    const theme = useTheme();
     const agentStatus = useSignal(null);
     const agentContext = useSignal(null);
     const error = useSignal(false);
@@ -5624,7 +5479,7 @@ For tests, pass a Ghostty instance directly:
     };
     const isConnected = error.value ? lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value <= 3e4 : true;
     const modelName = isConnected ? agentStatus.value?.data?.model ?? currentModel.value ?? "github-copilot/claude-sonnet-4.6" : "github-copilot/claude-sonnet-4.6";
-    const thinkingLevel = isConnected ? agentStatus.value?.data?.thinking_level ?? "" : "medium";
+    const thinkingLevel = isConnected ? agentStatus.value?.data?.thinking_level || "medium" : "medium";
     const contextPercent = isConnected ? agentContext.value?.percent ?? null : 42;
     const contextTokens = isConnected ? agentContext.value?.tokens ?? null : 54e3;
     const contextWindow = isConnected ? agentContext.value?.contextWindow ?? null : 128e3;
@@ -5633,50 +5488,24 @@ For tests, pass a Ghostty instance directly:
       "span",
       {
         "data-model-picker": true,
-        style: {
-          position: "relative",
-          display: "inline-flex",
-          alignItems: "center"
-        },
+        className: "model-badge-wrapper",
         children: [
           showPicker.value && /* @__PURE__ */ u4(
             "div",
             {
               "data-model-picker": true,
-              style: {
-                position: "absolute",
-                bottom: "calc(100% + 4px)",
-                left: 0,
-                zIndex: 9999,
-                background: "#2a2a3c",
-                border: `1px solid ${theme.border ?? "#45475a"}`,
-                borderRadius: "6px",
-                boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
-                maxHeight: "300px",
-                overflowY: "auto",
-                minWidth: "200px",
-                maxWidth: "320px",
-                scrollbarWidth: "thin",
-                scrollbarColor: "#45475a transparent"
-              },
+              className: "model-picker",
               children: models.value.map((entry) => {
                 const isCurrent = entry.id === activeModel;
                 const ctxK = entry.context_window ? entry.context_window >= 1e6 ? `${(entry.context_window / 1e6).toFixed(1)}M` : `${(entry.context_window / 1e3).toFixed(0)}k` : "";
                 return /* @__PURE__ */ u4(
                   "div",
                   {
+                    className: "model-picker__item",
                     onClick: () => handleSelectModel(entry.id),
                     style: {
-                      padding: "5px 12px",
-                      fontSize: "12px",
-                      cursor: "pointer",
                       color: isCurrent ? "#cba6f7" : "#cdd6f4",
-                      background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      whiteSpace: "nowrap",
-                      transition: "background 0.1s"
+                      background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent"
                     },
                     onMouseEnter: (e5) => {
                       e5.currentTarget.style.background = isCurrent ? "rgba(203,166,247,0.18)" : "rgba(255,255,255,0.07)";
@@ -5685,9 +5514,9 @@ For tests, pass a Ghostty instance directly:
                       e5.currentTarget.style.background = isCurrent ? "rgba(203,166,247,0.1)" : "transparent";
                     },
                     children: [
-                      /* @__PURE__ */ u4("span", { style: { width: "12px", flexShrink: 0, textAlign: "center" }, children: isCurrent ? "\u2713" : "" }),
-                      /* @__PURE__ */ u4("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" }, children: entry.id }),
-                      ctxK && /* @__PURE__ */ u4("span", { style: { color: "#9399b2", fontSize: "10px", flexShrink: 0 }, children: ctxK })
+                      /* @__PURE__ */ u4("span", { className: "model-picker__item__check", children: isCurrent ? "\u2713" : "" }),
+                      /* @__PURE__ */ u4("span", { className: "model-picker__item__name", children: entry.id }),
+                      ctxK && /* @__PURE__ */ u4("span", { className: "model-picker__item__ctx", children: ctxK })
                     ]
                   },
                   entry.id
@@ -5698,37 +5527,25 @@ For tests, pass a Ghostty instance directly:
           /* @__PURE__ */ u4(
             "span",
             {
+              className: "model-badge",
               onClick: handleBadgeClick,
-              style: {
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                background: "#1e66a8",
-                color: "#ffffff",
-                padding: "2px 10px",
-                borderRadius: "3px",
-                fontWeight: 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                userSelect: "none"
-              },
               title: `${modelName}${thinkingLevel ? ` \u2022 ${thinkingLevel}` : ""} \u2014 click to switch model`,
               children: [
-                /* @__PURE__ */ u4("span", { style: { display: "inline-flex", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "220px" }, children: [
-                  /* @__PURE__ */ u4("span", { style: { opacity: 0.8 }, children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
-                  /* @__PURE__ */ u4("span", { style: { fontWeight: 600 }, children: modelName.split("/").pop() || modelName })
+                /* @__PURE__ */ u4("span", { className: "model-badge__name-wrapper", children: [
+                  /* @__PURE__ */ u4("span", { className: "model-badge__provider", children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
+                  /* @__PURE__ */ u4("span", { className: "model-badge__name", children: modelName.split("/").pop() || modelName })
                 ] }),
                 thinkingLevel && /* @__PURE__ */ u4(
                   "span",
                   {
                     "data-model-picker": true,
-                    style: { position: "relative", display: "inline-flex" },
+                    className: "thinking-badge-wrapper",
                     children: [
                       /* @__PURE__ */ u4(
                         "span",
                         {
+                          className: "thinking-badge",
                           onClick: handleThinkingClick,
-                          style: { cursor: "pointer", borderBottom: "1px dashed rgba(255,255,255,0.5)", paddingBottom: "1px" },
                           title: "Click to change thinking level",
                           children: thinkingLevel
                         }
@@ -5737,37 +5554,20 @@ For tests, pass a Ghostty instance directly:
                         "div",
                         {
                           "data-model-picker": true,
-                          style: {
-                            position: "absolute",
-                            bottom: "calc(100% + 6px)",
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            zIndex: 9999,
-                            background: "#2a2a3c",
-                            border: `1px solid ${theme.border ?? "#45475a"}`,
-                            borderRadius: "6px",
-                            boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
-                            minWidth: "100px",
-                            overflow: "hidden"
-                          },
+                          className: "thinking-picker",
                           children: (thinkingLevels.value.length ? thinkingLevels.value : FALLBACK_THINKING_LEVELS).map((level) => {
                             const isActive = level === thinkingLevel;
                             return /* @__PURE__ */ u4(
                               "div",
                               {
+                                className: "thinking-picker__item",
                                 onClick: (ev) => {
                                   ev.stopPropagation();
                                   handleSelectThinking(level);
                                 },
                                 style: {
-                                  padding: "5px 12px",
-                                  fontSize: "12px",
-                                  cursor: "pointer",
                                   color: isActive ? "#a6e3a1" : "#cdd6f4",
-                                  background: isActive ? "rgba(166,227,161,0.1)" : "transparent",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px"
+                                  background: isActive ? "rgba(166,227,161,0.1)" : "transparent"
                                 },
                                 onMouseEnter: (ev) => {
                                   ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)";
@@ -5776,7 +5576,7 @@ For tests, pass a Ghostty instance directly:
                                   ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent";
                                 },
                                 children: [
-                                  /* @__PURE__ */ u4("span", { style: { width: "12px", textAlign: "center" }, children: isActive ? "\u2713" : "" }),
+                                  /* @__PURE__ */ u4("span", { className: "thinking-picker__item__check", children: isActive ? "\u2713" : "" }),
                                   /* @__PURE__ */ u4("span", { children: level })
                                 ]
                               },
@@ -5839,7 +5639,6 @@ For tests, pass a Ghostty instance directly:
     template: "#89dceb"
   };
   function CommandPalette({ visible, onClose, onCommand }) {
-    const theme = useTheme();
     const [query, setQuery] = d2("");
     const [selectedIndex, setSelectedIndex] = d2(0);
     const [backendCommands, setBackendCommands] = d2([]);
@@ -6003,11 +5802,6 @@ For tests, pass a Ghostty instance directly:
       "div",
       {
         className: "command-palette",
-        style: {
-          background: theme.bg,
-          border: `1px solid ${theme.inputBorder}`,
-          boxShadow: "0 18px 48px rgba(0, 0, 0, 0.35)"
-        },
         onClick: (event) => event.stopPropagation(),
         children: [
           /* @__PURE__ */ u4(
@@ -6017,32 +5811,22 @@ For tests, pass a Ghostty instance directly:
               className: "command-palette__input",
               placeholder: "Type a command...",
               value: query,
-              style: {
-                borderBottom: `1px solid ${theme.border}`,
-                color: theme.text
-              },
               onInput: (event) => setQuery(event.target.value),
               onKeyDown: handleKeyDown
             }
           ),
-          copiedLabel && /* @__PURE__ */ u4("div", { style: {
-            padding: "4px 12px",
-            fontSize: "11px",
-            color: "#a6e3a1",
-            background: "rgba(166,227,161,0.08)",
-            borderBottom: `1px solid ${theme.border}`
-          }, children: [
+          copiedLabel && /* @__PURE__ */ u4("div", { className: "command-palette__copied", children: [
             "Copied to clipboard: ",
             /* @__PURE__ */ u4("strong", { children: copiedLabel })
           ] }),
           /* @__PURE__ */ u4("ul", { ref: listRef, className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
             results.map((command, index) => {
-              const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? theme.textMuted;
+              const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
               return /* @__PURE__ */ u4(
                 "li",
                 {
                   className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
-                  style: { background: index === selectedIndex ? theme.border : "transparent" },
+                  style: { background: index === selectedIndex ? "var(--border)" : "transparent" },
                   onMouseDown: (event) => event.preventDefault(),
                   onClick: () => {
                     if (command.handler) {
@@ -6053,48 +5837,31 @@ For tests, pass a Ghostty instance directly:
                     onClose();
                   },
                   children: [
-                    /* @__PURE__ */ u4("span", { style: { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }, children: [
-                      /* @__PURE__ */ u4("span", { className: "command-palette__label", style: { color: theme.text }, children: command.label }),
-                      command.description && /* @__PURE__ */ u4(
-                        "span",
-                        {
-                          style: {
-                            color: "#a6adc8",
-                            fontSize: "11px",
-                            marginTop: "1px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap"
-                          },
-                          children: command.description
-                        }
-                      )
+                    /* @__PURE__ */ u4("span", { className: "command-palette__row-content", children: [
+                      /* @__PURE__ */ u4("span", { className: "command-palette__label", children: command.label }),
+                      command.description && /* @__PURE__ */ u4("span", { className: "command-palette__description", children: command.description })
                     ] }),
-                    /* @__PURE__ */ u4("span", { style: { display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }, children: [
+                    /* @__PURE__ */ u4("span", { className: "command-palette__row-meta", children: [
                       /* @__PURE__ */ u4(
                         "span",
                         {
+                          className: "command-palette__badge",
                           style: {
-                            fontSize: "10px",
-                            padding: "1px 5px",
-                            borderRadius: "3px",
                             background: `${badgeColor}22`,
                             color: badgeColor,
-                            border: `1px solid ${badgeColor}44`,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em"
+                            border: `1px solid ${badgeColor}44`
                           },
                           children: command.category
                         }
                       ),
-                      command.keybinding && /* @__PURE__ */ u4("span", { className: "command-palette__keybinding", style: { color: "#9399b2" }, children: command.keybinding })
+                      command.keybinding && /* @__PURE__ */ u4("span", { className: "command-palette__keybinding command-palette__keybinding--static", children: command.keybinding })
                     ] })
                   ]
                 },
                 command.id
               );
             }),
-            results.length === 0 && /* @__PURE__ */ u4("li", { className: "command-palette__empty", style: { color: theme.textMuted }, children: "No matching commands" })
+            results.length === 0 && /* @__PURE__ */ u4("li", { className: "command-palette__empty", children: "No matching commands" })
           ] })
         ]
       }
@@ -6103,7 +5870,6 @@ For tests, pass a Ghostty instance directly:
 
   // runtime/web/frontend/src/panels/WorkspacePanel.tsx
   function WorkspacePanel() {
-    const theme = useTheme();
     const [topHeight, setTopHeight] = d2(() => Number(localStorage.getItem("piclaw-workspace-split")) || 200);
     const containerRef = A2(null);
     const heightRef = A2(topHeight);
@@ -6131,27 +5897,21 @@ For tests, pass a Ghostty instance directly:
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }, []);
-    return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", width: "100%", height: "100%", overflow: "hidden" }, children: [
-      /* @__PURE__ */ u4("div", { style: { height: `${topHeight}px`, flexShrink: 0, overflowY: "auto", overflowX: "hidden" }, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", fontSize: "12px" }, children: [
-        /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: theme.accent, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
-        /* @__PURE__ */ u4("div", { style: { color: theme.textMuted }, children: "File tree will appear here" })
+    return /* @__PURE__ */ u4("div", { ref: containerRef, className: "workspace", children: [
+      /* @__PURE__ */ u4("div", { className: "workspace__pane-top", style: { height: `${topHeight}px` }, children: /* @__PURE__ */ u4("div", { className: "workspace__section", children: [
+        /* @__PURE__ */ u4("div", { className: "workspace__section-header", children: "Files" }),
+        /* @__PURE__ */ u4("div", { className: "workspace__section-empty", children: "File tree will appear here" })
       ] }) }),
       /* @__PURE__ */ u4(
         "div",
         {
-          style: { height: "6px", cursor: "row-resize", background: theme.handle, flexShrink: 0, transition: "background 0.1s" },
-          onMouseDown: onDragStart,
-          onMouseEnter: (e5) => {
-            e5.target.style.background = theme.handleHover;
-          },
-          onMouseLeave: (e5) => {
-            e5.target.style.background = theme.handle;
-          }
+          className: "workspace__drag-handle",
+          onMouseDown: onDragStart
         }
       ),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "8px 12px" }, children: [
-        /* @__PURE__ */ u4("div", { style: { fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }, children: "Preview" }),
-        /* @__PURE__ */ u4("div", { style: { fontSize: "12px", color: theme.textMuted }, children: "Select a file to preview" })
+      /* @__PURE__ */ u4("div", { className: "workspace__pane-bottom", children: [
+        /* @__PURE__ */ u4("div", { className: "workspace__preview-header", children: "Preview" }),
+        /* @__PURE__ */ u4("div", { className: "workspace__preview-empty", children: "Select a file to preview" })
       ] })
     ] });
   }
@@ -6175,13 +5935,11 @@ For tests, pass a Ghostty instance directly:
     }
   }
   function Placeholder({ text }) {
-    const theme = useTheme();
-    return /* @__PURE__ */ u4("div", { style: { padding: "12px", color: theme.textMuted, fontSize: "12px" }, children: text });
+    return /* @__PURE__ */ u4("div", { className: "panel-placeholder", children: text });
   }
 
   // runtime/web/frontend/src/panels/ChatPanel.tsx
   function ChatPanel({ onOpenPalette } = {}) {
-    const theme = useTheme();
     const textareaRef = A2(null);
     const handleInput = (e5) => {
       const el = e5.target;
@@ -6196,110 +5954,137 @@ For tests, pass a Ghostty instance directly:
       el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
       el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
     };
-    return /* @__PURE__ */ u4(
-      "section",
-      {
-        style: {
-          height: "100%",
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          background: theme.bg,
-          minHeight: 0
-        },
-        children: [
-          /* @__PURE__ */ u4(
-            "div",
-            {
-              style: {
-                flex: 1,
-                minHeight: 0,
-                overflow: "auto",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "24px"
-              },
-              children: /* @__PURE__ */ u4("div", { style: { textAlign: "center" }, children: [
-                /* @__PURE__ */ u4("h1", { style: { margin: 0, fontSize: "30px", color: theme.text }, children: "\u{1F916} Chat" }),
-                /* @__PURE__ */ u4("p", { style: { margin: "10px 0 0", color: theme.textMuted, fontSize: "14px" }, children: "Messages will appear here" })
-              ] })
+    return /* @__PURE__ */ u4("section", { className: "chat", children: [
+      /* @__PURE__ */ u4("div", { className: "chat__messages", children: /* @__PURE__ */ u4("div", { className: "chat__empty", children: [
+        /* @__PURE__ */ u4("h1", { className: "chat__empty-title", children: "\u{1F916} Chat" }),
+        /* @__PURE__ */ u4("p", { className: "chat__empty-subtitle", children: "Messages will appear here" })
+      ] }) }),
+      /* @__PURE__ */ u4("div", { className: "chat__compose", children: [
+        /* @__PURE__ */ u4(
+          "textarea",
+          {
+            ref: textareaRef,
+            className: "chat__input",
+            placeholder: "Type a message...",
+            rows: 1,
+            onInput: handleInput,
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter" && !e5.shiftKey) {
+                e5.preventDefault();
+              }
             }
-          ),
-          /* @__PURE__ */ u4(
-            "div",
-            {
-              style: {
-                background: theme.bgSidebar,
-                borderTop: `1px solid ${theme.border}`,
-                padding: "12px",
-                display: "flex",
-                gap: "10px",
-                alignItems: "flex-end",
-                flexShrink: 0
-              },
-              children: [
-                /* @__PURE__ */ u4(
-                  "textarea",
-                  {
-                    ref: textareaRef,
-                    placeholder: "Type a message...",
-                    rows: 1,
-                    onInput: handleInput,
-                    onKeyDown: (e5) => {
-                      if (e5.key === "Enter" && !e5.shiftKey) {
-                        e5.preventDefault();
-                      }
-                    },
-                    style: {
-                      flex: 1,
-                      minWidth: 0,
-                      border: `1px solid ${theme.inputBorder}`,
-                      background: theme.inputBg,
-                      color: theme.text,
-                      borderRadius: "10px",
-                      padding: "10px 12px",
-                      fontSize: "13px",
-                      outline: "none",
-                      resize: "none",
-                      lineHeight: "1.4",
-                      maxHeight: "25vh",
-                      overflowY: "hidden",
-                      fontFamily: "inherit",
-                      scrollbarWidth: "thin",
-                      scrollbarColor: `rgba(255,255,255,0.15) transparent`
-                    }
-                  }
-                ),
-                /* @__PURE__ */ u4(
-                  "button",
-                  {
-                    type: "button",
-                    style: {
-                      border: `1px solid ${theme.accent}`,
-                      background: theme.accent,
-                      color: theme.bgTerminal,
-                      borderRadius: "10px",
-                      padding: "10px 14px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      alignSelf: "flex-end"
-                    },
-                    children: "Send"
-                  }
-                )
-              ]
-            }
-          )
-        ]
-      }
-    );
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "chat__send-btn",
+            children: "Send"
+          }
+        )
+      ] })
+    ] });
+  }
+
+  // runtime/web/frontend/src/theme/theme.ts
+  var DARK_THEME = {
+    bg: "#1e1e2e",
+    bgSidebar: "#181825",
+    bgTerminal: "#11111b",
+    bgStatus: "#181825",
+    border: "#313244",
+    text: "#cdd6f4",
+    textMuted: "#9399b2",
+    accent: "#89b4fa",
+    success: "#a6e3a1",
+    error: "#f38ba8",
+    handleHover: "#89b4fa",
+    handle: "#313244",
+    inputBg: "#11111b",
+    inputBorder: "#45475a"
+  };
+  var LIGHT_THEME = {
+    bg: "#f3f3f3",
+    bgSidebar: "#e8e8e8",
+    bgTerminal: "#1e1e2e",
+    bgStatus: "#dcdcdc",
+    border: "#c8c8c8",
+    text: "#1a1a1a",
+    textMuted: "#4a4a4a",
+    accent: "#0078d4",
+    success: "#16a34a",
+    error: "#d32f2f",
+    handleHover: "#0078d4",
+    handle: "#c8c8c8",
+    inputBg: "#ffffff",
+    inputBorder: "#c8c8c8"
+  };
+  function getSystemTheme() {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return "dark";
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  // runtime/web/frontend/src/theme/ThemeProvider.tsx
+  var ThemeContext = X(DARK_THEME);
+  var ThemeControlContext = X({
+    mode: "dark",
+    setMode: () => {
+    },
+    toggleMode: () => {
+    }
+  });
+  function ThemeProvider({ children }) {
+    const [mode, setModeState] = d2(getSystemTheme());
+    const [manualOverride, setManualOverride] = d2(false);
+    y2(() => {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const onChange = (event) => {
+        if (!manualOverride) {
+          setModeState(event.matches ? "dark" : "light");
+        }
+      };
+      setModeState(mediaQuery.matches ? "dark" : "light");
+      mediaQuery.addEventListener("change", onChange);
+      return () => mediaQuery.removeEventListener("change", onChange);
+    }, [manualOverride]);
+    const setMode = (newMode) => {
+      setManualOverride(true);
+      setModeState(newMode);
+    };
+    const toggleMode = () => {
+      setManualOverride(true);
+      setModeState((prev) => prev === "dark" ? "light" : "dark");
+    };
+    const theme = T2(() => mode === "dark" ? DARK_THEME : LIGHT_THEME, [mode]);
+    y2(() => {
+      const root2 = document.documentElement;
+      root2.style.setProperty("--bg", theme.bg);
+      root2.style.setProperty("--bg-sidebar", theme.bgSidebar);
+      root2.style.setProperty("--bg-terminal", theme.bgTerminal);
+      root2.style.setProperty("--bg-status", theme.bgStatus);
+      root2.style.setProperty("--border", theme.border);
+      root2.style.setProperty("--text", theme.text);
+      root2.style.setProperty("--text-muted", theme.textMuted);
+      root2.style.setProperty("--accent", theme.accent);
+      root2.style.setProperty("--success", theme.success);
+      root2.style.setProperty("--error", theme.error);
+      root2.style.setProperty("--handle", theme.handle);
+      root2.style.setProperty("--handle-hover", theme.handleHover);
+      root2.style.setProperty("--input-bg", theme.inputBg);
+      root2.style.setProperty("--input-border", theme.inputBorder);
+    }, [theme]);
+    const control = T2(() => ({ mode, setMode, toggleMode }), [mode]);
+    return /* @__PURE__ */ u4(ThemeControlContext.Provider, { value: control, children: /* @__PURE__ */ u4(ThemeContext.Provider, { value: theme, children }) });
+  }
+  function useThemeControl() {
+    return x2(ThemeControlContext);
   }
 
   // runtime/web/frontend/src/App.tsx
   function AppContent() {
-    const theme = useTheme();
     const themeControl = useThemeControl();
     const connectionStatus = useSignal("disconnected");
     const activePanel = useSignal("explorer");
@@ -6495,21 +6280,26 @@ For tests, pass a Ghostty instance directly:
     }, [terminalHeight, terminalMaximized]);
     const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
     const sbWidth = sidebarCollapsed.value ? 0 : sidebarWidth.value;
-    return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: theme.bg, color: theme.text }, children: [
+    return /* @__PURE__ */ u4("div", { className: "app-layout", children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }, children: [
-        /* @__PURE__ */ u4("div", { style: { flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }, children: [
-          /* @__PURE__ */ u4("div", { style: { width: `${sbWidth}px`, minWidth: sidebarCollapsed.value ? 0 : 150, maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5), overflow: "hidden", transition: "width 0.15s ease", flexShrink: 0 }, children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) }),
+      /* @__PURE__ */ u4("div", { className: "app-layout__main", children: [
+        /* @__PURE__ */ u4("div", { className: "app-layout__content-area", children: [
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              className: "app-layout__sidebar-wrapper",
+              style: {
+                width: `${sbWidth}px`,
+                minWidth: sidebarCollapsed.value ? 0 : 150,
+                maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5)
+              },
+              children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
+            }
+          ),
           !sidebarCollapsed.value && /* @__PURE__ */ u4(
             "div",
             {
-              style: { width: "4px", cursor: "col-resize", background: theme.handle, flexShrink: 0, transition: "background 0.15s" },
-              onMouseEnter: (e5) => {
-                e5.target.style.background = theme.handleHover;
-              },
-              onMouseLeave: (e5) => {
-                e5.target.style.background = theme.handle;
-              },
+              className: "app-layout__resize-handle",
               onMouseDown: (e5) => {
                 e5.preventDefault();
                 const startX = e5.clientX;
@@ -6530,91 +6320,61 @@ For tests, pass a Ghostty instance directly:
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden", minWidth: 0, height: "100%" }, children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
+          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
             paletteVisible.value = true;
           } }) })
         ] }),
-        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: theme.bgTerminal }, children: [
+        terminalVisible.value && /* @__PURE__ */ u4("div", { className: "app-layout__terminal", style: { height: tH }, children: [
           /* @__PURE__ */ u4(
             "div",
             {
-              style: { height: "4px", cursor: "row-resize", background: theme.handle, flexShrink: 0 },
-              onMouseDown: onTermDragStart,
-              onMouseEnter: (e5) => {
-                e5.target.style.background = theme.handleHover;
-              },
-              onMouseLeave: (e5) => {
-                e5.target.style.background = theme.handle;
-              }
+              className: "app-layout__term-drag-handle",
+              onMouseDown: onTermDragStart
             }
           ),
-          /* @__PURE__ */ u4("div", { style: { height: "32px", background: theme.bgSidebar, borderBottom: `1px solid ${theme.border}`, display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }, children: [
-            /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: "Terminal" }),
-            /* @__PURE__ */ u4("div", { style: { marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }, children: [
+          /* @__PURE__ */ u4("div", { className: "terminal__header", children: [
+            /* @__PURE__ */ u4("span", { className: "terminal__title", children: "Terminal" }),
+            /* @__PURE__ */ u4("div", { className: "terminal__actions", children: [
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
+                  className: "terminal__btn",
                   onClick: () => {
                     terminalMaximized.value = !terminalMaximized.value;
                   },
-                  onMouseEnter: (e5) => {
-                    e5.target.style.color = theme.text;
-                  },
-                  onMouseLeave: (e5) => {
-                    e5.target.style.color = theme.textMuted;
-                  },
                   title: terminalMaximized.value ? "Restore" : "Maximize",
-                  children: /* @__PURE__ */ u4("i", { className: terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full", style: { fontSize: "14px" } })
+                  children: /* @__PURE__ */ u4("i", { className: terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full" })
                 }
               ),
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
+                  className: "terminal__btn",
                   onClick: () => {
                     window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
                   },
-                  onMouseEnter: (e5) => {
-                    e5.target.style.color = theme.text;
-                  },
-                  onMouseLeave: (e5) => {
-                    e5.target.style.color = theme.textMuted;
-                  },
                   title: "Open in new tab",
-                  children: /* @__PURE__ */ u4("i", { className: "codicon codicon-link-external", style: { fontSize: "14px" } })
+                  children: /* @__PURE__ */ u4("i", { className: "codicon codicon-link-external" })
                 }
               ),
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
+                  className: "terminal__btn",
                   onClick: () => {
                     window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
                   },
-                  onMouseEnter: (e5) => {
-                    e5.target.style.color = theme.text;
-                  },
-                  onMouseLeave: (e5) => {
-                    e5.target.style.color = theme.textMuted;
-                  },
                   title: "Pop out to window",
-                  children: /* @__PURE__ */ u4("i", { className: "codicon codicon-multiple-windows", style: { fontSize: "14px" } })
+                  children: /* @__PURE__ */ u4("i", { className: "codicon codicon-multiple-windows" })
                 }
               ),
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
+                  className: "terminal__btn",
                   onClick: () => {
                     terminalVisible.value = false;
                     terminalMaximized.value = false;
-                  },
-                  onMouseEnter: (e5) => {
-                    e5.target.style.color = theme.text;
-                  },
-                  onMouseLeave: (e5) => {
-                    e5.target.style.color = theme.textMuted;
                   },
                   title: "Close (Ctrl+`)",
                   children: "\u2715"
@@ -6624,26 +6384,26 @@ For tests, pass a Ghostty instance directly:
           ] }),
           /* @__PURE__ */ u4(TerminalComponent, {})
         ] }),
-        /* @__PURE__ */ u4("div", { style: { height: "32px", display: "flex", alignItems: "center", padding: "0 14px", background: theme.bgStatus, borderTop: `1px solid ${theme.border}`, fontSize: "13px", flexShrink: 0, gap: "14px" }, children: [
-          /* @__PURE__ */ u4("span", { style: { display: "flex", alignItems: "center", gap: "4px" }, children: [
-            /* @__PURE__ */ u4("span", { style: { width: "6px", height: "6px", borderRadius: "50%", background: connected ? theme.success : theme.error } }),
-            /* @__PURE__ */ u4("span", { style: { color: theme.textMuted }, children: connected ? "Connected" : "Disconnected" })
+        /* @__PURE__ */ u4("div", { className: "app-layout__status-bar", children: [
+          /* @__PURE__ */ u4("span", { className: "status-bar__conn", children: [
+            /* @__PURE__ */ u4(
+              "span",
+              {
+                className: "status-bar__conn-dot",
+                style: { background: connected ? "var(--success)" : "var(--error)" }
+              }
+            ),
+            /* @__PURE__ */ u4("span", { className: "status-bar__conn-text", children: connected ? "Connected" : "Disconnected" })
           ] }),
           /* @__PURE__ */ u4(ModelContextBar, {}),
-          /* @__PURE__ */ u4("span", { style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }, children: [
+          /* @__PURE__ */ u4("span", { className: "status-bar__right", children: [
             /* @__PURE__ */ u4(SystemStats, {}),
             !terminalVisible.value && /* @__PURE__ */ u4(
               "span",
               {
-                style: { cursor: "pointer", color: "#ffffff", background: "#1e66a8", padding: "2px 10px", borderRadius: "3px", fontWeight: 500 },
+                className: "status-bar__terminal-btn",
                 onClick: () => {
                   terminalVisible.value = true;
-                },
-                onMouseEnter: (e5) => {
-                  e5.target.style.opacity = "0.85";
-                },
-                onMouseLeave: (e5) => {
-                  e5.target.style.opacity = "1";
                 },
                 title: "Open Terminal (Ctrl+`)",
                 children: "Terminal"

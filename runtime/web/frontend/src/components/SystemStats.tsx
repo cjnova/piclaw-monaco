@@ -1,6 +1,5 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { useTheme } from "../theme/ThemeProvider";
 
 interface StatsData {
   cpu_percent: number;
@@ -21,15 +20,21 @@ function formatClock(date: Date): string {
   return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
 }
 
-function formatStats(stats: StatsData | null): string {
-  if (!stats) return "CPU --  RAM --  RSS --  SWP --";
+function StatsDisplay({ stats }: { stats: StatsData | null }) {
+  if (!stats) return <span className="sys-stats">CPU -- RAM -- RSS -- SWP --</span>;
   const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
   const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
-  return `CPU ${stats.cpu_percent}%  RAM ${stats.ram_percent}%  RSS ${rssMb}M  SWP ${swp}`;
+  return (
+    <span className="sys-stats">
+      <span className="sys-stats__label">CPU</span> {stats.cpu_percent}%
+      <span className="sys-stats__label">RAM</span> {stats.ram_percent}%
+      <span className="sys-stats__label">RSS</span> {rssMb}M
+      <span className="sys-stats__label">SWP</span> {swp}
+    </span>
+  );
 }
 
 export function SystemStats() {
-  const theme = useTheme();
   const clockText = useSignal<string>(formatClock(new Date()));
   const stats = useSignal<StatsData | null>(null);
 
@@ -73,14 +78,8 @@ export function SystemStats() {
   }, [stats]);
 
   return (
-    <span
-      style={{
-        color: theme.textMuted,
-        fontSize: "13px",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {formatStats(stats.value)}&nbsp;&nbsp;&mdash;&nbsp;&nbsp;{clockText.value}
+    <span className="sys-stats-bar">
+      <StatsDisplay stats={stats.value} />&nbsp;&nbsp;&mdash;&nbsp;&nbsp;{clockText.value}
     </span>
   );
 }

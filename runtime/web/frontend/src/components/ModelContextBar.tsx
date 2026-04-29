@@ -1,6 +1,5 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { useTheme } from "../theme/ThemeProvider";
 
 interface AgentStatus {
   status: "active" | "idle";
@@ -50,20 +49,19 @@ function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: num
 
   return (
     <span
-      style={{ display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}
+      className="context-ring"
       onClick={onClick}
       title={`Context: ${tokensK}/${totalK} (${p.toFixed(0)}%) \u2014 click to compact`}
     >
-      <svg width="12" height="12" viewBox="0 0 12 12" style={{ flexShrink: 0 }}>
+      <svg width="12" height="12" viewBox="0 0 12 12">
         <circle cx="6" cy="6" r="5" fill={color} opacity="0.9" />
       </svg>
-      <span style={{ fontSize: "11px", opacity: 0.9 }}>{tokensK}/{totalK}</span>
+      <span className="context-ring__label">{tokensK}/{totalK}</span>
     </span>
   );
 }
 
 export function ModelContextBar() {
-  const theme = useTheme();
   const agentStatus = useSignal<AgentStatus | null>(null);
   const agentContext = useSignal<AgentContext | null>(null);
   const error = useSignal<boolean>(false);
@@ -231,7 +229,7 @@ export function ModelContextBar() {
     ? (agentStatus.value?.data?.model ?? currentModel.value ?? "github-copilot/claude-sonnet-4.6")
     : "github-copilot/claude-sonnet-4.6";
   const thinkingLevel = isConnected
-    ? (agentStatus.value?.data?.thinking_level ?? "")
+    ? (agentStatus.value?.data?.thinking_level || "medium")
     : "medium";
   const contextPercent = isConnected
     ? (agentContext.value?.percent ?? null)
@@ -248,32 +246,13 @@ export function ModelContextBar() {
   return (
     <span
       data-model-picker
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        alignItems: "center",
-      }}
+      className="model-badge-wrapper"
     >
       {/* Model picker dropdown — opens above */}
       {showPicker.value && (
         <div
           data-model-picker
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 4px)",
-            left: 0,
-            zIndex: 9999,
-            background: "#2a2a3c",
-            border: `1px solid ${theme.border ?? "#45475a"}`,
-            borderRadius: "6px",
-            boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
-            maxHeight: "300px",
-            overflowY: "auto",
-            minWidth: "200px",
-            maxWidth: "320px",
-            scrollbarWidth: "thin",
-            scrollbarColor: "#45475a transparent",
-          }}
+          className="model-picker"
         >
           {models.value.map((entry) => {
             const isCurrent = entry.id === activeModel;
@@ -281,18 +260,11 @@ export function ModelContextBar() {
             return (
               <div
                 key={entry.id}
+                className="model-picker__item"
                 onClick={() => handleSelectModel(entry.id)}
                 style={{
-                  padding: "5px 12px",
-                  fontSize: "12px",
-                  cursor: "pointer",
                   color: isCurrent ? "#cba6f7" : "#cdd6f4",
                   background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  whiteSpace: "nowrap",
-                  transition: "background 0.1s",
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.background = isCurrent
@@ -305,11 +277,11 @@ export function ModelContextBar() {
                     : "transparent";
                 }}
               >
-                <span style={{ width: "12px", flexShrink: 0, textAlign: "center" }}>
+                <span className="model-picker__item__check">
                   {isCurrent ? "✓" : ""}
                 </span>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{entry.id}</span>
-                {ctxK && <span style={{ color: "#9399b2", fontSize: "10px", flexShrink: 0 }}>{ctxK}</span>}
+                <span className="model-picker__item__name">{entry.id}</span>
+                {ctxK && <span className="model-picker__item__ctx">{ctxK}</span>}
               </div>
             );
           })}
@@ -318,34 +290,22 @@ export function ModelContextBar() {
 
       {/* The badge itself */}
       <span
+        className="model-badge"
         onClick={handleBadgeClick}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "8px",
-          background: "#1e66a8",
-          color: "#ffffff",
-          padding: "2px 10px",
-          borderRadius: "3px",
-          fontWeight: 500,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-          userSelect: "none",
-        }}
         title={`${modelName}${thinkingLevel ? ` • ${thinkingLevel}` : ""} — click to switch model`}
       >
-        <span style={{ display: "inline-flex", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "220px" }}>
-          <span style={{ opacity: 0.8 }}>{modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}</span>
-          <span style={{ fontWeight: 600 }}>{modelName.split("/").pop() || modelName}</span>
+        <span className="model-badge__name-wrapper">
+          <span className="model-badge__provider">{modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}</span>
+          <span className="model-badge__name">{modelName.split("/").pop() || modelName}</span>
         </span>
         {thinkingLevel && (
           <span
             data-model-picker
-            style={{ position: "relative", display: "inline-flex" }}
+            className="thinking-badge-wrapper"
           >
             <span
+              className="thinking-badge"
               onClick={handleThinkingClick}
-              style={{ cursor: "pointer", borderBottom: "1px dashed rgba(255,255,255,0.5)", paddingBottom: "1px" }}
               title="Click to change thinking level"
             >
               {thinkingLevel}
@@ -353,40 +313,23 @@ export function ModelContextBar() {
             {showThinkingPicker.value && (
               <div
                 data-model-picker
-                style={{
-                  position: "absolute",
-                  bottom: "calc(100% + 6px)",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 9999,
-                  background: "#2a2a3c",
-                  border: `1px solid ${theme.border ?? "#45475a"}`,
-                  borderRadius: "6px",
-                  boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
-                  minWidth: "100px",
-                  overflow: "hidden",
-                }}
+                className="thinking-picker"
               >
                 {(thinkingLevels.value.length ? thinkingLevels.value : FALLBACK_THINKING_LEVELS).map((level) => {
                   const isActive = level === thinkingLevel;
                   return (
                     <div
                       key={level}
+                      className="thinking-picker__item"
                       onClick={(ev) => { ev.stopPropagation(); handleSelectThinking(level); }}
                       style={{
-                        padding: "5px 12px",
-                        fontSize: "12px",
-                        cursor: "pointer",
                         color: isActive ? "#a6e3a1" : "#cdd6f4",
                         background: isActive ? "rgba(166,227,161,0.1)" : "transparent",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
                       }}
                       onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)"; }}
                       onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent"; }}
                     >
-                      <span style={{ width: "12px", textAlign: "center" }}>{isActive ? "✓" : ""}</span>
+                      <span className="thinking-picker__item__check">{isActive ? "✓" : ""}</span>
                       <span>{level}</span>
                     </div>
                   );

@@ -1,4 +1,3 @@
-import { useTheme } from "../theme/ThemeProvider";
 import { WorkspacePanel } from "./WorkspacePanel";
 
 interface PanelRouterProps {
@@ -24,10 +23,8 @@ export function PanelRouter({ activePanel }: PanelRouterProps) {
 }
 
 function Placeholder({ text }: { text: string }) {
-  const theme = useTheme();
-
   return (
-    <div style={{ padding: "12px", color: theme.textMuted, fontSize: "12px" }}>
+    <div className="panel-placeholder">
       {text}
     </div>
   );
