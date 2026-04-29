@@ -10,44 +10,42 @@ interface PanelContent {
 const PANEL_CONTENT: Record<string, PanelContent> = {
   explorer: {
     title: "📁 Workspace",
-    description: "Coming soon...",
+    description: "File tree will appear here",
   },
   files: {
     title: "📁 Workspace",
-    description: "Coming soon...",
+    description: "File tree will appear here",
   },
   search: {
-    title: "🔍 Search Panel",
-    description: "Coming soon...",
+    title: "🔍 Search",
+    description: "Search input and results",
   },
   extensions: {
     title: "🧩 Addons",
-    description: "Coming soon...",
+    description: "Installed addons list",
   },
   agent: {
-    title: "🤖 Agent Panel",
-    description: "Coming soon...",
+    title: "🤖 Agent",
+    description: "Chat is always visible →",
   },
   settings: {
-    title: "⚙️ Settings Panel",
-    description: "Coming soon...",
+    title: "⚙️ Settings",
+    description: "Settings panels",
   },
 };
 
 const FALLBACK_PANEL: PanelContent = {
-  title: "🤖 Agent Panel",
-  description: "Coming soon...",
+  title: "📁 Workspace",
+  description: "File tree will appear here",
 };
 
 export function PanelRouter({ activePanel }: PanelRouterProps) {
   const panel = PANEL_CONTENT[activePanel] ?? FALLBACK_PANEL;
 
   return (
-    <section className="shell-panel-placeholder" aria-live="polite">
-      <div className="shell-panel-placeholder__content">
-        <h1 className="shell-panel-placeholder__title">{panel.title}</h1>
-        <p className="shell-panel-placeholder__description">{panel.description}</p>
-      </div>
+    <section aria-live="polite" style={{ height: "100%", padding: "12px" }}>
+      <div style={{ color: "#cdd6f4", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>{panel.title}</div>
+      <p style={{ color: "#a6adc8", fontSize: "13px", margin: 0 }}>{panel.description}</p>
     </section>
   );
 }

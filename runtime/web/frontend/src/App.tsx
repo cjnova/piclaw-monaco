@@ -5,8 +5,7 @@ import { WebSocketManager } from "./api/websocket";
 import { ActivityBar } from "./components/ActivityBar";
 import { Sidebar } from "./components/Sidebar";
 import { CommandPalette } from "./components/CommandPalette";
-import { SplitPane } from "./components/SplitPane";
-import { PanelRouter } from "./panels";
+import { PanelRouter, ChatPanel } from "./panels";
 import { commandRegistry } from "./services";
 
 export function App() {
@@ -46,7 +45,7 @@ export function App() {
   useEffect(() => {
     const cmds = [
       { id: "nav.explorer", label: "Show Explorer", category: "navigation" as const, keybinding: "Ctrl+Shift+E", handler: () => { activePanel.value = "explorer"; sidebarCollapsed.value = false; } },
-      { id: "nav.agent", label: "Show Agent", category: "navigation" as const, keybinding: "Ctrl+Shift+A", handler: () => { activePanel.value = "agent"; sidebarCollapsed.value = false; } },
+      { id: "nav.agent", label: "Show Agent", category: "navigation" as const, keybinding: "Ctrl+Shift+A", handler: () => { activePanel.value = "agent"; sidebarCollapsed.value = true; } },
       { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal" as const, keybinding: "Ctrl+`", handler: () => { terminalVisible.value = !terminalVisible.value; } },
       { id: "sidebar.toggle", label: "Toggle Sidebar", category: "navigation" as const, keybinding: "Ctrl+B", handler: () => { sidebarCollapsed.value = !sidebarCollapsed.value; } },
     ];
@@ -56,6 +55,12 @@ export function App() {
 
   // VS Code behavior: click active icon = toggle sidebar, click different icon = switch + open
   const handlePanelChange = useCallback((id: string) => {
+    if (id === "agent") {
+      activePanel.value = id;
+      sidebarCollapsed.value = true;
+      return;
+    }
+
     if (id === activePanel.value) {
       sidebarCollapsed.value = !sidebarCollapsed.value;
     } else {
@@ -102,7 +107,7 @@ export function App() {
             flexShrink: 0,
           }}>
             <Sidebar title={PANEL_NAMES[activePanel.value] || activePanel.value}>
-              <div style={{ padding: "8px 12px", color: "#6c7086", fontSize: "12px" }}>{activePanel.value} content...</div>
+              <PanelRouter activePanel={activePanel.value} />
             </Sidebar>
           </div>
           {/* Resize handle — only visible when sidebar is open */}
@@ -124,9 +129,9 @@ export function App() {
               }}
             />
           )}
-          {/* Main panel */}
-          <div style={{ flex: 1, overflow: "auto", minWidth: 0, height: "100%" }}>
-            <PanelRouter activePanel={activePanel.value} />
+          {/* Main panel: always chat */}
+          <div style={{ flex: 1, overflow: "hidden", minWidth: 0, height: "100%" }}>
+            <ChatPanel />
           </div>
         </div>
 

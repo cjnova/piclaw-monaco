@@ -1299,39 +1299,109 @@
   var PANEL_CONTENT = {
     explorer: {
       title: "\u{1F4C1} Workspace",
-      description: "Coming soon..."
+      description: "File tree will appear here"
     },
     files: {
       title: "\u{1F4C1} Workspace",
-      description: "Coming soon..."
+      description: "File tree will appear here"
     },
     search: {
-      title: "\u{1F50D} Search Panel",
-      description: "Coming soon..."
+      title: "\u{1F50D} Search",
+      description: "Search input and results"
     },
     extensions: {
       title: "\u{1F9E9} Addons",
-      description: "Coming soon..."
+      description: "Installed addons list"
     },
     agent: {
-      title: "\u{1F916} Agent Panel",
-      description: "Coming soon..."
+      title: "\u{1F916} Agent",
+      description: "Chat is always visible \u2192"
     },
     settings: {
-      title: "\u2699\uFE0F Settings Panel",
-      description: "Coming soon..."
+      title: "\u2699\uFE0F Settings",
+      description: "Settings panels"
     }
   };
   var FALLBACK_PANEL = {
-    title: "\u{1F916} Agent Panel",
-    description: "Coming soon..."
+    title: "\u{1F4C1} Workspace",
+    description: "File tree will appear here"
   };
   function PanelRouter({ activePanel }) {
     const panel = PANEL_CONTENT[activePanel] ?? FALLBACK_PANEL;
-    return /* @__PURE__ */ u4("section", { className: "shell-panel-placeholder", "aria-live": "polite", children: /* @__PURE__ */ u4("div", { className: "shell-panel-placeholder__content", children: [
-      /* @__PURE__ */ u4("h1", { className: "shell-panel-placeholder__title", children: panel.title }),
-      /* @__PURE__ */ u4("p", { className: "shell-panel-placeholder__description", children: panel.description })
-    ] }) });
+    return /* @__PURE__ */ u4("section", { "aria-live": "polite", style: { height: "100%", padding: "12px" }, children: [
+      /* @__PURE__ */ u4("div", { style: { color: "#cdd6f4", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }, children: panel.title }),
+      /* @__PURE__ */ u4("p", { style: { color: "#a6adc8", fontSize: "13px", margin: 0 }, children: panel.description })
+    ] });
+  }
+
+  // runtime/web/frontend/src/panels/ChatPanel.tsx
+  function ChatPanel() {
+    return /* @__PURE__ */ u4("section", { style: {
+      height: "100%",
+      width: "100%",
+      display: "flex",
+      flexDirection: "column",
+      background: "#1e1e2e",
+      minHeight: 0
+    }, children: [
+      /* @__PURE__ */ u4("div", { style: {
+        flex: 1,
+        minHeight: 0,
+        overflow: "auto",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px"
+      }, children: /* @__PURE__ */ u4("div", { style: { textAlign: "center" }, children: [
+        /* @__PURE__ */ u4("h1", { style: { margin: 0, fontSize: "30px", color: "#cdd6f4" }, children: "\u{1F916} Chat" }),
+        /* @__PURE__ */ u4("p", { style: { margin: "10px 0 0", color: "#a6adc8", fontSize: "14px" }, children: "Messages will appear here" })
+      ] }) }),
+      /* @__PURE__ */ u4("div", { style: {
+        background: "#181825",
+        borderTop: "1px solid #313244",
+        padding: "12px",
+        display: "flex",
+        gap: "10px",
+        alignItems: "center",
+        flexShrink: 0
+      }, children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "text",
+            placeholder: "Type a message...",
+            style: {
+              flex: 1,
+              minWidth: 0,
+              border: "1px solid #45475a",
+              background: "#11111b",
+              color: "#cdd6f4",
+              borderRadius: "10px",
+              padding: "10px 12px",
+              fontSize: "13px",
+              outline: "none"
+            }
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            style: {
+              border: "1px solid #89b4fa",
+              background: "#89b4fa",
+              color: "#11111b",
+              borderRadius: "10px",
+              padding: "10px 14px",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer"
+            },
+            children: "Send"
+          }
+        )
+      ] })
+    ] });
   }
 
   // runtime/web/frontend/src/App.tsx
@@ -1397,7 +1467,7 @@
         } },
         { id: "nav.agent", label: "Show Agent", category: "navigation", keybinding: "Ctrl+Shift+A", handler: () => {
           activePanel.value = "agent";
-          sidebarCollapsed.value = false;
+          sidebarCollapsed.value = true;
         } },
         { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal", keybinding: "Ctrl+`", handler: () => {
           terminalVisible.value = !terminalVisible.value;
@@ -1410,6 +1480,11 @@
       return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible, sidebarCollapsed]);
     const handlePanelChange = q2((id) => {
+      if (id === "agent") {
+        activePanel.value = id;
+        sidebarCollapsed.value = true;
+        return;
+      }
       if (id === activePanel.value) {
         sidebarCollapsed.value = !sidebarCollapsed.value;
       } else {
@@ -1452,10 +1527,7 @@
             overflow: "hidden",
             transition: "width 0.15s ease",
             flexShrink: 0
-          }, children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
-            activePanel.value,
-            " content..."
-          ] }) }) }),
+          }, children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) }),
           !sidebarCollapsed.value && /* @__PURE__ */ u4(
             "div",
             {
@@ -1486,7 +1558,7 @@
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto", minWidth: 0, height: "100%" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
+          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden", minWidth: 0, height: "100%" }, children: /* @__PURE__ */ u4(ChatPanel, {}) })
         ] }),
         terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }, children: [
           /* @__PURE__ */ u4(
