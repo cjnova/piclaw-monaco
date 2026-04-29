@@ -9,11 +9,11 @@ interface PanelContent {
 
 const PANEL_CONTENT: Record<string, PanelContent> = {
   explorer: {
-    title: "📁 Explorer Panel",
+    title: "📁 Workspace",
     description: "Coming soon...",
   },
   files: {
-    title: "📁 Explorer Panel",
+    title: "📁 Workspace",
     description: "Coming soon...",
   },
   search: {

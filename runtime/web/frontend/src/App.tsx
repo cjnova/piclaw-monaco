@@ -11,7 +11,7 @@ import { commandRegistry } from "./services";
 
 export function App() {
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
-  const activePanel = useSignal("agent");
+  const activePanel = useSignal("explorer");
   const paletteVisible = useSignal(false);
   const terminalVisible = useSignal(false);
   const terminalHeight = useSignal(200);
@@ -140,11 +140,16 @@ export function App() {
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
                   title={terminalMaximized.value ? "Restore" : "Maximize"}>{terminalMaximized.value ? "\u229F" : "\u229E"}</span>
-                <span style={{ cursor: "pointer", color: "\#6c7086", fontSize: "14px", padding: "2px 4px" }}
-                  onClick={() => { window.open(window.location.href, "_blank", "width=800,height=600"); }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "\#cdd6f4"; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "\#6c7086"; }}
-                  title="Pop out to new window">\u2197</span>
+                <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
+                  onClick={() => { window.open(window.location.href, "_blank"); }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
+                  title="Open in new tab"><i className="codicon codicon-link-external" style={{ fontSize: "14px" }} /></span>
+                <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
+                  onClick={() => { window.open(window.location.href, "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
+                  title="Pop out to window"><i className="codicon codicon-multiple-windows" style={{ fontSize: "14px" }} /></span>
                 <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
                   onClick={() => { terminalVisible.value = false; terminalMaximized.value = false; }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}

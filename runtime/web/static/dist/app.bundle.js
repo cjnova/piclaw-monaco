@@ -1132,7 +1132,7 @@
 
   // runtime/web/frontend/src/components/ActivityBar.tsx
   var PANELS = [
-    { id: "explorer", icon: "files", label: "Explorer" },
+    { id: "explorer", icon: "files", label: "Workspace" },
     { id: "search", icon: "search", label: "Search" },
     { id: "extensions", icon: "extensions", label: "Extensions" },
     { id: "agent", icon: "hubot", label: "Agent" },
@@ -1298,11 +1298,11 @@
   // runtime/web/frontend/src/panels/PanelRouter.tsx
   var PANEL_CONTENT = {
     explorer: {
-      title: "\u{1F4C1} Explorer Panel",
+      title: "\u{1F4C1} Workspace",
       description: "Coming soon..."
     },
     files: {
-      title: "\u{1F4C1} Explorer Panel",
+      title: "\u{1F4C1} Workspace",
       description: "Coming soon..."
     },
     search: {
@@ -1337,7 +1337,7 @@
   // runtime/web/frontend/src/App.tsx
   function App() {
     const connectionStatus = useSignal("disconnected");
-    const activePanel = useSignal("agent");
+    const activePanel = useSignal("explorer");
     const paletteVisible = useSignal(false);
     const terminalVisible = useSignal(false);
     const terminalHeight = useSignal(200);
@@ -1514,7 +1514,7 @@
                 {
                   style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
-                    window.open(window.location.href, "_blank", "width=800,height=600");
+                    window.open(window.location.href, "_blank");
                   },
                   onMouseEnter: (e4) => {
                     e4.target.style.color = "#cdd6f4";
@@ -1522,8 +1522,25 @@
                   onMouseLeave: (e4) => {
                     e4.target.style.color = "#6c7086";
                   },
-                  title: "Pop out to new window",
-                  children: "\\u2197"
+                  title: "Open in new tab",
+                  children: /* @__PURE__ */ u4("i", { className: "codicon codicon-link-external", style: { fontSize: "14px" } })
+                }
+              ),
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  onClick: () => {
+                    window.open(window.location.href, "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
+                  },
+                  onMouseEnter: (e4) => {
+                    e4.target.style.color = "#cdd6f4";
+                  },
+                  onMouseLeave: (e4) => {
+                    e4.target.style.color = "#6c7086";
+                  },
+                  title: "Pop out to window",
+                  children: /* @__PURE__ */ u4("i", { className: "codicon codicon-multiple-windows", style: { fontSize: "14px" } })
                 }
               ),
               /* @__PURE__ */ u4(
