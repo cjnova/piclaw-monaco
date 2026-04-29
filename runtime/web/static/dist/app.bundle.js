@@ -1460,8 +1460,8 @@
     const sidebarCollapsed = useSignal(false);
     const websocket = T2(() => new WebSocketManager(), []);
     y2(() => {
-      const unsubscribe = websocket.onStatusChange((status) => {
-        connectionStatus.value = status;
+      const unsubscribe = websocket.onStatusChange((s4) => {
+        connectionStatus.value = s4;
       });
       websocket.connect();
       return () => {
@@ -1470,19 +1470,20 @@
       };
     }, [connectionStatus, websocket]);
     y2(() => {
-      const handleKeyDown = (event) => {
-        if (event.ctrlKey && !event.shiftKey && !event.altKey && (event.code === "Backquote" || event.key === "`" || event.key === "\xBA" || event.key === "\\" || event.key === "Dead")) {
-          event.preventDefault();
-          event.stopPropagation();
+      const handleKeyDown = (e4) => {
+        if (e4.ctrlKey && !e4.shiftKey && !e4.altKey && (e4.code === "Backquote" || e4.key === "`" || e4.key === "\xBA" || e4.key === "Dead")) {
+          e4.preventDefault();
+          e4.stopPropagation();
           terminalVisible.value = !terminalVisible.value;
           return;
         }
-        if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "p") {
-          event.preventDefault();
+        if (e4.ctrlKey && e4.shiftKey && e4.key.toLowerCase() === "p") {
+          e4.preventDefault();
           paletteVisible.value = !paletteVisible.value;
+          return;
         }
-        if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "b") {
-          event.preventDefault();
+        if (e4.ctrlKey && !e4.shiftKey && e4.key.toLowerCase() === "b") {
+          e4.preventDefault();
           sidebarCollapsed.value = !sidebarCollapsed.value;
         }
       };
@@ -1490,7 +1491,7 @@
       return () => window.removeEventListener("keydown", handleKeyDown, true);
     }, [paletteVisible, terminalVisible, sidebarCollapsed]);
     y2(() => {
-      const commands = [
+      const cmds = [
         { id: "nav.explorer", label: "Show Explorer", category: "navigation", keybinding: "Ctrl+Shift+E", handler: () => {
           activePanel.value = "explorer";
         } },
@@ -1504,48 +1505,51 @@
           sidebarCollapsed.value = !sidebarCollapsed.value;
         } }
       ];
-      commands.forEach((c4) => commandRegistry.register(c4));
-      return () => commands.forEach((c4) => commandRegistry.unregister(c4.id));
+      cmds.forEach((c4) => commandRegistry.register(c4));
+      return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible, sidebarCollapsed]);
+    const toggleSidebar = q2(() => {
+      sidebarCollapsed.value = !sidebarCollapsed.value;
+    }, [sidebarCollapsed]);
     const connected = connectionStatus.value === "connected";
-    return /* @__PURE__ */ u4("div", { className: "shell-root", children: [
+    return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }, children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: (id) => {
         activePanel.value = id;
       } }),
-      /* @__PURE__ */ u4("div", { style: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }, children: [
-        /* @__PURE__ */ u4("header", { className: "shell-status", children: [
-          /* @__PURE__ */ u4("span", { className: `shell-status__dot ${connected ? "is-connected" : "is-disconnected"}`, title: connected ? "Connected" : "Disconnected" }),
-          /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
+      /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
+        /* @__PURE__ */ u4("div", { style: { height: "24px", display: "flex", alignItems: "center", padding: "0 12px", background: "#181825", borderBottom: "1px solid #313244", fontSize: "12px", flexShrink: 0 }, children: [
+          /* @__PURE__ */ u4("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8", marginRight: "6px" } }),
+          /* @__PURE__ */ u4("span", { style: { color: "#6c7086" }, children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: sidebarCollapsed.value ? 0 : 250, minSize: 150, maxSize: 800, children: [
-          /* @__PURE__ */ u4(
-            Sidebar,
-            {
-              title: activePanel.value,
-              collapsed: sidebarCollapsed.value,
-              onToggleCollapse: () => {
-                sidebarCollapsed.value = !sidebarCollapsed.value;
-              },
-              children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
-                activePanel.value,
-                " content here..."
-              ] })
-            }
-          ),
-          /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
-        ] }) }),
-        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: "200px", borderTop: "1px solid #313244", background: "#11111b", display: "flex", flexDirection: "column" }, children: [
-          /* @__PURE__ */ u4("div", { style: { height: "32px", background: "#181825", borderBottom: "1px solid #313244", display: "flex", alignItems: "center", padding: "0 12px", gap: "8px" }, children: [
-            /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px" }, children: "Terminal" }),
-            /* @__PURE__ */ u4("span", { style: { marginLeft: "auto", cursor: "pointer", color: "#6c7086", fontSize: "14px" }, onClick: () => {
-              terminalVisible.value = false;
-            }, children: "\u2715" })
-          ] }),
-          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }, children: [
-            "$ xterm.js will mount here (Wave 9)",
-            /* @__PURE__ */ u4("br", {}),
-            /* @__PURE__ */ u4("span", { style: { color: "#6c7086" }, children: "Press Ctrl+` or Ctrl+\xBA to toggle this panel" })
+        /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: sidebarCollapsed.value ? (
+          // No sidebar — just main panel
+          /* @__PURE__ */ u4("div", { style: { width: "100%", height: "100%", overflow: "auto" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
+        ) : (
+          // SplitPane: sidebar | main
+          /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 500, children: [
+            /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, collapsed: false, onToggleCollapse: toggleSidebar, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
+              activePanel.value,
+              " content..."
+            ] }) }),
+            /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
           ] })
+        ) }),
+        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: "200px", flexShrink: 0, borderTop: "1px solid #313244", background: "#11111b", display: "flex", flexDirection: "column" }, children: [
+          /* @__PURE__ */ u4("div", { style: { height: "32px", background: "#181825", borderBottom: "1px solid #313244", display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }, children: [
+            /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: "Terminal" }),
+            /* @__PURE__ */ u4(
+              "span",
+              {
+                style: { marginLeft: "auto", cursor: "pointer", color: "#6c7086", fontSize: "16px", lineHeight: 1, padding: "4px" },
+                onClick: () => {
+                  terminalVisible.value = false;
+                },
+                title: "Close terminal (Ctrl+`)",
+                children: "\u2715"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", overflow: "auto" }, children: "$ xterm.js will mount here (Wave 9)" })
         ] })
       ] }),
       /* @__PURE__ */ u4(CommandPalette, { visible: paletteVisible.value, onClose: () => {
