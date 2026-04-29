@@ -1480,6 +1480,11 @@
     }, [connectionStatus, websocket]);
     y2(() => {
       const handleWindowKeyDown = (event) => {
+        if (event.ctrlKey && event.code === "Backquote") {
+          event.preventDefault();
+          terminalVisible.value = !terminalVisible.value;
+          return;
+        }
         if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "p") {
           event.preventDefault();
           paletteVisible.value = !paletteVisible.value;

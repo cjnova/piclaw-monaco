@@ -31,6 +31,11 @@ export function App() {
 
   useEffect(() => {
     const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.code === "Backquote") {
+        event.preventDefault();
+        terminalVisible.value = !terminalVisible.value;
+        return;
+      }
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
         paletteVisible.value = !paletteVisible.value;
