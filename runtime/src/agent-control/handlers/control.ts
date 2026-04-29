@@ -12,11 +12,16 @@ import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import type { AgentControlCommand, AgentControlResult } from "../agent-control-types.js";
 import { formatCompactNumber } from "../agent-control-helpers.js";
 import { createMedia } from "../../db.js";
+import { getChatJid } from "../../core/chat-context.js";
 import { requestGracefulShutdown } from "../../runtime/shutdown-registry.js";
 import { createLogger, debugSuppressedError } from "../../utils/logger.js";
 import { killTrackedProcesses } from "../../utils/process-tracker.js";
 import { pruneOrphanToolResults } from "../../agent-pool/orphan-tool-results.js";
-import { runCompactionWithTimeout } from "../../agent-pool/compaction.js";
+import {
+  clearCompactionFailureBackoff,
+  noteCompactionFailure,
+  runCompactionWithTimeout,
+} from "../../agent-pool/compaction.js";
 
 const log = createLogger("agent-control.control");
 
@@ -149,10 +154,11 @@ export async function handleExit(session: AgentSession, _command: ExitCommand): 
 /** Handle /compact: manually trigger conversation compaction. */
 export async function handleCompact(session: AgentSession, command: CompactCommand): Promise<AgentControlResult> {
   try {
-    const prunedToolResults = pruneOrphanToolResults(session, "control:/compact");
+    const chatJid = getChatJid("control:/compact");
+    const prunedToolResults = pruneOrphanToolResults(session, chatJid);
     const compactionResult = await runCompactionWithTimeout(
       session,
-      "control:/compact",
+      chatJid,
       {
         onWarn: (message, details) => {
           log.warn(message, details);
@@ -161,6 +167,7 @@ export async function handleCompact(session: AgentSession, command: CompactComma
       async () => await session.compact(command.instructions?.trim() || undefined),
     );
     if (!compactionResult.ok) {
+      noteCompactionFailure(chatJid, compactionResult.errorMessage);
       const timedOut = /timed out/i.test(compactionResult.errorMessage);
       return {
         status: "error",
@@ -170,6 +177,7 @@ export async function handleCompact(session: AgentSession, command: CompactComma
       };
     }
 
+    clearCompactionFailureBackoff(chatJid);
     const generatedAt = new Date().toISOString();
     const attachmentId = createCompactReportAttachment(
       compactionResult.result.summary,

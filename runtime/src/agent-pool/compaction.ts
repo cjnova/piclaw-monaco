@@ -4,12 +4,21 @@
 
 import { type AgentSession, type AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
+import {
+  clearChatCompactionBackoff,
+  getChatCompactionBackoff,
+  setChatCompactionBackoff,
+  type ChatCompactionBackoffState,
+} from "../db.js";
 import { formatTimeoutDuration } from "./prompt-utils.js";
 
 export interface CompactionLifecycleOptions {
   onInfo?: (message: string, details: Record<string, unknown>) => void;
   onWarn?: (message: string, details: Record<string, unknown>) => void;
 }
+
+const DEFAULT_COMPACTION_BACKOFF_BASE_MS = 15 * 60_000;
+const DEFAULT_COMPACTION_BACKOFF_MAX_MS = 6 * 60 * 60_000;
 
 function estimateMessageTokens(message: any): number {
   if (!message || typeof message !== "object") return 0;
@@ -80,6 +89,61 @@ export function getModelContextWindow(session: AgentSession): number | null {
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(String(value || "").trim(), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getCompactionBackoffBaseMs(): number {
+  return parsePositiveInt(process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS, DEFAULT_COMPACTION_BACKOFF_BASE_MS);
+}
+
+function getCompactionBackoffMaxMs(): number {
+  return parsePositiveInt(process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS, DEFAULT_COMPACTION_BACKOFF_MAX_MS);
+}
+
+function computeCompactionBackoffMs(failureCount: number): number {
+  const normalizedFailures = Math.max(1, Math.trunc(failureCount));
+  const baseMs = getCompactionBackoffBaseMs();
+  const maxMs = getCompactionBackoffMaxMs();
+  return Math.min(maxMs, baseMs * 2 ** Math.max(0, normalizedFailures - 1));
+}
+
+function formatCompactionBackoffDetail(state: Pick<ChatCompactionBackoffState, "failureCount" | "backoffUntil" | "lastErrorMessage">): string {
+  const parts = [
+    `Skipping auto-compaction until ${state.backoffUntil}`,
+    `${state.failureCount} recent failure${state.failureCount === 1 ? "" : "s"}`,
+  ];
+  if (state.lastErrorMessage) {
+    parts.push(`Last error: ${state.lastErrorMessage.slice(0, 160)}`);
+  }
+  return parts.join(" — ");
+}
+
+export function getActiveCompactionBackoff(chatJid: string, nowMs = Date.now()): ChatCompactionBackoffState | null {
+  const state = getChatCompactionBackoff(chatJid);
+  if (!state) return null;
+  const untilMs = Date.parse(state.backoffUntil);
+  if (!Number.isFinite(untilMs) || untilMs <= nowMs) return null;
+  return state;
+}
+
+export function clearCompactionFailureBackoff(chatJid: string): void {
+  clearChatCompactionBackoff(chatJid);
+}
+
+export function noteCompactionFailure(chatJid: string, errorMessage: string, failedAtIso = new Date().toISOString()): ChatCompactionBackoffState {
+  const previous = getChatCompactionBackoff(chatJid);
+  const failureCount = (previous?.failureCount ?? 0) + 1;
+  const failedAtMs = Date.parse(failedAtIso);
+  const backoffMs = computeCompactionBackoffMs(failureCount);
+  const backoffUntil = new Date((Number.isFinite(failedAtMs) ? failedAtMs : Date.now()) + backoffMs).toISOString();
+  const nextState: ChatCompactionBackoffState = {
+    chatJid,
+    failureCount,
+    lastFailedAt: failedAtIso,
+    backoffUntil,
+    lastErrorMessage: errorMessage || null,
+  };
+  setChatCompactionBackoff(chatJid, nextState);
+  return nextState;
 }
 
 export function getCompactionTimeoutMs(): number {
@@ -193,6 +257,30 @@ export async function maybeAutoCompactSessionBeforePrompt(
     const reserveTokens = settings.reserveTokens ?? 16384;
     if (contextTokens <= contextWindow - reserveTokens) return;
 
+    const activeBackoff = getActiveCompactionBackoff(chatJid);
+    if (activeBackoff) {
+      const detail = formatCompactionBackoffDetail(activeBackoff);
+      options.onWarn?.("Pre-prompt auto-compaction suppressed for chat after recent failures", {
+        operation: "maybe_auto_compact_session_before_prompt.backoff",
+        chatJid,
+        contextTokens,
+        contextWindow,
+        reserveTokens: settings.reserveTokens ?? null,
+        failureCount: activeBackoff.failureCount,
+        backoffUntil: activeBackoff.backoffUntil,
+        lastErrorMessage: activeBackoff.lastErrorMessage,
+      });
+      onEvent?.({
+        type: "compaction_suppressed",
+        reason: "backoff",
+        until: activeBackoff.backoffUntil,
+        failureCount: activeBackoff.failureCount,
+        detail,
+        errorMessage: activeBackoff.lastErrorMessage ?? undefined,
+      } as unknown as AgentSessionEvent);
+      return;
+    }
+
     options.onInfo?.("Auto-compacting session before prompt", {
       operation: "maybe_auto_compact_session_before_prompt",
       chatJid,
@@ -212,6 +300,7 @@ export async function maybeAutoCompactSessionBeforePrompt(
       async () => await session.compact(),
     );
     if (!compactionResult.ok) {
+      const failureState = noteCompactionFailure(chatJid, compactionResult.errorMessage);
       const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
       onEvent?.({
         type: "compaction_end",
@@ -221,8 +310,16 @@ export async function maybeAutoCompactSessionBeforePrompt(
         willRetry: false,
         errorMessage: aborted ? undefined : `Pre-prompt compaction failed: ${compactionResult.errorMessage}`,
       } as AgentSessionEvent);
+      options.onWarn?.("Pre-prompt auto-compaction entered backoff for this chat", {
+        operation: "maybe_auto_compact_session_before_prompt.backoff_recorded",
+        chatJid,
+        failureCount: failureState.failureCount,
+        backoffUntil: failureState.backoffUntil,
+        lastErrorMessage: failureState.lastErrorMessage,
+      });
       throw new Error(compactionResult.errorMessage);
     }
+    clearCompactionFailureBackoff(chatJid);
     onEvent?.({
       type: "compaction_end",
       reason: "threshold",

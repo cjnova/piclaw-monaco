@@ -58,6 +58,14 @@ export interface PreflightRun extends PendingRunState {}
 /** Shape returned by getInflightRuns(). */
 export interface InflightRun extends PendingRunState {}
 
+export interface ChatCompactionBackoffState {
+  chatJid: string;
+  failureCount: number;
+  lastFailedAt: string;
+  backoffUntil: string;
+  lastErrorMessage: string | null;
+}
+
 /** Possible persisted assistant-output states seen after an inflight start. */
 export type AgentReplyState = "none" | "partial" | "terminal";
 
@@ -174,6 +182,78 @@ export function setDeferredQueuedFollowups(chatJid: string, items: DeferredQueue
     ON CONFLICT(chat_jid) DO UPDATE SET
       queued_followups_json = excluded.queued_followups_json
   `).run(chatJid, payload);
+}
+
+export function getChatCompactionBackoff(chatJid: string): ChatCompactionBackoffState | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      compaction_failure_count,
+      compaction_last_failed_at,
+      compaction_backoff_until,
+      compaction_last_error
+    FROM chat_cursors
+    WHERE chat_jid = ?
+  `).get(chatJid) as {
+    compaction_failure_count: number | null;
+    compaction_last_failed_at: string | null;
+    compaction_backoff_until: string | null;
+    compaction_last_error: string | null;
+  } | undefined;
+  if (!row?.compaction_failure_count || !row.compaction_last_failed_at || !row.compaction_backoff_until) return null;
+  return {
+    chatJid,
+    failureCount: Number(row.compaction_failure_count),
+    lastFailedAt: row.compaction_last_failed_at,
+    backoffUntil: row.compaction_backoff_until,
+    lastErrorMessage: row.compaction_last_error ?? null,
+  };
+}
+
+export function setChatCompactionBackoff(
+  chatJid: string,
+  backoff: {
+    failureCount: number;
+    lastFailedAt: string;
+    backoffUntil: string;
+    lastErrorMessage?: string | null;
+  },
+): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO chat_cursors (
+      chat_jid,
+      cursor_ts,
+      compaction_failure_count,
+      compaction_last_failed_at,
+      compaction_backoff_until,
+      compaction_last_error
+    )
+    VALUES (?, '', ?, ?, ?, ?)
+    ON CONFLICT(chat_jid) DO UPDATE SET
+      compaction_failure_count  = excluded.compaction_failure_count,
+      compaction_last_failed_at = excluded.compaction_last_failed_at,
+      compaction_backoff_until  = excluded.compaction_backoff_until,
+      compaction_last_error     = excluded.compaction_last_error
+  `).run(
+    chatJid,
+    backoff.failureCount,
+    backoff.lastFailedAt,
+    backoff.backoffUntil,
+    backoff.lastErrorMessage ?? null,
+  );
+}
+
+export function clearChatCompactionBackoff(chatJid: string): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE chat_cursors
+    SET compaction_failure_count  = NULL,
+        compaction_last_failed_at = NULL,
+        compaction_backoff_until  = NULL,
+        compaction_last_error     = NULL
+    WHERE chat_jid = ?
+  `).run(chatJid);
 }
 
 // ---------------------------------------------------------------------------

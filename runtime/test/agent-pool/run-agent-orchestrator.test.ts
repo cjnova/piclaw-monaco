@@ -418,6 +418,191 @@ test("runAgentPrompt aborts a stuck pre-prompt compaction and continues", async 
   }
 });
 
+test("runAgentPrompt suppresses auto-compaction for chats under backoff after recent failures", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_COMPACTION_TIMEOUT_MS: "20",
+    PICLAW_COMPACTION_BACKOFF_BASE_MS: "600000",
+    PICLAW_COMPACTION_BACKOFF_MAX_MS: "600000",
+  });
+  const chatJid = `web:compaction-backoff-${Date.now()}`;
+  const db = await import("../../src/db.js");
+  db.initDatabase();
+  const compactionEvents: string[] = [];
+
+  class FailingSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      this.isCompacting = true;
+      await new Promise(() => {});
+    }
+    abortCompaction() {
+      this.isCompacting = false;
+    }
+    async prompt() {
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "first" } });
+      }
+    }
+    async abort() {
+      this.isCompacting = false;
+    }
+  }
+
+  class SuppressedSession {
+    calls: string[] = [];
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      this.calls.push("compact");
+    }
+    async prompt() {
+      this.calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "second" } });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const turnCoordinator = new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} });
+    await runAgentPrompt("test", chatJid, { timeoutMs: 0 }, {
+      getOrCreateRuntime: async () => createRuntime(new FailingSession()) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(db.getChatCompactionBackoff(chatJid)).toEqual(expect.objectContaining({ failureCount: 1 }));
+
+    const secondSession = new SuppressedSession();
+    const secondResult = await runAgentPrompt("test", chatJid, {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "compaction_suppressed") compactionEvents.push(String((event as any).type));
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(secondSession) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(secondResult.status).toBe("success");
+    expect(secondResult.result).toBe("second");
+    expect(secondSession.calls).toEqual(["prompt"]);
+    expect(compactionEvents).toEqual(["compaction_suppressed"]);
+  } finally {
+    restoreEnv();
+  }
+});
+
+test("runAgentPrompt clears compaction backoff after a successful compaction", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_COMPACTION_BACKOFF_BASE_MS: "600000",
+    PICLAW_COMPACTION_BACKOFF_MAX_MS: "600000",
+  });
+  const chatJid = `web:compaction-clear-${Date.now()}`;
+  const db = await import("../../src/db.js");
+  db.initDatabase();
+  db.setChatCompactionBackoff(chatJid, {
+    failureCount: 2,
+    lastFailedAt: "2024-03-20T00:00:00.000Z",
+    backoffUntil: new Date(Date.now() - 60_000).toISOString(),
+    lastErrorMessage: "Previous compaction timed out",
+  });
+
+  class StubSession {
+    calls: string[] = [];
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      this.calls.push("compact");
+    }
+    async prompt() {
+      this.calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "ok" } });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const result = await runAgentPrompt("test", chatJid, { timeoutMs: 0 }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("success");
+    expect(session.calls).toEqual(["compact", "prompt"]);
+    expect(db.getChatCompactionBackoff(chatJid)).toBeNull();
+  } finally {
+    restoreEnv();
+  }
+});
+
 test("runAgentPrompt does not auto-recover generic failures after tool activity", async () => {
   const restoreEnv = setEnv({
     PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",

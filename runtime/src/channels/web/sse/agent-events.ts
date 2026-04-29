@@ -558,6 +558,25 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
 
     const customEventType = (event as { type?: string }).type;
 
+    if (customEventType === "compaction_suppressed") {
+      const e = event as { until?: string; failureCount?: number; detail?: string; errorMessage?: string };
+      const failureCount = typeof e.failureCount === "number" && Number.isFinite(e.failureCount) ? e.failureCount : null;
+      const detail = e.detail
+        || [
+          e.until ? `Skipping auto-compaction until ${e.until}` : null,
+          failureCount != null ? `${failureCount} recent failure${failureCount === 1 ? "" : "s"}` : null,
+          e.errorMessage ? `Last error: ${truncateErrorDetail(e.errorMessage)}` : null,
+        ].filter(Boolean).join(" — ");
+      options.emitter.status({
+        ...base,
+        type: "intent",
+        title: "Compaction temporarily suppressed",
+        detail,
+        intent_key: "compaction",
+        started_at: new Date().toISOString(),
+      });
+    }
+
     if (customEventType === "recovery_start") {
       const e = event as { strategy?: string; attempt?: number; maxAttempts?: number; delayMs?: number; reason?: string; errorMessage?: string };
       const strategy = e.strategy === "compact_then_retry"
