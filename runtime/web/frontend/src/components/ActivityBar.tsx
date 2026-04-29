@@ -23,7 +23,7 @@ export function ActivityBar({ activePanel, onPanelChange }: ActivityBarProps) {
           <button
             key={panel.id}
             type="button"
-            className={`activity-bar__button ${active ? "is-active" : ""} ${panel.alignBottom ? "is-bottom" : ""}`}
+            className={`activity-bar__button ${active ? "is-active" : ""} ${"alignBottom" in panel && panel.alignBottom ? "is-bottom" : ""}`}
             title={panel.label}
             aria-label={panel.label}
             aria-pressed={active}
