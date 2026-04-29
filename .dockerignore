@@ -1,39 +1,7 @@
+node_modules
 .git
-.gitignore
-.gitattributes
-README.md
-docs/
-.dockerignore
-docker-compose*.yml
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-*.log
-tmp/
-temp/
-node_modules/
-__pycache__/
-*.bak
-*.backup
-home/
-workspaces/
-
-# Include the skeleton
-!skel/
-!skel/**
-
-# Include runtime subtree and root packaging/docs files needed by Docker
-!runtime/
-!runtime/**
+.github
+*.md
 !README.md
-!LICENSE
-!package.json
-!bun.lock
-!docs/install-from-repo.md
-
-# Keep the repo-local kanban board out of Docker build context
-kanban/
+tmp
+logs
