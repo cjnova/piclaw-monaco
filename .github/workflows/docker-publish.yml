@@ -1,8 +1,8 @@
 name: Docker Publish
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
     tags: ['v*']
 
 env:
