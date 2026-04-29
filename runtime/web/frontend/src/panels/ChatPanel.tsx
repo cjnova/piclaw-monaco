@@ -53,6 +53,21 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
   };
 
+  const sendMessage = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const content = el.value.trim();
+    if (!content) return;
+    el.value = "";
+    el.style.height = "auto";
+    fetch("/agent/web:default/message", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    }).catch((err) => console.warn("[chat] send failed:", err));
+  };
+
   const pages = extensionPages.value;
   const showTabs = pages.length > 0;
 
@@ -97,13 +112,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  // TODO: send message
+                  sendMessage();
                 }
               }}
             />
             <button
               type="button"
               className="chat__send-btn"
+              onClick={sendMessage}
             >
               Send
             </button>
