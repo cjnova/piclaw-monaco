@@ -13,13 +13,17 @@ export function App() {
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
   const activePanel = useSignal("explorer");
   const paletteVisible = useSignal(false);
-  const terminalVisible = useSignal(false);
-  const terminalHeight = useSignal(200);
+  const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
+  const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
   const terminalMaximized = useSignal(false);
-  const sidebarCollapsed = useSignal(false);
-  const sidebarWidth = useSignal(250);
+  const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
+  const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
   const websocket = useMemo(() => new WebSocketManager(), []);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
+  useEffect(() => { localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value)); }, [sidebarWidth.value]);
+  useEffect(() => { localStorage.setItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value)); }, [sidebarCollapsed.value]);
+  useEffect(() => { localStorage.setItem("piclaw-terminal-visible", String(terminalVisible.value)); }, [terminalVisible.value]);
+  useEffect(() => { localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value)); }, [terminalHeight.value]);
 
   useEffect(() => {
     const unsub = websocket.onStatusChange((s) => { connectionStatus.value = s; });
