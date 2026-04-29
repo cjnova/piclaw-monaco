@@ -24,6 +24,7 @@
 
 import { readFileSync } from "fs";
 import { getDb } from "../db/connection.js";
+// External provider fallback — see docs/keychain.md#external-keychain-providers
 import { getFromExternalProviders, listFromExternalProviders } from "./keychain-providers.js";
 
 const encoder = new TextEncoder();
@@ -196,7 +197,15 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
   );
 }
 
-/** Retrieve and decrypt a keychain entry by name. Throws if not found. */
+/**
+ * Retrieve and decrypt a keychain entry by name.
+ *
+ * Lookup order:
+ *   1. Internal encrypted SQLite keychain
+ *   2. Registered external keychain providers (see keychain-providers.ts)
+ *
+ * Throws if the entry is not found in any source.
+ */
 export async function getKeychainEntry(name: string): Promise<KeychainEntry> {
   const db = getDb();
   const row = db
@@ -234,7 +243,13 @@ export function listKeychainEntries(): KeychainEntryMetadata[] {
   return rows;
 }
 
-/** List all entries from both internal keychain and registered external providers. */
+/**
+ * List all entries from both internal keychain and registered external providers.
+ *
+ * Internal entries take precedence — if both internal and external have the
+ * same name, only the internal entry appears. External-only entries are
+ * appended with null timestamps.
+ */
 export async function listAllKeychainEntries(): Promise<KeychainEntryMetadata[]> {
   const internal = listKeychainEntries();
   const internalNames = new Set(internal.map((e) => e.name));
