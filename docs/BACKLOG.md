@@ -179,3 +179,60 @@ bunx tsc -p runtime/web/frontend/tsconfig.json --noEmit
 - All layout state persisted in localStorage
 - Backend is completely untouched — all changes are in `runtime/web/frontend/` and `runtime/web/static/`
 - Upstream sync: `git fetch upstream && git merge upstream/main`
+
+## Layout Clarification (2026-04-29)
+
+### Main Panel = ALWAYS Chat
+The central/main panel is **always** the chat timeline. It never switches. Activity Bar icons only control the **left sidebar** content.
+
+### Sidebar Panels
+
+**📁 Workspace** (split vertically):
+```
+┌─────────────────────┐
+│ WORKSPACE           │
+├─────────────────────┤
+│ File tree           │
+│  ▸ notes/       27  │
+│  ▸ repos/           │
+│    file.md          │ ← selected
+│  ▸ workitems/    7  │
+├─────────────────────┤
+│ file.md [+][✏️][🗑][↓]│
+│ type: markdown      │
+│ size: 11.1 KB       │
+│ modified: date      │
+├─────────────────────┤
+│ PREVIEW             │
+│ (rendered markdown   │
+│  or folder donut     │
+│  chart)              │
+└─────────────────────┘
+```
+
+When **folder** selected: action bar shows `[+] create [↑] upload [↓] download zip` + donut chart preview
+When **file** selected: action bar shows `[+] create [✏️] edit [🗑] delete [↓] download` + metadata + rendered preview (markdown, code, etc.)
+
+**🔍 Search**: search input + results (future)
+**🧩 Addons**: extension list + details (future)
+**🤖 Agent**: focuses compose box (chat is always visible)
+**⚙️ Settings**: existing piclaw settings panels
+
+### Updated Target Layout
+```
+┌────┬──────────────────┬────────────────────────────────────┐
+│    │  SIDEBAR          │  CHAT (always visible)              │
+│ A  │  (controlled by   │  Agent messages, streaming          │
+│ c  │   Activity Bar)   │  Markdown, code blocks              │
+│ t  │                   │  Adaptive cards, widgets            │
+│ i  │  📁 = file tree   │                                    │
+│ v  │       + preview   │                                    │
+│ i  │  🔍 = search      │                                    │
+│ t  │  🧩 = addons      │                                    │
+│ y  │  🤖 = focus chat  │  [Compose box]                     │
+│    │  ⚙️ = settings    ├────────────────────────────────────┤
+│ B  │                   │  TERMINAL (docked bottom)           │
+│ a  │                   ├────────────────────────────────────┤
+│ r  │                   │  STATUS BAR                         │
+└────┴──────────────────┴────────────────────────────────────┘
+```
