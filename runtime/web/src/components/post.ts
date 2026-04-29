@@ -891,6 +891,16 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
     displayContent = getPeerMessageDisplayContent(displayContent, blocks);
     const { content: cleanedContent, fileRefs } = extractFileRefs(displayContent);
     const { content: cleanedWithMsgRefs, messageRefs } = extractMessageRefs(cleanedContent);
+    const handleActivateMessageRef = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onMessageRef?.(post.id, post.chat_jid || null);
+    };
+    const handleSearchTagKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            handleActivateMessageRef(e);
+        }
+    };
     const { content: cleanedWithAttachments, attachments } = extractAttachmentRefs(cleanedWithMsgRefs);
     displayContent = cleanedWithAttachments;
     const directCardBlocks = extractCardBlocks(blocks);
@@ -1189,12 +1199,20 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
                             @${peerMessageMeta?.sourceAgentName}
                         </span>
                     `}
-                    ${showSearchChatAgentTag && html`<span class="post-chat-agent-tag" title=${`Chat: ${searchChatAgentName}`}>@${searchChatAgentName}</span>`}
-                    <a class="post-time" href=${`#msg-${post.id}`} onClick=${(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onMessageRef) onMessageRef(post.id);
-                    }}>${formatTime(post.timestamp)}</a>
+                    ${showSearchChatAgentTag && html`
+                        <span
+                            class="post-chat-agent-tag"
+                            role="button"
+                            tabIndex="0"
+                            style="cursor:pointer"
+                            title=${`Open ${searchChatAgentName} and reference this message`}
+                            onClick=${handleActivateMessageRef}
+                            onKeyDown=${handleSearchTagKeyDown}
+                        >
+                            @${searchChatAgentName}
+                        </span>
+                    `}
+                    <a class="post-time" href=${`#msg-${post.id}`} onClick=${handleActivateMessageRef}>${formatTime(post.timestamp)}</a>
                     ${recoveryMarker && html`
                         <span
                             class="post-recovery-chip"
