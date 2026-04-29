@@ -225,25 +225,13 @@ function SunburstChart({ root, totalSize }: SunburstChartProps) {
         ))}
         {/* Center circle */}
         <circle cx={SB_CX} cy={SB_CY} r="35" fill="rgba(20,20,30,0.88)" />
-        {/* Center text */}
-        <text
-          x={SB_CX}
-          y={SB_CY - 5}
-          textAnchor="middle"
-          dominantBaseline="auto"
-          className="workspace__sunburst-total"
-        >
-          {formatBytes(totalSize)}
-        </text>
-        <text
-          x={SB_CX}
-          y={SB_CY + 9}
-          textAnchor="middle"
-          dominantBaseline="auto"
-          className="workspace__sunburst-label"
-        >
-          total
-        </text>
+        {/* Center text — use foreignObject for reliable centering */}
+        <foreignObject x={SB_CX - 35} y={SB_CY - 18} width="70" height="36">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" }}>
+            <span className="workspace__sunburst-total">{formatBytes(totalSize)}</span>
+            <span className="workspace__sunburst-label">TOTAL</span>
+          </div>
+        </foreignObject>
       </svg>
     </div>
   );

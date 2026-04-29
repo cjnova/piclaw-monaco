@@ -1239,25 +1239,12 @@ body {
   flex-shrink: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.15) transparent;
+  scrollbar-width: none;
 }
 
 .workspace__pane-top::-webkit-scrollbar {
-  width: 6px;
-}
-
-.workspace__pane-top::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.workspace__pane-top::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
-  border-radius: 3px;
-}
-
-.workspace__pane-top::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.25);
+  width: 0;
+  display: none;
 }
 
 .workspace__section {
@@ -1731,12 +1718,14 @@ body {
 .workspace__sunburst-total {
   font-size: 11px;
   font-weight: 600;
+  color: var(--text);
   fill: var(--text);
   font-family: var(--font-ui, system-ui, sans-serif);
 }
 
 .workspace__sunburst-label {
   font-size: 9px;
+  color: var(--text-muted);
   fill: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
