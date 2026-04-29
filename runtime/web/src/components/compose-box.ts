@@ -12,6 +12,12 @@ import { useConnectionStatusPresentation } from '../ui/connection-status.js';
 import { FilePill } from './file-pill.js';
 import { refreshAgentModelStateBestEffort } from './compose-model-refresh.js';
 import { renderMarkdown } from '../markdown.js';
+import {
+    describeSpeechRecognitionError,
+    extractSpeechRecognitionText,
+    getSpeechInputSupport,
+    mergeSpeechComposeText,
+} from '../ui/compose-speech.ts';
 
 /**
  * Slash command definitions for autocomplete.
@@ -771,6 +777,8 @@ export function ComposeBox({
     const [footerWidth, setFooterWidth] = useState(0);
     const [submitError, setSubmitError] = useState(null);
     const [submitNotice, setSubmitNotice] = useState(null);
+    const [speechSupport, setSpeechSupport] = useState(() => getSpeechInputSupport());
+    const [speechUiState, setSpeechUiState] = useState({ kind: 'idle', title: '', detail: '' });
     const [statusNoticeNowMs, setStatusNoticeNowMs] = useState(() => Date.now());
     const [extensionWorkingFrameIndex, setExtensionWorkingFrameIndex] = useState(0);
     const textareaRef = useRef(null);
@@ -782,6 +790,12 @@ export function ComposeBox({
     const sessionTriggerRef = useRef(null);
     const footerRef = useRef(null);
     const popupTypeaheadRef = useRef({ value: '', updatedAt: 0 });
+    const speechRecognitionRef = useRef(null);
+    const speechBaseContentRef = useRef('');
+    const speechFinalTranscriptRef = useRef('');
+    const speechInterimTranscriptRef = useRef('');
+    const speechLastErrorRef = useRef('');
+    const speechPendingStopRef = useRef(false);
     const dragCounterRef = useRef(0);
     const renameSessionInProgressRef = useRef(false);
     const historyMax = 200;
@@ -872,7 +886,18 @@ export function ComposeBox({
             textarea.setSelectionRange?.(end, end);
         });
     }, [prefillRequest, searchMode]);
+    useEffect(() => {
+        setSpeechSupport(getSpeechInputSupport());
+    }, []);
+
     const canSend = content.trim() || mediaFiles.length > 0 || fileRefs.length > 0 || messageRefs.length > 0;
+    const speechUiVisible = speechUiState.kind !== 'idle';
+    const speechUiPulsing = speechUiState.kind === 'requesting_permission' || speechUiState.kind === 'listening';
+    const speechButtonVisible = !searchMode && Boolean(speechSupport?.showButton);
+    const speechButtonActive = speechUiState.kind === 'requesting_permission' || speechUiState.kind === 'listening';
+    const speechButtonTitle = speechButtonActive
+        ? 'Stop voice input'
+        : (speechSupport?.title || 'Voice input');
     const canShareLocation = typeof window !== 'undefined'
         && typeof navigator !== 'undefined'
         && Boolean(navigator.geolocation)
@@ -1230,6 +1255,175 @@ export function ComposeBox({
         updateValue(next);
     };
 
+    const focusTextarea = useCallback(() => {
+        requestAnimationFrame(() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            try {
+                textarea.focus({ preventScroll: true });
+            } catch {
+                textarea.focus();
+            }
+        });
+    }, []);
+
+    const clearSpeechUiState = useCallback(() => {
+        setSpeechUiState({ kind: 'idle', title: '', detail: '' });
+    }, []);
+
+    const applySpeechComposeValue = useCallback((finalTranscript = speechFinalTranscriptRef.current, interimTranscript = speechInterimTranscriptRef.current) => {
+        if (searchMode) return;
+        updateValue(mergeSpeechComposeText(speechBaseContentRef.current, finalTranscript, interimTranscript));
+    }, [searchMode]);
+
+    const stopSpeechRecognition = useCallback(() => {
+        speechPendingStopRef.current = true;
+        const recognition = speechRecognitionRef.current;
+        if (!recognition) {
+            clearSpeechUiState();
+            return;
+        }
+        try {
+            recognition.stop();
+        } catch {
+            speechRecognitionRef.current = null;
+            clearSpeechUiState();
+        }
+    }, [clearSpeechUiState]);
+
+    const handleSpeechToggle = useCallback(() => {
+        setSubmitError(null);
+        setSubmitNotice(null);
+
+        if (speechRecognitionRef.current) {
+            stopSpeechRecognition();
+            return;
+        }
+
+        if (!speechSupport?.showButton) return;
+
+        if (speechSupport.mode === 'fallback') {
+            focusTextarea();
+            setSpeechUiState({
+                kind: 'guidance',
+                title: speechSupport.title || 'Use keyboard dictation',
+                detail: speechSupport.detail || 'Use your keyboard dictation mic for voice input here.',
+            });
+            return;
+        }
+
+        if (!speechSupport?.canStart || !speechSupport?.recognitionCtor) {
+            setSpeechUiState({
+                kind: 'error',
+                title: speechSupport?.title || 'Voice input unavailable',
+                detail: speechSupport?.detail || 'This browser does not expose native speech recognition in this context.',
+            });
+            return;
+        }
+
+        try {
+            const recognition = new speechSupport.recognitionCtor();
+            speechRecognitionRef.current = recognition;
+            speechBaseContentRef.current = String(content || '');
+            speechFinalTranscriptRef.current = '';
+            speechInterimTranscriptRef.current = '';
+            speechLastErrorRef.current = '';
+            speechPendingStopRef.current = false;
+
+            recognition.lang = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US';
+            recognition.interimResults = true;
+            recognition.continuous = false;
+            if ('maxAlternatives' in recognition) {
+                recognition.maxAlternatives = 1;
+            }
+
+            recognition.onstart = () => {
+                setSpeechUiState({
+                    kind: 'listening',
+                    title: 'Listening…',
+                    detail: 'Speak now. Tap the mic again to stop.',
+                });
+            };
+
+            recognition.onresult = (event) => {
+                const { finalText, interimText } = extractSpeechRecognitionText(event?.results, event?.resultIndex || 0);
+                if (finalText) {
+                    speechFinalTranscriptRef.current = `${speechFinalTranscriptRef.current} ${finalText}`.trim();
+                }
+                speechInterimTranscriptRef.current = interimText;
+                applySpeechComposeValue();
+                setSpeechUiState({
+                    kind: 'listening',
+                    title: 'Listening…',
+                    detail: interimText
+                        ? `Heard: ${interimText}`
+                        : 'Speak now. Tap the mic again to stop.',
+                });
+            };
+
+            recognition.onerror = (event) => {
+                const errorCode = String(event?.error || '').trim();
+                speechLastErrorRef.current = errorCode;
+                speechRecognitionRef.current = null;
+                speechInterimTranscriptRef.current = '';
+                if (errorCode === 'aborted') {
+                    clearSpeechUiState();
+                    return;
+                }
+                setSpeechUiState({
+                    kind: 'error',
+                    title: 'Voice input failed',
+                    detail: describeSpeechRecognitionError(errorCode, speechSupport),
+                });
+            };
+
+            recognition.onend = () => {
+                const lastError = speechLastErrorRef.current;
+                const pendingStop = speechPendingStopRef.current;
+                const hadTranscript = Boolean(speechFinalTranscriptRef.current.trim() || speechInterimTranscriptRef.current.trim());
+                speechRecognitionRef.current = null;
+                speechPendingStopRef.current = false;
+                speechLastErrorRef.current = '';
+
+                if (speechInterimTranscriptRef.current.trim()) {
+                    speechFinalTranscriptRef.current = `${speechFinalTranscriptRef.current} ${speechInterimTranscriptRef.current}`.trim();
+                    speechInterimTranscriptRef.current = '';
+                }
+                if (hadTranscript) {
+                    applySpeechComposeValue(speechFinalTranscriptRef.current, '');
+                }
+
+                if (lastError && lastError !== 'aborted') {
+                    return;
+                }
+                if (!hadTranscript && !pendingStop) {
+                    setSpeechUiState({
+                        kind: 'error',
+                        title: 'No speech detected',
+                        detail: describeSpeechRecognitionError('no-speech', speechSupport),
+                    });
+                    return;
+                }
+                clearSpeechUiState();
+            };
+
+            setSpeechUiState({
+                kind: 'requesting_permission',
+                title: 'Starting voice input…',
+                detail: 'Allow microphone access if the browser asks.',
+            });
+            focusTextarea();
+            recognition.start();
+        } catch (error) {
+            speechRecognitionRef.current = null;
+            setSpeechUiState({
+                kind: 'error',
+                title: 'Voice input failed',
+                detail: error?.message || 'Could not start native browser speech recognition.',
+            });
+        }
+    }, [applySpeechComposeValue, clearSpeechUiState, content, focusTextarea, speechSupport, stopSpeechRecognition]);
+
     const extractCurrentModel = (response) => {
         const fromLabel = response?.command?.model_label;
         if (fromLabel) return fromLabel;
@@ -1365,6 +1559,11 @@ export function ComposeBox({
             (includeFileRefs ? fileRefs.length === 0 : true) &&
             (includeMessageRefs ? messageRefs.length === 0 : true)
         ) return;
+
+        if (speechRecognitionRef.current) {
+            stopSpeechRecognition();
+        }
+        clearSpeechUiState();
 
         setShowSlash(false);
         setSlashMatches([]);
@@ -2061,8 +2260,14 @@ export function ComposeBox({
     // Auto-resize textarea
     const handleInput = (e) => {
         const value = e.target.value;
+        if (speechRecognitionRef.current && e?.isTrusted) {
+            stopSpeechRecognition();
+        }
         setSubmitError(null);
         setSubmitNotice(null);
+        if (speechUiState.kind === 'guidance' || speechUiState.kind === 'error') {
+            clearSpeechUiState();
+        }
         if (showSessionPopup) setShowSessionPopup(false);
         resizeTextarea(e.target);
         if (shouldRouteComposeValueToSessionSwitcher(value, {
@@ -2087,6 +2292,33 @@ export function ComposeBox({
     useEffect(() => {
         requestAnimationFrame(() => resizeTextarea());
     }, [content, searchText, searchMode]);
+
+    useEffect(() => {
+        if (!searchMode) return undefined;
+        if (speechRecognitionRef.current) {
+            stopSpeechRecognition();
+        }
+        return undefined;
+    }, [searchMode, stopSpeechRecognition]);
+
+    useEffect(() => {
+        if (speechRecognitionRef.current) {
+            stopSpeechRecognition();
+        }
+        clearSpeechUiState();
+    }, [currentChatJid, clearSpeechUiState, stopSpeechRecognition]);
+
+    useEffect(() => {
+        return () => {
+            if (!speechRecognitionRef.current) return;
+            try {
+                speechRecognitionRef.current.stop();
+            } catch {
+                /* noop */
+            }
+            speechRecognitionRef.current = null;
+        };
+    }, []);
 
     useEffect(() => {
         if (!statusNoticeIsCompaction) return;
@@ -2116,6 +2348,15 @@ export function ComposeBox({
 
     return html`
         <div class="compose-box">
+            ${speechUiVisible && html`
+                <div class=${`compose-inline-status compose-speech-status compose-speech-status-${speechUiState.kind}`} role="status" aria-live="polite">
+                    <div class="compose-inline-status-row">
+                        <span class=${buildComposeStatusDotClass({ pulsing: speechUiPulsing })} aria-hidden="true"></span>
+                        <span class="compose-inline-status-title">${speechUiState.title}</span>
+                    </div>
+                    ${speechUiState.detail && html`<div class="compose-inline-status-detail">${speechUiState.detail}</div>`}
+                </div>
+            `}
             ${showQueueStack && !searchMode && html`
                 <${QueuedFollowupStack}
                     items=${followupQueueItems}
@@ -2571,6 +2812,21 @@ export function ComposeBox({
                                 <circle cx="12" cy="12" r="10" />
                                 <path d="M12 2a14 14 0 0 1 0 20a14 14 0 0 1 0-20" />
                                 <path d="M2 12h20" />
+                            </svg>
+                        </button>
+                    `}
+                    ${speechButtonVisible && html`
+                        <button
+                            class=${`icon-btn voice-input-btn${speechButtonActive ? ' active' : ''}${speechSupport.mode === 'fallback' ? ' fallback' : ''}`}
+                            onClick=${handleSpeechToggle}
+                            title=${speechButtonTitle}
+                            aria-label=${speechButtonTitle}
+                            type="button"
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                <path d="M12 19v3" />
                             </svg>
                         </button>
                     `}
