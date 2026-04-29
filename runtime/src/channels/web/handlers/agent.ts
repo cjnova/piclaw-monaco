@@ -63,6 +63,38 @@ import {
 
 const log = createLogger("web.handlers.agent");
 
+type BrowserObservabilityContext = {
+  userId?: string;
+  sessionId?: string;
+  clientId?: string;
+};
+
+function readTrimmedHeader(req: Request, name: string): string | null {
+  const value = req.headers.get(name);
+  return value && value.trim() ? value.trim() : null;
+}
+
+function getBrowserObservabilityContext(req: Request): BrowserObservabilityContext {
+  const userId = readTrimmedHeader(req, "x-piclaw-user-id");
+  const sessionId = readTrimmedHeader(req, "x-piclaw-session-id");
+  const clientId = readTrimmedHeader(req, "x-piclaw-client-id");
+  return {
+    ...(userId ? { userId } : {}),
+    ...(sessionId ? { sessionId } : {}),
+    ...(clientId ? { clientId } : {}),
+  };
+}
+
+function withObservabilityMetadata(details: Record<string, unknown>, turnId: string, browserContext?: BrowserObservabilityContext): Record<string, unknown> {
+  return {
+    ...details,
+    turnId,
+    ...(browserContext?.userId ? { userId: browserContext.userId } : {}),
+    ...(browserContext?.sessionId ? { sessionId: browserContext.sessionId } : {}),
+    ...(browserContext?.clientId ? { clientId: browserContext.clientId } : {}),
+  };
+}
+
 function isRateLimitError(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
   return /\b429\b|rate[ -]?limit|too many requests|retry-after/i.test(errorText);
@@ -476,6 +508,7 @@ export async function handleAgentMessage(
   defaultAgentId: string
 ): Promise<Response> {
   const agentId = pathname.split("/")[2] || defaultAgentId;
+  const browserObservability = getBrowserObservabilityContext(req);
   const parsed = await parseAgentMessageRequest(req);
   if (parsed.error || !parsed.payload) return channel.json({ error: parsed.error }, 400);
 
@@ -546,9 +579,13 @@ export async function handleAgentMessage(
       ? (channel.agentPool as { getAgentHandleForChat: (chatJid: string) => string }).getAgentHandleForChat(chatJid)
       : fallbackAgentHandle(chatJid);
     const forwardedContent = mention.remainder;
+    const forwardHeaders = new Headers({ "Content-Type": "application/json" });
+    if (browserObservability.userId) forwardHeaders.set("x-piclaw-user-id", browserObservability.userId);
+    if (browserObservability.sessionId) forwardHeaders.set("x-piclaw-session-id", browserObservability.sessionId);
+    if (browserObservability.clientId) forwardHeaders.set("x-piclaw-client-id", browserObservability.clientId);
     const forwardReq = new Request(`http://internal/agent/${agentId}/message?chat_jid=${encodeURIComponent(mentionTarget.chat_jid)}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: forwardHeaders,
       body: JSON.stringify({
         content: forwardedContent,
         media_ids: normalized.mediaIds,
@@ -1135,7 +1172,7 @@ export async function handleAgentMessage(
   });
 
   channel.queue.enqueue(async () => {
-    await processChat(channel, chatJid, agentId, interaction.data?.thread_id ?? interaction.id);
+    await processChat(channel, chatJid, agentId, interaction.data?.thread_id ?? interaction.id, browserObservability);
   }, `chat:${chatJid}:${interaction.id}`, `chat:${chatJid}`);
 
   return channel.json({ user_message: interaction, thread_id: threadId }, 201);
@@ -1154,7 +1191,8 @@ export async function processChat(
   channel: WebChannelLike,
   chatJid: string,
   agentId: string,
-  threadRootId?: number
+  threadRootId?: number,
+  browserObservability?: BrowserObservabilityContext,
 ): Promise<void> {
   const MAX_MATERIALIZE_RETRIES = 5;
 
@@ -1413,8 +1451,8 @@ export async function processChat(
         session,
         chatJid,
         {
-          onInfo: (message, details) => log.info(message, details),
-          onWarn: (message, details) => log.warn(message, details),
+          onInfo: (message, details) => log.info(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
+          onWarn: (message, details) => log.warn(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
         },
         trackedStreamingHandler,
       );
@@ -1596,6 +1634,10 @@ export async function processChat(
 
   const output = await channel.agentPool.runAgent(prompt, chatJid, {
     timeoutMs,
+    turnId,
+    ...(browserObservability?.userId ? { userId: browserObservability.userId } : {}),
+    ...(browserObservability?.sessionId ? { sessionId: browserObservability.sessionId } : {}),
+    ...(browserObservability?.clientId ? { clientId: browserObservability.clientId } : {}),
     skipPrePromptCompaction: true,
     onEvent: trackedStreamingHandler,
     onTurnComplete: (turn: { text: string; attachments: unknown[] }) => {

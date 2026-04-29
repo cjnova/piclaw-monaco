@@ -711,11 +711,13 @@ export async function handleGetAddonWebEntries(
   return json({ entries: getInstalledAddonWebEntries() });
 }
 
-function parseAddonConfigApiPath(pathname: string): { addonId: string } | null {
-  const match = /^\/agent\/addons\/api\/([^/]+)\/config$/.exec(pathname);
+function parseAddonConfigApiPath(pathname: string): { addonId: string; action: string } | null {
+  const match = /^\/agent\/addons\/api\/([^/]+)\/([a-z0-9-]+)$/i.exec(pathname);
   if (!match) return null;
   const addonId = decodeURIComponent(match[1] || '').trim();
-  return addonId ? { addonId } : null;
+  const action = decodeURIComponent(match[2] || '').trim();
+  if (!addonId || !action) return null;
+  return { addonId, action };
 }
 
 function parseAddonCommandJsonPayload(
@@ -753,8 +755,8 @@ export async function handleAddonConfigApiRequest(
   }
 
   const slashCommand = req.method === 'GET'
-    ? `/${parsed.addonId}-config-get`
-    : `/${parsed.addonId}-config-set ${JSON.stringify(await req.json().catch(() => ({})))}`;
+    ? `/${parsed.addonId}-${parsed.action}-get`
+    : `/${parsed.addonId}-${parsed.action}-set ${JSON.stringify(await req.json().catch(() => ({})))}`;
 
   const result = await agentPool.applySlashCommand(chatJid, slashCommand);
   if (result.status !== 'success') {

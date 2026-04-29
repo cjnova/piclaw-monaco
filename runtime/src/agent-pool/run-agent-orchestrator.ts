@@ -204,12 +204,17 @@ function emitAgentSessionEvent(onEvent: RunAgentOptions["onEvent"], event: Recor
   onEvent?.(event as AgentSessionEvent);
 }
 
-function getRunObservabilityDetails(runOptions: RunAgentOptions): Record<string, unknown> {
+function getRunObservabilityDetails(
+  runOptions: RunAgentOptions,
+  extras: { sessionLeafId?: string | null } = {},
+): Record<string, unknown> {
+  const sessionLeafId = extras.sessionLeafId ?? runOptions.sessionLeafId ?? null;
   return {
     ...(runOptions.turnId ? { turnId: runOptions.turnId } : {}),
     ...(runOptions.userId ? { userId: runOptions.userId } : {}),
     ...(runOptions.sessionId ? { sessionId: runOptions.sessionId } : {}),
     ...(runOptions.clientId ? { clientId: runOptions.clientId } : {}),
+    ...(sessionLeafId ? { sessionLeafId } : {}),
   };
 }
 
@@ -280,6 +285,9 @@ async function runPromptAttempt(
   let activeModelResponse: { sequence: number; startedAt: number } | null = null;
   const sessionEntryBaseline = snapshotSessionEntryCount(session);
   const toolUseMessageBudget = getToolUseMessageBudget();
+  runOptions.sessionLeafId = typeof session.sessionManager?.getLeafId === "function"
+    ? session.sessionManager.getLeafId() ?? undefined
+    : runOptions.sessionLeafId;
 
   const originalOnTurnComplete = runOptions.onTurnComplete;
   const onTurnComplete = originalOnTurnComplete
@@ -681,6 +689,7 @@ export async function runAgentPrompt(
       ? session.sessionManager.getLeafId()
       : null;
     options.setActiveForkBaseLeaf(chatJid, forkBaseLeafId ?? null);
+    runOptions.sessionLeafId = forkBaseLeafId ?? undefined;
     options.onInfo?.("Prompting session", {
       operation: "run_agent.prompt",
       chatJid,

@@ -627,6 +627,31 @@ test('handleAddonConfigApiRequest maps GET config requests to addon slash comman
   expect(invocations).toEqual([{ chatJid: 'web:test', rawText: '/observability-config-get' }]);
 });
 
+test('handleAddonConfigApiRequest maps arbitrary GET addon API requests to addon slash commands', async () => {
+  const invocations: Array<{ chatJid: string; rawText: string }> = [];
+  const res = await handleAddonConfigApiRequest(
+    new Request('https://example.test/agent/addons/api/observability/browser-config'),
+    '/agent/addons/api/observability/browser-config',
+    (body, status = 200) => new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+    {
+      async applySlashCommand(chatJid: string, rawText: string) {
+        invocations.push({ chatJid, rawText });
+        return {
+          status: 'success',
+          messages: [{ customType: 'observability', text: '{"ok":true,"enabled":true}' }],
+        };
+      },
+    },
+    'web:test',
+  );
+  expect(res?.status).toBe(200);
+  expect(await res?.json()).toEqual({ ok: true, enabled: true });
+  expect(invocations).toEqual([{ chatJid: 'web:test', rawText: '/observability-browser-config-get' }]);
+});
+
 test('handleAddonConfigApiRequest maps POST config requests to addon slash commands', async () => {
   const invocations: Array<{ chatJid: string; rawText: string }> = [];
   const res = await handleAddonConfigApiRequest(
