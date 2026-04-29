@@ -5204,6 +5204,16 @@ For tests, pass a Ghostty instance directly:
     ] });
   }
 
+  // runtime/web/frontend/src/api/chat-jid.ts
+  function getChatJid() {
+    if (typeof window === "undefined") return "web:default";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("chat_jid") || "web:default";
+  }
+  function getMessageUrl() {
+    return `/agent/${encodeURIComponent(getChatJid())}/message`;
+  }
+
   // runtime/web/frontend/src/components/ModelContextBar.tsx
   var FALLBACK_MODELS = [
     { id: "github-copilot/claude-sonnet-4.6", context_window: 2e5 },
@@ -5257,6 +5267,11 @@ For tests, pass a Ghostty instance directly:
           } else {
             error.value = true;
           }
+          const modelsRes = await fetch("/agent/models");
+          if (modelsRes.ok) {
+            const info = await modelsRes.json();
+            if (info.current) currentModel.value = info.current;
+          }
         } catch (err) {
           console.warn("[ModelContextBar] status fetch failed:", err);
           error.value = true;
@@ -5305,7 +5320,7 @@ For tests, pass a Ghostty instance directly:
     }, [showPicker.value, showThinkingPicker.value]);
     const handleCompact = (e5) => {
       e5.stopPropagation();
-      fetch("/agent/web:default/message", {
+      fetch(getMessageUrl(), {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -5336,7 +5351,7 @@ For tests, pass a Ghostty instance directly:
     };
     const handleSelectModel = async (id) => {
       try {
-        const res = await fetch("/agent/web:default/message", {
+        const res = await fetch(getMessageUrl(), {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -5359,7 +5374,7 @@ For tests, pass a Ghostty instance directly:
     };
     const handleSelectThinking = async (level) => {
       try {
-        const res = await fetch("/agent/web:default/message", {
+        const res = await fetch(getMessageUrl(), {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -8320,13 +8335,39 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         }
       }
     }
+    const displayName = isUser ? "You" : "PiClaw";
+    const avatarLetter = isUser ? "Y" : "P";
     return /* @__PURE__ */ u4(
       "div",
       {
         className: `message-list__item ${isUser ? "message-list__item--user" : "message-list__item--agent"}`,
         children: [
-          !isUser && /* @__PURE__ */ u4("div", { className: "message-list__avatar", "aria-hidden": "true", children: "\u{1F916}" }),
-          /* @__PURE__ */ u4("div", { className: "message-list__bubble", children: [
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              className: `message-list__avatar-circle ${isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"}`,
+              "aria-hidden": "true",
+              children: avatarLetter
+            }
+          ),
+          /* @__PURE__ */ u4("div", { className: "message-list__body", children: [
+            /* @__PURE__ */ u4("div", { className: "message-list__header", children: [
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  className: `message-list__name ${isUser ? "message-list__name--user" : "message-list__name--agent"}`,
+                  children: displayName
+                }
+              ),
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  className: "message-list__time",
+                  title: new Date(interaction.created_at).toLocaleString(),
+                  children: relativeTime(interaction.created_at)
+                }
+              )
+            ] }),
             toolPairs.length > 0 && /* @__PURE__ */ u4("div", { className: "message-list__tool-calls", children: toolPairs.map((pair, i6) => /* @__PURE__ */ u4(
               ToolCallBlock,
               {
@@ -8342,17 +8383,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 dangerouslySetInnerHTML: isUser ? void 0 : { __html: renderMarkdown(interaction.content) },
                 children: isUser ? interaction.content : void 0
               }
-            ),
-            /* @__PURE__ */ u4(
-              "span",
-              {
-                className: "message-list__time",
-                title: new Date(interaction.created_at).toLocaleString(),
-                children: relativeTime(interaction.created_at)
-              }
             )
-          ] }),
-          isUser && /* @__PURE__ */ u4("div", { className: "message-list__avatar message-list__avatar--user", "aria-hidden": "true", children: "\u{1F464}" })
+          ] })
         ]
       }
     );
@@ -8369,13 +8401,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const userScrolledRef = A2(false);
     const scrollToBottom = q2((force = false) => {
       if (force || !userScrolledRef.current) {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        const el = listRef.current;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+        }
       }
     }, []);
     y2(() => {
       async function fetchTimeline() {
         try {
-          const res = await fetch("/timeline?limit=50&chat_jid=web:default", {
+          const res = await fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, {
             credentials: "include"
           });
           if (res.status === 401) {
@@ -8404,7 +8439,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       fetchTimeline();
     }, [scrollToBottom]);
     y2(() => {
-      const es = new EventSource("/sse/stream");
+      const es = new EventSource(`/sse/stream?chat_jid=${getChatJid()}`);
       sseRef.current = es;
       es.addEventListener("new_post", (e5) => {
         try {
@@ -8446,6 +8481,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       });
       es.addEventListener("agent_response", () => {
         setDraft("");
+        scrollToBottom(true);
       });
       es.onopen = () => setConnected(true);
       es.onerror = () => setConnected(false);
@@ -8462,7 +8498,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           if (prev.some((m6) => m6.id === msg.id)) return prev;
           return [...prev, { id: msg.id, type: "user", content: msg.data?.content ?? "", created_at: msg.timestamp, data: msg.data }];
         });
-        scrollToBottom();
+        userScrolledRef.current = false;
+        scrollToBottom(true);
       };
       window.addEventListener("piclaw:new-message", handler);
       return () => window.removeEventListener("piclaw:new-message", handler);
@@ -8483,7 +8520,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       setLoadingMore(true);
       try {
         const res = await fetch(
-          `/timeline?limit=50&chat_jid=web:default&before=${oldestId}`,
+          `/timeline?limit=50&chat_jid=${getChatJid()}&before=${oldestId}`,
           { credentials: "include" }
         );
         if (!res.ok) return;
@@ -8520,9 +8557,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       messages.length === 0 && connected === true && /* @__PURE__ */ u4("div", { className: "message-list__empty", children: /* @__PURE__ */ u4("p", { children: "No messages yet. Say hello! \u{1F44B}" }) }),
       messages.map((msg) => /* @__PURE__ */ u4(MessageItem, { interaction: msg }, msg.id)),
       draft && /* @__PURE__ */ u4("div", { className: "message-list__draft", children: [
-        /* @__PURE__ */ u4("div", { className: "message-list__avatar", "aria-hidden": "true", children: "\u{1F916}" }),
-        /* @__PURE__ */ u4("div", { className: "message-list__bubble message-list__bubble--draft", children: [
-          /* @__PURE__ */ u4("span", { className: "message-list__draft-indicator", children: "\u25CF Draft" }),
+        /* @__PURE__ */ u4("div", { className: "message-list__avatar-circle message-list__avatar-circle--agent", "aria-hidden": "true", children: "P" }),
+        /* @__PURE__ */ u4("div", { className: "message-list__body message-list__body--draft", children: [
+          /* @__PURE__ */ u4("div", { className: "message-list__header", children: [
+            /* @__PURE__ */ u4("span", { className: "message-list__name message-list__name--agent", children: "PiClaw" }),
+            /* @__PURE__ */ u4("span", { className: "message-list__draft-indicator", children: "\u25CF typing" })
+          ] }),
           /* @__PURE__ */ u4(
             "div",
             {
@@ -8572,7 +8612,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       if (!content) return;
       el.value = "";
       el.style.height = "auto";
-      fetch("/agent/web:default/message", {
+      fetch(getMessageUrl(), {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },

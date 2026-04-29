@@ -1,3 +1,4 @@
+import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
@@ -60,7 +61,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     if (!content) return;
     el.value = "";
     el.style.height = "auto";
-    fetch("/agent/web:default/message", {
+    fetch(getMessageUrl(), {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },

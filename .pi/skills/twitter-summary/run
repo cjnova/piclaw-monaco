@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper to run the Playwright-based twitter summary scraper.
+# Usage: ./run <handle> [hours] [out.json]
+
+HANDLE=${1:-}
+HOURS=${2:-16}
+OUT=${3:-/tmp/twitter_fetch.json}
+LOG=${LOG:-/tmp/twitter-summary.log}
+INSTALL_LOG=${INSTALL_LOG:-/tmp/twitter-playwright-install.log}
+
+SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$SKILL_DIR/playwright-twitter-summary.ts"
+
+if [ -z "$HANDLE" ]; then
+  echo "Usage: $0 <handle> [hours] [output.json]" >&2
+  echo "Error: handle is required and no default account is configured." >&2
+  exit 64
+fi
+
+HANDLE="${HANDLE#@}"
+if ! printf '%s' "$HANDLE" | grep -Eq '^[A-Za-z0-9_]{1,15}$'; then
+  echo "Error: invalid handle '$HANDLE'. Use a Twitter/X handle without @ (letters, numbers, underscore; max 15 chars)." >&2
+  exit 64
+fi
+
+cd /workspace
+
+ensure_playwright() {
+  if [ -d /workspace/node_modules/playwright ]; then
+    return 0
+  fi
+  bun add -d playwright >"$INSTALL_LOG" 2>&1 || {
+    echo "Playwright install failed. See $INSTALL_LOG" >&2
+    return 1
+  }
+  bunx playwright install --with-deps >>"$INSTALL_LOG" 2>&1 || {
+    echo "Playwright browser install failed. See $INSTALL_LOG" >&2
+    return 1
+  }
+}
+
+ensure_browsers() {
+  local cache_dir="$HOME/.cache/ms-playwright"
+  if [ -d "$cache_dir" ]; then
+    if ls "$cache_dir" | grep -qE '(chromium|firefox|webkit)'; then
+      return 0
+    fi
+  fi
+  bunx playwright install --with-deps >>"$INSTALL_LOG" 2>&1 || {
+    echo "Playwright browser install failed. See $INSTALL_LOG" >&2
+    return 1
+  }
+}
+
+ensure_playwright
+ensure_browsers
+
+bun "$SCRIPT" --handle="$HANDLE" --hours="$HOURS" > "$OUT" 2>"$LOG" || {
+  echo "Scraper failed. See $LOG" >&2
+  exit 1
+}

@@ -979,7 +979,7 @@ body {
   padding: 16px 16px 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.12) transparent;
 }
@@ -1030,109 +1030,155 @@ body {
   cursor: default;
 }
 
+/* ── Message item: linear / Slack-style layout ────────────────────────── */
 .message-list__item {
   display: flex;
+  flex-direction: row;
   gap: 10px;
-  align-items: flex-end;
+  align-items: flex-start;
   max-width: 100%;
 }
 
-.message-list__item--user {
-  flex-direction: row-reverse;
-}
-
+/* No right-alignment — both user and agent are left-aligned */
+.message-list__item--user,
 .message-list__item--agent {
   flex-direction: row;
 }
 
-.message-list__avatar {
-  font-size: 18px;
+/* Avatar circle */
+.message-list__avatar-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   flex-shrink: 0;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.message-list__bubble {
-  max-width: 78%;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 1px;
+  user-select: none;
 }
 
-.message-list__bubble--draft {
+.message-list__avatar-circle--user {
+  background: var(--accent);
+  color: var(--bg-terminal);
+}
+
+.message-list__avatar-circle--agent {
+  background: #7c3aed;
+  color: #fff;
+}
+
+/* Body area (everything to the right of avatar) */
+.message-list__body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Agent replies get a subtle left-border thread indent */
+.message-list__item--agent .message-list__body {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  margin-left: 0;
+}
+
+.message-list__body--draft {
   opacity: 0.8;
 }
 
+/* Header: name + timestamp on one line */
+.message-list__header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.message-list__name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.message-list__name--user {
+  color: var(--accent);
+}
+
+.message-list__name--agent {
+  color: #a78bfa;
+}
+
+.message-list__time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Content: plain text, no bubble background */
 .message-list__content {
   font-size: 13px;
   line-height: 1.55;
   color: var(--text);
   word-break: break-word;
-}
-
-/* User bubble */
-.message-list__item--user .message-list__content {
-  background: var(--accent);
-  color: var(--bg-terminal);
-  border-radius: 16px 16px 4px 16px;
-  padding: 9px 13px;
   white-space: pre-wrap;
 }
 
-/* Agent bubble */
 .message-list__item--agent .message-list__content {
-  background: var(--bg-sidebar);
-  border: 1px solid var(--border);
-  border-radius: 4px 16px 16px 16px;
-  padding: 9px 13px;
+  white-space: normal;
 }
 
 .message-list__content p:first-child { margin-top: 0; }
 .message-list__content p:last-child { margin-bottom: 0; }
+.message-list__content p { margin: 4px 0; }
 
-.message-list__content pre,
+.message-list__content ul,
+.message-list__content ol {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.message-list__content li {
+  margin: 2px 0;
+}
+
 .message-list__content code {
+  font-family: var(--font-mono, 'Fira Mono', monospace);
+  font-size: 12px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.message-list__content pre {
   font-family: var(--font-mono, 'Fira Mono', monospace);
   font-size: 12px;
   background: var(--bg-terminal);
   border-radius: 6px;
-  padding: 2px 5px;
-}
-
-.message-list__content pre {
   padding: 10px 12px;
   overflow-x: auto;
   margin: 6px 0;
+  border: 1px solid var(--border);
 }
 
 .message-list__content pre code {
   background: transparent;
   padding: 0;
+  border-radius: 0;
 }
 
-.message-list__time {
-  font-size: 10px;
-  color: var(--text-muted);
-  align-self: flex-end;
-  padding: 0 2px;
-}
-
-.message-list__item--user .message-list__time {
-  text-align: right;
-}
-
+/* Draft */
 .message-list__draft {
   display: flex;
+  flex-direction: row;
   gap: 10px;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .message-list__draft-indicator {
   font-size: 11px;
   color: var(--accent);
   font-weight: 600;
-  display: block;
-  margin-bottom: 2px;
   animation: draft-pulse 1.2s ease-in-out infinite;
 }
 

@@ -1,3 +1,4 @@
+import { getMessageUrl } from "../api/chat-jid";
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 
@@ -83,6 +84,12 @@ export function ModelContextBar() {
         } else {
           error.value = true;
         }
+        // Also fetch current model (status.data is null when idle)
+        const modelsRes = await fetch("/agent/models");
+        if (modelsRes.ok) {
+          const info = await modelsRes.json() as { current?: string; thinking_level?: string };
+          if (info.current) currentModel.value = info.current;
+        }
       } catch (err) {
         console.warn("[ModelContextBar] status fetch failed:", err);
         error.value = true;
@@ -140,7 +147,7 @@ export function ModelContextBar() {
 
   const handleCompact = (e: MouseEvent) => {
     e.stopPropagation();
-    fetch("/agent/web:default/message", {
+    fetch(getMessageUrl(), {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -179,7 +186,7 @@ export function ModelContextBar() {
 
   const handleSelectModel = async (id: string) => {
     try {
-      const res = await fetch("/agent/web:default/message", {
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -204,7 +211,7 @@ export function ModelContextBar() {
 
   const handleSelectThinking = async (level: string) => {
     try {
-      const res = await fetch("/agent/web:default/message", {
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },

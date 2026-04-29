@@ -1,3 +1,4 @@
+import { getChatJid, getMessageUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { marked } from "marked";
 
@@ -138,16 +139,39 @@ function MessageItem({ interaction }: MessageItemProps) {
     }
   }
 
+  const displayName = isUser ? "You" : "PiClaw";
+  const avatarLetter = isUser ? "Y" : "P";
+
   return (
     <div
       className={`message-list__item ${
         isUser ? "message-list__item--user" : "message-list__item--agent"
       }`}
     >
-      {!isUser && (
-        <div className="message-list__avatar" aria-hidden="true">🤖</div>
-      )}
-      <div className="message-list__bubble">
+      <div
+        className={`message-list__avatar-circle ${
+          isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"
+        }`}
+        aria-hidden="true"
+      >
+        {avatarLetter}
+      </div>
+      <div className="message-list__body">
+        <div className="message-list__header">
+          <span
+            className={`message-list__name ${
+              isUser ? "message-list__name--user" : "message-list__name--agent"
+            }`}
+          >
+            {displayName}
+          </span>
+          <span
+            className="message-list__time"
+            title={new Date(interaction.created_at).toLocaleString()}
+          >
+            {relativeTime(interaction.created_at)}
+          </span>
+        </div>
         {toolPairs.length > 0 && (
           <div className="message-list__tool-calls">
             {toolPairs.map((pair, i) => (
@@ -172,18 +196,7 @@ function MessageItem({ interaction }: MessageItemProps) {
             {isUser ? interaction.content : undefined}
           </div>
         )}
-        <span
-          className="message-list__time"
-          title={new Date(interaction.created_at).toLocaleString()}
-        >
-          {relativeTime(interaction.created_at)}
-        </span>
       </div>
-      {isUser && (
-        <div className="message-list__avatar message-list__avatar--user" aria-hidden="true">
-          👤
-        </div>
-      )}
     </div>
   );
 }
@@ -203,7 +216,10 @@ export function MessageList() {
 
   const scrollToBottom = useCallback((force = false) => {
     if (force || !userScrolledRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      const el = listRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
   }, []);
 
@@ -211,7 +227,7 @@ export function MessageList() {
   useEffect(() => {
     async function fetchTimeline() {
       try {
-        const res = await fetch("/timeline?limit=50&chat_jid=web:default", {
+        const res = await fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, {
           credentials: "include",
         });
         if (res.status === 401) {
@@ -243,7 +259,7 @@ export function MessageList() {
 
   // SSE stream
   useEffect(() => {
-    const es = new EventSource("/sse/stream");
+    const es = new EventSource(`/sse/stream?chat_jid=${getChatJid()}`);
     sseRef.current = es;
 
     es.addEventListener("new_post", (e: MessageEvent) => {
@@ -294,6 +310,7 @@ export function MessageList() {
 
     es.addEventListener("agent_response", () => {
       setDraft("");
+      scrollToBottom(true);
     });
 
     es.onopen = () => setConnected(true);
@@ -314,7 +331,8 @@ export function MessageList() {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, { id: msg.id, type: "user", content: msg.data?.content ?? "", created_at: msg.timestamp, data: msg.data }];
       });
-      scrollToBottom();
+      userScrolledRef.current = false;
+      scrollToBottom(true);
     };
     window.addEventListener("piclaw:new-message", handler);
     return () => window.removeEventListener("piclaw:new-message", handler);
@@ -338,7 +356,7 @@ export function MessageList() {
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/timeline?limit=50&chat_jid=web:default&before=${oldestId}`,
+        `/timeline?limit=50&chat_jid=${getChatJid()}&before=${oldestId}`,
         { credentials: "include" }
       );
       if (!res.ok) return;
@@ -397,9 +415,12 @@ export function MessageList() {
 
       {draft && (
         <div className="message-list__draft">
-          <div className="message-list__avatar" aria-hidden="true">🤖</div>
-          <div className="message-list__bubble message-list__bubble--draft">
-            <span className="message-list__draft-indicator">● Draft</span>
+          <div className="message-list__avatar-circle message-list__avatar-circle--agent" aria-hidden="true">P</div>
+          <div className="message-list__body message-list__body--draft">
+            <div className="message-list__header">
+              <span className="message-list__name message-list__name--agent">PiClaw</span>
+              <span className="message-list__draft-indicator">● typing</span>
+            </div>
             <div
               className="message-list__content"
               // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown from trusted server
