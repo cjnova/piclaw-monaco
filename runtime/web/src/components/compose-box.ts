@@ -2318,7 +2318,7 @@ export function ComposeBox({
                                     const archived = Boolean(chat.archived_at);
                                     const isRoot = chat.chat_jid === (chat.root_chat_jid || chat.chat_jid);
                                     const canPrune = !isRoot && !chat.is_active && !archived && typeof onDeleteSession === 'function';
-                                    const canPurgeArchived = archived && !isRoot && canPurgeArchivedSession;
+                                    const canPurgeArchived = archived && canPurgeArchivedSession;
                                     const label = formatBranchPickerLabel(chat, { currentChatJid });
                                     return html`
                                         <div key=${chat.chat_jid} class=${`compose-model-popup-item-row${archived ? ' archived' : ''}`}>
@@ -2369,8 +2369,12 @@ export function ComposeBox({
                                                 <button
                                                     type="button"
                                                     class="compose-model-popup-item-delete"
-                                                    title=${canPurgeArchived ? 'Permanently delete this archived branch' : 'Delete this branch'}
-                                                    aria-label=${canPurgeArchived ? `Permanently delete @${chat.agent_name}` : `Delete @${chat.agent_name}`}
+                                                    title=${canPurgeArchived
+                                                        ? (isRoot ? 'Permanently delete this archived session' : 'Permanently delete this archived branch')
+                                                        : 'Delete this branch'}
+                                                    aria-label=${canPurgeArchived
+                                                        ? (isRoot ? `Permanently delete archived session @${chat.agent_name}` : `Permanently delete archived branch @${chat.agent_name}`)
+                                                        : `Delete @${chat.agent_name}`}
                                                     onClick=${(e) => {
                                                         e.stopPropagation();
                                                         setShowSessionPopup(false);

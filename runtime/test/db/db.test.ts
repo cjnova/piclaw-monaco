@@ -344,7 +344,25 @@ test("permanentDeleteArchivedBranch removes archived branch state without deleti
   expect(archived.agent_name).toBe("archived");
 });
 
-test("permanentDeleteArchivedBranch rejects non-archived and root chats", () => {
+test("permanentDeleteArchivedBranch allows archived root sessions without child branches", () => {
+  const rootChatJid = `web:test-purge-root-${Date.now()}`;
+  const now = new Date().toISOString();
+
+  db.storeChatMetadata(rootChatJid, now, "Root");
+  const messageRowId = db.storeMessage(makeMessage(rootChatJid, "root message", now));
+  const mediaId = db.createMedia("root.txt", "text/plain", new TextEncoder().encode("root"), null, null);
+  db.attachMediaToMessage(messageRowId, [mediaId]);
+  db.archiveChatBranch(rootChatJid);
+
+  const deleted = db.permanentDeleteArchivedBranch(rootChatJid);
+  expect(deleted.branch.chat_jid).toBe(rootChatJid);
+  expect(db.getChatBranchByChatJid(rootChatJid)).toBeNull();
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM chats WHERE jid = ?").get(rootChatJid)).toEqual({ count: 0 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(rootChatJid)).toEqual({ count: 0 });
+  expect(db.getMediaById(mediaId)).toBeUndefined();
+});
+
+test("permanentDeleteArchivedBranch rejects non-archived chats and root sessions with child branches", () => {
   const rootChatJid = `web:test-purge-guard-${Date.now()}`;
   db.storeChatMetadata(rootChatJid, new Date().toISOString(), "Root");
   const root = db.getChatBranchByChatJid(rootChatJid);
@@ -358,7 +376,7 @@ test("permanentDeleteArchivedBranch rejects non-archived and root chats", () => 
   expect(() => db.permanentDeleteArchivedBranch(branch.chat_jid)).toThrow(/not archived/);
   db.archiveChatBranch(branch.chat_jid);
   db.archiveChatBranch(rootChatJid);
-  expect(() => db.permanentDeleteArchivedBranch(rootChatJid)).toThrow(/root chat session/);
+  expect(() => db.permanentDeleteArchivedBranch(rootChatJid)).toThrow(/child branch sessions still exist/);
 });
 
 test("initDatabase migrates legacy chat branch uniqueness so pruned handles can be reused", () => {

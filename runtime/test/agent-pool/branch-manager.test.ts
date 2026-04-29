@@ -276,6 +276,42 @@ test("AgentBranchManager permanently purges archived branches and removes sessio
   ws.cleanup();
 });
 
+test("AgentBranchManager permanently purges archived root sessions without child branches", async () => {
+  const ws = createTempWorkspace("piclaw-root-session-purge-");
+  restoreEnv = setEnv({ PICLAW_WORKSPACE: ws.workspace, PICLAW_STORE: ws.store, PICLAW_DATA: ws.data });
+
+  const db = await importFresh<typeof import("../src/db.js")>("../src/db.js");
+  db.initDatabase();
+  db.storeChatMetadata("web:custom", new Date().toISOString(), "Custom Root");
+  db.archiveChatBranch("web:custom");
+
+  let disposed = 0;
+  const session = {
+    sessionId: "root-session",
+    sessionName: "Custom Root",
+    model: { provider: "openai", id: "gpt-test" },
+    isStreaming: false,
+    isCompacting: false,
+    isRetrying: false,
+    isBashRunning: false,
+    dispose: () => { disposed += 1; },
+  };
+
+  const fixture = createManager();
+  fixture.pool.set("web:custom", { runtime: createRuntime(session), lastUsed: Date.now() });
+  const baseDir = ensureSessionDir("web:custom");
+  writeFileSync(join(baseDir, ".branch-seed.json"), JSON.stringify({ version: 1, parentSession: null, sessionName: "Custom Root", model: null, thinkingLevel: null, mode: "rotated_context" }), "utf8");
+
+  const result = await fixture.manager.permanentPurgeChatBranch("web:custom");
+  expect(result.branch.chat_jid).toBe("web:custom");
+  expect(result.removedSessionArtifacts).toContain(baseDir);
+  expect(fixture.pool.has("web:custom")).toBe(false);
+  expect(db.getChatBranchByChatJid("web:custom")).toBeNull();
+  expect(disposed).toBe(1);
+
+  ws.cleanup();
+});
+
 test("AgentBranchManager archives a non-default root session and blocks roots with child branches", async () => {
   const ws = createTempWorkspace("piclaw-root-session-archive-");
   restoreEnv = setEnv({ PICLAW_WORKSPACE: ws.workspace, PICLAW_STORE: ws.store, PICLAW_DATA: ws.data });

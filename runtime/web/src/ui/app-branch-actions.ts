@@ -291,7 +291,7 @@ export interface PurgeArchivedBranchOptions {
   confirm?: (message: string) => boolean;
 }
 
-/** Permanently delete an already archived branch after an explicit irreversible confirmation. */
+/** Permanently delete an already archived session or branch after an explicit irreversible confirmation. */
 export async function purgeArchivedBranch(options: PurgeArchivedBranchOptions): Promise<boolean> {
   const {
     targetChatJid,
@@ -313,9 +313,11 @@ export async function purgeArchivedBranch(options: PurgeArchivedBranchOptions): 
     return false;
   }
 
+  const isRootSession = Boolean(branch?.chat_jid && branch.chat_jid === (branch.root_chat_jid || branch.chat_jid));
   const label = `@${branch?.agent_name || normalized}`;
+  const targetLabel = isRootSession ? 'session' : 'branch';
   const confirmed = confirm(
-    `Permanently delete ${label}?\n\nThis removes all chat history, token usage, cursor state, scheduled tasks, and session files for this branch. It cannot be undone.`
+    `Permanently delete ${label}?\n\nThis removes all chat history, token usage, cursor state, scheduled tasks, and session files for this ${targetLabel}. It cannot be undone.`
   );
   if (!confirmed) return false;
 
@@ -325,11 +327,11 @@ export async function purgeArchivedBranch(options: PurgeArchivedBranchOptions): 
       refreshActiveChatAgents?.(),
       refreshCurrentChatBranches?.(),
     ]);
-    showIntentToast?.('Archived branch deleted', `${label} was permanently deleted.`, 'info', 4000);
+    showIntentToast?.(isRootSession ? 'Archived session deleted' : 'Archived branch deleted', `${label} was permanently deleted.`, 'info', 4000);
     return true;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || 'Could not permanently delete archived branch.');
-    showIntentToast?.('Could not delete branch', message || 'Could not permanently delete archived branch.', 'warning', 5000);
+    const message = error instanceof Error ? error.message : String(error || `Could not permanently delete archived ${isRootSession ? 'session' : 'branch'}.`);
+    showIntentToast?.('Could not delete branch', message || `Could not permanently delete archived ${isRootSession ? 'session' : 'branch'}.`, 'warning', 5000);
     return false;
   }
 }
