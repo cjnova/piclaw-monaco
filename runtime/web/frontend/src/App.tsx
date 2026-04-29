@@ -120,7 +120,7 @@ export function App() {
             />
           )}
           {/* Main panel */}
-          <div style={{ flex: 1, overflow: "auto", minWidth: 0 }}>
+          <div style={{ flex: 1, overflow: "auto", minWidth: 0, height: "100%" }}>
             <PanelRouter activePanel={activePanel.value} />
           </div>
         </div>
@@ -140,6 +140,11 @@ export function App() {
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
                   title={terminalMaximized.value ? "Restore" : "Maximize"}>{terminalMaximized.value ? "\u229F" : "\u229E"}</span>
+                <span style={{ cursor: "pointer", color: "\#6c7086", fontSize: "14px", padding: "2px 4px" }}
+                  onClick={() => { window.open(window.location.href, "_blank", "width=800,height=600"); }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "\#cdd6f4"; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "\#6c7086"; }}
+                  title="Pop out to new window">\u2197</span>
                 <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
                   onClick={() => { terminalVisible.value = false; terminalMaximized.value = false; }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}

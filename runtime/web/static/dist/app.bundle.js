@@ -1473,7 +1473,7 @@
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto", minWidth: 0 }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
+          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto", minWidth: 0, height: "100%" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
         ] }),
         terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }, children: [
           /* @__PURE__ */ u4(
@@ -1507,6 +1507,23 @@
                   },
                   title: terminalMaximized.value ? "Restore" : "Maximize",
                   children: terminalMaximized.value ? "\u229F" : "\u229E"
+                }
+              ),
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  onClick: () => {
+                    window.open(window.location.href, "_blank", "width=800,height=600");
+                  },
+                  onMouseEnter: (e4) => {
+                    e4.target.style.color = "#cdd6f4";
+                  },
+                  onMouseLeave: (e4) => {
+                    e4.target.style.color = "#6c7086";
+                  },
+                  title: "Pop out to new window",
+                  children: "\\u2197"
                 }
               ),
               /* @__PURE__ */ u4(
