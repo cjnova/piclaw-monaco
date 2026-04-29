@@ -5,7 +5,7 @@ import { AuthStorage, ModelRegistry, SettingsManager, getAgentDir } from '@mario
 import '../helpers.js';
 import { withTempWorkspaceEnv } from '../helpers.js';
 import { createSessionInDir, getInstalledAddonExtensionPaths } from '../../src/agent-pool/session.ts';
-import { clearExtensionRoutes, getRegisteredRoutes, handleExtensionRoutes } from '../../src/channels/web/http/extension-routes.js';
+import { clearExtensionRoutes, getRegisteredRoutes, handleExtensionRoutes, isExtensionRouteRegistryFrozen } from '../../src/channels/web/http/extension-routes.js';
 
 afterEach(() => {
   clearExtensionRoutes();
@@ -59,6 +59,8 @@ test('web sessions load installed addon extensions from the workspace extensions
     const settingsManager = SettingsManager.create(workspace.workspace, getAgentDir());
     const sessionDir = join(workspace.workspace, 'sessions', 'web-test');
 
+    expect(isExtensionRouteRegistryFrozen()).toBe(false);
+
     const runtime = await createSessionInDir(sessionDir, {
       authStorage,
       modelRegistry,
@@ -73,6 +75,7 @@ test('web sessions load installed addon extensions from the workspace extensions
       expect(getRegisteredRoutes()).toEqual([
         expect.objectContaining({ prefix: '/example-addon' }),
       ]);
+      expect(isExtensionRouteRegistryFrozen()).toBe(true);
     } finally {
       runtime.dispose?.();
     }

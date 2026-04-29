@@ -8,8 +8,8 @@
  * Security:
  *   - Routes are served *after* authentication checks, so only
  *     authenticated users can access them.
- *   - The registry freezes after startup so late-loaded code cannot
- *     register new routes after the initial extension load pass.
+ *   - The registry freezes after the first real extension/resource load so
+ *     late-loaded code cannot register brand-new routes after the initial pass.
  *   - Every registration is logged with the extension path for audit.
  *   - Extensions must sanitise paths against traversal attacks themselves.
  */
@@ -70,15 +70,6 @@ export function registerExtensionRoute(
   const normalised = prefix.startsWith("/") ? prefix : `/${prefix}`;
   const now = new Date().toISOString();
 
-  if (frozen) {
-    log.warn("Rejected extension route registration — registry is frozen", {
-      operation: "web_extension_routes.register_rejected",
-      prefix: normalised,
-      extensionPath,
-    });
-    return "rejected";
-  }
-
   const existing = routes.find((route) => route.prefix === normalised && route.extensionPath === extensionPath);
   if (existing) {
     existing.handler = handler;
@@ -89,6 +80,15 @@ export function registerExtensionRoute(
       extensionPath,
     });
     return "updated";
+  }
+
+  if (frozen) {
+    log.warn("Rejected extension route registration — registry is frozen", {
+      operation: "web_extension_routes.register_rejected",
+      prefix: normalised,
+      extensionPath,
+    });
+    return "rejected";
   }
 
   routes.push({ prefix: normalised, handler, extensionPath, registeredAt: now });
