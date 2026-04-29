@@ -61,6 +61,7 @@ export function App() {
   }, [activePanel, sidebarCollapsed]);
 
   const connected = connectionStatus.value === "connected";
+  const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Agent", settings: "Settings" };
 
   const onTermDragStart = useCallback((e: MouseEvent) => {
     e.preventDefault();
@@ -96,7 +97,7 @@ export function App() {
             transition: "width 0.15s ease",
             flexShrink: 0,
           }}>
-            <Sidebar title={activePanel.value}>
+            <Sidebar title={PANEL_NAMES[activePanel.value] || activePanel.value}>
               <div style={{ padding: "8px 12px", color: "#6c7086", fontSize: "12px" }}>{activePanel.value} content...</div>
             </Sidebar>
           </div>

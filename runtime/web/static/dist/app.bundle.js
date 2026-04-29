@@ -1406,6 +1406,7 @@
       }
     }, [activePanel, sidebarCollapsed]);
     const connected = connectionStatus.value === "connected";
+    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Agent", settings: "Settings" };
     const onTermDragStart = q2((e4) => {
       e4.preventDefault();
       termDragRef.current = { startY: e4.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
@@ -1439,7 +1440,7 @@
             overflow: "hidden",
             transition: "width 0.15s ease",
             flexShrink: 0
-          }, children: /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
+          }, children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
             activePanel.value,
             " content..."
           ] }) }) }),
