@@ -3,14 +3,18 @@ import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
 import { WebSocketManager } from "./api/websocket";
 import { ActivityBar } from "./components/ActivityBar";
+import { TerminalComponent } from "./components/TerminalComponent";
 import { Sidebar } from "./components/Sidebar";
+import { SystemStats } from "./components/SystemStats";
+import { ModelContextBar } from "./components/ModelContextBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { PanelRouter, ChatPanel } from "./panels";
 import { commandRegistry } from "./services";
-import { ThemeProvider, useTheme } from "./theme/ThemeProvider";
+import { ThemeProvider, useTheme, useThemeControl } from "./theme/ThemeProvider";
 
 function AppContent() {
   const theme = useTheme();
+  const themeControl = useThemeControl();
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
   const activePanel = useSignal("explorer");
   const paletteVisible = useSignal(false);
@@ -62,22 +66,72 @@ function AppContent() {
       if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         sidebarCollapsed.value = !sidebarCollapsed.value;
+        return;
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        activePanel.value = "explorer";
+        sidebarCollapsed.value = false;
+        return;
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        activePanel.value = "search";
+        sidebarCollapsed.value = false;
+        return;
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        activePanel.value = "extensions";
+        sidebarCollapsed.value = false;
+        return;
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        activePanel.value = "agent";
+        sidebarCollapsed.value = true;
+        return;
+      }
+      if (e.ctrlKey && !e.shiftKey && e.key === ",") {
+        e.preventDefault();
+        activePanel.value = "settings";
+        sidebarCollapsed.value = false;
+        return;
       }
     };
     window.addEventListener("keydown", h, true);
     return () => window.removeEventListener("keydown", h, true);
-  }, [paletteVisible, terminalVisible, sidebarCollapsed]);
+  }, [paletteVisible, terminalVisible, sidebarCollapsed, activePanel]);
 
   useEffect(() => {
     const cmds = [
+      // Navigation
       { id: "nav.explorer", label: "Show Explorer", category: "navigation" as const, keybinding: "Ctrl+Shift+E", handler: () => { activePanel.value = "explorer"; sidebarCollapsed.value = false; } },
+      { id: "nav.search", label: "Show Search", category: "navigation" as const, keybinding: "Ctrl+Shift+F", handler: () => { activePanel.value = "search"; sidebarCollapsed.value = false; } },
+      { id: "nav.extensions", label: "Show Addons", category: "navigation" as const, keybinding: "Ctrl+Shift+X", handler: () => { activePanel.value = "extensions"; sidebarCollapsed.value = false; } },
       { id: "nav.agent", label: "Show Agent", category: "navigation" as const, keybinding: "Ctrl+Shift+A", handler: () => { activePanel.value = "agent"; sidebarCollapsed.value = true; } },
-      { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal" as const, keybinding: "Ctrl+`", handler: () => { terminalVisible.value = !terminalVisible.value; } },
+      { id: "nav.settings", label: "Show Settings", category: "navigation" as const, keybinding: "Ctrl+,", handler: () => { activePanel.value = "settings"; sidebarCollapsed.value = false; } },
       { id: "sidebar.toggle", label: "Toggle Sidebar", category: "navigation" as const, keybinding: "Ctrl+B", handler: () => { sidebarCollapsed.value = !sidebarCollapsed.value; } },
+      // Terminal
+      { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal" as const, keybinding: "Ctrl+`", handler: () => { terminalVisible.value = !terminalVisible.value; } },
+      { id: "terminal.maximize", label: "Maximize Terminal", category: "terminal" as const, handler: () => { terminalVisible.value = true; terminalMaximized.value = true; } },
+      { id: "terminal.restore", label: "Restore Terminal", category: "terminal" as const, handler: () => { terminalMaximized.value = false; } },
+      { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "_blank"); } },
+      { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); } },
+      { id: "terminal.close", label: "Close Terminal", category: "terminal" as const, handler: () => { terminalVisible.value = false; terminalMaximized.value = false; } },
+      // Theme
+      { id: "theme.toggleDarkLight", label: "Toggle Dark/Light Theme", category: "theme" as const, handler: () => { themeControl.toggleMode(); } },
+      { id: "theme.dark", label: "Switch to Dark Theme", category: "theme" as const, handler: () => { themeControl.setMode("dark"); } },
+      { id: "theme.light", label: "Switch to Light Theme", category: "theme" as const, handler: () => { themeControl.setMode("light"); } },
+      // Session
+      { id: "session.reconnect", label: "Reconnect WebSocket", category: "session" as const, handler: () => { websocket.disconnect(); websocket.connect(); } },
+      // General
+      { id: "general.commandPalette", label: "Open Command Palette", category: "general" as const, keybinding: "Ctrl+Shift+P", handler: () => { paletteVisible.value = !paletteVisible.value; } },
+      { id: "general.clearLocalStorage", label: "Clear Layout State", category: "general" as const, handler: () => { ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k) => localStorage.removeItem(k)); } },
     ];
     cmds.forEach((c) => commandRegistry.register(c));
     return () => cmds.forEach((c) => commandRegistry.unregister(c.id));
-  }, [activePanel, terminalVisible, sidebarCollapsed]);
+  }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl, websocket]);
 
   const handlePanelChange = useCallback((id: string) => {
     if (id === "agent") {
@@ -158,7 +212,7 @@ function AppContent() {
             />
           )}
           <div style={{ flex: 1, overflow: "hidden", minWidth: 0, height: "100%" }}>
-            <ChatPanel />
+            <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
           </div>
         </div>
 
@@ -193,22 +247,26 @@ function AppContent() {
                   title="Close (Ctrl+`)">&#x2715;</span>
               </div>
             </div>
-            <div style={{ flex: 1, padding: "12px", color: theme.textMuted, fontFamily: "var(--font-mono)", fontSize: "13px", overflow: "auto" }}>$ xterm.js (Wave 9)</div>
+            <TerminalComponent />
           </div>
         )}
 
-        <div style={{ height: "22px", display: "flex", alignItems: "center", padding: "0 8px", background: theme.bgStatus, borderTop: `1px solid ${theme.border}`, fontSize: "11px", flexShrink: 0, gap: "12px" }}>
+        <div style={{ height: "32px", display: "flex", alignItems: "center", padding: "0 14px", background: theme.bgStatus, borderTop: `1px solid ${theme.border}`, fontSize: "13px", flexShrink: 0, gap: "14px" }}>
           <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
             <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: connected ? theme.success : theme.error }} />
             <span style={{ color: theme.textMuted }}>{connected ? "Connected" : "Disconnected"}</span>
           </span>
-          {!terminalVisible.value && (
-            <span style={{ cursor: "pointer", color: theme.textMuted, marginLeft: "auto" }}
-              onClick={() => { terminalVisible.value = true; }}
-              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
-              title="Open Terminal (Ctrl+`)">Terminal</span>
-          )}
+          <ModelContextBar />
+          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+            <SystemStats />
+            {!terminalVisible.value && (
+              <span style={{ cursor: "pointer", color: "#ffffff", background: "#1e66a8", padding: "2px 10px", borderRadius: "3px", fontWeight: 500 }}
+                onClick={() => { terminalVisible.value = true; }}
+                onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = "0.85"; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = "1"; }}
+                title="Open Terminal (Ctrl+`)">Terminal</span>
+            )}
+          </span>
         </div>
       </div>
 

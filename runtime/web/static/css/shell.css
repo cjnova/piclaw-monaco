@@ -279,6 +279,7 @@ body {
 }
 
 .command-palette-backdrop {
+  position: fixed;
   inset: 0;
   background: var(--overlay);
   display: flex;
@@ -293,10 +294,10 @@ body {
   max-height: 400px;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: #2a2a3c;
   border: 1px solid var(--input-border);
   border-radius: 8px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
 
@@ -305,8 +306,8 @@ body {
   border-bottom: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  font-size: 14px;
-  padding: 12px 14px;
+  font-size: 12px;
+  padding: 9px 11px;
   outline: none;
 }
 
@@ -319,15 +320,34 @@ body {
   margin: 0;
   padding: 6px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.command-palette__results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.command-palette__results::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.command-palette__results::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+
+.command-palette__results::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
 }
 
 .command-palette__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 6px;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 3px;
   cursor: pointer;
 }
 
@@ -337,17 +357,19 @@ body {
 
 .command-palette__label {
   color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .command-palette__keybinding {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .command-palette__empty {
-  padding: 10px 12px;
+  padding: 6px 8px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .split-handle--collapsed {

@@ -6,15 +6,193 @@
   <title>PiClaw Terminal</title>
   <link rel="stylesheet" href="/static/css/fonts.css" />
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #11111b; color: #a6adc8; overflow: hidden; }
-    body { font-family: var(--font-mono); font-size: 13px; padding: 12px; display: flex; flex-direction: column; }
-    .terminal-content { flex: 1; overflow: auto; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #11111b;
+      color: #cdd6f4;
+      overflow: hidden;
+    }
+    #terminal-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    #status {
+      height: 22px;
+      background: #181825;
+      border-top: 1px solid #313244;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      font-size: 11px;
+      font-family: var(--font-mono, monospace);
+      color: #6c7086;
+      flex-shrink: 0;
+    }
+    #status .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f38ba8;
+      margin-right: 6px;
+      transition: background 0.3s;
+    }
+    #status .dot.connected {
+      background: #a6e3a1;
+    }
   </style>
 </head>
 <body>
-  <div class="terminal-content">
-    $ xterm.js will mount here (Wave 9)<br/>
-    <span style="color: #6c7086;">Terminal-only view — standalone window</span>
+  <div id="terminal-container"></div>
+  <div id="status">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">Connecting...</span>
   </div>
+
+  <script type="module">
+    // Load ghostty-web from vendored JS
+    import { init, Terminal, FitAddon } from '/static/js/vendor/ghostty-web.js';
+
+    const THEME = {
+      foreground: '#cdd6f4',
+      background: '#11111b',
+      cursor: '#f5e0dc',
+      cursorAccent: '#11111b',
+      selectionBackground: '#45475a',
+      selectionForeground: '#cdd6f4',
+      black: '#45475a',
+      red: '#f38ba8',
+      green: '#a6e3a1',
+      yellow: '#f9e2af',
+      blue: '#89b4fa',
+      magenta: '#f5c2e7',
+      cyan: '#94e2d5',
+      white: '#bac2de',
+      brightBlack: '#585b70',
+      brightRed: '#f38ba8',
+      brightGreen: '#a6e3a1',
+      brightYellow: '#f9e2af',
+      brightBlue: '#89b4fa',
+      brightMagenta: '#f5c2e7',
+      brightCyan: '#94e2d5',
+      brightWhite: '#a6adc8',
+    };
+
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    function setStatus(connected, msg) {
+      if (connected) {
+        statusDot.classList.add('connected');
+      } else {
+        statusDot.classList.remove('connected');
+      }
+      statusText.textContent = msg;
+    }
+
+    async function main() {
+      // Initialize WASM
+      await init();
+
+      // Fetch session info
+      let sessionInfo;
+      try {
+        const resp = await fetch('/terminal/session', { credentials: 'same-origin' });
+        sessionInfo = await resp.json();
+      } catch (err) {
+        setStatus(false, 'Failed to fetch session info');
+        console.error('[terminal] failed to fetch session info:', err);
+        return;
+      }
+
+      // Create terminal
+      const container = document.getElementById('terminal-container');
+      const terminal = new Terminal({
+        fontFamily: '"JetBrains Mono NF", monospace',
+        fontSize: 13,
+        theme: THEME,
+        cursorBlink: true,
+        cursorStyle: 'block',
+        scrollback: 5000,
+      });
+
+      const fitAddon = new FitAddon();
+      terminal.loadAddon(fitAddon);
+      terminal.open(container);
+
+      // Wait for fonts, then fit
+      try { await document.fonts.ready; } catch (_) {}
+      fitAddon.fit();
+      fitAddon.observeResize();
+
+      // Connect WebSocket
+      const wsPath = (sessionInfo && sessionInfo.ws_path) || '/terminal/ws';
+      const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + wsPath;
+
+      function connect() {
+        const ws = new WebSocket(wsUrl);
+        setStatus(false, 'Connecting...');
+
+        ws.addEventListener('open', () => {
+          setStatus(true, 'Connected');
+          const dims = fitAddon.proposeDimensions();
+          if (dims) {
+            ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+          }
+        });
+
+        ws.addEventListener('message', (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'output' && typeof msg.data === 'string') {
+              terminal.write(msg.data);
+            } else if (msg.type === 'session') {
+              // Session connected
+              if (msg.cols && msg.rows) {
+                const dims = fitAddon.proposeDimensions();
+                if (!dims) terminal.resize(msg.cols, msg.rows);
+              }
+            }
+          } catch (_) {
+            if (typeof event.data === 'string') {
+              terminal.write(event.data);
+            }
+          }
+        });
+
+        ws.addEventListener('close', () => {
+          setStatus(false, 'Reconnecting...');
+          setTimeout(connect, 3000);
+        });
+
+        ws.addEventListener('error', (err) => {
+          console.error('[terminal] websocket error:', err);
+        });
+
+        terminal.onData((data) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'input', data }));
+          }
+        });
+
+        terminal.onResize(({ cols, rows }) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+          }
+        });
+      }
+
+      connect();
+    }
+
+    main().catch((err) => {
+      console.error('[terminal] init error:', err);
+      document.getElementById('status-text').textContent = 'Error: ' + err.message;
+    });
+  </script>
 </body>
 </html>

@@ -22,7 +22,7 @@ export const DARK_THEME: Theme = {
   bgStatus: "#181825",
   border: "#313244",
   text: "#cdd6f4",
-  textMuted: "#6c7086",
+  textMuted: "#9399b2",
   accent: "#89b4fa",
   success: "#a6e3a1",
   error: "#f38ba8",

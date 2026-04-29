@@ -8,17 +8,45 @@ interface CommandPaletteProps {
   onClose: () => void;
 }
 
+interface BackendCommand {
+  name: string;
+  description: string;
+  source: string;
+}
+
+interface MergedCommand {
+  id: string;
+  label: string;
+  description?: string;
+  category: string;
+  keybinding?: string;
+  handler?: () => void;
+  isBackend: boolean;
+}
+
+const CATEGORY_BADGE_COLORS: Record<string, string> = {
+  navigation: "#89b4fa",
+  terminal: "#a6e3a1",
+  session: "#f9e2af",
+  theme: "#cba6f7",
+  general: "#94e2d5",
+  core: "#f38ba8",
+  extension: "#fab387",
+  skill: "#a6e3a1",
+  template: "#89dceb",
+};
+
 export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
   const theme = useTheme();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const results = useMemo(() => commandRegistry.search(query), [query]);
+  const listRef = useRef<HTMLUListElement>(null);
 
+  // Fetch backend commands when palette opens
   useEffect(() => {
-    if (!visible) {
-      return;
-    }
+    if (!visible) return;
 
     setQuery("");
     setSelectedIndex(0);
@@ -27,15 +55,62 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
       inputRef.current?.focus();
     }, 0);
 
+    // Fetch real piclaw commands from backend
+    fetch("/agent/commands", { credentials: "same-origin" })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<{ commands: BackendCommand[] }>;
+      })
+      .then((data) => {
+        setBackendCommands(data.commands ?? []);
+      })
+      .catch((err) => {
+        console.warn("[CommandPalette] Failed to fetch backend commands:", err);
+        setBackendCommands([]);
+      });
+
     return () => window.clearTimeout(timer);
   }, [visible]);
 
+  // Merge local UI commands (first) with backend commands (after)
+  const allCommands = useMemo((): MergedCommand[] => {
+    const localCmds: MergedCommand[] = commandRegistry.getAll().map((cmd) => ({
+      id: cmd.id,
+      label: cmd.label,
+      category: cmd.category,
+      keybinding: cmd.keybinding,
+      handler: cmd.handler,
+      isBackend: false,
+    }));
+
+    const backendCmds: MergedCommand[] = backendCommands
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((cmd) => ({
+        id: `backend:${cmd.name}`,
+        label: cmd.name,
+        description: cmd.description,
+        category: cmd.source ?? "core",
+        isBackend: true,
+      }));
+
+    return [...localCmds, ...backendCmds];
+  }, [backendCommands, visible]);
+
+  // Filter by query
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allCommands;
+    return allCommands.filter(
+      (cmd) =>
+        cmd.label.toLowerCase().includes(q) ||
+        (cmd.description?.toLowerCase().includes(q) ?? false)
+    );
+  }, [query, allCommands]);
+
   useEffect(() => {
     setSelectedIndex((current) => {
-      if (results.length === 0) {
-        return 0;
-      }
-
+      if (results.length === 0) return 0;
       return Math.min(current, results.length - 1);
     });
   }, [results]);
@@ -46,13 +121,24 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
 
   const executeSelected = () => {
     const command = results[selectedIndex];
+    if (!command) return;
 
-    if (!command) {
-      return;
+    if (command.handler) {
+      command.handler();
+    } else if (command.isBackend) {
+      // Backend commands: log for now (chat wiring not yet implemented)
+      console.info("[CommandPalette] Backend command selected:", command.label);
     }
-
-    commandRegistry.execute(command.id);
     onClose();
+  };
+
+  const scrollActiveIntoView = (index: number) => {
+    requestAnimationFrame(() => {
+      const list = listRef.current;
+      if (!list) return;
+      const active = list.children[index] as HTMLElement | undefined;
+      active?.scrollIntoView({ block: "nearest" });
+    });
   };
 
   const handleKeyDown = (event: JSX.TargetedKeyboardEvent<HTMLInputElement>) => {
@@ -62,14 +148,19 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
       return;
     }
 
+    if (event.key === "Backspace" && query === "") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setSelectedIndex((current) => {
-        if (results.length === 0) {
-          return 0;
-        }
-
-        return (current + 1) % results.length;
+        if (results.length === 0) return 0;
+        const next = (current + 1) % results.length;
+        scrollActiveIntoView(next);
+        return next;
       });
       return;
     }
@@ -77,12 +168,48 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setSelectedIndex((current) => {
-        if (results.length === 0) {
-          return 0;
-        }
-
-        return (current - 1 + results.length) % results.length;
+        if (results.length === 0) return 0;
+        const prev = (current - 1 + results.length) % results.length;
+        scrollActiveIntoView(prev);
+        return prev;
       });
+      return;
+    }
+
+    if (event.key === "PageDown") {
+      event.preventDefault();
+      setSelectedIndex((current) => {
+        if (results.length === 0) return 0;
+        const next = Math.min(current + 10, results.length - 1);
+        scrollActiveIntoView(next);
+        return next;
+      });
+      return;
+    }
+
+    if (event.key === "PageUp") {
+      event.preventDefault();
+      setSelectedIndex((current) => {
+        if (results.length === 0) return 0;
+        const prev = Math.max(current - 10, 0);
+        scrollActiveIntoView(prev);
+        return prev;
+      });
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      setSelectedIndex(0);
+      scrollActiveIntoView(0);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      const last = Math.max(results.length - 1, 0);
+      setSelectedIndex(last);
+      scrollActiveIntoView(last);
       return;
     }
 
@@ -115,22 +242,65 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
-        <ul className="command-palette__results" role="listbox" aria-label="Commands">
-          {results.map((command, index) => (
-            <li
-              key={command.id}
-              className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-              style={{ background: index === selectedIndex ? theme.border : "transparent" }}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                commandRegistry.execute(command.id);
-                onClose();
-              }}
-            >
-              <span className="command-palette__label" style={{ color: theme.text }}>{command.label}</span>
-              <span className="command-palette__keybinding" style={{ color: theme.textMuted }}>{command.keybinding ?? ""}</span>
-            </li>
-          ))}
+        <ul ref={listRef} className="command-palette__results" role="listbox" aria-label="Commands">
+          {results.map((command, index) => {
+            const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? theme.textMuted;
+            return (
+              <li
+                key={command.id}
+                className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
+                style={{ background: index === selectedIndex ? theme.border : "transparent" }}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (command.handler) {
+                    command.handler();
+                  } else if (command.isBackend) {
+                    console.info("[CommandPalette] Backend command selected:", command.label);
+                  }
+                  onClose();
+                }}
+              >
+                <span style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                  <span className="command-palette__label" style={{ color: theme.text }}>{command.label}</span>
+                  {command.description && (
+                    <span
+                      style={{
+                        color: "#a6adc8",
+                        fontSize: "11px",
+                        marginTop: "1px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {command.description}
+                    </span>
+                  )}
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      padding: "1px 5px",
+                      borderRadius: "3px",
+                      background: `${badgeColor}22`,
+                      color: badgeColor,
+                      border: `1px solid ${badgeColor}44`,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {command.category}
+                  </span>
+                  {command.keybinding && (
+                    <span className="command-palette__keybinding" style={{ color: "#9399b2" }}>
+                      {command.keybinding}
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
           {results.length === 0 && (
             <li className="command-palette__empty" style={{ color: theme.textMuted }}>
               No matching commands
