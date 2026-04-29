@@ -94,6 +94,8 @@ const envConfig = readEnvFile([
   "PICLAW_SESSION_MAX_SIZE_MB",
   "PICLAW_SESSION_AUTO_ROTATE",
   "PICLAW_TURN_MAX_TOOL_USE_MESSAGES",
+  "PICLAW_PROGRESS_WATCHDOG_ENABLED",
+  "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
   "PICLAW_WORKSPACE_SEARCH_ROOTS",
   "PICLAW_INTERNAL_SECRET",
   "PICLAW_REMOTE_INTEROP_ENABLED",
@@ -198,6 +200,16 @@ const compactionConfig =
   piclawConfig.compaction && typeof piclawConfig.compaction === "object"
     ? (piclawConfig.compaction as Record<string, unknown>)
     : piclawConfig;
+
+function hasDefinedConfigValue(source: Record<string, unknown>, keys: string[]): boolean {
+  return keys.some((key) => {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) return false;
+    const value = source[key];
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    return true;
+  });
+}
 
 // Extract individual settings from the JSON config, trying multiple key aliases.
 const configAppToken = pickString(pushoverConfig, ["appToken", "app_token", "PUSHOVER_APP_TOKEN"]);
@@ -797,12 +809,30 @@ const configCompactionBackoffMaxMs = pickNumber(compactionConfig, [
   "compactionBackoffMaxMs",
   "PICLAW_COMPACTION_BACKOFF_MAX_MS",
 ]);
-const configProgressWatchdogTimeoutMs = pickNumber(compactionConfig, [
+const PROGRESS_WATCHDOG_ENABLED_CONFIG_KEYS = [
+  "progressWatchdogEnabled",
+  "progress_watchdog_enabled",
+  "watchdogEnabled",
+  "PICLAW_PROGRESS_WATCHDOG_ENABLED",
+];
+const PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS = [
   "progressWatchdogTimeoutMs",
   "progress_watchdog_timeout_ms",
   "watchdogTimeoutMs",
   "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
-]);
+];
+const configProgressWatchdogEnabled = pickBoolean(compactionConfig, PROGRESS_WATCHDOG_ENABLED_CONFIG_KEYS);
+const configProgressWatchdogTimeoutMs = pickNumber(compactionConfig, PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS);
+const hasExplicitConfigProgressWatchdogTimeout = hasDefinedConfigValue(compactionConfig, PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS);
+const envProgressWatchdogEnabled = pickBoolean({
+  PICLAW_PROGRESS_WATCHDOG_ENABLED: process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED ?? envConfig.PICLAW_PROGRESS_WATCHDOG_ENABLED,
+}, ["PICLAW_PROGRESS_WATCHDOG_ENABLED"]);
+const envProgressWatchdogTimeoutMs = pickNumber({
+  PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS ?? envConfig.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
+}, ["PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS"]);
+const hasExplicitEnvProgressWatchdogTimeout = hasDefinedConfigValue({
+  PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS ?? envConfig.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
+}, ["PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS"]);
 const configAdditionalDefaultTools = pickStringArray(toolsConfig, [
   "additionalDefaultTools",
   "additional_default_tools",
@@ -836,6 +866,7 @@ export interface CompactionRuntimeConfig {
   timeoutMs: number;
   backoffBaseMs: number;
   backoffMaxMs: number;
+  progressWatchdogEnabled: boolean;
   progressWatchdogTimeoutMs: number;
 }
 
@@ -943,6 +974,14 @@ const DEFAULT_COMPACTION_BACKOFF_BASE_MS = 15 * 60_000;
 const DEFAULT_COMPACTION_BACKOFF_MAX_MS = 6 * 60 * 60_000;
 const DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS = 120_000;
 
+function resolveDefaultProgressWatchdogEnabled(): boolean {
+  if (envProgressWatchdogEnabled !== undefined) return envProgressWatchdogEnabled;
+  if (configProgressWatchdogEnabled !== undefined) return configProgressWatchdogEnabled;
+  if (hasExplicitEnvProgressWatchdogTimeout) return Number(envProgressWatchdogTimeoutMs ?? 0) > 0;
+  if (hasExplicitConfigProgressWatchdogTimeout) return Number(configProgressWatchdogTimeoutMs ?? 0) > 0;
+  return false;
+}
+
 let COMPACTION_RUNTIME_CONFIG: CompactionRuntimeConfig = Object.seal({
   timeoutMs: Number.isFinite(configCompactionTimeoutMs) && (configCompactionTimeoutMs ?? 0) > 0
     ? Math.round(Number(configCompactionTimeoutMs))
@@ -953,10 +992,20 @@ let COMPACTION_RUNTIME_CONFIG: CompactionRuntimeConfig = Object.seal({
   backoffMaxMs: Number.isFinite(configCompactionBackoffMaxMs) && (configCompactionBackoffMaxMs ?? 0) > 0
     ? Math.round(Number(configCompactionBackoffMaxMs))
     : DEFAULT_COMPACTION_BACKOFF_MAX_MS,
+  progressWatchdogEnabled: resolveDefaultProgressWatchdogEnabled(),
   progressWatchdogTimeoutMs: Number.isFinite(configProgressWatchdogTimeoutMs)
     ? Math.max(0, Math.round(Number(configProgressWatchdogTimeoutMs)))
     : DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS,
 });
+
+function parseOptionalBooleanFlag(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  return fallback;
+}
 
 function parsePositiveDurationMs(value: unknown, fallback: number): number {
   const parsed = Number(value);
@@ -977,6 +1026,10 @@ export function getCompactionRuntimeConfig(): Readonly<CompactionRuntimeConfig> 
     timeoutMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_TIMEOUT_MS, COMPACTION_RUNTIME_CONFIG.timeoutMs),
     backoffBaseMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS, COMPACTION_RUNTIME_CONFIG.backoffBaseMs),
     backoffMaxMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS, COMPACTION_RUNTIME_CONFIG.backoffMaxMs),
+    progressWatchdogEnabled: parseOptionalBooleanFlag(
+      process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED,
+      COMPACTION_RUNTIME_CONFIG.progressWatchdogEnabled,
+    ),
     progressWatchdogTimeoutMs: parseOptionalNonNegativeDurationMs(
       process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
       COMPACTION_RUNTIME_CONFIG.progressWatchdogTimeoutMs,
@@ -988,6 +1041,7 @@ export function setCompactionRuntimeConfig(patch: {
   timeoutMs?: number;
   backoffBaseMs?: number;
   backoffMaxMs?: number;
+  progressWatchdogEnabled?: boolean;
   progressWatchdogTimeoutMs?: number;
 }): Readonly<CompactionRuntimeConfig> {
   const current = getCompactionRuntimeConfig();
@@ -995,6 +1049,9 @@ export function setCompactionRuntimeConfig(patch: {
     timeoutMs: patch.timeoutMs === undefined ? current.timeoutMs : parsePositiveDurationMs(patch.timeoutMs, current.timeoutMs),
     backoffBaseMs: patch.backoffBaseMs === undefined ? current.backoffBaseMs : parsePositiveDurationMs(patch.backoffBaseMs, current.backoffBaseMs),
     backoffMaxMs: patch.backoffMaxMs === undefined ? current.backoffMaxMs : parsePositiveDurationMs(patch.backoffMaxMs, current.backoffMaxMs),
+    progressWatchdogEnabled: typeof patch.progressWatchdogEnabled === "boolean"
+      ? patch.progressWatchdogEnabled
+      : current.progressWatchdogEnabled,
     progressWatchdogTimeoutMs: patch.progressWatchdogTimeoutMs === undefined
       ? current.progressWatchdogTimeoutMs
       : parseOptionalNonNegativeDurationMs(patch.progressWatchdogTimeoutMs, current.progressWatchdogTimeoutMs),
@@ -1019,12 +1076,16 @@ export function setCompactionRuntimeConfig(patch: {
     "backoffMaxMs",
     "backoff_max_ms",
     "compactionBackoffMaxMs",
+    "progressWatchdogEnabled",
+    "progress_watchdog_enabled",
+    "watchdogEnabled",
     "progressWatchdogTimeoutMs",
     "progress_watchdog_timeout_ms",
     "watchdogTimeoutMs",
     "PICLAW_COMPACTION_TIMEOUT_MS",
     "PICLAW_COMPACTION_BACKOFF_BASE_MS",
     "PICLAW_COMPACTION_BACKOFF_MAX_MS",
+    "PICLAW_PROGRESS_WATCHDOG_ENABLED",
     "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
   ];
   for (const key of clearKeys) {
@@ -1034,6 +1095,7 @@ export function setCompactionRuntimeConfig(patch: {
   compaction.timeoutMs = next.timeoutMs;
   compaction.backoffBaseMs = next.backoffBaseMs;
   compaction.backoffMaxMs = next.backoffMaxMs;
+  compaction.progressWatchdogEnabled = next.progressWatchdogEnabled;
   compaction.progressWatchdogTimeoutMs = next.progressWatchdogTimeoutMs;
   config.compaction = compaction;
   writeJsonConfig(getConfigPath(), config);
@@ -1041,6 +1103,7 @@ export function setCompactionRuntimeConfig(patch: {
   process.env.PICLAW_COMPACTION_TIMEOUT_MS = String(next.timeoutMs);
   process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS = String(next.backoffBaseMs);
   process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS = String(next.backoffMaxMs);
+  process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED = next.progressWatchdogEnabled ? "1" : "0";
   process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS = String(next.progressWatchdogTimeoutMs);
 
   COMPACTION_RUNTIME_CONFIG = Object.seal(next);

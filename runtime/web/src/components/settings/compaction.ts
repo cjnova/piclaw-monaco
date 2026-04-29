@@ -10,6 +10,7 @@ function normalizeCompactionSettings(data = {}) {
         compactionTimeoutSec: data.compactionTimeoutSec ?? 180,
         compactionBackoffBaseMin: data.compactionBackoffBaseMin ?? 15,
         compactionBackoffMaxMin: data.compactionBackoffMaxMin ?? 360,
+        progressWatchdogEnabled: Boolean(data.progressWatchdogEnabled ?? false),
         progressWatchdogTimeoutSec: data.progressWatchdogTimeoutSec ?? 120,
         compactionBackoffs: Array.isArray(data.compactionBackoffs) ? data.compactionBackoffs : [],
         progressWatchdogPhases: Array.isArray(data.progressWatchdogPhases) ? data.progressWatchdogPhases : [],
@@ -28,6 +29,7 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
     const [compactionTimeoutSec, setCompactionTimeoutSec] = useState(180);
     const [compactionBackoffBaseMin, setCompactionBackoffBaseMin] = useState(15);
     const [compactionBackoffMaxMin, setCompactionBackoffMaxMin] = useState(360);
+    const [progressWatchdogEnabled, setProgressWatchdogEnabled] = useState(false);
     const [progressWatchdogTimeoutSec, setProgressWatchdogTimeoutSec] = useState(120);
     const [compactionBackoffs, setCompactionBackoffs] = useState([]);
     const [progressWatchdogPhases, setProgressWatchdogPhases] = useState([]);
@@ -46,6 +48,7 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
         setCompactionTimeoutSec(next.compactionTimeoutSec);
         setCompactionBackoffBaseMin(next.compactionBackoffBaseMin);
         setCompactionBackoffMaxMin(next.compactionBackoffMaxMin);
+        setProgressWatchdogEnabled(next.progressWatchdogEnabled);
         setProgressWatchdogTimeoutSec(next.progressWatchdogTimeoutSec);
         setCompactionBackoffs(next.compactionBackoffs);
         setProgressWatchdogPhases(next.progressWatchdogPhases);
@@ -53,6 +56,7 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
             compactionTimeoutSec: next.compactionTimeoutSec,
             compactionBackoffBaseMin: next.compactionBackoffBaseMin,
             compactionBackoffMaxMin: next.compactionBackoffMaxMin,
+            progressWatchdogEnabled: next.progressWatchdogEnabled,
             progressWatchdogTimeoutSec: next.progressWatchdogTimeoutSec,
         });
     }, []);
@@ -65,8 +69,9 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
         compactionTimeoutSec,
         compactionBackoffBaseMin,
         compactionBackoffMaxMin,
+        progressWatchdogEnabled,
         progressWatchdogTimeoutSec,
-    }), [compactionTimeoutSec, compactionBackoffBaseMin, compactionBackoffMaxMin, progressWatchdogTimeoutSec]);
+    }), [compactionTimeoutSec, compactionBackoffBaseMin, compactionBackoffMaxMin, progressWatchdogEnabled, progressWatchdogTimeoutSec]);
 
     useEffect(() => {
         if (currentSnapshot === savedSnapshotRef.current) return;
@@ -180,6 +185,13 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
 
             <h3 style="margin-top:20px">Stall watchdog</h3>
             <div class="settings-row">
+                <label>Enable watchdog</label>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" checked=${progressWatchdogEnabled} onChange=${e => setProgressWatchdogEnabled(Boolean(e.target.checked))} />
+                    <span class="settings-hint" style="margin:0">Disabled by default. When enabled, a helper process terminates the runtime if an active phase stops heartbeating.</span>
+                </div>
+            </div>
+            <div class="settings-row">
                 <label>Watchdog timeout (sec)</label>
                 <${NumberStepper}
                     label="watchdog timeout"
@@ -188,9 +200,10 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
                     max=${3600}
                     fallback=${120}
                     width="90px"
+                    disabled=${!progressWatchdogEnabled}
                     onChange=${setProgressWatchdogTimeoutSec}
                 />
-                <span class="settings-hint" style="margin:0">0 disables the watchdog. A helper process terminates the runtime if an active phase stops heartbeating.</span>
+                <span class="settings-hint" style="margin:0">How long an active phase can go without a heartbeat before the watchdog kills the runtime.</span>
             </div>
 
             <h3 style="margin-top:20px">Active compaction suppressions</h3>

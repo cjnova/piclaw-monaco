@@ -7,11 +7,16 @@ import {
   setCompactionRuntimeConfig,
 } from "../../../core/config.js";
 import { getTrackedPhasesSnapshot } from "../../../runtime/progress-watchdog.js";
+import {
+  startExternalProgressWatchdogMonitor,
+  stopExternalProgressWatchdogMonitor,
+} from "../../../runtime/progress-watchdog-supervisor.js";
 
 export interface CompactionSettingsData {
   compactionTimeoutSec: number;
   compactionBackoffBaseMin: number;
   compactionBackoffMaxMin: number;
+  progressWatchdogEnabled: boolean;
   progressWatchdogTimeoutSec: number;
   compactionBackoffs: Array<{
     chatJid: string;
@@ -33,6 +38,7 @@ export interface CompactionSettingsInput {
   compactionTimeoutSec?: unknown;
   compactionBackoffBaseMin?: unknown;
   compactionBackoffMaxMin?: unknown;
+  progressWatchdogEnabled?: unknown;
   progressWatchdogTimeoutSec?: unknown;
 }
 
@@ -43,6 +49,10 @@ function normalizeOptionalInt(value: unknown, min: number, max: number): number 
   return Math.min(max, Math.max(min, Math.round(parsed)));
 }
 
+function normalizeOptionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 export function getCompactionSettingsData(): CompactionSettingsData {
   const config = getCompactionRuntimeConfig();
   const now = Date.now();
@@ -50,6 +60,7 @@ export function getCompactionSettingsData(): CompactionSettingsData {
     compactionTimeoutSec: Math.max(1, Math.round(config.timeoutMs / 1000)),
     compactionBackoffBaseMin: Math.max(1, Math.round(config.backoffBaseMs / 60_000)),
     compactionBackoffMaxMin: Math.max(1, Math.round(config.backoffMaxMs / 60_000)),
+    progressWatchdogEnabled: config.progressWatchdogEnabled,
     progressWatchdogTimeoutSec: Math.max(0, Math.round(config.progressWatchdogTimeoutMs / 1000)),
     compactionBackoffs: getAllChatCompactionBackoffs()
       .filter((entry) => {
@@ -76,11 +87,12 @@ export function getCompactionSettingsData(): CompactionSettingsData {
   };
 }
 
-export function saveCompactionSettings(input: CompactionSettingsInput): CompactionSettingsData {
+export async function saveCompactionSettings(input: CompactionSettingsInput): Promise<CompactionSettingsData> {
   const patch: {
     timeoutMs?: number;
     backoffBaseMs?: number;
     backoffMaxMs?: number;
+    progressWatchdogEnabled?: boolean;
     progressWatchdogTimeoutMs?: number;
   } = {};
 
@@ -99,13 +111,23 @@ export function saveCompactionSettings(input: CompactionSettingsInput): Compacti
     patch.backoffMaxMs = nextBackoffMaxMin * 60_000;
   }
 
+  const nextProgressWatchdogEnabled = normalizeOptionalBoolean(input.progressWatchdogEnabled);
+  if (nextProgressWatchdogEnabled !== undefined) {
+    patch.progressWatchdogEnabled = nextProgressWatchdogEnabled;
+  }
+
   const nextProgressWatchdogTimeoutSec = normalizeOptionalInt(input.progressWatchdogTimeoutSec, 0, 3600);
   if (nextProgressWatchdogTimeoutSec !== undefined) {
     patch.progressWatchdogTimeoutMs = nextProgressWatchdogTimeoutSec * 1000;
   }
 
   if (Object.keys(patch).length > 0) {
-    setCompactionRuntimeConfig(patch);
+    const saved = setCompactionRuntimeConfig(patch);
+    if (saved.progressWatchdogEnabled) {
+      startExternalProgressWatchdogMonitor();
+    } else {
+      await stopExternalProgressWatchdogMonitor();
+    }
   }
 
   return getCompactionSettingsData();

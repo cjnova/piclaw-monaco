@@ -373,7 +373,7 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
     handle: async (channel, req) => {
       try {
         const body = await req.json().catch(() => ({}));
-        const saved = saveCompactionSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
+        const saved = await saveCompactionSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
         return channel.json({ ok: true, settings: saved });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

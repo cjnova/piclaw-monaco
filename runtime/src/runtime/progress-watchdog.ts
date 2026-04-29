@@ -61,7 +61,8 @@ function getProgressWatchdogScanIntervalMs(timeoutMs: number): number {
 
 export function getProgressWatchdogTimeoutMs(): number {
   if (progressWatchdogTimeoutOverrideMs !== null) return progressWatchdogTimeoutOverrideMs;
-  return getCompactionRuntimeConfig().progressWatchdogTimeoutMs;
+  const config = getCompactionRuntimeConfig();
+  return config.progressWatchdogEnabled ? config.progressWatchdogTimeoutMs : 0;
 }
 
 export function buildProgressWatchdogSnapshot(shuttingDown = false): ProgressWatchdogSnapshot {

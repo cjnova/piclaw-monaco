@@ -10,6 +10,7 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
     PICLAW_COMPACTION_TIMEOUT_MS: undefined,
     PICLAW_COMPACTION_BACKOFF_BASE_MS: undefined,
     PICLAW_COMPACTION_BACKOFF_MAX_MS: undefined,
+    PICLAW_PROGRESS_WATCHDOG_ENABLED: undefined,
     PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: undefined,
   }, async (workspace) => {
     const db = await importFresh<typeof import('../../src/db.js')>('../src/db.js');
@@ -18,10 +19,11 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
       '../src/channels/web/handlers/compaction-settings.js',
     );
 
-    const saved = handler.saveCompactionSettings({
+    const saved = await handler.saveCompactionSettings({
       compactionTimeoutSec: 240,
       compactionBackoffBaseMin: 12,
       compactionBackoffMaxMin: 180,
+      progressWatchdogEnabled: true,
       progressWatchdogTimeoutSec: 75,
     });
 
@@ -29,6 +31,7 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
       compactionTimeoutSec: 240,
       compactionBackoffBaseMin: 12,
       compactionBackoffMaxMin: 180,
+      progressWatchdogEnabled: true,
       progressWatchdogTimeoutSec: 75,
     });
 
@@ -38,7 +41,42 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
         timeoutMs: 240000,
         backoffBaseMs: 720000,
         backoffMaxMs: 10800000,
+        progressWatchdogEnabled: true,
         progressWatchdogTimeoutMs: 75000,
+      },
+    });
+  });
+});
+
+test('saveCompactionSettings can disable watchdog without clearing its timeout', async () => {
+  await withTempWorkspaceEnv('piclaw-compaction-watchdog-disabled-', {
+    PICLAW_COMPACTION_TIMEOUT_MS: undefined,
+    PICLAW_COMPACTION_BACKOFF_BASE_MS: undefined,
+    PICLAW_COMPACTION_BACKOFF_MAX_MS: undefined,
+    PICLAW_PROGRESS_WATCHDOG_ENABLED: undefined,
+    PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: undefined,
+  }, async (workspace) => {
+    const db = await importFresh<typeof import('../../src/db.js')>('../src/db.js');
+    db.initDatabase();
+    const handler = await importFresh<typeof import('../../src/channels/web/handlers/compaction-settings.js')>(
+      '../src/channels/web/handlers/compaction-settings.js',
+    );
+
+    const saved = await handler.saveCompactionSettings({
+      progressWatchdogEnabled: false,
+      progressWatchdogTimeoutSec: 120,
+    });
+
+    expect(saved).toMatchObject({
+      progressWatchdogEnabled: false,
+      progressWatchdogTimeoutSec: 120,
+    });
+
+    const persisted = JSON.parse(readFileSync(join(workspace.workspace, '.piclaw', 'config.json'), 'utf8'));
+    expect(persisted).toMatchObject({
+      compaction: {
+        progressWatchdogEnabled: false,
+        progressWatchdogTimeoutMs: 120000,
       },
     });
   });
