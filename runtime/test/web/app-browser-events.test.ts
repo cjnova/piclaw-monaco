@@ -165,7 +165,7 @@ test('watchSettingsShortcut accepts default bindings and ignores editable target
   (globalThis as any).window = originalWindow;
 });
 
-test('watchKeyboardHelpShortcut opens the keyboard section on quote outside editable targets', () => {
+test('watchKeyboardHelpShortcut opens the keyboard section on quote and question mark outside editable targets', () => {
   const doc = createEventTarget();
   const events: Array<{ type: string; detail?: any }> = [];
   const originalWindow = (globalThis as any).window;
@@ -179,16 +179,21 @@ test('watchKeyboardHelpShortcut opens the keyboard section on quote outside edit
 
   const dispose = watchKeyboardHelpShortcut({ document: doc as any });
 
-  const accepted = doc.dispatch('keydown', { shiftKey: true, key: '"' });
+  const acceptedQuote = doc.dispatch('keydown', { shiftKey: true, key: '"' });
+  const acceptedQuestion = doc.dispatch('keydown', { shiftKey: true, key: '?' });
   const editable = doc.dispatch('keydown', {
     shiftKey: true,
-    key: '"',
+    key: '?',
     target: { closest: (selector: string) => selector.includes('textarea') ? ({} as Element) : null },
   });
 
-  expect(accepted.prevented).toBe(true);
+  expect(acceptedQuote.prevented).toBe(true);
+  expect(acceptedQuestion.prevented).toBe(true);
   expect(editable.prevented).toBeUndefined();
-  expect(events).toEqual([{ type: 'piclaw:open-settings', detail: { section: 'keyboard' } }]);
+  expect(events).toEqual([
+    { type: 'piclaw:open-settings', detail: { section: 'keyboard' } },
+    { type: 'piclaw:open-settings', detail: { section: 'keyboard' } },
+  ]);
 
   dispose();
   expect(doc.count('keydown')).toBe(0);

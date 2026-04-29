@@ -171,8 +171,17 @@ export function KeychainSection({ filter = '' }) {
                     <button class="settings-keychain-dismiss" onClick=${() => setError(null)}>✕</button>
                 </div>
             `}
-            <div class="settings-keychain-toolbar">
-                <span class="settings-hint" style="margin:0">${filtered.length} entr${filtered.length === 1 ? 'y' : 'ies'}${lf ? ` matching "${filter}"` : ''}</span>
+            <div class="settings-keychain-toolbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <span class="settings-hint" style="margin:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span>${filtered.length} entr${filtered.length === 1 ? 'y' : 'ies'}${lf ? ` matching "${filter}"` : ''}, encrypted at rest.</span>
+                    <span style="display:inline-flex; align-items:center; gap:6px;">
+                        <span>Click</span>
+                        <span aria-hidden="true" style="display:inline-flex; width:18px; height:18px; align-items:center; justify-content:center; border-radius:999px; border:1px solid var(--border-color, rgba(120,120,120,.22)); background:var(--panel-bg, rgba(255,255,255,.04));">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </span>
+                        <span>to reveal.</span>
+                    </span>
+                </span>
                 <button class="settings-keychain-add-btn" onClick=${() => setShowAdd(!showAdd)}>
                     ${showAdd ? 'Cancel' : '+ Add entry'}
                 </button>
@@ -328,7 +337,6 @@ export function KeychainSection({ filter = '' }) {
                     </tbody>
                 </table>
             </div>
-            <p class="settings-hint">Entries are encrypted at rest. Click 👁 to reveal — master password required.</p>
         </div>
     `;
 }

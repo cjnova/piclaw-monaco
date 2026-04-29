@@ -76,28 +76,29 @@ export function KeyboardSection({ filter = '', setStatus }) {
                 <code>/help</code> and typing <code>"</code> outside the compose box open this pane.
             </p>
 
-            <div class="settings-row" style="align-items:center; gap:10px; margin-bottom:16px;">
-                <button class="settings-addon-btn" onClick=${resetAll}>Reset all to defaults</button>
+            <div class="settings-row" style="align-items:center; gap:10px; margin-bottom:18px; justify-content:flex-end;">
+                <button class="settings-addon-btn" style="min-width:180px; height:40px; font-size:14px;" onClick=${resetAll}>Reset all to defaults</button>
             </div>
 
-            <div class="settings-shortcut-list">
+            <div class="settings-shortcut-list" style="display:grid; gap:16px;">
                 ${visibleActions.map((action) => html`
-                    <div class="settings-shortcut-card" key=${action.id}>
-                        <div class="settings-shortcut-copy">
-                            <div class="settings-shortcut-title">${action.label}</div>
-                            <div class="settings-hint" style="margin:4px 0 0 0;">${action.description}</div>
-                            <div class="settings-shortcut-default">Default: <code>${formatShortcutBindingList(action.defaultBindings)}</code></div>
+                    <div class="settings-shortcut-card" key=${action.id} style="display:grid; grid-template-columns:minmax(240px, 1.25fr) minmax(320px, 1fr); gap:18px; align-items:start; padding:18px 20px; border:1px solid var(--border-color, rgba(120,120,120,.22)); border-radius:16px; background:var(--panel-bg, rgba(255,255,255,.04));">
+                        <div class="settings-shortcut-copy" style="min-width:0;">
+                            <div class="settings-shortcut-title" style="font-size:17px; font-weight:700; line-height:1.3;">${action.label}</div>
+                            <div class="settings-hint" style="margin:6px 0 0 0; font-size:14px; line-height:1.5;">${action.description}</div>
+                            <div class="settings-shortcut-default" style="margin-top:10px; font-size:13px; color:var(--text-secondary);">Default: <code style="font-size:13px;">${formatShortcutBindingList(action.defaultBindings)}</code></div>
                         </div>
-                        <div class="settings-shortcut-controls">
+                        <div class="settings-shortcut-controls" style="display:grid; gap:10px; min-width:0;">
                             <input
                                 type="text"
                                 value=${drafts[action.id] || ''}
                                 placeholder=${formatShortcutBindingList(action.defaultBindings)}
                                 onInput=${(e) => setDrafts((prev) => ({ ...prev, [action.id]: e.target.value }))}
+                                style="width:100%; min-height:46px; padding:10px 14px; font-size:16px; line-height:1.35; font-family:var(--font-mono, ui-monospace, monospace); border-radius:12px;"
                             />
-                            <div class="settings-shortcut-actions">
-                                <button class="settings-addon-btn settings-addon-btn-install" onClick=${() => saveAction(action.id)}>Save</button>
-                                <button class="settings-addon-btn" onClick=${() => resetAction(action.id)}>Default</button>
+                            <div class="settings-shortcut-actions" style="display:flex; justify-content:flex-end; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <button class="settings-addon-btn settings-addon-btn-install" style="min-width:96px; height:40px; font-size:14px;" onClick=${() => saveAction(action.id)}>Save</button>
+                                <button class="settings-addon-btn" style="min-width:96px; height:40px; font-size:14px;" onClick=${() => resetAction(action.id)}>Default</button>
                             </div>
                         </div>
                     </div>

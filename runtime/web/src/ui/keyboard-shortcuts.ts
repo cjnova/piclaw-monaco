@@ -21,8 +21,8 @@ export const KEYBOARD_SHORTCUT_ACTIONS: KeyboardShortcutActionDefinition[] = [
   {
     id: 'openHelp',
     label: 'Open keyboard help',
-    description: 'Open Settings → Keyboard. Default: quote when focus is outside compose and other editable fields.',
-    defaultBindings: ['"'],
+    description: 'Open Settings → Keyboard. Default: question mark and quote when focus is outside compose and other editable fields.',
+    defaultBindings: ['?', '"'],
   },
   {
     id: 'openSettings',

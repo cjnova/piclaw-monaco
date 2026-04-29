@@ -2,6 +2,7 @@
 import { html, useCallback, useEffect, useMemo, useRef, useState } from '../vendor/preact-htm.js';
 import { getAgentCommands, getQuickActionsSettings } from '../api.js';
 import { isPopupTypeaheadKey } from '../ui/popup-typeahead.js';
+import { KEYBOARD_SHORTCUT_ACTIONS, matchesKeyboardShortcutAction } from '../ui/keyboard-shortcuts.ts';
 import {
     WORKSPACE_QUICK_ACTIONS_CATALOG,
     buildTimelineQuickActionItems,
@@ -35,13 +36,20 @@ function isEditableTarget(target) {
     ].join(', ')));
 }
 
-function isEligibleTimelineTarget(target) {
+export function isEligibleTimelineTarget(target) {
     if (!target || typeof target !== 'object') return true;
     if (isEditableTarget(target)) return false;
     const tagName = String(target.tagName || '').toUpperCase();
     if (tagName === 'BODY' || tagName === 'HTML') return true;
     if (typeof target.closest !== 'function') return true;
     return Boolean(target.closest('.container, .timeline, .post, .post-body, .post-content, .agent-status-panel'));
+}
+
+export function shouldOpenTimelineQuickActionsFromKeyEvent(event) {
+    if (!isPopupTypeaheadKey(event)) return false;
+    if (!isEligibleTimelineTarget(event?.target)) return false;
+    const matchesShortcut = KEYBOARD_SHORTCUT_ACTIONS.some((action) => matchesKeyboardShortcutAction(event, action.id));
+    return !matchesShortcut;
 }
 
 function toggleChatOnlyMode(chatOnlyMode) {
@@ -236,8 +244,7 @@ export function TimelineQuickActions({
     useEffect(() => {
         const onKeyDown = (event) => {
             if (!open) {
-                if (!isPopupTypeaheadKey(event)) return;
-                if (!isEligibleTimelineTarget(event.target)) return;
+                if (!shouldOpenTimelineQuickActionsFromKeyEvent(event)) return;
                 event.preventDefault();
                 setQuery(String(event.key || ''));
                 setHighlightIndex(0);
