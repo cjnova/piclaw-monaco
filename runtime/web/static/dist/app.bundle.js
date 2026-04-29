@@ -1122,7 +1122,7 @@
 
   // runtime/web/frontend/src/components/ActivityBar.tsx
   var PANELS = [
-    { id: "files", icon: "files", label: "Explorer" },
+    { id: "explorer", icon: "files", label: "Explorer" },
     { id: "search", icon: "search", label: "Search" },
     { id: "extensions", icon: "extensions", label: "Extensions" },
     { id: "agent", icon: "hubot", label: "Agent" },
@@ -1145,6 +1145,45 @@
         panel.id
       );
     }) });
+  }
+
+  // runtime/web/frontend/src/panels/PanelRouter.tsx
+  var PANEL_CONTENT = {
+    explorer: {
+      title: "\u{1F4C1} Explorer Panel",
+      description: "Coming soon..."
+    },
+    files: {
+      title: "\u{1F4C1} Explorer Panel",
+      description: "Coming soon..."
+    },
+    search: {
+      title: "\u{1F50D} Search Panel",
+      description: "Coming soon..."
+    },
+    extensions: {
+      title: "\u{1F9E9} Extensions Panel",
+      description: "Coming soon..."
+    },
+    agent: {
+      title: "\u{1F916} Agent Panel",
+      description: "Coming soon..."
+    },
+    settings: {
+      title: "\u2699\uFE0F Settings Panel",
+      description: "Coming soon..."
+    }
+  };
+  var FALLBACK_PANEL = {
+    title: "\u{1F916} Agent Panel",
+    description: "Coming soon..."
+  };
+  function PanelRouter({ activePanel }) {
+    const panel = PANEL_CONTENT[activePanel] ?? FALLBACK_PANEL;
+    return /* @__PURE__ */ u4("section", { className: "shell-panel-placeholder", "aria-live": "polite", children: /* @__PURE__ */ u4("div", { className: "shell-panel-placeholder__content", children: [
+      /* @__PURE__ */ u4("h1", { className: "shell-panel-placeholder__title", children: panel.title }),
+      /* @__PURE__ */ u4("p", { className: "shell-panel-placeholder__description", children: panel.description })
+    ] }) });
   }
 
   // runtime/web/frontend/src/App.tsx
@@ -1173,7 +1212,7 @@
           }
         }
       ),
-      /* @__PURE__ */ u4("main", { className: "shell-content", "aria-live": "polite", children: [
+      /* @__PURE__ */ u4("main", { className: "shell-content", children: [
         /* @__PURE__ */ u4("header", { className: "shell-status", children: [
           /* @__PURE__ */ u4(
             "span",
@@ -1185,7 +1224,7 @@
           ),
           /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4("section", { className: "shell-panel-placeholder", children: /* @__PURE__ */ u4("h1", { children: activePanel.value }) })
+        /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
       ] })
     ] });
   }

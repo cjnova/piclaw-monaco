@@ -97,5 +97,20 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  text-transform: capitalize;
+}
+
+.shell-panel-placeholder__content {
+  text-align: center;
+}
+
+.shell-panel-placeholder__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.shell-panel-placeholder__description {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #9399b2;
 }

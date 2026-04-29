@@ -1,38 +1,17 @@
 services:
-  pibox:
-    image: pibox:latest
-    shm_size: '256m'
-    init: true
-    container_name: pibox
-    hostname: pibox
+  piclaw-monaco:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
-      TERM: xterm-256color
-      PUID: "${PUID:-1000}"
-      PGID: "${PGID:-1000}"
-      PICLAW_WEB_PORT: "${PICLAW_WEB_PORT:-8080}"
-      PICLAW_AUTOSTART: "${PICLAW_AUTOSTART:-1}"
+      PORT: ${PORT:-8080}
     ports:
-      - "${PICLAW_WEB_BIND_HOST:-127.0.0.1}:${PICLAW_WEB_PORT:-8080}:8080"
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '${CPU_LIMITS:-2}'
-          memory: '${MEMORY_LIMITS:-4G}'
+      - "${PORT:-8080}:8080"
     volumes:
-      - ./home:/config          # canonical persisted agent-home backing store; /home/agent/.pi maps here via the entrypoint symlink setup
-      - workspace:/workspace    # workspace + piclaw state (SQLite, sessions, IPC)
-    networks:
-      - pibox
+      - piclaw-data:/workspace
+    restart: unless-stopped
 
 volumes:
-  workspace:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${WORKSPACE_PATH:-./workspace}
-
-networks:
-  pibox:
-    driver: bridge
+  piclaw-data:
