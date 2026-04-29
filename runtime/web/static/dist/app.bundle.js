@@ -1514,7 +1514,7 @@
                 {
                   style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
-                    window.open(window.location.href, "_blank");
+                    window.open("/terminal.html", "_blank");
                   },
                   onMouseEnter: (e4) => {
                     e4.target.style.color = "#cdd6f4";
@@ -1531,7 +1531,7 @@
                 {
                   style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
-                    window.open(window.location.href, "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
+                    window.open("/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
                   },
                   onMouseEnter: (e4) => {
                     e4.target.style.color = "#cdd6f4";
