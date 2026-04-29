@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - name: Build frontend
+        run: bun run runtime/web/frontend/build.ts
+      - name: Typecheck frontend
+        run: bunx tsc -p runtime/web/frontend/tsconfig.json --noEmit
