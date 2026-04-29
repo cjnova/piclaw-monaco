@@ -1445,21 +1445,21 @@
     const theme = useTheme();
     const [topHeight, setTopHeight] = d2(() => Number(localStorage.getItem("piclaw-workspace-split")) || 200);
     const containerRef = A2(null);
-    const dragRef = A2(null);
+    const heightRef = A2(topHeight);
     const onDragStart = q2((e4) => {
       e4.preventDefault();
       e4.stopPropagation();
-      dragRef.current = { startY: e4.clientY, startH: topHeight };
+      const startY = e4.clientY;
+      const startH = heightRef.current;
       const onMove = (ev) => {
-        if (!dragRef.current) return;
-        const delta = ev.clientY - dragRef.current.startY;
+        const delta = ev.clientY - startY;
         const containerH = containerRef.current?.getBoundingClientRect().height || 500;
-        const next = Math.max(60, Math.min(containerH - 60, dragRef.current.startH + delta));
+        const next = Math.max(60, Math.min(containerH - 60, startH + delta));
+        heightRef.current = next;
         setTopHeight(next);
       };
       const onUp = () => {
-        dragRef.current = null;
-        localStorage.setItem("piclaw-workspace-split", String(topHeight));
+        localStorage.setItem("piclaw-workspace-split", String(heightRef.current));
         document.body.style.userSelect = "";
         document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMove);
@@ -1469,7 +1469,7 @@
       document.body.style.cursor = "row-resize";
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
-    }, [topHeight]);
+    }, []);
     return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", width: "100%", height: "100%", overflow: "hidden" }, children: [
       /* @__PURE__ */ u4("div", { style: { height: `${topHeight}px`, flexShrink: 0, overflowY: "auto", overflowX: "hidden" }, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", fontSize: "12px" }, children: [
         /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: theme.accent, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
