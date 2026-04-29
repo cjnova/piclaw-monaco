@@ -148,6 +148,77 @@ describe("internal-tools extension", () => {
     expect(result.details.recommendations[0].parameters).toBeDefined();
   });
 
+  test("image workflows recommend image_process for icons and transparent favicons", async () => {
+    const { internalTools } = await import("../../src/extensions/internal-tools.js");
+    const { imageProcessing } = await import("../../src/extensions/image-processing.js");
+    const fake = createFakeExtensionApi({ allTools: [] });
+    imageProcessing(fake.api as any);
+    fake.setAllTools([
+      ...[...fake.tools.values()].map((tool: any) => ({
+        name: tool.name,
+        description: tool.description,
+        promptSnippet: tool.promptSnippet,
+        promptGuidelines: tool.promptGuidelines,
+        parameters: tool.parameters,
+      })),
+      {
+        name: "attach_file",
+        description: "Upload a workspace file so the user gets a download card.",
+        promptSnippet: "Attach a file to the chat.",
+      },
+      {
+        name: "read_attachment",
+        description: "Load attachment bytes/text/image data by media id.",
+        promptSnippet: "Read an uploaded attachment.",
+      },
+    ]);
+    internalTools(fake.api);
+
+    const tool = fake.tools.get("list_tools");
+    const result = await tool.execute("t7-image", {
+      intent: "regenerate transparent favicons and app icons from a PNG",
+      include_parameters: true,
+    });
+    expect(result.details.recommendations[0].name).toBe("image_process");
+    expect(result.details.recommendations[0].matched_sources.some((source: string) => (
+      source === "promptSnippet"
+      || source.startsWith("recommend.")
+      || source === "jdoc.guidance"
+    ))).toBe(true);
+    expect(result.details.recommendations[0].parameters).toBeDefined();
+  });
+
+  test("query mode ranks image_process for favicon/transparency searches", async () => {
+    const { internalTools } = await import("../../src/extensions/internal-tools.js");
+    const fake = createFakeExtensionApi({
+      allTools: [
+        {
+          name: "attach_file",
+          description: "Upload a workspace file so the user gets a download card.",
+          promptSnippet: "Attach a file to the chat.",
+        },
+        {
+          name: "read_attachment",
+          description: "Load attachment bytes/text/image data by media id.",
+          promptSnippet: "Read an uploaded attachment.",
+        },
+        {
+          name: "image_process",
+          description: "Process workspace images with sharp. Useful for icons, favicons, logos, screenshots, avatars, transparent PNGs, and GIF workflows.",
+          promptSnippet: "image_process: edit workspace images/icons/screenshots — resize, crop, rotate, convert, optimize, preserve transparency, inspect metadata, and build GIF/tile assets.",
+          promptGuidelines: [
+            "Prefer image_process over bash or hand-rolled scripts for image editing tasks such as icons, favicons, logos, screenshots, avatars, transparent PNGs, and GIFs.",
+          ],
+        },
+      ],
+    });
+    internalTools(fake.api);
+
+    const tool = fake.tools.get("list_tools");
+    const result = await tool.execute("t7-query-image", { query: "favicon transparent png" });
+    expect(result.details.tools[0].name).toBe("image_process");
+  });
+
   test("intent mode falls back cleanly when no strong recommendation exists", async () => {
     const { internalTools } = await import("../../src/extensions/internal-tools.js");
     const fake = createFakeExtensionApi({

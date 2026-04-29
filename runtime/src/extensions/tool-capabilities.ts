@@ -583,22 +583,27 @@ const TOOL_CAPABILITIES: Record<string, ToolCapability> = {
   image_process: {
     kind: "mutating",
     weight: "standard",
+    summary: "Edit workspace images and icons: resize/crop/convert/optimize, preserve transparency, inspect metadata, and build GIF/favicon-style assets.",
     recommend: rec({
-      domains: ["image", "graphics", "media", "workspace"],
+      domains: ["image", "graphics", "media", "workspace", "icons", "favicons"],
       verbs: [
-        "resize", "crop", "convert", "optimize", "trim", "rotate", "flip",
+        "resize", "crop", "convert", "optimize", "optimise", "trim", "rotate", "flip",
         "blur", "sharpen", "composite", "overlay", "denoise",
         "greyscale", "grayscale", "adjust", "tint", "negate", "invert",
         "threshold", "normalize", "level", "brighten", "darken", "saturate",
         "render", "rasterize", "animate", "tile", "extend", "pad",
-        "extract", "strip", "watermark", "label", "transform",
+        "extract", "strip", "watermark", "label", "transform", "compress",
       ],
       nouns: [
-        "image", "photo", "picture", "icon", "thumbnail", "avatar", "screenshot",
-        "png", "jpeg", "jpg", "webp", "avif", "gif", "tiff", "svg",
-        "spritesheet", "sprite", "animation", "frame", "channel", "alpha",
+        "image", "photo", "picture", "icon", "favicon", "logo", "thumbnail", "avatar", "screenshot",
+        "png", "jpeg", "jpg", "webp", "avif", "gif", "tiff", "svg", "ico",
+        "spritesheet", "sprite", "animation", "frame", "channel", "alpha", "transparency", "background",
         "color", "contrast", "brightness", "saturation", "gamma",
         "metadata", "exif", "icc", "tiles", "deepzoom",
+      ],
+      keywords: [
+        "app icon", "web app icon", "apple touch icon", "transparent png", "preserve transparency",
+        "remove background", "favicon", "maskable icon", "social preview image",
       ],
     }),
   },

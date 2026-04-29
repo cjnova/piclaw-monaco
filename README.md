@@ -142,6 +142,9 @@ See [WORKITEMS.md](WORKITEMS.md) for board lane definitions and label taxonomy.
 - [davebcn87/pi-autoresearch](https://github.com/davebcn87/pi-autoresearch) — autonomous experiment loop by Tobi Lutke and David Cortés (now carried by the autoresearch add-on in `rcarmo/piclaw-addons`)
 - [nicobailon/visual-explainer](https://github.com/nicobailon/visual-explainer) — visual artifact generation skill philosophy, prompt workflow, and template patterns by Nico Bailon (adapted, not vendored)
 
+> [!NOTE]
+> piclaw is **not** directly affiliated with [pi.dev](https://pi.dev). It is a derivative work that leverages all of its core Pi functionality and builds additional runtime, tooling, and UI layers around it.
+
 ## Licence
 
 MIT

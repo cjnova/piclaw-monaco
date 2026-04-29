@@ -270,18 +270,44 @@ function buildCatalog(api: ExtensionAPI, includeParameters: boolean): ToolCatalo
 }
 
 function matchesQuery(tool: ToolCatalogEntry, query: string): boolean {
-  return Boolean(
-    tool.name.toLowerCase().includes(query)
-    || tool.description.toLowerCase().includes(query)
-    || tool.summary.toLowerCase().includes(query)
-    || tool.promptSnippet?.toLowerCase().includes(query)
-    || tool.toolsets.some((toolset) => toolset.toLowerCase().includes(query))
-    || tool.discoveryDoc?.summary?.toLowerCase().includes(query)
-    || tool.discoveryDoc?.aliases.some((entry) => entry.toLowerCase().includes(query))
-    || tool.discoveryDoc?.keywords.some((entry) => entry.toLowerCase().includes(query))
-    || tool.discoveryDoc?.examples.some((entry) => entry.toLowerCase().includes(query))
-    || tool.discoveryDoc?.guidance.some((entry) => entry.toLowerCase().includes(query))
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) return true;
+
+  const directMatch = Boolean(
+    tool.name.toLowerCase().includes(normalizedQuery)
+    || tool.description.toLowerCase().includes(normalizedQuery)
+    || tool.summary.toLowerCase().includes(normalizedQuery)
+    || tool.promptSnippet?.toLowerCase().includes(normalizedQuery)
+    || tool.toolsets.some((toolset) => toolset.toLowerCase().includes(normalizedQuery))
+    || tool.discoveryDoc?.summary?.toLowerCase().includes(normalizedQuery)
+    || tool.discoveryDoc?.aliases.some((entry) => entry.toLowerCase().includes(normalizedQuery))
+    || tool.discoveryDoc?.keywords.some((entry) => entry.toLowerCase().includes(normalizedQuery))
+    || tool.discoveryDoc?.examples.some((entry) => entry.toLowerCase().includes(normalizedQuery))
+    || tool.discoveryDoc?.guidance.some((entry) => entry.toLowerCase().includes(normalizedQuery))
   );
+  if (directMatch) return true;
+
+  const queryTokens = tokenizeText(normalizedQuery);
+  if (queryTokens.length === 0) return false;
+
+  const searchTerms = [
+    tool.name,
+    tool.description,
+    tool.summary,
+    tool.promptSnippet,
+    ...tool.toolsets,
+    tool.discoveryDoc?.summary,
+    ...(tool.discoveryDoc?.aliases ?? []),
+    ...(tool.discoveryDoc?.keywords ?? []),
+    ...(tool.discoveryDoc?.examples ?? []),
+    ...(tool.discoveryDoc?.guidance ?? []),
+    ...(tool.capability.recommend?.domains ?? []),
+    ...(tool.capability.recommend?.verbs ?? []),
+    ...(tool.capability.recommend?.nouns ?? []),
+    ...(tool.capability.recommend?.keywords ?? []),
+  ];
+  const termTokens = new Set(searchTerms.flatMap((term) => tokenizeText(term)));
+  return queryTokens.some((token) => termTokens.has(token));
 }
 
 function scoreQuery(tool: ToolCatalogEntry, query: string): number {
