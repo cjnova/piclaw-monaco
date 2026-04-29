@@ -4,6 +4,7 @@
 
 import { type AgentSession, type AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
+import { getCompactionRuntimeConfig } from "../core/config.js";
 import {
   clearChatCompactionBackoff,
   getChatCompactionBackoff,
@@ -17,8 +18,6 @@ export interface CompactionLifecycleOptions {
   onWarn?: (message: string, details: Record<string, unknown>) => void;
 }
 
-const DEFAULT_COMPACTION_BACKOFF_BASE_MS = 15 * 60_000;
-const DEFAULT_COMPACTION_BACKOFF_MAX_MS = 6 * 60 * 60_000;
 
 function estimateMessageTokens(message: any): number {
   if (!message || typeof message !== "object") return 0;
@@ -92,11 +91,11 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 }
 
 function getCompactionBackoffBaseMs(): number {
-  return parsePositiveInt(process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS, DEFAULT_COMPACTION_BACKOFF_BASE_MS);
+  return getCompactionRuntimeConfig().backoffBaseMs;
 }
 
 function getCompactionBackoffMaxMs(): number {
-  return parsePositiveInt(process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS, DEFAULT_COMPACTION_BACKOFF_MAX_MS);
+  return getCompactionRuntimeConfig().backoffMaxMs;
 }
 
 function computeCompactionBackoffMs(failureCount: number): number {
@@ -147,7 +146,7 @@ export function noteCompactionFailure(chatJid: string, errorMessage: string, fai
 }
 
 export function getCompactionTimeoutMs(): number {
-  return parsePositiveInt(process.env.PICLAW_COMPACTION_TIMEOUT_MS, DEFAULT_COMPACTION_TIMEOUT_MS);
+  return getCompactionRuntimeConfig().timeoutMs;
 }
 
 export async function abortCompactionBestEffort(

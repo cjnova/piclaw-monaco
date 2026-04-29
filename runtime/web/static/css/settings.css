@@ -475,6 +475,29 @@
     opacity: 0.5;
 }
 
+.settings-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.settings-secondary-btn {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, rgba(128,128,128,0.3));
+    background: color-mix(in srgb, var(--bg-secondary, #f5f5f5) 82%, transparent);
+    color: inherit;
+    cursor: pointer;
+}
+
+.settings-secondary-btn:hover {
+    background: color-mix(in srgb, var(--accent-color) 14%, var(--bg-primary));
+}
+
+.settings-secondary-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .settings-empty {
     text-align: center;
     color: var(--text-secondary);

@@ -2321,8 +2321,8 @@ export function ComposeBox({
             if (!speechRecognitionRef.current) return;
             try {
                 speechRecognitionRef.current.stop();
-            } catch {
-                /* noop */
+            } catch (error) {
+                console.debug('[compose] failed to stop speech recognition during cleanup', error);
             }
             speechRecognitionRef.current = null;
         };

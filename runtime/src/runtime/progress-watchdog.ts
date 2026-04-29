@@ -1,12 +1,16 @@
 /**
  * runtime/progress-watchdog.ts – Detect active chat runs that stop making progress.
  *
- * This is an in-process watchdog intended to turn silent stalls into explicit
- * failures that the service manager can recover from. Callers mark the current
- * phase for a chat (prompt, streaming, tool execution, recovery, etc.) and
- * periodically heartbeat it while work is progressing.
+ * Maintains both an in-process watchdog and a persisted heartbeat snapshot that
+ * an external helper process can monitor. Callers mark the current phase for a
+ * chat (prompt, streaming, tool execution, recovery, etc.) and periodically
+ * heartbeat it while work is progressing.
  */
 
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { DATA_DIR, getCompactionRuntimeConfig } from "../core/config.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
 
 const log = createLogger("runtime.progress-watchdog");
@@ -31,32 +35,86 @@ export interface ProgressWatchdogStall extends ProgressWatchdogEntry {
   timeoutMs: number;
 }
 
-const DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS = 120_000;
+export interface PersistedProgressWatchdogState {
+  pid: number;
+  updatedAt: string;
+  timeoutMs: number;
+  shuttingDown: boolean;
+  entries: ProgressWatchdogEntry[];
+}
+
 const MIN_SCAN_INTERVAL_MS = 1_000;
 const MAX_SCAN_INTERVAL_MS = 5_000;
+const STATE_PERSIST_DEBOUNCE_MS = 250;
+const WATCHDOG_STATE_PATH = join(DATA_DIR, "runtime", "progress-watchdog-state.json");
 
 const activeByChat = new Map<string, ProgressWatchdogEntry & { stallReported?: boolean }>();
 
 let scanTimer: ReturnType<typeof setInterval> | null = null;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let terminateProcess: (stall: ProgressWatchdogStall) => void = (_stall) => {
   process.exit(1);
 };
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(String(value || "").trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-export function getProgressWatchdogTimeoutMs(): number {
-  const raw = String(process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS || "").trim();
-  if (!raw) return DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS;
-  if (["0", "false", "off", "disabled", "no"].includes(raw.toLowerCase())) return 0;
-  return parsePositiveInt(raw, DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS);
-}
-
 function getProgressWatchdogScanIntervalMs(timeoutMs: number): number {
   if (timeoutMs <= 0) return 0;
   return Math.max(MIN_SCAN_INTERVAL_MS, Math.min(MAX_SCAN_INTERVAL_MS, Math.floor(timeoutMs / 4)));
+}
+
+export function getProgressWatchdogStatePath(): string {
+  return WATCHDOG_STATE_PATH;
+}
+
+export function getProgressWatchdogTimeoutMs(): number {
+  return getCompactionRuntimeConfig().progressWatchdogTimeoutMs;
+}
+
+function buildPersistedProgressWatchdogState(shuttingDown = false): PersistedProgressWatchdogState {
+  return {
+    pid: process.pid,
+    updatedAt: new Date().toISOString(),
+    timeoutMs: getProgressWatchdogTimeoutMs(),
+    shuttingDown,
+    entries: getTrackedPhasesSnapshot(),
+  };
+}
+
+function persistProgressWatchdogStateNow(shuttingDown = false): void {
+  try {
+    mkdirSync(dirname(WATCHDOG_STATE_PATH), { recursive: true });
+    writeFileSync(WATCHDOG_STATE_PATH, `${JSON.stringify(buildPersistedProgressWatchdogState(shuttingDown), null, 2)}\n`, "utf8");
+  } catch (error) {
+    debugSuppressedError(log, "Failed to persist progress-watchdog heartbeat state.", error, {
+      operation: "progress_watchdog.persist_state",
+      statePath: WATCHDOG_STATE_PATH,
+      shuttingDown,
+    });
+  }
+}
+
+function schedulePersistProgressWatchdogState(): void {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistProgressWatchdogStateNow(false);
+  }, STATE_PERSIST_DEBOUNCE_MS);
+  if (typeof persistTimer.unref === "function") persistTimer.unref();
+}
+
+export function flushProgressWatchdogState(): void {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  persistProgressWatchdogStateNow(false);
+}
+
+export function markProgressWatchdogShuttingDown(): void {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  persistProgressWatchdogStateNow(true);
 }
 
 function ensureScanLoop(): void {
@@ -91,6 +149,7 @@ export function beginTrackedPhase(
     stallReported: false,
   });
   ensureScanLoop();
+  flushProgressWatchdogState();
 }
 
 export function heartbeatTrackedPhase(
@@ -111,6 +170,7 @@ export function heartbeatTrackedPhase(
       stallReported: false,
     });
     ensureScanLoop();
+    flushProgressWatchdogState();
     return;
   }
 
@@ -121,11 +181,13 @@ export function heartbeatTrackedPhase(
     metadata: metadata ? { ...(current.metadata || {}), ...metadata } : current.metadata,
     stallReported: false,
   });
+  schedulePersistProgressWatchdogState();
 }
 
 export function endTrackedPhase(chatJid: string): void {
   activeByChat.delete(chatJid);
   stopScanLoopIfIdle();
+  flushProgressWatchdogState();
 }
 
 export function getTrackedPhasesSnapshot(): ProgressWatchdogEntry[] {
@@ -197,7 +259,19 @@ export function resetProgressWatchdogForTests(): void {
     clearInterval(scanTimer);
     scanTimer = null;
   }
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
   terminateProcess = () => {
     process.exit(1);
   };
+  try {
+    rmSync(WATCHDOG_STATE_PATH, { force: true });
+  } catch (error) {
+    debugSuppressedError(log, "Failed to remove progress-watchdog state during test reset.", error, {
+      operation: "progress_watchdog.reset_tests_cleanup",
+      statePath: WATCHDOG_STATE_PATH,
+    });
+  }
 }
