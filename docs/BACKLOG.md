@@ -1,6 +1,6 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-04-29
+Updated: 2026-04-29 (post-review)
 
 ## Vision
 
@@ -83,7 +83,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 - [x] **Status bar**: connection dot, model/context badge, CPU/RAM stats, date/time clock, Terminal button
 - [x] **Model picker**: click badge → dropdown with available models, switch via `/model <id>`
 - [x] **Thinking level picker**: click thinking level → dropdown, switch via `/thinking <level>`
-- [x] **Context indicator**: filled circle (green/yellow/red) + consumed/total tokens, click to compact
+- [x] **Context indicator**: filled circle (green/yellow/red) + consumed/total tokens (1M notation), click to compact
+- [x] **Model dropdown**: shows context window size per model (e.g., 200k, 1.0M)
 - [x] **Chat compose box**: multiline textarea, auto-grows up to 25vh, thin scrollbar
 - [x] **Theme toggle**: dark/light via command palette
 - [x] **Theme**: Catppuccin Mocha dark, brighter textMuted (#9399b2) for readability
@@ -91,7 +92,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 - [x] Font stack loaded (IBM Plex Sans, JetBrains Mono NF, codicons)
 - [x] Layout persists across refreshes (localStorage)
 - [x] CI: build + typecheck on every push/PR
-- [x] Docker: multi-arch image (manual publish or tag)
+- [x] Code review hardening pass (delta CPU stats, stale state detection, CSRF, AbortController, noopener)
 
 ### New Keyboard Shortcuts (Wave 9)
 
