@@ -173,3 +173,76 @@ body {
 .split-handle:hover {
   background: #45475a;
 }
+
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 72px;
+  z-index: 2000;
+}
+
+.command-palette {
+  width: min(600px, calc(100vw - 32px));
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.command-palette__input {
+  border: 0;
+  border-bottom: 1px solid #313244;
+  background: transparent;
+  color: #cdd6f4;
+  font-size: 14px;
+  padding: 12px 14px;
+  outline: none;
+}
+
+.command-palette__input::placeholder {
+  color: #7f849c;
+}
+
+.command-palette__results {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.command-palette__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.command-palette__row.is-active {
+  background: #313244;
+}
+
+.command-palette__label {
+  color: #cdd6f4;
+}
+
+.command-palette__keybinding {
+  color: #7f849c;
+  font-size: 12px;
+}
+
+.command-palette__empty {
+  padding: 10px 12px;
+  color: #7f849c;
+  font-size: 13px;
+}
