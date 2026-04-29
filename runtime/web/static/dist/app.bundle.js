@@ -133,27 +133,27 @@
     };
   }
   function q(n3, u5, t4, i5, r4, o4, e4, f5, c4, s4) {
-    var a4, h5, p5, v4, y5, d4, _4, k4, x3, M2, $2, I2, P2, A4, H2, T3 = u5.type;
+    var a4, h5, p5, v4, y5, d4, _4, k4, x4, M2, $2, I2, P2, A4, H2, T3 = u5.type;
     if (void 0 !== u5.constructor) return null;
     128 & t4.__u && (c4 = !!(32 & t4.__u), o4 = [f5 = u5.__e = t4.__e]), (a4 = l.__b) && a4(u5);
     n: if ("function" == typeof T3) try {
-      if (k4 = u5.props, x3 = T3.prototype && T3.prototype.render, M2 = (a4 = T3.contextType) && i5[a4.__c], $2 = a4 ? M2 ? M2.props.value : a4.__ : i5, t4.__c ? _4 = (h5 = u5.__c = t4.__c).__ = h5.__E : (x3 ? u5.__c = h5 = new T3(k4, $2) : (u5.__c = h5 = new C(k4, $2), h5.constructor = T3, h5.render = Q), M2 && M2.sub(h5), h5.state || (h5.state = {}), h5.__n = i5, p5 = h5.__d = true, h5.__h = [], h5._sb = []), x3 && null == h5.__s && (h5.__s = h5.state), x3 && null != T3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = m({}, h5.__s)), m(h5.__s, T3.getDerivedStateFromProps(k4, h5.__s))), v4 = h5.props, y5 = h5.state, h5.__v = u5, p5) x3 && null == T3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), x3 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
+      if (k4 = u5.props, x4 = T3.prototype && T3.prototype.render, M2 = (a4 = T3.contextType) && i5[a4.__c], $2 = a4 ? M2 ? M2.props.value : a4.__ : i5, t4.__c ? _4 = (h5 = u5.__c = t4.__c).__ = h5.__E : (x4 ? u5.__c = h5 = new T3(k4, $2) : (u5.__c = h5 = new C(k4, $2), h5.constructor = T3, h5.render = Q), M2 && M2.sub(h5), h5.state || (h5.state = {}), h5.__n = i5, p5 = h5.__d = true, h5.__h = [], h5._sb = []), x4 && null == h5.__s && (h5.__s = h5.state), x4 && null != T3.getDerivedStateFromProps && (h5.__s == h5.state && (h5.__s = m({}, h5.__s)), m(h5.__s, T3.getDerivedStateFromProps(k4, h5.__s))), v4 = h5.props, y5 = h5.state, h5.__v = u5, p5) x4 && null == T3.getDerivedStateFromProps && null != h5.componentWillMount && h5.componentWillMount(), x4 && null != h5.componentDidMount && h5.__h.push(h5.componentDidMount);
       else {
-        if (x3 && null == T3.getDerivedStateFromProps && k4 !== v4 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(k4, $2), u5.__v == t4.__v || !h5.__e && null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(k4, h5.__s, $2)) {
+        if (x4 && null == T3.getDerivedStateFromProps && k4 !== v4 && null != h5.componentWillReceiveProps && h5.componentWillReceiveProps(k4, $2), u5.__v == t4.__v || !h5.__e && null != h5.shouldComponentUpdate && false === h5.shouldComponentUpdate(k4, h5.__s, $2)) {
           u5.__v != t4.__v && (h5.props = k4, h5.state = h5.__s, h5.__d = false), u5.__e = t4.__e, u5.__k = t4.__k, u5.__k.some(function(n4) {
             n4 && (n4.__ = u5);
           }), w.push.apply(h5.__h, h5._sb), h5._sb = [], h5.__h.length && e4.push(h5);
           break n;
         }
-        null != h5.componentWillUpdate && h5.componentWillUpdate(k4, h5.__s, $2), x3 && null != h5.componentDidUpdate && h5.__h.push(function() {
+        null != h5.componentWillUpdate && h5.componentWillUpdate(k4, h5.__s, $2), x4 && null != h5.componentDidUpdate && h5.__h.push(function() {
           h5.componentDidUpdate(v4, y5, d4);
         });
       }
-      if (h5.context = $2, h5.props = k4, h5.__P = n3, h5.__e = false, I2 = l.__r, P2 = 0, x3) h5.state = h5.__s, h5.__d = false, I2 && I2(u5), a4 = h5.render(h5.props, h5.state, h5.context), w.push.apply(h5.__h, h5._sb), h5._sb = [];
+      if (h5.context = $2, h5.props = k4, h5.__P = n3, h5.__e = false, I2 = l.__r, P2 = 0, x4) h5.state = h5.__s, h5.__d = false, I2 && I2(u5), a4 = h5.render(h5.props, h5.state, h5.context), w.push.apply(h5.__h, h5._sb), h5._sb = [];
       else do {
         h5.__d = false, I2 && I2(u5), a4 = h5.render(h5.props, h5.state, h5.context), h5.state = h5.__s;
       } while (h5.__d && ++P2 < 25);
-      h5.state = h5.__s, null != h5.getChildContext && (i5 = m(m({}, i5), h5.getChildContext())), x3 && !p5 && null != h5.getSnapshotBeforeUpdate && (d4 = h5.getSnapshotBeforeUpdate(v4, y5)), A4 = null != a4 && a4.type === S && null == a4.key ? E(a4.props.children) : a4, f5 = L(n3, g(A4) ? A4 : [A4], u5, t4, i5, r4, o4, e4, f5, c4, s4), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), _4 && (h5.__E = h5.__ = null);
+      h5.state = h5.__s, null != h5.getChildContext && (i5 = m(m({}, i5), h5.getChildContext())), x4 && !p5 && null != h5.getSnapshotBeforeUpdate && (d4 = h5.getSnapshotBeforeUpdate(v4, y5)), A4 = null != a4 && a4.type === S && null == a4.key ? E(a4.props.children) : a4, f5 = L(n3, g(A4) ? A4 : [A4], u5, t4, i5, r4, o4, e4, f5, c4, s4), h5.base = u5.__e, u5.__u &= -161, h5.__h.length && e4.push(h5), _4 && (h5.__E = h5.__ = null);
     } catch (n4) {
       if (u5.__v = null, c4 || null != o4) if (n4.then) {
         for (u5.__u |= c4 ? 160 : 128; f5 && 8 == f5.nodeType && f5.nextSibling; ) f5 = f5.nextSibling;
@@ -187,25 +187,25 @@
     return "object" != typeof n3 || null == n3 || n3.__b > 0 ? n3 : g(n3) ? n3.map(E) : m({}, n3);
   }
   function G(u5, t4, i5, r4, o4, e4, f5, c4, s4) {
-    var a4, h5, p5, v4, y5, w4, _4, m5 = i5.props || d, k4 = t4.props, x3 = t4.type;
-    if ("svg" == x3 ? o4 = "http://www.w3.org/2000/svg" : "math" == x3 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
-      for (a4 = 0; a4 < e4.length; a4++) if ((y5 = e4[a4]) && "setAttribute" in y5 == !!x3 && (x3 ? y5.localName == x3 : 3 == y5.nodeType)) {
+    var a4, h5, p5, v4, y5, w4, _4, m5 = i5.props || d, k4 = t4.props, x4 = t4.type;
+    if ("svg" == x4 ? o4 = "http://www.w3.org/2000/svg" : "math" == x4 ? o4 = "http://www.w3.org/1998/Math/MathML" : o4 || (o4 = "http://www.w3.org/1999/xhtml"), null != e4) {
+      for (a4 = 0; a4 < e4.length; a4++) if ((y5 = e4[a4]) && "setAttribute" in y5 == !!x4 && (x4 ? y5.localName == x4 : 3 == y5.nodeType)) {
         u5 = y5, e4[a4] = null;
         break;
       }
     }
     if (null == u5) {
-      if (null == x3) return document.createTextNode(k4);
-      u5 = document.createElementNS(o4, x3, k4.is && k4), c4 && (l.__m && l.__m(t4, e4), c4 = false), e4 = null;
+      if (null == x4) return document.createTextNode(k4);
+      u5 = document.createElementNS(o4, x4, k4.is && k4), c4 && (l.__m && l.__m(t4, e4), c4 = false), e4 = null;
     }
-    if (null == x3) m5 === k4 || c4 && u5.data == k4 || (u5.data = k4);
+    if (null == x4) m5 === k4 || c4 && u5.data == k4 || (u5.data = k4);
     else {
       if (e4 = e4 && n.call(u5.childNodes), !c4 && null != e4) for (m5 = {}, a4 = 0; a4 < u5.attributes.length; a4++) m5[(y5 = u5.attributes[a4]).name] = y5.value;
       for (a4 in m5) y5 = m5[a4], "dangerouslySetInnerHTML" == a4 ? p5 = y5 : "children" == a4 || a4 in k4 || "value" == a4 && "defaultValue" in k4 || "checked" == a4 && "defaultChecked" in k4 || N(u5, a4, null, y5, o4);
       for (a4 in k4) y5 = k4[a4], "children" == a4 ? v4 = y5 : "dangerouslySetInnerHTML" == a4 ? h5 = y5 : "value" == a4 ? w4 = y5 : "checked" == a4 ? _4 = y5 : c4 && "function" != typeof y5 || m5[a4] === y5 || N(u5, a4, y5, m5[a4], o4);
       if (h5) c4 || p5 && (h5.__html == p5.__html || h5.__html == u5.innerHTML) || (u5.innerHTML = h5.__html), t4.__k = [];
-      else if (p5 && (u5.innerHTML = ""), L("template" == t4.type ? u5.content : u5, g(v4) ? v4 : [v4], t4, i5, r4, "foreignObject" == x3 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && $(i5, 0), c4, s4), null != e4) for (a4 = e4.length; a4--; ) b(e4[a4]);
-      c4 || (a4 = "value", "progress" == x3 && null == w4 ? u5.removeAttribute("value") : null != w4 && (w4 !== u5[a4] || "progress" == x3 && !w4 || "option" == x3 && w4 != m5[a4]) && N(u5, a4, w4, m5[a4], o4), a4 = "checked", null != _4 && _4 != u5[a4] && N(u5, a4, _4, m5[a4], o4));
+      else if (p5 && (u5.innerHTML = ""), L("template" == t4.type ? u5.content : u5, g(v4) ? v4 : [v4], t4, i5, r4, "foreignObject" == x4 ? "http://www.w3.org/1999/xhtml" : o4, e4, f5, e4 ? e4[0] : i5.__k && $(i5, 0), c4, s4), null != e4) for (a4 = e4.length; a4--; ) b(e4[a4]);
+      c4 || (a4 = "value", "progress" == x4 && null == w4 ? u5.removeAttribute("value") : null != w4 && (w4 !== u5[a4] || "progress" == x4 && !w4 || "option" == x4 && w4 != m5[a4]) && N(u5, a4, w4, m5[a4], o4), a4 = "checked", null != _4 && _4 != u5[a4] && N(u5, a4, _4, m5[a4], o4));
     }
     return u5;
   }
@@ -238,6 +238,29 @@
   function R(u5, t4, i5) {
     var r4, o4, e4, f5;
     t4 == document && (t4 = document.documentElement), l.__ && l.__(u5, t4), o4 = (r4 = "function" == typeof i5) ? null : i5 && i5.__k || t4.__k, e4 = [], f5 = [], q(t4, u5 = (!r4 && i5 || t4).__k = k(S, null, [u5]), o4 || d, d, t4.namespaceURI, !r4 && i5 ? [i5] : o4 ? null : t4.firstChild ? n.call(t4.childNodes) : null, e4, !r4 && i5 ? i5 : o4 ? o4.__e : t4.firstChild, r4, f5), D(e4, u5, f5);
+  }
+  function X(n3) {
+    function l5(n4) {
+      var u5, t4;
+      return this.getChildContext || (u5 = /* @__PURE__ */ new Set(), (t4 = {})[l5.__c] = this, this.getChildContext = function() {
+        return t4;
+      }, this.componentWillUnmount = function() {
+        u5 = null;
+      }, this.shouldComponentUpdate = function(n5) {
+        this.props.value != n5.value && u5.forEach(function(n6) {
+          n6.__e = true, A(n6);
+        });
+      }, this.sub = function(n5) {
+        u5.add(n5);
+        var l6 = n5.componentWillUnmount;
+        n5.componentWillUnmount = function() {
+          u5 && u5.delete(n5), l6 && l6.call(n5);
+        };
+      }), n4.children;
+    }
+    return l5.__c = "__cC" + y++, l5.__ = n3, l5.Provider = l5.__l = (l5.Consumer = function(n4, l6) {
+      return n4.children(l6);
+    }).contextType = l5, l5;
   }
   n = w.slice, l = { __e: function(n3, l5, u5, t4) {
     for (var i5, r4, o4; l5 = l5.__; ) if ((i5 = l5.__c) && !i5.__) try {
@@ -330,6 +353,10 @@
     return o2 = 8, T2(function() {
       return n3;
     }, t4);
+  }
+  function x2(n3) {
+    var u5 = r2.context[n3.__c], i5 = p2(t2++, 9);
+    return i5.c = n3, u5 ? (null == i5.__ && (i5.__ = true, u5.sub(r2)), u5.props.value) : n3.__;
   }
   function j2() {
     for (var n3; n3 = f2.shift(); ) {
@@ -732,7 +759,7 @@
     i5.s = void 0;
     S2(i5);
   }
-  function x2(i5) {
+  function x3(i5) {
     if (r3 !== this) throw new Error("Out-of-order effect");
     b2(this);
     r3 = i5;
@@ -769,7 +796,7 @@
     s3++;
     var i5 = r3;
     r3 = this;
-    return x2.bind(this, i5);
+    return x3.bind(this, i5);
   };
   E2.prototype.N = function() {
     if (!(2 & this.f)) {
@@ -1107,6 +1134,24 @@
     }
   };
 
+  // runtime/web/frontend/src/theme/theme.ts
+  var DARK_THEME = {
+    bg: "#1e1e2e",
+    bgSidebar: "#181825",
+    bgTerminal: "#11111b",
+    bgStatus: "#181825",
+    border: "#313244",
+    text: "#cdd6f4",
+    textMuted: "#6c7086",
+    accent: "#89b4fa",
+    success: "#a6e3a1",
+    error: "#f38ba8",
+    handleHover: "#89b4fa",
+    handle: "#313244",
+    inputBg: "#11111b",
+    inputBorder: "#45475a"
+  };
+
   // node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
   var f4 = 0;
   var i4 = Array.isArray;
@@ -1117,6 +1162,12 @@
     var l5 = { type: e4, props: p5, key: n3, ref: a4, __k: null, __: null, __b: 0, __e: null, __c: null, constructor: void 0, __v: --f4, __i: -1, __u: 0, __source: i5, __self: u5 };
     if ("function" == typeof e4 && (a4 = e4.defaultProps)) for (c4 in a4) void 0 === p5[c4] && (p5[c4] = a4[c4]);
     return l.vnode && l.vnode(l5), l5;
+  }
+
+  // runtime/web/frontend/src/theme/ThemeProvider.tsx
+  var ThemeContext = X(DARK_THEME);
+  function useTheme() {
+    return x2(ThemeContext);
   }
 
   // runtime/web/frontend/src/components/Icon.tsx
@@ -1139,29 +1190,69 @@
     { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
   function ActivityBar({ activePanel, onPanelChange }) {
-    return /* @__PURE__ */ u4("nav", { className: "activity-bar", "aria-label": "Activity bar", children: PANELS.map((panel) => {
-      const active = panel.id === activePanel;
-      return /* @__PURE__ */ u4(
-        "button",
-        {
-          type: "button",
-          className: `activity-bar__button ${active ? "is-active" : ""} ${"alignBottom" in panel && panel.alignBottom ? "is-bottom" : ""}`,
-          title: panel.label,
-          "aria-label": panel.label,
-          "aria-pressed": active,
-          onClick: () => onPanelChange(panel.id),
-          children: /* @__PURE__ */ u4(Icon, { name: panel.icon, size: 24, className: "activity-bar__icon" })
+    const theme = useTheme();
+    return /* @__PURE__ */ u4(
+      "nav",
+      {
+        className: "activity-bar",
+        "aria-label": "Activity bar",
+        style: {
+          background: theme.bgSidebar,
+          borderRight: `1px solid ${theme.border}`
         },
-        panel.id
-      );
-    }) });
+        children: PANELS.map((panel) => {
+          const active = panel.id === activePanel;
+          return /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              className: `activity-bar__button ${active ? "is-active" : ""} ${"alignBottom" in panel && panel.alignBottom ? "is-bottom" : ""}`,
+              style: {
+                color: active ? theme.text : theme.textMuted,
+                borderLeftColor: active ? theme.accent : "transparent"
+              },
+              title: panel.label,
+              "aria-label": panel.label,
+              "aria-pressed": active,
+              onMouseEnter: (e4) => {
+                if (!active) {
+                  e4.currentTarget.style.color = theme.text;
+                }
+              },
+              onMouseLeave: (e4) => {
+                if (!active) {
+                  e4.currentTarget.style.color = theme.textMuted;
+                }
+              },
+              onClick: () => onPanelChange(panel.id),
+              children: /* @__PURE__ */ u4(Icon, { name: panel.icon, size: 24, className: "activity-bar__icon" })
+            },
+            panel.id
+          );
+        })
+      }
+    );
   }
 
   // runtime/web/frontend/src/components/Sidebar.tsx
   function Sidebar({ title, children }) {
-    return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#181825" }, children: [
-      /* @__PURE__ */ u4("header", { style: { height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }, children: /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: title.toUpperCase() }) }),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }, children })
+    const theme = useTheme();
+    return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: theme.bgSidebar }, children: [
+      /* @__PURE__ */ u4(
+        "header",
+        {
+          style: {
+            height: "35px",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 12px",
+            borderBottom: `1px solid ${theme.border}`,
+            flexShrink: 0
+          },
+          children: /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: title.toUpperCase() })
+        }
+      ),
+      /* @__PURE__ */ u4("div", { className: "sidebar__content", style: { flex: 1, minHeight: 0, overflow: "hidden" }, children })
     ] });
   }
 
@@ -1196,6 +1287,7 @@
 
   // runtime/web/frontend/src/components/CommandPalette.tsx
   function CommandPalette({ visible, onClose }) {
+    const theme = useTheme();
     const [query, setQuery] = d2("");
     const [selectedIndex, setSelectedIndex] = d2(0);
     const inputRef = A2(null);
@@ -1261,56 +1353,77 @@
         executeSelected();
       }
     };
-    return /* @__PURE__ */ u4("div", { className: "command-palette-backdrop", onClick: onClose, children: /* @__PURE__ */ u4("div", { className: "command-palette", onClick: (event) => event.stopPropagation(), children: [
-      /* @__PURE__ */ u4(
-        "input",
-        {
-          ref: inputRef,
-          className: "command-palette__input",
-          placeholder: "Type a command...",
-          value: query,
-          onInput: (event) => setQuery(event.target.value),
-          onKeyDown: handleKeyDown
-        }
-      ),
-      /* @__PURE__ */ u4("ul", { className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
-        results.map((command, index) => /* @__PURE__ */ u4(
-          "li",
-          {
-            className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
-            onMouseDown: (event) => event.preventDefault(),
-            onClick: () => {
-              commandRegistry.execute(command.id);
-              onClose();
-            },
-            children: [
-              /* @__PURE__ */ u4("span", { className: "command-palette__label", children: command.label }),
-              /* @__PURE__ */ u4("span", { className: "command-palette__keybinding", children: command.keybinding ?? "" })
-            ]
-          },
-          command.id
-        )),
-        results.length === 0 && /* @__PURE__ */ u4("li", { className: "command-palette__empty", children: "No matching commands" })
-      ] })
-    ] }) });
+    return /* @__PURE__ */ u4("div", { className: "command-palette-backdrop", onClick: onClose, children: /* @__PURE__ */ u4(
+      "div",
+      {
+        className: "command-palette",
+        style: {
+          background: theme.bg,
+          border: `1px solid ${theme.inputBorder}`,
+          boxShadow: "0 18px 48px rgba(0, 0, 0, 0.35)"
+        },
+        onClick: (event) => event.stopPropagation(),
+        children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              ref: inputRef,
+              className: "command-palette__input",
+              placeholder: "Type a command...",
+              value: query,
+              style: {
+                borderBottom: `1px solid ${theme.border}`,
+                color: theme.text
+              },
+              onInput: (event) => setQuery(event.target.value),
+              onKeyDown: handleKeyDown
+            }
+          ),
+          /* @__PURE__ */ u4("ul", { className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
+            results.map((command, index) => /* @__PURE__ */ u4(
+              "li",
+              {
+                className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
+                style: { background: index === selectedIndex ? theme.border : "transparent" },
+                onMouseDown: (event) => event.preventDefault(),
+                onClick: () => {
+                  commandRegistry.execute(command.id);
+                  onClose();
+                },
+                children: [
+                  /* @__PURE__ */ u4("span", { className: "command-palette__label", style: { color: theme.text }, children: command.label }),
+                  /* @__PURE__ */ u4("span", { className: "command-palette__keybinding", style: { color: theme.textMuted }, children: command.keybinding ?? "" })
+                ]
+              },
+              command.id
+            )),
+            results.length === 0 && /* @__PURE__ */ u4("li", { className: "command-palette__empty", style: { color: theme.textMuted }, children: "No matching commands" })
+          ] })
+        ]
+      }
+    ) });
   }
 
   // runtime/web/frontend/src/panels/WorkspacePanel.tsx
   function WorkspacePanel() {
-    const topHeight = useSignal(Number(localStorage.getItem("piclaw-workspace-split")) || 200);
+    const theme = useTheme();
+    const [topHeight, setTopHeight] = d2(() => Number(localStorage.getItem("piclaw-workspace-split")) || 200);
     const containerRef = A2(null);
+    const dragRef = A2(null);
     const onDragStart = q2((e4) => {
       e4.preventDefault();
-      const startY = e4.clientY;
-      const startH = topHeight.value;
+      e4.stopPropagation();
+      dragRef.current = { startY: e4.clientY, startH: topHeight };
       const onMove = (ev) => {
-        const delta = ev.clientY - startY;
+        if (!dragRef.current) return;
+        const delta = ev.clientY - dragRef.current.startY;
         const containerH = containerRef.current?.getBoundingClientRect().height || 500;
-        const next = Math.max(80, Math.min(containerH - 80, startH + delta));
-        topHeight.value = next;
+        const next = Math.max(60, Math.min(containerH - 60, dragRef.current.startH + delta));
+        setTopHeight(next);
       };
       const onUp = () => {
-        localStorage.setItem("piclaw-workspace-split", String(topHeight.value));
+        dragRef.current = null;
+        localStorage.setItem("piclaw-workspace-split", String(topHeight));
         document.body.style.userSelect = "";
         document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMove);
@@ -1321,27 +1434,27 @@
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }, [topHeight]);
-    return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", flex: 1, height: "100%", overflow: "hidden" }, children: [
-      /* @__PURE__ */ u4("div", { style: { height: `${topHeight.value}px`, flexShrink: 0, overflow: "auto", padding: "8px 0" }, className: "sidebar__content", children: /* @__PURE__ */ u4("div", { style: { padding: "0 12px", fontSize: "12px" }, children: [
-        /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: "#89b4fa", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
-        /* @__PURE__ */ u4("div", { style: { color: "#6c7086" }, children: "File tree will appear here" })
+    return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", width: "100%", height: "100%", overflow: "hidden" }, children: [
+      /* @__PURE__ */ u4("div", { style: { height: `${topHeight}px`, flexShrink: 0, overflowY: "auto", overflowX: "hidden" }, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", fontSize: "12px" }, children: [
+        /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: theme.accent, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
+        /* @__PURE__ */ u4("div", { style: { color: theme.textMuted }, children: "File tree will appear here" })
       ] }) }),
       /* @__PURE__ */ u4(
         "div",
         {
-          style: { height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0 },
+          style: { height: "6px", cursor: "row-resize", background: theme.handle, flexShrink: 0, transition: "background 0.1s" },
           onMouseDown: onDragStart,
           onMouseEnter: (e4) => {
-            e4.target.style.background = "#89b4fa";
+            e4.target.style.background = theme.handleHover;
           },
           onMouseLeave: (e4) => {
-            e4.target.style.background = "#313244";
+            e4.target.style.background = theme.handle;
           }
         }
       ),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, minHeight: 0, overflow: "auto", padding: "8px 12px" }, className: "sidebar__content", children: [
-        /* @__PURE__ */ u4("div", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }, children: "Preview" }),
-        /* @__PURE__ */ u4("div", { style: { fontSize: "12px", color: "#6c7086" }, children: "Select a file to preview" })
+      /* @__PURE__ */ u4("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "8px 12px" }, children: [
+        /* @__PURE__ */ u4("div", { style: { fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }, children: "Preview" }),
+        /* @__PURE__ */ u4("div", { style: { fontSize: "12px", color: theme.textMuted }, children: "Select a file to preview" })
       ] })
     ] });
   }
@@ -1365,77 +1478,97 @@
     }
   }
   function Placeholder({ text }) {
-    return /* @__PURE__ */ u4("div", { style: { padding: "12px", color: "#6c7086", fontSize: "12px" }, children: text });
+    const theme = useTheme();
+    return /* @__PURE__ */ u4("div", { style: { padding: "12px", color: theme.textMuted, fontSize: "12px" }, children: text });
   }
 
   // runtime/web/frontend/src/panels/ChatPanel.tsx
   function ChatPanel() {
-    return /* @__PURE__ */ u4("section", { style: {
-      height: "100%",
-      width: "100%",
-      display: "flex",
-      flexDirection: "column",
-      background: "#1e1e2e",
-      minHeight: 0
-    }, children: [
-      /* @__PURE__ */ u4("div", { style: {
-        flex: 1,
-        minHeight: 0,
-        overflow: "auto",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px"
-      }, children: /* @__PURE__ */ u4("div", { style: { textAlign: "center" }, children: [
-        /* @__PURE__ */ u4("h1", { style: { margin: 0, fontSize: "30px", color: "#cdd6f4" }, children: "\u{1F916} Chat" }),
-        /* @__PURE__ */ u4("p", { style: { margin: "10px 0 0", color: "#a6adc8", fontSize: "14px" }, children: "Messages will appear here" })
-      ] }) }),
-      /* @__PURE__ */ u4("div", { style: {
-        background: "#181825",
-        borderTop: "1px solid #313244",
-        padding: "12px",
-        display: "flex",
-        gap: "10px",
-        alignItems: "center",
-        flexShrink: 0
-      }, children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "text",
-            placeholder: "Type a message...",
-            style: {
-              flex: 1,
-              minWidth: 0,
-              border: "1px solid #45475a",
-              background: "#11111b",
-              color: "#cdd6f4",
-              borderRadius: "10px",
-              padding: "10px 12px",
-              fontSize: "13px",
-              outline: "none"
+    const theme = useTheme();
+    return /* @__PURE__ */ u4(
+      "section",
+      {
+        style: {
+          height: "100%",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          background: theme.bg,
+          minHeight: 0
+        },
+        children: [
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              style: {
+                flex: 1,
+                minHeight: 0,
+                overflow: "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "24px"
+              },
+              children: /* @__PURE__ */ u4("div", { style: { textAlign: "center" }, children: [
+                /* @__PURE__ */ u4("h1", { style: { margin: 0, fontSize: "30px", color: theme.text }, children: "\u{1F916} Chat" }),
+                /* @__PURE__ */ u4("p", { style: { margin: "10px 0 0", color: theme.textMuted, fontSize: "14px" }, children: "Messages will appear here" })
+              ] })
             }
-          }
-        ),
-        /* @__PURE__ */ u4(
-          "button",
-          {
-            type: "button",
-            style: {
-              border: "1px solid #89b4fa",
-              background: "#89b4fa",
-              color: "#11111b",
-              borderRadius: "10px",
-              padding: "10px 14px",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer"
-            },
-            children: "Send"
-          }
-        )
-      ] })
-    ] });
+          ),
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              style: {
+                background: theme.bgSidebar,
+                borderTop: `1px solid ${theme.border}`,
+                padding: "12px",
+                display: "flex",
+                gap: "10px",
+                alignItems: "center",
+                flexShrink: 0
+              },
+              children: [
+                /* @__PURE__ */ u4(
+                  "input",
+                  {
+                    type: "text",
+                    placeholder: "Type a message...",
+                    style: {
+                      flex: 1,
+                      minWidth: 0,
+                      border: `1px solid ${theme.inputBorder}`,
+                      background: theme.inputBg,
+                      color: theme.text,
+                      borderRadius: "10px",
+                      padding: "10px 12px",
+                      fontSize: "13px",
+                      outline: "none"
+                    }
+                  }
+                ),
+                /* @__PURE__ */ u4(
+                  "button",
+                  {
+                    type: "button",
+                    style: {
+                      border: `1px solid ${theme.accent}`,
+                      background: theme.accent,
+                      color: "#11111b",
+                      borderRadius: "10px",
+                      padding: "10px 14px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    },
+                    children: "Send"
+                  }
+                )
+              ]
+            }
+          )
+        ]
+      }
+    );
   }
 
   // runtime/web/frontend/src/App.tsx
