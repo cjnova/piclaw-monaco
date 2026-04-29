@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { commandRegistry } from "../services";
+import { useTheme } from "../theme/ThemeProvider";
 
 interface CommandPaletteProps {
   visible: boolean;
@@ -8,6 +9,7 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
+  const theme = useTheme();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,12 +94,24 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
 
   return (
     <div className="command-palette-backdrop" onClick={onClose}>
-      <div className="command-palette" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="command-palette"
+        style={{
+          background: theme.bg,
+          border: `1px solid ${theme.inputBorder}`,
+          boxShadow: "0 18px 48px rgba(0, 0, 0, 0.35)",
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
         <input
           ref={inputRef}
           className="command-palette__input"
           placeholder="Type a command..."
           value={query}
+          style={{
+            borderBottom: `1px solid ${theme.border}`,
+            color: theme.text,
+          }}
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
@@ -106,17 +120,22 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
             <li
               key={command.id}
               className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
+              style={{ background: index === selectedIndex ? theme.border : "transparent" }}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 commandRegistry.execute(command.id);
                 onClose();
               }}
             >
-              <span className="command-palette__label">{command.label}</span>
-              <span className="command-palette__keybinding">{command.keybinding ?? ""}</span>
+              <span className="command-palette__label" style={{ color: theme.text }}>{command.label}</span>
+              <span className="command-palette__keybinding" style={{ color: theme.textMuted }}>{command.keybinding ?? ""}</span>
             </li>
           ))}
-          {results.length === 0 && <li className="command-palette__empty">No matching commands</li>}
+          {results.length === 0 && (
+            <li className="command-palette__empty" style={{ color: theme.textMuted }}>
+              No matching commands
+            </li>
+          )}
         </ul>
       </div>
     </div>
