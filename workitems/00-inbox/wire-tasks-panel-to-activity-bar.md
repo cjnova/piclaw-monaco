@@ -30,6 +30,18 @@ Piclaw has a built-in task scheduler (`scheduled_tasks` tool) with cron/interval
 
 ## Design
 
+### Horizontal Tabs
+
+The Tasks panel uses horizontal tabs (same pattern as Dashboards/extension pages) to host multiple management views:
+
+| Tab | Description | Backend API |
+|---|---|---|
+| **Tasks** | Scheduled tasks (cron/interval/once) — create, pause, resume, delete | `scheduled_tasks` system |
+| **Channels** | Active web chat sessions — list, switch, rename | `GET /agent/active-chats`, `POST /agent/rename-jid` |
+| **Branches** | Conversation branches — fork, rename, prune, restore | `GET /agent/branches`, `POST /agent/branch-fork`, `POST /agent/branch-rename`, `POST /agent/branch-prune`, `POST /agent/branch-restore` |
+
+Each tab fetches its own data independently. Switching tabs is instant (cached state). The tab bar matches the style used in the Dashboards panel (`.chat-tabs` pattern).
+
 Activity Bar: Add a new icon (codicon `tasklist`) between Dashboards and Settings.
 
 ### Sidebar panel shows:
@@ -55,9 +67,12 @@ Activity Bar: Add a new icon (codicon `tasklist`) between Dashboards and Setting
 - [ ] New Activity Bar icon for Tasks appears between Dashboards and Settings
 - [ ] Clicking opens sidebar with task list
 - [ ] Tasks fetched from backend API on mount
+- [ ] Horizontal tab bar with Tasks, Channels, Branches tabs
 - [ ] Tasks grouped by status (active/paused/completed)
 - [ ] Each task shows: ID, type, schedule, last run, status
 - [ ] Pause/Resume/Delete controls work
+- [ ] Channels tab shows active chat sessions with switch/rename controls
+- [ ] Branches tab shows conversation branches with fork/prune/restore controls
 - [ ] Filter input searches by task name/ID
 - [ ] Empty state shown when no tasks exist
 - [ ] Handles auth errors gracefully (401 → "Authenticate to view tasks")
