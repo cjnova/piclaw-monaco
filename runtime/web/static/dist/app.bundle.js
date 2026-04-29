@@ -1161,7 +1161,7 @@
   function Sidebar({ title, children }) {
     return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#181825" }, children: [
       /* @__PURE__ */ u4("header", { style: { height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }, children: /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: title.toUpperCase() }) }),
-      /* @__PURE__ */ u4("div", { className: "sidebar__content", style: { flex: 1, minHeight: 0, overflow: "hidden" }, children })
+      /* @__PURE__ */ u4("div", { style: { flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }, children })
     ] });
   }
 
@@ -1321,7 +1321,7 @@
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }, [topHeight]);
-    return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }, children: [
+    return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", flex: 1, height: "100%", overflow: "hidden" }, children: [
       /* @__PURE__ */ u4("div", { style: { height: `${topHeight.value}px`, flexShrink: 0, overflow: "auto", padding: "8px 0" }, className: "sidebar__content", children: /* @__PURE__ */ u4("div", { style: { padding: "0 12px", fontSize: "12px" }, children: [
         /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: "#89b4fa", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
         /* @__PURE__ */ u4("div", { style: { color: "#6c7086" }, children: "File tree will appear here" })

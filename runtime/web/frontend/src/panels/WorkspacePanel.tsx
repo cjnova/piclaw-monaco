@@ -30,7 +30,7 @@ export function WorkspacePanel() {
   }, [topHeight]);
 
   return (
-    <div ref={containerRef} style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div ref={containerRef} style={{ display: "flex", flexDirection: "column", flex: 1, height: "100%", overflow: "hidden" }}>
       {/* Top: File tree */}
       <div style={{ height: `${topHeight.value}px`, flexShrink: 0, overflow: "auto", padding: "8px 0" }} className="sidebar__content">
         <div style={{ padding: "0 12px", fontSize: "12px" }}>
