@@ -37,6 +37,7 @@ import { SESSIONS_DIR, WORKSPACE_DIR } from "../core/config.js";
 import { buildChannelSystemPromptAppendix } from "../channels/formatting.js";
 import { detectChannel } from "../router.js";
 import { builtinExtensionFactories } from "../extensions/index.js";
+import { freezeExtensionRoutes } from "../channels/web/http/extension-routes.js";
 import { bindImmediateToolActivation } from "./tool-activation-live-update.js";
 import { ensureExtensionNodeModulesLink } from "./session-node-modules-link.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
@@ -537,6 +538,7 @@ export async function createSessionInDir(
       ...(appendSystemPromptOverride ? { appendSystemPromptOverride } : {}),
     });
     await resourceLoader.reload();
+    freezeExtensionRoutes();
 
     const services: AgentSessionServices = {
       cwd,
