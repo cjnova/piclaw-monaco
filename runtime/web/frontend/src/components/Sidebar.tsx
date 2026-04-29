@@ -11,7 +11,7 @@ export function Sidebar({ title, children }: SidebarProps) {
       <header style={{ height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }}>
         <span style={{ fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }}>{title.toUpperCase()}</span>
       </header>
-      <div style={{ flex: 1, overflow: "auto" }}>
+      <div className="sidebar__content" style={{ flex: 1 }}>
         {children}
       </div>
     </aside>

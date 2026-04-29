@@ -1161,7 +1161,7 @@
   function Sidebar({ title, children }) {
     return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#181825" }, children: [
       /* @__PURE__ */ u4("header", { style: { height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }, children: /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: title.toUpperCase() }) }),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto" }, children })
+      /* @__PURE__ */ u4("div", { className: "sidebar__content", style: { flex: 1 }, children })
     ] });
   }
 

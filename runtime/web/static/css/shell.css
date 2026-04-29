@@ -323,3 +323,28 @@ body {
   opacity: 1;
   background: #89b4fa !important;
 }
+
+/* Hide scrollbar when no overflow, thin overlay when needed */
+.sidebar__content,
+.chat-messages {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #45475a transparent;
+}
+.sidebar__content::-webkit-scrollbar,
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar__content::-webkit-scrollbar-track,
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar__content::-webkit-scrollbar-thumb,
+.chat-messages::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 3px;
+}
+.sidebar__content::-webkit-scrollbar-thumb:hover,
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #585b70;
+}
