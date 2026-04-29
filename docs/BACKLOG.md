@@ -112,18 +112,37 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 ## Remaining Work
 
-### Wave 10 — Real Content
+### Wave 10 — Real Content ✅
 
 | Task | Description | Status |
 |---|---|---|
-| 011-task-tree-data-provider | Backend API for workspace file listing | ⏳ |
-| 012-task-tree-view-component | File tree component in Workspace sidebar | ⏳ |
-| 015-task-message-list-component | Chat message list in Agent panel | ⏳ |
-| 029-task-extensions-api-endpoint | Backend API for installed extensions | ⏳ |
+| 011-task-tree-data-provider | Backend API for workspace file listing | ✅ |
+| 012-task-tree-view-component | File tree component in Workspace sidebar | ✅ |
+| 015-task-message-list-component | Chat message list in Agent panel | ✅ |
+| 029-task-extensions-api-endpoint | Backend API for installed extensions | ✅ |
 | 037-task-search-backend | Backend search endpoint (ripgrep) | ✅ (uses existing /search) |
 | 038-task-search-sidebar-ui | Search input + results UI in sidebar | ✅ |
+| render-extension-pages | Dashboards panel — extension page discovery + iframe | ✅ |
+| chat-send | Wire compose box to POST /agent/message | ✅ |
 
-### Wave 11+ — Full Functionality
+### Wave 10b — Upstream Sync & Foundation
+
+| Task | Description | Status |
+|---|---|---|
+| merge-upstream-v2-1-0 | Merge upstream v2.1.0 tag, resolve conflicts, rebuild | ⏳ |
+| adopt-security-freeze-extension-routes | Verify extension route freeze works with our frontend | ⏳ |
+| configure-dev-provider | Configure model provider on dev instance for testing | ⏳ |
+| verify-all-panels-post-merge | Smoke test all panels after merge | ⏳ |
+
+### Wave 10c — Settings Panel
+
+| Task | Description | Status |
+|---|---|---|
+| wire-settings-panel-to-piclaw-config | Full settings panel (General, Providers, Models, Appearance, etc.) | ⏳ |
+| adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
+| wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
+
+### Wave 11 — Full Functionality
 
 | Task | Description |
 |---|---|
@@ -142,8 +161,6 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 - Split views (editor + chat)
 - Diff viewer
 - LSP/IntelliSense integration
-- Wire ⚙️ Settings to existing piclaw settings API
-- Wire 🤖 Agent to existing chat timeline API
 
 ## Development
 
