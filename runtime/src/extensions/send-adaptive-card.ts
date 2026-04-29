@@ -119,6 +119,7 @@ export const sendAdaptiveCard: ExtensionFactory = (pi: ExtensionAPI) => {
 
       return {
         ...result,
+        terminate: true,
         details: {
           ...(isRecord(result.details) ? result.details : {}),
           tool: "send_adaptive_card",
