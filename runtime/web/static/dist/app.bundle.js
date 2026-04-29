@@ -326,6 +326,11 @@
     var u5 = p2(t2++, 7);
     return C2(u5.__H, r4) && (u5.__ = n3(), u5.__H = r4, u5.__h = n3), u5.__;
   }
+  function q2(n3, t4) {
+    return o2 = 8, T2(function() {
+      return n3;
+    }, t4);
+  }
   function j2() {
     for (var n3; n3 = f2.shift(); ) {
       var t4 = n3.__H;
@@ -1326,100 +1331,107 @@
   }
 
   // runtime/web/frontend/src/components/SplitPane.tsx
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
   function SplitPane({
     direction,
     initialSize,
     minSize,
     maxSize,
-    minSecondSize = 0,
-    collapseSecond = false,
     children,
     onResize
   }) {
-    const normalizedInitialSize = T2(() => clamp(initialSize, minSize, maxSize), [initialSize, minSize, maxSize]);
-    const [firstSize, setFirstSize] = d2(normalizedInitialSize);
-    const [isCollapsed, setIsCollapsed] = d2(false);
-    const [isDragging, setIsDragging] = d2(false);
+    const [size, setSize] = d2(initialSize);
+    const [collapsed, setCollapsed] = d2(false);
+    const savedSizeRef = A2(initialSize);
     const rootRef = A2(null);
-    const dragStartPositionRef = A2(0);
-    const dragStartSizeRef = A2(normalizedInitialSize);
-    const restoreSizeRef = A2(normalizedInitialSize);
-    const [firstChild, secondChild] = children;
-    y2(() => {
-      if (!isDragging) return;
-      const axis = direction === "horizontal" ? "clientX" : "clientY";
-      const handleMouseMove = (event) => {
-        const currentPosition = event[axis];
-        const delta = currentPosition - dragStartPositionRef.current;
-        const containerSize = direction === "horizontal" ? rootRef.current?.getBoundingClientRect().width ?? 0 : rootRef.current?.getBoundingClientRect().height ?? 0;
-        const maxAllowedFirst = containerSize > 0 ? Math.max(minSize, containerSize - minSecondSize) : maxSize;
-        const nextSize = clamp(dragStartSizeRef.current + delta, 0, Math.min(maxSize, maxAllowedFirst));
-        if (nextSize < minSize / 2) {
-          setFirstSize(0);
-          setIsCollapsed(true);
-          onResize?.(0);
-        } else {
-          const clamped = clamp(nextSize, minSize, Math.min(maxSize, maxAllowedFirst));
-          setFirstSize(clamped);
-          setIsCollapsed(false);
-          if (clamped > 0) restoreSizeRef.current = clamped;
-          onResize?.(clamped);
+    const draggingRef = A2(false);
+    const startPosRef = A2(0);
+    const startSizeRef = A2(0);
+    const [first, second] = children;
+    const isHorizontal = direction === "horizontal";
+    const onMouseDown = q2((e4) => {
+      e4.preventDefault();
+      draggingRef.current = true;
+      startPosRef.current = isHorizontal ? e4.clientX : e4.clientY;
+      startSizeRef.current = collapsed ? 0 : size;
+      if (collapsed) setCollapsed(false);
+      const onMouseMove = (ev) => {
+        if (!draggingRef.current) return;
+        const pos = isHorizontal ? ev.clientX : ev.clientY;
+        const delta = pos - startPosRef.current;
+        let next = startSizeRef.current + delta;
+        if (next < minSize * 0.4) {
+          next = 0;
+        } else if (next < minSize) {
+          next = minSize;
+        } else if (next > maxSize) {
+          next = maxSize;
         }
+        setSize(next);
+        setCollapsed(next === 0);
+        if (next >= minSize) savedSizeRef.current = next;
+        onResize?.(next);
       };
-      const handleMouseUp = () => setIsDragging(false);
-      const previousUserSelect = document.body.style.userSelect;
-      const previousCursor = document.body.style.cursor;
+      const onMouseUp = () => {
+        draggingRef.current = false;
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      };
       document.body.style.userSelect = "none";
-      document.body.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        document.body.style.userSelect = previousUserSelect;
-        document.body.style.cursor = previousCursor;
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-    }, [direction, isDragging, maxSize, minSecondSize, minSize, onResize]);
-    const handleMouseDown = (event) => {
-      event.preventDefault();
-      const axis = direction === "horizontal" ? "clientX" : "clientY";
-      dragStartPositionRef.current = event[axis];
-      dragStartSizeRef.current = isCollapsed ? 0 : firstSize;
-      setIsDragging(true);
-    };
-    const handleDoubleClick = () => {
-      if (isCollapsed) {
-        const restored = clamp(restoreSizeRef.current || normalizedInitialSize, minSize, maxSize);
-        setFirstSize(restored);
-        setIsCollapsed(false);
+      document.body.style.cursor = isHorizontal ? "col-resize" : "row-resize";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    }, [isHorizontal, size, collapsed, minSize, maxSize, onResize]);
+    const onDoubleClick = q2(() => {
+      if (collapsed) {
+        const restored = Math.max(minSize, Math.min(maxSize, savedSizeRef.current || initialSize));
+        setSize(restored);
+        setCollapsed(false);
         onResize?.(restored);
       } else {
-        if (firstSize > 0) restoreSizeRef.current = firstSize;
-        setFirstSize(0);
-        setIsCollapsed(true);
+        savedSizeRef.current = size;
+        setSize(0);
+        setCollapsed(true);
         onResize?.(0);
       }
-    };
-    const displaySize = isCollapsed ? 0 : firstSize;
-    const firstPaneStyle = collapseSecond ? void 0 : direction === "horizontal" ? { width: `${displaySize}px`, minWidth: `${displaySize}px`, maxWidth: `${displaySize}px`, overflow: "hidden" } : { height: `${displaySize}px`, minHeight: `${displaySize}px`, maxHeight: `${displaySize}px`, overflow: "hidden" };
-    return /* @__PURE__ */ u4("div", { ref: rootRef, className: `split-pane split-pane--${direction} ${isCollapsed ? "is-collapsed" : ""}`, children: [
-      /* @__PURE__ */ u4("div", { className: "split-pane__first", style: firstPaneStyle, children: firstChild }),
-      /* @__PURE__ */ u4(
-        "div",
-        {
-          className: `split-handle split-handle--${direction} ${isCollapsed ? "split-handle--collapsed" : ""}`,
-          onMouseDown: handleMouseDown,
-          onDblClick: handleDoubleClick,
-          role: "separator",
-          "aria-orientation": direction === "horizontal" ? "vertical" : "horizontal",
-          "aria-label": isCollapsed ? "Double-click or drag to restore panel" : "Resize panels"
-        }
-      ),
-      /* @__PURE__ */ u4("div", { className: "split-pane__second", children: secondChild })
-    ] });
+    }, [collapsed, size, minSize, maxSize, initialSize, onResize]);
+    const displaySize = collapsed ? 0 : size;
+    const firstStyle = isHorizontal ? { width: `${displaySize}px`, flexShrink: 0, overflow: "hidden" } : { height: `${displaySize}px`, flexShrink: 0, overflow: "hidden" };
+    return /* @__PURE__ */ u4(
+      "div",
+      {
+        ref: rootRef,
+        className: `split-pane split-pane--${direction}`,
+        style: { display: "flex", flexDirection: isHorizontal ? "row" : "column", width: "100%", height: "100%" },
+        children: [
+          /* @__PURE__ */ u4("div", { style: firstStyle, children: first }),
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              className: `split-handle split-handle--${direction}`,
+              onMouseDown,
+              onDblClick: onDoubleClick,
+              style: {
+                flexShrink: 0,
+                background: collapsed ? "#45475a" : "#313244",
+                cursor: isHorizontal ? "col-resize" : "row-resize",
+                width: isHorizontal ? "4px" : "100%",
+                height: isHorizontal ? "100%" : "4px",
+                transition: "background 0.15s"
+              },
+              onMouseEnter: (e4) => {
+                e4.target.style.background = "#89b4fa";
+              },
+              onMouseLeave: (e4) => {
+                e4.target.style.background = collapsed ? "#45475a" : "#313244";
+              }
+            }
+          ),
+          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden", minWidth: 0, minHeight: 0 }, children: second })
+        ]
+      }
+    );
   }
 
   // runtime/web/frontend/src/panels/PanelRouter.tsx
@@ -1480,7 +1492,7 @@
     }, [connectionStatus, websocket]);
     y2(() => {
       const handleWindowKeyDown = (event) => {
-        if (event.ctrlKey && event.code === "Backquote") {
+        if (event.ctrlKey && (event.code === "Backquote" || event.key === "`" || event.key === "Dead")) {
           event.preventDefault();
           terminalVisible.value = !terminalVisible.value;
           return;

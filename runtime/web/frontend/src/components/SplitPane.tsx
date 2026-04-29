@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 
 interface SplitPaneProps {
@@ -6,14 +6,8 @@ interface SplitPaneProps {
   initialSize: number;
   minSize: number;
   maxSize: number;
-  minSecondSize?: number;
-  collapseSecond?: boolean;
   children: [ComponentChildren, ComponentChildren];
   onResize?: (size: number) => void;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 export function SplitPane({
@@ -21,116 +15,106 @@ export function SplitPane({
   initialSize,
   minSize,
   maxSize,
-  minSecondSize = 0,
-  collapseSecond = false,
   children,
   onResize,
 }: SplitPaneProps) {
-  const normalizedInitialSize = useMemo(() => clamp(initialSize, minSize, maxSize), [initialSize, minSize, maxSize]);
-  const [firstSize, setFirstSize] = useState<number>(normalizedInitialSize);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-
+  const [size, setSize] = useState(initialSize);
+  const [collapsed, setCollapsed] = useState(false);
+  const savedSizeRef = useRef(initialSize);
   const rootRef = useRef<HTMLDivElement>(null);
-  const dragStartPositionRef = useRef(0);
-  const dragStartSizeRef = useRef(normalizedInitialSize);
-  const restoreSizeRef = useRef(normalizedInitialSize);
+  const draggingRef = useRef(false);
+  const startPosRef = useRef(0);
+  const startSizeRef = useRef(0);
 
-  const [firstChild, secondChild] = children;
+  const [first, second] = children;
 
-  useEffect(() => {
-    if (!isDragging) return;
+  const isHorizontal = direction === "horizontal";
 
-    const axis = direction === "horizontal" ? "clientX" : "clientY";
+  const onMouseDown = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    startPosRef.current = isHorizontal ? e.clientX : e.clientY;
+    startSizeRef.current = collapsed ? 0 : size;
+    if (collapsed) setCollapsed(false);
 
-    const handleMouseMove = (event: MouseEvent) => {
-      const currentPosition = event[axis];
-      const delta = currentPosition - dragStartPositionRef.current;
-      const containerSize = direction === "horizontal"
-        ? rootRef.current?.getBoundingClientRect().width ?? 0
-        : rootRef.current?.getBoundingClientRect().height ?? 0;
-      const maxAllowedFirst = containerSize > 0 ? Math.max(minSize, containerSize - minSecondSize) : maxSize;
-      const nextSize = clamp(dragStartSizeRef.current + delta, 0, Math.min(maxSize, maxAllowedFirst));
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const pos = isHorizontal ? ev.clientX : ev.clientY;
+      const delta = pos - startPosRef.current;
+      let next = startSizeRef.current + delta;
 
-      // Auto-collapse when dragged below half of minSize
-      if (nextSize < minSize / 2) {
-        setFirstSize(0);
-        setIsCollapsed(true);
-        onResize?.(0);
-      } else {
-        const clamped = clamp(nextSize, minSize, Math.min(maxSize, maxAllowedFirst));
-        setFirstSize(clamped);
-        setIsCollapsed(false);
-        if (clamped > 0) restoreSizeRef.current = clamped;
-        onResize?.(clamped);
+      // Snap to collapse if dragged very small
+      if (next < minSize * 0.4) {
+        next = 0;
+      } else if (next < minSize) {
+        next = minSize;
+      } else if (next > maxSize) {
+        next = maxSize;
       }
+
+      setSize(next);
+      setCollapsed(next === 0);
+      if (next >= minSize) savedSizeRef.current = next;
+      onResize?.(next);
     };
 
-    const handleMouseUp = () => setIsDragging(false);
+    const onMouseUp = () => {
+      draggingRef.current = false;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
 
-    const previousUserSelect = document.body.style.userSelect;
-    const previousCursor = document.body.style.cursor;
     document.body.style.userSelect = "none";
-    document.body.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
+    document.body.style.cursor = isHorizontal ? "col-resize" : "row-resize";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [isHorizontal, size, collapsed, minSize, maxSize, onResize]);
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.body.style.userSelect = previousUserSelect;
-      document.body.style.cursor = previousCursor;
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [direction, isDragging, maxSize, minSecondSize, minSize, onResize]);
-
-  const handleMouseDown = (event: MouseEvent) => {
-    event.preventDefault();
-    const axis = direction === "horizontal" ? "clientX" : "clientY";
-    dragStartPositionRef.current = event[axis];
-    // When collapsed, dragging should start from 0 so user can drag open
-    dragStartSizeRef.current = isCollapsed ? 0 : firstSize;
-    setIsDragging(true);
-  };
-
-  const handleDoubleClick = () => {
-    if (isCollapsed) {
-      const restored = clamp(restoreSizeRef.current || normalizedInitialSize, minSize, maxSize);
-      setFirstSize(restored);
-      setIsCollapsed(false);
+  const onDoubleClick = useCallback(() => {
+    if (collapsed) {
+      const restored = Math.max(minSize, Math.min(maxSize, savedSizeRef.current || initialSize));
+      setSize(restored);
+      setCollapsed(false);
       onResize?.(restored);
     } else {
-      if (firstSize > 0) restoreSizeRef.current = firstSize;
-      setFirstSize(0);
-      setIsCollapsed(true);
+      savedSizeRef.current = size;
+      setSize(0);
+      setCollapsed(true);
       onResize?.(0);
     }
-  };
+  }, [collapsed, size, minSize, maxSize, initialSize, onResize]);
 
-  const displaySize = isCollapsed ? 0 : firstSize;
+  const displaySize = collapsed ? 0 : size;
 
-  const firstPaneStyle = collapseSecond
-    ? undefined
-    : direction === "horizontal"
-      ? { width: `${displaySize}px`, minWidth: `${displaySize}px`, maxWidth: `${displaySize}px`, overflow: "hidden" as const }
-      : { height: `${displaySize}px`, minHeight: `${displaySize}px`, maxHeight: `${displaySize}px`, overflow: "hidden" as const };
+  const firstStyle = isHorizontal
+    ? { width: `${displaySize}px`, flexShrink: 0, overflow: "hidden" as const }
+    : { height: `${displaySize}px`, flexShrink: 0, overflow: "hidden" as const };
 
   return (
-    <div ref={rootRef} className={`split-pane split-pane--${direction} ${isCollapsed ? "is-collapsed" : ""}`}>
-      <div className="split-pane__first" style={firstPaneStyle}>
-        {firstChild}
-      </div>
+    <div
+      ref={rootRef}
+      className={`split-pane split-pane--${direction}`}
+      style={{ display: "flex", flexDirection: isHorizontal ? "row" : "column", width: "100%", height: "100%" }}
+    >
+      <div style={firstStyle}>{first}</div>
       <div
-        className={`split-handle split-handle--${direction} ${isCollapsed ? "split-handle--collapsed" : ""}`}
-        onMouseDown={handleMouseDown}
-        onDblClick={handleDoubleClick}
-        role="separator"
-        aria-orientation={direction === "horizontal" ? "vertical" : "horizontal"}
-        aria-label={isCollapsed ? "Double-click or drag to restore panel" : "Resize panels"}
+        className={`split-handle split-handle--${direction}`}
+        onMouseDown={onMouseDown}
+        onDblClick={onDoubleClick}
+        style={{
+          flexShrink: 0,
+          background: collapsed ? "#45475a" : "#313244",
+          cursor: isHorizontal ? "col-resize" : "row-resize",
+          width: isHorizontal ? "4px" : "100%",
+          height: isHorizontal ? "100%" : "4px",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#89b4fa"; }}
+        onMouseLeave={(e) => { (e.target as HTMLElement).style.background = collapsed ? "#45475a" : "#313244"; }}
       />
-      <div className="split-pane__second">
-        {secondChild}
-      </div>
+      <div style={{ flex: 1, overflow: "hidden", minWidth: 0, minHeight: 0 }}>{second}</div>
     </div>
   );
 }

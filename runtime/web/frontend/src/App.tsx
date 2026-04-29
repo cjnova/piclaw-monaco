@@ -31,7 +31,7 @@ export function App() {
 
   useEffect(() => {
     const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.code === "Backquote") {
+      if (event.ctrlKey && (event.code === "Backquote" || event.key === "`" || event.key === "Dead")) {
         event.preventDefault();
         terminalVisible.value = !terminalVisible.value;
         return;
