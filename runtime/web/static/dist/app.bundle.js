@@ -1151,6 +1151,28 @@
     inputBg: "#11111b",
     inputBorder: "#45475a"
   };
+  var LIGHT_THEME = {
+    bg: "#ffffff",
+    bgSidebar: "#f5f5f5",
+    bgTerminal: "#1e1e2e",
+    bgStatus: "#e0e0e0",
+    border: "#d4d4d4",
+    text: "#1e1e1e",
+    textMuted: "#6e6e6e",
+    accent: "#89b4fa",
+    success: "#16a34a",
+    error: "#dc2626",
+    handleHover: "#89b4fa",
+    handle: "#d4d4d4",
+    inputBg: "#ffffff",
+    inputBorder: "#d4d4d4"
+  };
+  function getSystemTheme() {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return "dark";
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
 
   // node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
   var f4 = 0;
@@ -1166,6 +1188,20 @@
 
   // runtime/web/frontend/src/theme/ThemeProvider.tsx
   var ThemeContext = X(DARK_THEME);
+  function ThemeProvider({ children }) {
+    const [mode, setMode] = d2(getSystemTheme());
+    y2(() => {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const onChange = (event) => {
+        setMode(event.matches ? "dark" : "light");
+      };
+      setMode(mediaQuery.matches ? "dark" : "light");
+      mediaQuery.addEventListener("change", onChange);
+      return () => mediaQuery.removeEventListener("change", onChange);
+    }, []);
+    const theme = T2(() => mode === "dark" ? DARK_THEME : LIGHT_THEME, [mode]);
+    return /* @__PURE__ */ u4(ThemeContext.Provider, { value: theme, children });
+  }
   function useTheme() {
     return x2(ThemeContext);
   }
@@ -1553,7 +1589,7 @@
                     style: {
                       border: `1px solid ${theme.accent}`,
                       background: theme.accent,
-                      color: "#11111b",
+                      color: theme.bgTerminal,
                       borderRadius: "10px",
                       padding: "10px 14px",
                       fontSize: "13px",
@@ -1572,7 +1608,8 @@
   }
 
   // runtime/web/frontend/src/App.tsx
-  function App() {
+  function AppContent() {
+    const theme = useTheme();
     const connectionStatus = useSignal("disconnected");
     const activePanel = useSignal("explorer");
     const paletteVisible = useSignal(false);
@@ -1683,27 +1720,20 @@
     }, [terminalHeight, terminalMaximized]);
     const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
     const sbWidth = sidebarCollapsed.value ? 0 : sidebarWidth.value;
-    return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }, children: [
+    return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: theme.bg, color: theme.text }, children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
       /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }, children: [
         /* @__PURE__ */ u4("div", { style: { flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }, children: [
-          /* @__PURE__ */ u4("div", { style: {
-            width: `${sbWidth}px`,
-            minWidth: sidebarCollapsed.value ? 0 : 150,
-            maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5),
-            overflow: "hidden",
-            transition: "width 0.15s ease",
-            flexShrink: 0
-          }, children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) }),
+          /* @__PURE__ */ u4("div", { style: { width: `${sbWidth}px`, minWidth: sidebarCollapsed.value ? 0 : 150, maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5), overflow: "hidden", transition: "width 0.15s ease", flexShrink: 0 }, children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) }),
           !sidebarCollapsed.value && /* @__PURE__ */ u4(
             "div",
             {
-              style: { width: "4px", cursor: "col-resize", background: "#313244", flexShrink: 0, transition: "background 0.15s" },
+              style: { width: "4px", cursor: "col-resize", background: theme.handle, flexShrink: 0, transition: "background 0.15s" },
               onMouseEnter: (e4) => {
-                e4.target.style.background = "#89b4fa";
+                e4.target.style.background = theme.handleHover;
               },
               onMouseLeave: (e4) => {
-                e4.target.style.background = "#313244";
+                e4.target.style.background = theme.handle;
               },
               onMouseDown: (e4) => {
                 e4.preventDefault();
@@ -1727,35 +1757,35 @@
           ),
           /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden", minWidth: 0, height: "100%" }, children: /* @__PURE__ */ u4(ChatPanel, {}) })
         ] }),
-        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }, children: [
+        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: theme.bgTerminal }, children: [
           /* @__PURE__ */ u4(
             "div",
             {
-              style: { height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0 },
+              style: { height: "4px", cursor: "row-resize", background: theme.handle, flexShrink: 0 },
               onMouseDown: onTermDragStart,
               onMouseEnter: (e4) => {
-                e4.target.style.background = "#89b4fa";
+                e4.target.style.background = theme.handleHover;
               },
               onMouseLeave: (e4) => {
-                e4.target.style.background = "#313244";
+                e4.target.style.background = theme.handle;
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { style: { height: "32px", background: "#181825", borderBottom: "1px solid #313244", display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }, children: [
-            /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: "Terminal" }),
+          /* @__PURE__ */ u4("div", { style: { height: "32px", background: theme.bgSidebar, borderBottom: `1px solid ${theme.border}`, display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }, children: [
+            /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: theme.accent, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: "Terminal" }),
             /* @__PURE__ */ u4("div", { style: { marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }, children: [
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
                     terminalMaximized.value = !terminalMaximized.value;
                   },
                   onMouseEnter: (e4) => {
-                    e4.target.style.color = "#cdd6f4";
+                    e4.target.style.color = theme.text;
                   },
                   onMouseLeave: (e4) => {
-                    e4.target.style.color = "#6c7086";
+                    e4.target.style.color = theme.textMuted;
                   },
                   title: terminalMaximized.value ? "Restore" : "Maximize",
                   children: /* @__PURE__ */ u4("i", { className: terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full", style: { fontSize: "14px" } })
@@ -1764,15 +1794,15 @@
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
                     window.open("/static/terminal.html", "_blank");
                   },
                   onMouseEnter: (e4) => {
-                    e4.target.style.color = "#cdd6f4";
+                    e4.target.style.color = theme.text;
                   },
                   onMouseLeave: (e4) => {
-                    e4.target.style.color = "#6c7086";
+                    e4.target.style.color = theme.textMuted;
                   },
                   title: "Open in new tab",
                   children: /* @__PURE__ */ u4("i", { className: "codicon codicon-link-external", style: { fontSize: "14px" } })
@@ -1781,15 +1811,15 @@
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
                     window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
                   },
                   onMouseEnter: (e4) => {
-                    e4.target.style.color = "#cdd6f4";
+                    e4.target.style.color = theme.text;
                   },
                   onMouseLeave: (e4) => {
-                    e4.target.style.color = "#6c7086";
+                    e4.target.style.color = theme.textMuted;
                   },
                   title: "Pop out to window",
                   children: /* @__PURE__ */ u4("i", { className: "codicon codicon-multiple-windows", style: { fontSize: "14px" } })
@@ -1798,16 +1828,16 @@
               /* @__PURE__ */ u4(
                 "span",
                 {
-                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
                     terminalVisible.value = false;
                     terminalMaximized.value = false;
                   },
                   onMouseEnter: (e4) => {
-                    e4.target.style.color = "#cdd6f4";
+                    e4.target.style.color = theme.text;
                   },
                   onMouseLeave: (e4) => {
-                    e4.target.style.color = "#6c7086";
+                    e4.target.style.color = theme.textMuted;
                   },
                   title: "Close (Ctrl+`)",
                   children: "\u2715"
@@ -1815,25 +1845,25 @@
               )
             ] })
           ] }),
-          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "var(--font-mono)", fontSize: "13px", overflow: "auto" }, children: "$ xterm.js (Wave 9)" })
+          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: theme.textMuted, fontFamily: "var(--font-mono)", fontSize: "13px", overflow: "auto" }, children: "$ xterm.js (Wave 9)" })
         ] }),
-        /* @__PURE__ */ u4("div", { style: { height: "22px", display: "flex", alignItems: "center", padding: "0 8px", background: "#181825", borderTop: "1px solid #313244", fontSize: "11px", flexShrink: 0, gap: "12px" }, children: [
+        /* @__PURE__ */ u4("div", { style: { height: "22px", display: "flex", alignItems: "center", padding: "0 8px", background: theme.bgStatus, borderTop: `1px solid ${theme.border}`, fontSize: "11px", flexShrink: 0, gap: "12px" }, children: [
           /* @__PURE__ */ u4("span", { style: { display: "flex", alignItems: "center", gap: "4px" }, children: [
-            /* @__PURE__ */ u4("span", { style: { width: "6px", height: "6px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8" } }),
-            /* @__PURE__ */ u4("span", { style: { color: "#6c7086" }, children: connected ? "Connected" : "Disconnected" })
+            /* @__PURE__ */ u4("span", { style: { width: "6px", height: "6px", borderRadius: "50%", background: connected ? theme.success : theme.error } }),
+            /* @__PURE__ */ u4("span", { style: { color: theme.textMuted }, children: connected ? "Connected" : "Disconnected" })
           ] }),
           !terminalVisible.value && /* @__PURE__ */ u4(
             "span",
             {
-              style: { cursor: "pointer", color: "#6c7086", marginLeft: "auto" },
+              style: { cursor: "pointer", color: theme.textMuted, marginLeft: "auto" },
               onClick: () => {
                 terminalVisible.value = true;
               },
               onMouseEnter: (e4) => {
-                e4.target.style.color = "#cdd6f4";
+                e4.target.style.color = theme.text;
               },
               onMouseLeave: (e4) => {
-                e4.target.style.color = "#6c7086";
+                e4.target.style.color = theme.textMuted;
               },
               title: "Open Terminal (Ctrl+`)",
               children: "Terminal"
@@ -1845,6 +1875,9 @@
         paletteVisible.value = false;
       } })
     ] });
+  }
+  function App() {
+    return /* @__PURE__ */ u4(ThemeProvider, { children: /* @__PURE__ */ u4(AppContent, {}) });
   }
 
   // runtime/web/frontend/src/index.tsx

@@ -62,7 +62,7 @@ export function ChatPanel() {
           style={{
             border: `1px solid ${theme.accent}`,
             background: theme.accent,
-            color: "#11111b",
+            color: theme.bgTerminal,
             borderRadius: "10px",
             padding: "10px 14px",
             fontSize: "13px",
