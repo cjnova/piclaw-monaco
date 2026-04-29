@@ -409,6 +409,12 @@ export class WebAgentControlPlaneService {
       if (!branch) {
         return this.options.json({ error: "Branch renaming is not available." }, 501);
       }
+      // Broadcast so all connected clients refresh their branch/agent lists.
+      const effectiveChatJid = branch.chat_jid || chatJid;
+      this.options.broadcastEvent("extension_ui_title", {
+        chat_jid: effectiveChatJid,
+        title: branch.agent_name || "",
+      });
       return this.options.json({ status: "ok", branch }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "Failed to rename branch.");
@@ -431,6 +437,11 @@ export class WebAgentControlPlaneService {
       if (!result) {
         return this.options.json({ error: "JID renaming is not available." }, 501);
       }
+      // Broadcast so all connected clients refresh their branch/agent lists.
+      this.options.broadcastEvent("extension_ui_title", {
+        chat_jid: result.newJid || newJid,
+        title: result.branch?.agent_name || "",
+      });
       return this.options.json({ status: "ok", ...result }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "Failed to rename JID.");
