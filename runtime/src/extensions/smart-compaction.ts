@@ -108,9 +108,9 @@ function fileListsFromOps(fileOps: FileOperations): {
   readFiles: string[];
   modifiedFiles: string[];
 } {
-  const modified = new Set(normalizePathSet([...fileOps.written, ...fileOps.edited]));
-  const readOnly = normalizePathSet([...fileOps.read]).filter((f) => !modified.has(f));
-  return { readFiles: filterJunkPaths(readOnly), modifiedFiles: [...modified] };
+  const modified = new Set(filterJunkPaths(normalizePathSet([...fileOps.written, ...fileOps.edited])));
+  const readOnly = filterJunkPaths(normalizePathSet([...fileOps.read]).filter((f) => !modified.has(f)));
+  return { readFiles: readOnly, modifiedFiles: [...modified] };
 }
 
 /**
@@ -120,18 +120,19 @@ function fileListsFromOps(fileOps: FileOperations): {
  */
 const JUNK_PATH_PATTERNS: RegExp[] = [
   /^\/dev\//,                          // device nodes (/dev/stdin, /dev/null)
-  /^\/tmp\//,                          // temp files
-  /^\/var\/log\//,                     // log files
+  /^\/var\/log\//,                     // host log files
   /^\/proc\//,                         // proc filesystem
   /^\/sys\//,                          // sys filesystem
-  /\/\.cache\//,                       // cache dirs
-  /\/node_modules\//,                  // node_modules
-  /\.jsonl$/,                          // session log files
-  /\/\.pi\/agent\/sessions\//,         // pi session files
-  /\/\.pi\/agent\/models\.json$/,      // pi model config
-  /\/\.pi\/agent\/settings\.json$/,    // pi settings
-  /\/bun\.lock$/,                      // lockfiles
-  /\/package-lock\.json$/,
+  /^(?:\/tmp|tmp)\//,                  // host temp files or workspace tmp/
+  /(?:^|\/)\.piclaw\/tmp\//,          // piclaw temp files
+  /(?:^|\/)\.cache\//,                // cache dirs
+  /(?:^|\/)node_modules\//,           // dependency trees
+  /(?:^|\/)\.pi\/agent\/sessions\//,  // pi session files
+  /(?:^|\/)\.pi\/agent\/models\.json$/, // pi model config
+  /(?:^|\/)\.pi\/agent\/settings\.json$/, // pi settings
+  /(?:^|\/)bun\.lock$/,               // lockfiles
+  /(?:^|\/)package-lock\.json$/,
+  /\.jsonl$/,                          // session/log jsonl files
   /\.wasm$/,                           // binary blobs
   /\.map$/,                            // source maps
   /\.min\.js$/,                        // minified bundles

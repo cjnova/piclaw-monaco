@@ -341,7 +341,7 @@ describe("smart-compaction", () => {
           "piclaw/runtime/test/scripts/check-import-boundaries.test.ts",
           "piclaw/runtime/web/src/components/settings/providers.ts",
           "piclaw/scripts/check-import-boundaries.test.ts",
-          "tmp/pr474-dispatch.patch",
+          "notes/reference/pr474-dispatch.md",
         ]),
         written: new Set<string>(),
         edited: new Set<string>(),
@@ -360,8 +360,60 @@ describe("smart-compaction", () => {
     const readFilesBlock = result.compaction.summary.split("<read-files>")[1].split("</read-files>")[0];
     expect(readFilesBlock).toContain("base: piclaw/");
     expect(readFilesBlock).toContain("runtime/src/agent-control/handlers/login.ts");
-    expect(readFilesBlock).toContain("tmp/pr474-dispatch.patch");
+    expect(readFilesBlock).toContain("notes/reference/pr474-dispatch.md");
     expect(readFilesBlock).not.toContain("piclaw/runtime/src/agent-control/handlers/login.ts");
+  });
+
+  it("filters junk paths after normalization for both read and modified files", async () => {
+    (completeSimple as any).mockResolvedValueOnce({
+      content: [{ type: "text", text: "## Goal\nTest\n\n## Constraints\n## Progress\n### Done\n### In Progress\n### Blocked\n## Key Decisions\n## Next Steps\n## Critical Context" }],
+      stopReason: "end",
+    });
+
+    const prep = makePreparation(60, {
+      fileOps: {
+        read: new Set([
+          "/workspace/piclaw/runtime/src/channels/web/http/dispatch-agent.ts",
+          "tmp/pr474-dispatch.patch",
+          ".piclaw/tmp/pi-bash-123.log",
+          ".pi/agent/sessions/abc/session.jsonl",
+          "node_modules/pkg/index.js",
+        ]),
+        written: new Set([
+          "/workspace/piclaw/runtime/src/utils/logger.ts",
+          "tmp/edit_probe.txt",
+          ".piclaw/tmp/pi-edit-123.log",
+        ]),
+        edited: new Set([
+          "/workspace/piclaw/runtime/src/extensions/observability.ts",
+          ".pi/agent/models.json",
+        ]),
+      },
+    });
+
+    const result = await handler!(
+      {
+        preparation: prep,
+        branchEntries: [],
+        signal: new AbortController().signal,
+      },
+      makeCtx(),
+    );
+
+    const readFilesBlock = result.compaction.summary.split("<read-files>")[1].split("</read-files>")[0];
+    const modifiedFilesBlock = result.compaction.summary.split("<modified-files>")[1].split("</modified-files>")[0];
+
+    expect(readFilesBlock).toContain("runtime/src/channels/web/http/dispatch-agent.ts");
+    expect(readFilesBlock).not.toContain("tmp/pr474-dispatch.patch");
+    expect(readFilesBlock).not.toContain(".piclaw/tmp/pi-bash-123.log");
+    expect(readFilesBlock).not.toContain(".pi/agent/sessions/abc/session.jsonl");
+    expect(readFilesBlock).not.toContain("node_modules/pkg/index.js");
+
+    expect(modifiedFilesBlock).toContain("runtime/src/extensions/observability.ts");
+    expect(modifiedFilesBlock).toContain("runtime/src/utils/logger.ts");
+    expect(modifiedFilesBlock).not.toContain("tmp/edit_probe.txt");
+    expect(modifiedFilesBlock).not.toContain(".piclaw/tmp/pi-edit-123.log");
+    expect(modifiedFilesBlock).not.toContain(".pi/agent/models.json");
   });
 
   it("falls through on LLM error", async () => {
