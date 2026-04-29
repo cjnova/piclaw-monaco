@@ -9,6 +9,13 @@
 - PR descriptions should include: summary, what changed, test results
 - One logical change per PR; don't bundle unrelated work
 
+### Worktrees
+
+- Use `git worktree add` for parallel work instead of switching branches in the main checkout
+- After merging a PR, remove the worktree (`git worktree remove <path>`) and confirm cleanup with `git worktree list`
+- Before starting new work, run `git worktree list` and prune any stale/orphaned worktrees (`git worktree prune`)
+- Never leave merged-branch worktrees lying around
+
 ## Build and test
 
 - `bun run typecheck` — type-check the runtime
