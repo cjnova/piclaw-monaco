@@ -1349,31 +1349,27 @@
     const restoreSizeRef = A2(normalizedInitialSize);
     const [firstChild, secondChild] = children;
     y2(() => {
-      const clamped = clamp(normalizedInitialSize, minSize, maxSize);
-      setFirstSize(clamped);
-      restoreSizeRef.current = clamped;
-      setIsCollapsed(false);
-    }, [normalizedInitialSize, minSize, maxSize]);
-    y2(() => {
-      if (!isDragging) {
-        return;
-      }
+      if (!isDragging) return;
       const axis = direction === "horizontal" ? "clientX" : "clientY";
       const handleMouseMove = (event) => {
         const currentPosition = event[axis];
         const delta = currentPosition - dragStartPositionRef.current;
         const containerSize = direction === "horizontal" ? rootRef.current?.getBoundingClientRect().width ?? 0 : rootRef.current?.getBoundingClientRect().height ?? 0;
         const maxAllowedFirst = containerSize > 0 ? Math.max(minSize, containerSize - minSecondSize) : maxSize;
-        const nextSize = clamp(dragStartSizeRef.current + delta, minSize, Math.min(maxSize, maxAllowedFirst));
-        setFirstSize(nextSize);
-        if (nextSize > 0) {
-          restoreSizeRef.current = nextSize;
+        const nextSize = clamp(dragStartSizeRef.current + delta, 0, Math.min(maxSize, maxAllowedFirst));
+        if (nextSize < minSize / 2) {
+          setFirstSize(0);
+          setIsCollapsed(true);
+          onResize?.(0);
+        } else {
+          const clamped = clamp(nextSize, minSize, Math.min(maxSize, maxAllowedFirst));
+          setFirstSize(clamped);
+          setIsCollapsed(false);
+          if (clamped > 0) restoreSizeRef.current = clamped;
+          onResize?.(clamped);
         }
-        onResize?.(nextSize);
       };
-      const handleMouseUp = () => {
-        setIsDragging(false);
-      };
+      const handleMouseUp = () => setIsDragging(false);
       const previousUserSelect = document.body.style.userSelect;
       const previousCursor = document.body.style.cursor;
       document.body.style.userSelect = "none";
@@ -1391,10 +1387,7 @@
       event.preventDefault();
       const axis = direction === "horizontal" ? "clientX" : "clientY";
       dragStartPositionRef.current = event[axis];
-      dragStartSizeRef.current = firstSize;
-      if (isCollapsed) {
-        setIsCollapsed(false);
-      }
+      dragStartSizeRef.current = isCollapsed ? 0 : firstSize;
       setIsDragging(true);
     };
     const handleDoubleClick = () => {
@@ -1403,28 +1396,26 @@
         setFirstSize(restored);
         setIsCollapsed(false);
         onResize?.(restored);
-        return;
+      } else {
+        if (firstSize > 0) restoreSizeRef.current = firstSize;
+        setFirstSize(0);
+        setIsCollapsed(true);
+        onResize?.(0);
       }
-      if (firstSize > 0) {
-        restoreSizeRef.current = firstSize;
-      }
-      setFirstSize(0);
-      setIsCollapsed(true);
-      onResize?.(0);
     };
-    const firstPaneStyle = collapseSecond ? void 0 : direction === "horizontal" ? { width: `${firstSize}px`, minWidth: `${firstSize}px`, maxWidth: `${firstSize}px` } : { height: `${firstSize}px`, minHeight: `${firstSize}px`, maxHeight: `${firstSize}px` };
-    return /* @__PURE__ */ u4("div", { ref: rootRef, className: `split-pane split-pane--${direction} ${collapseSecond ? "is-second-collapsed" : ""}`, children: [
+    const displaySize = isCollapsed ? 0 : firstSize;
+    const firstPaneStyle = collapseSecond ? void 0 : direction === "horizontal" ? { width: `${displaySize}px`, minWidth: `${displaySize}px`, maxWidth: `${displaySize}px`, overflow: "hidden" } : { height: `${displaySize}px`, minHeight: `${displaySize}px`, maxHeight: `${displaySize}px`, overflow: "hidden" };
+    return /* @__PURE__ */ u4("div", { ref: rootRef, className: `split-pane split-pane--${direction} ${isCollapsed ? "is-collapsed" : ""}`, children: [
       /* @__PURE__ */ u4("div", { className: "split-pane__first", style: firstPaneStyle, children: firstChild }),
       /* @__PURE__ */ u4(
         "div",
         {
-          className: `split-handle split-handle--${direction}`,
+          className: `split-handle split-handle--${direction} ${isCollapsed ? "split-handle--collapsed" : ""}`,
           onMouseDown: handleMouseDown,
           onDblClick: handleDoubleClick,
           role: "separator",
           "aria-orientation": direction === "horizontal" ? "vertical" : "horizontal",
-          "aria-label": "Resize panels",
-          "aria-hidden": collapseSecond
+          "aria-label": isCollapsed ? "Double-click or drag to restore panel" : "Resize panels"
         }
       ),
       /* @__PURE__ */ u4("div", { className: "split-pane__second", children: secondChild })

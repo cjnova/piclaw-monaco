@@ -313,3 +313,13 @@ body {
   color: #7f849c;
   font-size: 13px;
 }
+
+/* SplitPane collapse/restore fixes */
+.split-handle--collapsed {
+  background: #45475a !important;
+  opacity: 0.6;
+}
+.split-handle--collapsed:hover {
+  opacity: 1;
+  background: #89b4fa !important;
+}
