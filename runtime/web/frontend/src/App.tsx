@@ -1,6 +1,11 @@
-import { signal } from "@preact/signals";
+import { Icon } from "./components/Icon";
 
-const greeting = signal("Hello PiClaw Monaco");
+const items = [
+  { name: "files", label: "Explorer" },
+  { name: "search", label: "Search" },
+  { name: "extensions", label: "Extensions" },
+  { name: "hubot", label: "Agent" },
+];
 
 export function App() {
   return (
@@ -11,13 +16,22 @@ export function App() {
         color: "#ffffff",
         display: "flex",
         fontFamily: "Inter, system-ui, sans-serif",
-        fontSize: "24px",
         height: "100vh",
         justifyContent: "center",
         margin: "0",
       }}
     >
-      {greeting.value}
+      <div style={{ display: "grid", gap: "12px" }}>
+        {items.map((item) => (
+          <div
+            key={item.name}
+            style={{ alignItems: "center", display: "flex", gap: "8px" }}
+          >
+            <Icon name={item.name} />
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
