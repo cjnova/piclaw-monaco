@@ -18,6 +18,7 @@ import {
   isComposeSubmitAbortMode,
   resolveSessionPopupChats,
   isSessionPopupChatEmphasized,
+  resolveSessionPopupInitialIndex,
   resolveUiOnlyCommandNotice,
 } from '../../web/src/components/compose-box.ts';
 import { CONTROL_COMMAND_DEFINITIONS } from '../../src/agent-control/command-registry.ts';
@@ -122,6 +123,19 @@ test('isSessionPopupChatEmphasized only highlights active non-archived sessions'
   expect(isSessionPopupChatEmphasized({ is_active: true, archived_at: null })).toBe(true);
   expect(isSessionPopupChatEmphasized({ is_active: true, archived_at: '2026-04-29T00:00:00Z' })).toBe(false);
   expect(isSessionPopupChatEmphasized({ is_active: false, archived_at: null })).toBe(false);
+});
+
+test('resolveSessionPopupInitialIndex prefers the current session over the first alphabetical row', () => {
+  expect(resolveSessionPopupInitialIndex([
+    { type: 'session', chat: { chat_jid: 'web:alpha' }, disabled: false },
+    { type: 'session', chat: { chat_jid: 'web:current' }, disabled: false },
+    { type: 'action', key: 'action:new', disabled: false },
+  ], 'web:current')).toBe(1);
+  expect(resolveSessionPopupInitialIndex([
+    { type: 'session', chat: { chat_jid: 'web:alpha' }, disabled: false },
+    { type: 'session', chat: { chat_jid: 'web:current' }, disabled: true },
+    { type: 'action', key: 'action:new', disabled: false },
+  ], 'web:current')).toBe(0);
 });
 
 test('resolveComposePrefillRequest applies new non-search prefill tokens exactly once', () => {

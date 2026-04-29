@@ -137,6 +137,22 @@ export function isSessionPopupChatEmphasized(chat) {
     return Boolean(chat?.is_active && !chat?.archived_at);
 }
 
+export function resolveSessionPopupInitialIndex(items, currentChatJid = null) {
+    const list = Array.isArray(items) ? items : [];
+    const normalizedCurrentChatJid = typeof currentChatJid === 'string' ? currentChatJid.trim() : '';
+    if (normalizedCurrentChatJid) {
+        const currentIndex = list.findIndex((item) => {
+            if (item?.disabled) return false;
+            if (item?.type !== 'session') return false;
+            const chatJid = typeof item?.chat?.chat_jid === 'string' ? item.chat.chat_jid.trim() : '';
+            return chatJid === normalizedCurrentChatJid;
+        });
+        if (currentIndex >= 0) return currentIndex;
+    }
+    const firstEnabledIndex = list.findIndex((item) => !item?.disabled);
+    return firstEnabledIndex >= 0 ? firstEnabledIndex : 0;
+}
+
 export function resolveUiOnlyCommandNotice(commandText, response) {
     const message = typeof response?.command?.message === 'string' ? response.command.message.trim() : '';
     if (!response?.ui_only || !message) return null;
@@ -1233,12 +1249,6 @@ export function ComposeBox({
         }
     };
 
-    const findFirstEnabledPopupIndex = (items) => {
-        const list = Array.isArray(items) ? items : [];
-        const index = list.findIndex((item) => !item?.disabled);
-        return index >= 0 ? index : 0;
-    };
-
     const sessionPopupEntries = useMemo(() => {
         const entries = [];
         for (const chat of switchableChatAgents) {
@@ -2160,9 +2170,9 @@ export function ComposeBox({
 
     useEffect(() => {
         if (!showSessionPopup) return;
-        setSessionPopupIndex(findFirstEnabledPopupIndex(sessionPopupEntries));
+        setSessionPopupIndex(resolveSessionPopupInitialIndex(sessionPopupEntries, currentChatJid));
         popupTypeaheadRef.current = { value: '', updatedAt: 0 };
-    }, [showSessionPopup, currentChatJid]);
+    }, [showSessionPopup, currentChatJid, sessionPopupEntries]);
 
     useEffect(() => {
         if (!showModelPopup) return;
