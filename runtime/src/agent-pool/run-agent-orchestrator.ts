@@ -204,6 +204,15 @@ function emitAgentSessionEvent(onEvent: RunAgentOptions["onEvent"], event: Recor
   onEvent?.(event as AgentSessionEvent);
 }
 
+function getRunObservabilityDetails(runOptions: RunAgentOptions): Record<string, unknown> {
+  return {
+    ...(runOptions.turnId ? { turnId: runOptions.turnId } : {}),
+    ...(runOptions.userId ? { userId: runOptions.userId } : {}),
+    ...(runOptions.sessionId ? { sessionId: runOptions.sessionId } : {}),
+    ...(runOptions.clientId ? { clientId: runOptions.clientId } : {}),
+  };
+}
+
 async function runRecoveryCompaction(
   session: AgentSession,
   chatJid: string,
@@ -253,6 +262,7 @@ async function runPromptAttempt(
   runOptions: RunAgentOptions,
   options: RunAgentOrchestratorOptions,
   totalRunStartedAt: number,
+  modelLabel: string | null,
 ): Promise<PromptAttemptResult> {
   let hadToolActivity = false;
   let hadPartialOutput = false;
@@ -266,6 +276,8 @@ async function runPromptAttempt(
   let assistantToolUseMessageCount = 0;
   let toolExecutionCount = 0;
   let toolUseBudgetExceeded = false;
+  let modelResponseSequence = 0;
+  let activeModelResponse: { sequence: number; startedAt: number } | null = null;
   const sessionEntryBaseline = snapshotSessionEntryCount(session);
   const toolUseMessageBudget = getToolUseMessageBudget();
 
@@ -314,6 +326,7 @@ async function runPromptAttempt(
           chatJid,
           toolName: e.toolName,
           toolCallId: e.toolCallId,
+          ...getRunObservabilityDetails(runOptions),
         });
       }
     }
@@ -327,11 +340,38 @@ async function runPromptAttempt(
         toolCallId: e.toolCallId ?? null,
         isError: Boolean(e.isError),
         durationMs: typeof e.durationMs === "number" ? e.durationMs : null,
+        ...getRunObservabilityDetails(runOptions),
       });
     }
 
+    if (event.type === "message_start") {
+      const message = (event as { message?: { role?: unknown } }).message;
+      if (message?.role === "assistant" && !activeModelResponse) {
+        modelResponseSequence += 1;
+        activeModelResponse = { sequence: modelResponseSequence, startedAt: Date.now() };
+        options.onInfo?.("Assistant model response started", {
+          operation: "model.response.start",
+          chatJid,
+          model: modelLabel,
+          sequence: modelResponseSequence,
+          ...getRunObservabilityDetails(runOptions),
+        });
+      }
+    }
     if (event.type === "message_update") {
       const messageEvent = (event as { assistantMessageEvent?: { type?: string; delta?: string } }).assistantMessageEvent;
+      if ((messageEvent?.type === "text_start" || messageEvent?.type === "thinking_start") && !activeModelResponse) {
+        modelResponseSequence += 1;
+        activeModelResponse = { sequence: modelResponseSequence, startedAt: Date.now() };
+        options.onInfo?.("Assistant model response started", {
+          operation: "model.response.start",
+          chatJid,
+          model: modelLabel,
+          sequence: modelResponseSequence,
+          phase: messageEvent.type,
+          ...getRunObservabilityDetails(runOptions),
+        });
+      }
       if (messageEvent?.type === "text_delta" && typeof messageEvent.delta === "string" && messageEvent.delta.length > 0) {
         hadPartialOutput = true;
       }
@@ -362,7 +402,22 @@ async function runPromptAttempt(
       // when the LLM tries to issue further tool calls (stopReason === "toolUse").
     }
     if (event.type === "message_end") {
-      const message = (event as { message?: { role?: unknown; content?: unknown; stopReason?: unknown } }).message;
+      const message = (event as { message?: { role?: unknown; content?: unknown; stopReason?: unknown; errorMessage?: unknown; usage?: Record<string, unknown> } }).message;
+      if (message?.role === "assistant") {
+        const durationMs = activeModelResponse ? Math.max(0, Date.now() - activeModelResponse.startedAt) : null;
+        options.onInfo?.("Assistant model response completed", {
+          operation: "model.response.end",
+          chatJid,
+          model: modelLabel,
+          sequence: activeModelResponse?.sequence ?? null,
+          durationMs,
+          stopReason: typeof message.stopReason === "string" ? message.stopReason : null,
+          errorMessage: typeof message.errorMessage === "string" ? message.errorMessage : null,
+          usage: message.usage ?? null,
+          ...getRunObservabilityDetails(runOptions),
+        });
+        activeModelResponse = null;
+      }
       if (message?.role === "assistant" && Array.isArray(message.content)) {
         const hasToolCall = message.content.some((block) => block && typeof block === "object" && (block as { type?: unknown }).type === "toolCall");
         sawAssistantToolCallMessage = sawAssistantToolCallMessage || hasToolCall;
@@ -428,6 +483,7 @@ async function runPromptAttempt(
       sessionIsStreaming: Boolean(session.isStreaming),
       sessionIsCompacting: Boolean(session.isCompacting),
       sessionIsRetrying: Boolean(session.isRetrying),
+      ...getRunObservabilityDetails(runOptions),
     });
     const idleMaxWaitMs = resolveSessionIdleMaxWaitMs(session);
     await waitForSessionIdle(session, 10, (result) => {
@@ -516,6 +572,7 @@ async function runPromptAttempt(
             hadToolActivity,
             hadCompletedTurnOutput,
             blankTurnDelta,
+            ...getRunObservabilityDetails(runOptions),
           });
         }
         // When the provider stopped cleanly after tool use with no other failure
@@ -629,6 +686,7 @@ export async function runAgentPrompt(
       chatJid,
       model: modelLabel,
       promptLength: prompt.length,
+      ...getRunObservabilityDetails(runOptions),
     });
 
     const timeoutMs = typeof runOptions.timeoutMs === "number" ? runOptions.timeoutMs : getAgentRuntimeConfig().timeoutMs;
@@ -704,6 +762,7 @@ export async function runAgentPrompt(
           runOptions,
           options,
           startTime,
+          modelLabel,
         );
 
         // If the tool-call cap was hit, abort immediately without recovery.
@@ -728,6 +787,7 @@ export async function runAgentPrompt(
             outputChars: finalText?.length ?? 0,
             recoveryAttemptsUsed,
             recovered: recoveryAttemptsUsed > 0,
+            ...getRunObservabilityDetails(runOptions),
           });
           if (recoveryAttemptsUsed > 0) {
             emitAgentSessionEvent(runOptions.onEvent, {
@@ -767,6 +827,7 @@ export async function runAgentPrompt(
           recoveryAttemptsUsed,
           recoveryStrategy: decision.strategy,
           reason: decision.reason,
+          ...getRunObservabilityDetails(runOptions),
         });
 
         recoveryDiagnostics.push(buildRecoveryDiagnosticEntry(
