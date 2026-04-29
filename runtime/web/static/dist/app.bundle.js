@@ -5394,8 +5394,10 @@ For tests, pass a Ghostty instance directly:
     return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
   }
   function formatStats(stats) {
-    if (!stats) return "\u2197 --  \u{1F9E0} --/-- GB";
-    return `\u2197 ${stats.cpu_percent.toFixed(1)}%  \xB7\xB7\xB7 ${stats.mem_used_gb.toFixed(1)}/${stats.mem_total_gb.toFixed(1)} GB`;
+    if (!stats) return "CPU --  RAM --  RSS --  SWP --";
+    const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
+    const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
+    return `CPU ${stats.cpu_percent}%  RAM ${stats.ram_percent}%  RSS ${rssMb}M  SWP ${swp}`;
   }
   function SystemStats() {
     const theme = useTheme();
@@ -5420,7 +5422,7 @@ For tests, pass a Ghostty instance directly:
     y2(() => {
       const fetchStats = async () => {
         try {
-          const res = await fetch("/api/system-stats");
+          const res = await fetch("/agent/system-metrics");
           if (res.ok) {
             stats.value = await res.json();
           }

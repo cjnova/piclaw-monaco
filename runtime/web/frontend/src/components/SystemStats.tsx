@@ -4,8 +4,11 @@ import { useTheme } from "../theme/ThemeProvider";
 
 interface StatsData {
   cpu_percent: number;
-  mem_used_gb: number;
-  mem_total_gb: number;
+  ram_percent: number;
+  swap_percent: number | null;
+  process_memory: {
+    rss_bytes: number;
+  };
 }
 
 function formatClock(date: Date): string {
@@ -19,8 +22,10 @@ function formatClock(date: Date): string {
 }
 
 function formatStats(stats: StatsData | null): string {
-  if (!stats) return "\u2197 --  \uD83E\uDDE0 --/-- GB";
-  return `\u2197 ${stats.cpu_percent.toFixed(1)}%  \u00B7\u00B7\u00B7 ${stats.mem_used_gb.toFixed(1)}/${stats.mem_total_gb.toFixed(1)} GB`;
+  if (!stats) return "CPU --  RAM --  RSS --  SWP --";
+  const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
+  const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
+  return `CPU ${stats.cpu_percent}%  RAM ${stats.ram_percent}%  RSS ${rssMb}M  SWP ${swp}`;
 }
 
 export function SystemStats() {
@@ -53,7 +58,7 @@ export function SystemStats() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("/api/system-stats");
+        const res = await fetch("/agent/system-metrics");
         if (res.ok) {
           stats.value = await res.json() as StatsData;
         }

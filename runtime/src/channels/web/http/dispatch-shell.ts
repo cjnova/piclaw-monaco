@@ -2,14 +2,6 @@
  * web/http/dispatch-shell.ts – Shell/static/avatar route dispatch helpers.
  */
 
-import os from "node:os";
-
-// CPU delta tracking — compute current-interval load rather than lifetime average
-let _prevCpuTick = 0;
-let _prevCpuIdle = 0;
-let _lastCpuPercent = 0;
-let _lastCpuSampleTime = 0;
-const CPU_CACHE_MS = 2_000;
 import type { WebChannelLike } from "../core/web-channel-contracts.js";
 import type { RouteFlags } from "./route-flags.js";
 
@@ -107,40 +99,6 @@ export async function handleShellRoutes(
 
   if (flags.isGetOrHead && pathname === "/avatar/user") {
     return await channel.handleAvatar("user", req);
-  }
-
-  if (req.method === "GET" && pathname === "/api/system-stats") {
-    const now = Date.now();
-    if (now - _lastCpuSampleTime > CPU_CACHE_MS) {
-      const cpus = os.cpus();
-      let totalIdle = 0;
-      let totalTick = 0;
-      for (const cpu of cpus) {
-        for (const type of Object.keys(cpu.times) as (keyof typeof cpu.times)[]) {
-          totalTick += cpu.times[type];
-        }
-        totalIdle += cpu.times.idle;
-      }
-      const deltaTick = totalTick - _prevCpuTick;
-      const deltaIdle = totalIdle - _prevCpuIdle;
-      if (_prevCpuTick > 0 && deltaTick > 0) {
-        // Use delta from last sample for current-interval CPU load
-        _lastCpuPercent = Math.round(((deltaTick - deltaIdle) / deltaTick) * 1000) / 10;
-      } else if (totalTick > 0) {
-        // First sample — fall back to lifetime average
-        _lastCpuPercent = Math.round(((totalTick - totalIdle) / totalTick) * 1000) / 10;
-      }
-      _prevCpuTick = totalTick;
-      _prevCpuIdle = totalIdle;
-      _lastCpuSampleTime = now;
-    }
-    const cpuPercent = _lastCpuPercent;
-    const memTotalGb = Math.round((os.totalmem() / (1024 ** 3)) * 10) / 10;
-    const memUsedGb = Math.round(((os.totalmem() - os.freemem()) / (1024 ** 3)) * 10) / 10;
-    return new Response(
-      JSON.stringify({ cpu_percent: cpuPercent, mem_used_gb: memUsedGb, mem_total_gb: memTotalGb }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
   }
 
   if (req.method === "GET" && (pathname === "/export/timeline" || pathname === "/internal/export/timeline")) {
