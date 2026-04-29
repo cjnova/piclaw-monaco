@@ -1563,7 +1563,7 @@
               )
             ] })
           ] }),
-          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", overflow: "auto" }, children: "$ xterm.js (Wave 9)" })
+          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "var(--font-mono)", fontSize: "13px", overflow: "auto" }, children: "$ xterm.js (Wave 9)" })
         ] }),
         /* @__PURE__ */ u4("div", { style: { height: "22px", display: "flex", alignItems: "center", padding: "0 8px", background: "#181825", borderTop: "1px solid #313244", fontSize: "11px", flexShrink: 0, gap: "12px" }, children: [
           /* @__PURE__ */ u4("span", { style: { display: "flex", alignItems: "center", gap: "4px" }, children: [

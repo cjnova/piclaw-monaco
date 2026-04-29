@@ -157,7 +157,7 @@ export function App() {
                   title="Close (Ctrl+`)">&#x2715;</span>
               </div>
             </div>
-            <div style={{ flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", overflow: "auto" }}>$ xterm.js (Wave 9)</div>
+            <div style={{ flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "var(--font-mono)", fontSize: "13px", overflow: "auto" }}>$ xterm.js (Wave 9)</div>
           </div>
         )}
 
