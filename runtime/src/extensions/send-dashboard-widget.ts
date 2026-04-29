@@ -120,6 +120,7 @@ export const sendDashboardWidget: ExtensionFactory = (pi: ExtensionAPI) => {
 
       return {
         ...result,
+        terminate: true,
         details: { ...(isRecord(result.details) ? result.details : {}), tool: "send_dashboard_widget", widget_id: block.widget_id, chat_jid: chatJid },
       };
     },
