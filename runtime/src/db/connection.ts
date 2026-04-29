@@ -683,15 +683,19 @@ function ensureChatCursorColumns(database: Database): void {
       .map((r) => r.name)
   );
   const toAdd: Array<[string, string]> = [
-    ["preflight_prev_ts",    "TEXT"],
-    ["preflight_message_id", "TEXT"],
-    ["preflight_started_at", "TEXT"],
-    ["failed_prev_ts",       "TEXT"],
-    ["failed_ts",            "TEXT"],
-    ["failed_message_id",    "TEXT"],
-    ["failed_thread_root",   "INTEGER"],
-    ["failed_created_at",    "TEXT"],
-    ["queued_followups_json", "TEXT"],
+    ["preflight_prev_ts",         "TEXT"],
+    ["preflight_message_id",      "TEXT"],
+    ["preflight_started_at",      "TEXT"],
+    ["failed_prev_ts",            "TEXT"],
+    ["failed_ts",                 "TEXT"],
+    ["failed_message_id",         "TEXT"],
+    ["failed_thread_root",        "INTEGER"],
+    ["failed_created_at",         "TEXT"],
+    ["queued_followups_json",     "TEXT"],
+    ["compaction_failure_count",  "INTEGER"],
+    ["compaction_last_failed_at", "TEXT"],
+    ["compaction_backoff_until",  "TEXT"],
+    ["compaction_last_error",     "TEXT"],
   ];
   for (const [col, type] of toAdd) {
     if (!cols.has(col)) {

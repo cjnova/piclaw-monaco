@@ -34,9 +34,11 @@ import {
 } from "./prompt-utils.js";
 import {
   DEFAULT_FALLBACK_CONTEXT_WINDOW,
+  clearCompactionFailureBackoff,
   estimateContextTokensFromSession,
   getModelContextWindow,
   maybeAutoCompactSessionBeforePrompt,
+  noteCompactionFailure,
   runCompactionWithTimeout,
 } from "./compaction.js";
 import {
@@ -220,6 +222,7 @@ async function runRecoveryCompaction(
     async () => await session.compact(),
   );
   if (!compactionResult.ok) {
+    noteCompactionFailure(chatJid, compactionResult.errorMessage);
     const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
     emitAgentSessionEvent(runOptions.onEvent, {
       type: "compaction_end",
@@ -231,6 +234,7 @@ async function runRecoveryCompaction(
     });
     return { ok: false, errorMessage: compactionResult.errorMessage };
   }
+  clearCompactionFailureBackoff(chatJid);
   emitAgentSessionEvent(runOptions.onEvent, {
     type: "compaction_end",
     reason: "overflow",

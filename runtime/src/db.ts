@@ -117,8 +117,17 @@ export {
   hasAgentRepliesAfter,
   getDeferredQueuedFollowups,
   setDeferredQueuedFollowups,
+  getChatCompactionBackoff,
+  setChatCompactionBackoff,
+  clearChatCompactionBackoff,
 } from "./db/chat-cursors.js";
-export type { PreflightRun, InflightRun, DeferredQueuedFollowupRecord, AgentReplyState } from "./db/chat-cursors.js";
+export type {
+  PreflightRun,
+  InflightRun,
+  DeferredQueuedFollowupRecord,
+  AgentReplyState,
+  ChatCompactionBackoffState,
+} from "./db/chat-cursors.js";
 export {
   storeTokenUsage,
   getTokenUsageTotals,
