@@ -99,7 +99,7 @@ export function App() {
     <div style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }}>
       <ActivityBar activePanel={activePanel.value} onPanelChange={handlePanelChange} />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Status bar */}
         <div style={{ height: "24px", display: "flex", alignItems: "center", padding: "0 12px", background: "#181825", borderBottom: "1px solid #313244", fontSize: "12px", flexShrink: 0 }}>
           <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8", marginRight: "6px" }} />
@@ -107,7 +107,7 @@ export function App() {
         </div>
 
         {/* Middle: Sidebar + Main */}
-        <div style={{ flex: 1, overflow: "hidden" }}>
+        <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden" }}>
           {sidebarCollapsed.value ? (
             <div style={{ width: "100%", height: "100%", overflow: "auto" }}>
               <PanelRouter activePanel={activePanel.value} />

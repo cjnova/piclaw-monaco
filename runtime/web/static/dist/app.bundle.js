@@ -1552,12 +1552,12 @@
     const tHeight = terminalMaximized.value ? "calc(100% - 56px)" : `${terminalHeight.value}px`;
     return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }, children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
+      /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }, children: [
         /* @__PURE__ */ u4("div", { style: { height: "24px", display: "flex", alignItems: "center", padding: "0 12px", background: "#181825", borderBottom: "1px solid #313244", fontSize: "12px", flexShrink: 0 }, children: [
           /* @__PURE__ */ u4("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8", marginRight: "6px" } }),
           /* @__PURE__ */ u4("span", { style: { color: "#6c7086" }, children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: sidebarCollapsed.value ? /* @__PURE__ */ u4("div", { style: { width: "100%", height: "100%", overflow: "auto" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) : /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: Math.round(window.innerWidth * 0.5), children: [
+        /* @__PURE__ */ u4("div", { style: { flex: "1 1 0", minHeight: 0, overflow: "hidden" }, children: sidebarCollapsed.value ? /* @__PURE__ */ u4("div", { style: { width: "100%", height: "100%", overflow: "auto" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) : /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: Math.round(window.innerWidth * 0.5), children: [
           /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, collapsed: false, onToggleCollapse: toggleSidebar, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
             activePanel.value,
             " content..."
