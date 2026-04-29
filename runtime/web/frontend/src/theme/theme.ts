@@ -33,20 +33,20 @@ export const DARK_THEME: Theme = {
 };
 
 export const LIGHT_THEME: Theme = {
-  bg: "#ffffff",
-  bgSidebar: "#f5f5f5",
+  bg: "#f3f3f3",
+  bgSidebar: "#e8e8e8",
   bgTerminal: "#1e1e2e",
-  bgStatus: "#e0e0e0",
-  border: "#d4d4d4",
-  text: "#1e1e1e",
-  textMuted: "#6e6e6e",
-  accent: "#89b4fa",
+  bgStatus: "#dcdcdc",
+  border: "#c8c8c8",
+  text: "#292929",
+  textMuted: "#616161",
+  accent: "#0078d4",
   success: "#16a34a",
-  error: "#dc2626",
-  handleHover: "#89b4fa",
-  handle: "#d4d4d4",
+  error: "#d32f2f",
+  handleHover: "#0078d4",
+  handle: "#c8c8c8",
   inputBg: "#ffffff",
-  inputBorder: "#d4d4d4",
+  inputBorder: "#c8c8c8",
 };
 
 export function getSystemTheme(): "dark" | "light" {
