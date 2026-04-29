@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
-import { WebSocketManager } from "./api/websocket";
 import { ActivityBar } from "./components/ActivityBar";
 import { TerminalComponent } from "./components/TerminalComponent";
 import { Sidebar } from "./components/Sidebar";
@@ -22,7 +21,7 @@ function AppContent() {
   const terminalMaximized = useSignal(false);
   const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
   const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
-  const websocket = useMemo(() => new WebSocketManager(), []);
+  const sseRef = useRef<EventSource | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
@@ -39,15 +38,15 @@ function AppContent() {
   }, [terminalHeight.value]);
 
   useEffect(() => {
-    const unsub = websocket.onStatusChange((s) => {
-      connectionStatus.value = s;
-    });
-    websocket.connect();
+    const es = new EventSource("/sse/stream");
+    sseRef.current = es;
+    es.onopen = () => { connectionStatus.value = "connected"; };
+    es.onerror = () => { connectionStatus.value = "disconnected"; };
     return () => {
-      unsub();
-      websocket.disconnect();
+      es.close();
+      sseRef.current = null;
     };
-  }, [connectionStatus, websocket]);
+  }, [connectionStatus]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -123,14 +122,14 @@ function AppContent() {
       { id: "theme.dark", label: "Switch to Dark Theme", category: "theme" as const, handler: () => { themeControl.setMode("dark"); } },
       { id: "theme.light", label: "Switch to Light Theme", category: "theme" as const, handler: () => { themeControl.setMode("light"); } },
       // Session
-      { id: "session.reconnect", label: "Reconnect WebSocket", category: "session" as const, handler: () => { websocket.disconnect(); websocket.connect(); } },
+      { id: "session.reconnect", label: "Reconnect", category: "session" as const, handler: () => { if (sseRef.current) sseRef.current.close(); const es = new EventSource("/sse/stream"); sseRef.current = es; es.onopen = () => { connectionStatus.value = "connected"; }; es.onerror = () => { connectionStatus.value = "disconnected"; }; } },
       // General
       { id: "general.commandPalette", label: "Open Command Palette", category: "general" as const, keybinding: "Ctrl+Shift+P", handler: () => { paletteVisible.value = !paletteVisible.value; } },
       { id: "general.clearLocalStorage", label: "Clear Layout State", category: "general" as const, handler: () => { ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k) => localStorage.removeItem(k)); } },
     ];
     cmds.forEach((c) => commandRegistry.register(c));
     return () => cmds.forEach((c) => commandRegistry.unregister(c.id));
-  }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl, websocket]);
+  }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl]);
 
   const handlePanelChange = useCallback((id: string) => {
     if (id === "agent") {

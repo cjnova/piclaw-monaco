@@ -1053,109 +1053,6 @@
     if (1 === _3.push(this)) (l.requestAnimationFrame || A3)(F);
   }
 
-  // runtime/web/frontend/src/api/websocket.ts
-  var DEFAULT_MAX_RECONNECT_DELAY_MS = 3e4;
-  var DEFAULT_INITIAL_RECONNECT_DELAY_MS = 1e3;
-  function resolveWebSocketUrl(path = "/ws") {
-    if (typeof window !== "undefined" && window.location) {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      return `${protocol}//${window.location.host}${path}`;
-    }
-    return `ws://localhost${path}`;
-  }
-  var WebSocketManager = class {
-    constructor(url = resolveWebSocketUrl(), initialReconnectDelayMs = DEFAULT_INITIAL_RECONNECT_DELAY_MS, maxReconnectDelayMs = DEFAULT_MAX_RECONNECT_DELAY_MS) {
-      this.url = url;
-      this.initialReconnectDelayMs = initialReconnectDelayMs;
-      this.maxReconnectDelayMs = maxReconnectDelayMs;
-    }
-    socket = null;
-    reconnectTimer = null;
-    reconnectAttempts = 0;
-    shouldReconnect = true;
-    messageHandlers = /* @__PURE__ */ new Set();
-    statusHandlers = /* @__PURE__ */ new Set();
-    connect() {
-      this.clearReconnectTimer();
-      if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
-        return;
-      }
-      try {
-        this.socket = new WebSocket(this.url);
-        this.emitStatus("disconnected");
-        this.attachSocketListeners(this.socket);
-      } catch {
-        this.emitStatus("disconnected");
-        this.scheduleReconnect();
-      }
-    }
-    disconnect() {
-      this.shouldReconnect = false;
-      this.clearReconnectTimer();
-      if (this.socket) {
-        this.socket.close();
-        this.socket = null;
-      }
-      this.emitStatus("disconnected");
-    }
-    onMessage(handler) {
-      this.messageHandlers.add(handler);
-      return () => this.messageHandlers.delete(handler);
-    }
-    onStatusChange(handler) {
-      this.statusHandlers.add(handler);
-      return () => this.statusHandlers.delete(handler);
-    }
-    send(data) {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        this.socket.send(data);
-      }
-    }
-    attachSocketListeners(socket) {
-      socket.onopen = () => {
-        this.reconnectAttempts = 0;
-        this.emitStatus("connected");
-      };
-      socket.onmessage = (event) => {
-        for (const handler of this.messageHandlers) {
-          handler(event);
-        }
-      };
-      socket.onclose = () => {
-        this.emitStatus("disconnected");
-        this.socket = null;
-        if (this.shouldReconnect) {
-          this.scheduleReconnect();
-        }
-      };
-      socket.onerror = () => {
-        this.emitStatus("disconnected");
-      };
-    }
-    scheduleReconnect() {
-      if (!this.shouldReconnect || this.reconnectTimer) {
-        return;
-      }
-      const delay = Math.min(this.maxReconnectDelayMs, this.initialReconnectDelayMs * 2 ** this.reconnectAttempts);
-      this.reconnectAttempts += 1;
-      this.reconnectTimer = setTimeout(() => {
-        this.reconnectTimer = null;
-        this.connect();
-      }, delay);
-    }
-    clearReconnectTimer() {
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-      }
-    }
-    emitStatus(status) {
-      for (const handler of this.statusHandlers) {
-        handler(status);
-      }
-    }
-  };
-
   // node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
   var f4 = 0;
   var i4 = Array.isArray;
@@ -5868,490 +5765,6 @@ For tests, pass a Ghostty instance directly:
     ) });
   }
 
-  // runtime/web/frontend/src/components/FileTree.tsx
-  function formatBytes(bytes) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  }
-  async function fetchTree(dirPath) {
-    const params = new URLSearchParams({ path: dirPath, depth: "1" });
-    const res = await fetch(`/workspace/tree?${params}`, { credentials: "same-origin" });
-    if (res.status === 401) throw new Error("auth");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.root?.children ?? [];
-  }
-  function TreeItem({ node, depth, selectedPath, onSelect }) {
-    const isDir = node.type === "dir";
-    const [expanded, setExpanded] = d2(false);
-    const [children, setChildren] = d2(
-      node.children !== void 0 ? node.children : null
-    );
-    const [loading, setLoading] = d2(false);
-    const [error, setError] = d2(null);
-    const isSelected = selectedPath === node.path;
-    const toggle = q2(async () => {
-      if (!isDir) {
-        onSelect(node);
-        return;
-      }
-      if (!expanded) {
-        if (children === null) {
-          setLoading(true);
-          setError(null);
-          try {
-            const loaded = await fetchTree(node.path);
-            setChildren(loaded);
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : "Failed to load";
-            setError(msg);
-          } finally {
-            setLoading(false);
-          }
-        }
-        setExpanded(true);
-      } else {
-        setExpanded(false);
-      }
-      onSelect(node);
-    }, [isDir, expanded, children, node, onSelect]);
-    const iconName = isDir ? expanded ? "folder-opened" : "folder" : getFileIcon(node.name);
-    const meta = isDir ? node.child_count !== void 0 ? `${node.child_count}` : "" : node.size !== null ? formatBytes(node.size) : "";
-    return /* @__PURE__ */ u4("div", { children: [
-      /* @__PURE__ */ u4(
-        "div",
-        {
-          className: [
-            "file-tree__item",
-            isDir ? "file-tree__item--dir" : "file-tree__item--file",
-            isSelected ? "file-tree__item--selected" : ""
-          ].filter(Boolean).join(" "),
-          style: { paddingLeft: `${depth * 16}px` },
-          onClick: toggle,
-          title: node.path,
-          children: [
-            /* @__PURE__ */ u4(
-              "span",
-              {
-                className: `codicon codicon-${expanded && isDir ? "chevron-down" : isDir ? "chevron-right" : "blank"} file-tree__chevron`
-              }
-            ),
-            /* @__PURE__ */ u4("span", { className: `codicon codicon-${iconName} file-tree__icon` }),
-            /* @__PURE__ */ u4("span", { className: "file-tree__name", children: node.name }),
-            meta && /* @__PURE__ */ u4("span", { className: "file-tree__meta", children: meta })
-          ]
-        }
-      ),
-      loading && /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "file-tree__loading",
-          style: { paddingLeft: `${(depth + 1) * 16}px` },
-          children: "Loading\u2026"
-        }
-      ),
-      error && /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "file-tree__error",
-          style: { paddingLeft: `${(depth + 1) * 16}px` },
-          children: [
-            error === "auth" ? "Authenticate to browse files" : "Failed to load",
-            /* @__PURE__ */ u4(
-              "button",
-              {
-                className: "file-tree__retry",
-                onClick: (e5) => {
-                  e5.stopPropagation();
-                  setError(null);
-                  setChildren(null);
-                  setExpanded(false);
-                },
-                children: "Retry"
-              }
-            )
-          ]
-        }
-      ),
-      expanded && !loading && children && children.length > 0 && /* @__PURE__ */ u4("div", { children: children.map((child) => /* @__PURE__ */ u4(
-        TreeItem,
-        {
-          node: child,
-          depth: depth + 1,
-          selectedPath,
-          onSelect
-        },
-        child.path
-      )) }),
-      expanded && !loading && children && children.length === 0 && /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "file-tree__empty",
-          style: { paddingLeft: `${(depth + 1) * 16}px` },
-          children: "Empty folder"
-        }
-      )
-    ] });
-  }
-  function getFileIcon(name) {
-    const ext = name.split(".").pop()?.toLowerCase() ?? "";
-    const iconMap = {
-      ts: "symbol-misc",
-      tsx: "symbol-misc",
-      js: "symbol-misc",
-      jsx: "symbol-misc",
-      json: "json",
-      md: "markdown",
-      txt: "file-text",
-      html: "code",
-      css: "symbol-color",
-      scss: "symbol-color",
-      svg: "file-media",
-      png: "file-media",
-      jpg: "file-media",
-      jpeg: "file-media",
-      gif: "file-media",
-      webp: "file-media",
-      sh: "terminal",
-      yaml: "list-tree",
-      yml: "list-tree",
-      toml: "list-tree",
-      lock: "lock",
-      gitignore: "git-commit",
-      env: "key"
-    };
-    return iconMap[ext] ?? "file";
-  }
-  function FileTree({ onFileSelect }) {
-    const [rootChildren, setRootChildren] = d2(null);
-    const [loading, setLoading] = d2(true);
-    const [error, setError] = d2(null);
-    const [selectedPath, setSelectedPath] = d2(null);
-    const load = q2(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const children = await fetchTree("");
-        setRootChildren(children);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to load";
-        setError(msg);
-      } finally {
-        setLoading(false);
-      }
-    }, []);
-    y2(() => {
-      load();
-    }, [load]);
-    const handleSelect = q2(
-      (node) => {
-        setSelectedPath(node.path);
-        if (node.type === "file") {
-          onFileSelect?.(node);
-        }
-      },
-      [onFileSelect]
-    );
-    if (loading) {
-      return /* @__PURE__ */ u4("div", { className: "file-tree file-tree__loading", children: "Loading workspace\u2026" });
-    }
-    if (error) {
-      return /* @__PURE__ */ u4("div", { className: "file-tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__error", children: [
-        error === "auth" ? "Authenticate to browse files" : "Failed to load workspace",
-        /* @__PURE__ */ u4("button", { className: "file-tree__retry", onClick: load, children: "Retry" })
-      ] }) });
-    }
-    if (!rootChildren || rootChildren.length === 0) {
-      return /* @__PURE__ */ u4("div", { className: "file-tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__empty", children: "No files found" }) });
-    }
-    return /* @__PURE__ */ u4("div", { className: "file-tree", children: rootChildren.map((node) => /* @__PURE__ */ u4(
-      TreeItem,
-      {
-        node,
-        depth: 0,
-        selectedPath,
-        onSelect: handleSelect
-      },
-      node.path
-    )) });
-  }
-
-  // runtime/web/frontend/src/panels/WorkspacePanel.tsx
-  function WorkspacePanel() {
-    const [topHeight, setTopHeight] = d2(() => Number(localStorage.getItem("piclaw-workspace-split")) || 260);
-    const containerRef = A2(null);
-    const heightRef = A2(topHeight);
-    const [selectedFile, setSelectedFile] = d2(null);
-    const onDragStart = q2((e5) => {
-      e5.preventDefault();
-      e5.stopPropagation();
-      const startY = e5.clientY;
-      const startH = heightRef.current;
-      const onMove = (ev) => {
-        const delta = ev.clientY - startY;
-        const containerH = containerRef.current?.getBoundingClientRect().height || 500;
-        const next = Math.max(60, Math.min(containerH - 60, startH + delta));
-        heightRef.current = next;
-        setTopHeight(next);
-      };
-      const onUp = () => {
-        localStorage.setItem("piclaw-workspace-split", String(heightRef.current));
-        document.body.style.userSelect = "";
-        document.body.style.cursor = "";
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      };
-      document.body.style.userSelect = "none";
-      document.body.style.cursor = "row-resize";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    }, []);
-    return /* @__PURE__ */ u4("div", { ref: containerRef, className: "workspace", children: [
-      /* @__PURE__ */ u4("div", { className: "workspace__pane-top", style: { height: `${topHeight}px` }, children: [
-        /* @__PURE__ */ u4("div", { className: "workspace__section-header workspace__section-header--padded", children: "Files" }),
-        /* @__PURE__ */ u4(FileTree, { onFileSelect: setSelectedFile })
-      ] }),
-      /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "workspace__drag-handle",
-          onMouseDown: onDragStart
-        }
-      ),
-      /* @__PURE__ */ u4("div", { className: "workspace__pane-bottom", children: [
-        /* @__PURE__ */ u4("div", { className: "workspace__preview-header", children: "Preview" }),
-        selectedFile ? /* @__PURE__ */ u4("div", { className: "workspace__preview-info", children: [
-          /* @__PURE__ */ u4("div", { className: "workspace__preview-name", children: selectedFile.name }),
-          /* @__PURE__ */ u4("div", { className: "workspace__preview-path", children: selectedFile.path }),
-          selectedFile.size !== null && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: [
-            "Size: ",
-            selectedFile.size < 1024 ? `${selectedFile.size} B` : selectedFile.size < 1048576 ? `${(selectedFile.size / 1024).toFixed(1)} KB` : `${(selectedFile.size / 1048576).toFixed(1)} MB`
-          ] }),
-          selectedFile.mtime && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: [
-            "Modified: ",
-            selectedFile.mtime
-          ] })
-        ] }) : /* @__PURE__ */ u4("div", { className: "workspace__preview-empty", children: "Select a file to preview" })
-      ] })
-    ] });
-  }
-
-  // runtime/web/frontend/src/panels/SearchPanel.tsx
-  function formatTime(ts) {
-    if (!ts) return "";
-    try {
-      const d5 = new Date(ts);
-      return d5.toLocaleString(void 0, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-    } catch {
-      return ts;
-    }
-  }
-  function getSnippet(result) {
-    return result.text ?? result.content ?? "";
-  }
-  function getTimestamp(result) {
-    return result.created_at ?? result.timestamp ?? "";
-  }
-  function SearchPanel() {
-    const [query, setQuery] = d2("");
-    const [results, setResults] = d2([]);
-    const [status, setStatus] = d2("idle");
-    const debounceRef = A2(null);
-    const abortRef = A2(null);
-    const doSearch = q2(async (q5) => {
-      if (!q5.trim()) {
-        setResults([]);
-        setStatus("idle");
-        return;
-      }
-      if (abortRef.current) {
-        abortRef.current.abort();
-      }
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setStatus("loading");
-      try {
-        const url = `/search?q=${encodeURIComponent(q5)}&limit=50&offset=0&scope=all`;
-        const res = await fetch(url, {
-          credentials: "same-origin",
-          signal: controller.signal
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const items = data.results ?? data.messages ?? data.items ?? [];
-        setResults(items);
-        setStatus("done");
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setResults([]);
-        setStatus("error");
-      }
-    }, []);
-    const handleInput = (e5) => {
-      const val = e5.target.value;
-      setQuery(val);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        doSearch(val);
-      }, 300);
-    };
-    y2(() => {
-      return () => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (abortRef.current) abortRef.current.abort();
-      };
-    }, []);
-    const renderBody = () => {
-      if (!query.trim()) {
-        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: "Type to search messages" });
-      }
-      if (status === "loading") {
-        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: "Searching\u2026" });
-      }
-      if (status === "error") {
-        return /* @__PURE__ */ u4("div", { className: "search-panel__empty search-panel__empty--error", children: "Search failed. Try again." });
-      }
-      if (results.length === 0) {
-        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: [
-          "No results for \u201C",
-          query,
-          "\u201D"
-        ] });
-      }
-      return /* @__PURE__ */ u4("ul", { className: "search-panel__results", children: results.map((r4) => /* @__PURE__ */ u4(
-        "li",
-        {
-          className: "search-panel__item",
-          "data-message-id": r4.id,
-          onClick: () => {
-            console.log("[search] navigate to message:", r4.id);
-          },
-          children: [
-            /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) }),
-            getTimestamp(r4) && /* @__PURE__ */ u4("span", { className: "search-panel__item-time", children: formatTime(getTimestamp(r4)) })
-          ]
-        },
-        r4.id
-      )) });
-    };
-    return /* @__PURE__ */ u4("div", { className: "search-panel", children: [
-      /* @__PURE__ */ u4("div", { className: "search-panel__input-wrapper", children: [
-        /* @__PURE__ */ u4("span", { className: "search-panel__icon", "aria-hidden": "true", children: "\u{1F50D}" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "text",
-            className: "search-panel__input",
-            placeholder: "Search messages\u2026",
-            value: query,
-            onInput: handleInput,
-            spellcheck: false,
-            autocomplete: "off"
-          }
-        )
-      ] }),
-      renderBody()
-    ] });
-  }
-
-  // runtime/web/frontend/src/panels/AddonsPanel.tsx
-  function AddonsPanel() {
-    const [addons, setAddons] = d2([]);
-    const [status, setStatus] = d2("loading");
-    const loadAddons = q2(async () => {
-      setStatus("loading");
-      try {
-        const res = await fetch("/agent/addons", { credentials: "same-origin" });
-        if (res.status === 401) {
-          setStatus("error");
-          return;
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setAddons(Array.isArray(data.addons) ? data.addons : []);
-        setStatus("done");
-      } catch {
-        setStatus("error");
-      }
-    }, []);
-    y2(() => {
-      loadAddons();
-    }, [loadAddons]);
-    if (status === "loading") {
-      return /* @__PURE__ */ u4("div", { className: "addons-panel", children: /* @__PURE__ */ u4("div", { className: "addons-panel__empty", children: "Loading addons\u2026" }) });
-    }
-    if (status === "error") {
-      return /* @__PURE__ */ u4("div", { className: "addons-panel", children: /* @__PURE__ */ u4("div", { className: "addons-panel__empty addons-panel__empty--error", children: [
-        "Failed to load addons.",
-        " ",
-        /* @__PURE__ */ u4("button", { className: "addons-panel__retry", onClick: loadAddons, children: "Retry" })
-      ] }) });
-    }
-    const installed = addons.filter((a4) => a4.installed);
-    const available = addons.filter((a4) => !a4.installed);
-    return /* @__PURE__ */ u4("div", { className: "addons-panel", children: [
-      installed.length > 0 && /* @__PURE__ */ u4(S, { children: [
-        /* @__PURE__ */ u4("div", { className: "addons-panel__section-header", children: "Installed" }),
-        /* @__PURE__ */ u4("ul", { className: "addons-panel__list", children: installed.map((addon) => /* @__PURE__ */ u4(AddonItem, { addon }, addon.slug)) })
-      ] }),
-      available.length > 0 && /* @__PURE__ */ u4(S, { children: [
-        /* @__PURE__ */ u4("div", { className: "addons-panel__section-header", children: "Available" }),
-        /* @__PURE__ */ u4("ul", { className: "addons-panel__list", children: available.map((addon) => /* @__PURE__ */ u4(AddonItem, { addon }, addon.slug)) })
-      ] }),
-      addons.length === 0 && /* @__PURE__ */ u4("div", { className: "addons-panel__empty", children: "No addons installed" })
-    ] });
-  }
-  function AddonItem({ addon }) {
-    const displayVersion = addon.installedVersion ?? addon.version;
-    return /* @__PURE__ */ u4("li", { className: "addons-panel__item", children: [
-      /* @__PURE__ */ u4("span", { className: "addons-panel__item-icon codicon codicon-extensions", "aria-hidden": "true" }),
-      /* @__PURE__ */ u4("div", { className: "addons-panel__item-info", children: [
-        /* @__PURE__ */ u4("div", { className: "addons-panel__item-header", children: [
-          /* @__PURE__ */ u4("span", { className: "addons-panel__item-name", children: addon.name }),
-          displayVersion && /* @__PURE__ */ u4("span", { className: "addons-panel__item-version", children: displayVersion }),
-          addon.hasUpdate && /* @__PURE__ */ u4("span", { className: "addons-panel__item-update-badge", title: "Update available", children: "\u2191" })
-        ] }),
-        addon.description && /* @__PURE__ */ u4("div", { className: "addons-panel__item-desc", children: addon.description })
-      ] }),
-      /* @__PURE__ */ u4(
-        "span",
-        {
-          className: `addons-panel__item-status${addon.installed ? " addons-panel__item-status--enabled" : ""}`,
-          title: addon.installed ? "Installed" : "Not installed",
-          "aria-label": addon.installed ? "Installed" : "Not installed"
-        }
-      )
-    ] });
-  }
-
-  // runtime/web/frontend/src/panels/PanelRouter.tsx
-  function PanelRouter({ activePanel }) {
-    switch (activePanel) {
-      case "explorer":
-      case "files":
-        return /* @__PURE__ */ u4(WorkspacePanel, {});
-      case "search":
-        return /* @__PURE__ */ u4(SearchPanel, {});
-      case "extensions":
-        return /* @__PURE__ */ u4(AddonsPanel, {});
-      case "agent":
-        return /* @__PURE__ */ u4(Placeholder, { text: "Chat is always visible \u2192" });
-      case "settings":
-        return /* @__PURE__ */ u4(Placeholder, { text: "Settings panels" });
-      default:
-        return /* @__PURE__ */ u4(Placeholder, { text: "Select a panel" });
-    }
-  }
-  function Placeholder({ text }) {
-    return /* @__PURE__ */ u4("div", { className: "panel-placeholder", children: text });
-  }
-
   // node_modules/marked/lib/marked.esm.js
   function z4() {
     return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
@@ -7584,6 +6997,1083 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   var Jt = b5.parse;
   var Vt = x5.lex;
 
+  // runtime/web/frontend/src/components/FileTree.tsx
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  }
+  async function fetchTree(dirPath) {
+    const params = new URLSearchParams({ path: dirPath, depth: "1" });
+    const res = await fetch(`/workspace/tree?${params}`, { credentials: "same-origin" });
+    if (res.status === 401) throw new Error("auth");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.root?.children ?? [];
+  }
+  function TreeItem({ node, depth, selectedPath, onSelect }) {
+    const isDir = node.type === "dir";
+    const [expanded, setExpanded] = d2(false);
+    const [children, setChildren] = d2(
+      node.children !== void 0 ? node.children : null
+    );
+    const [loading, setLoading] = d2(false);
+    const [error, setError] = d2(null);
+    const isSelected = selectedPath === node.path;
+    const toggle = q2(async () => {
+      if (!isDir) {
+        onSelect(node);
+        return;
+      }
+      onSelect(node);
+      if (!expanded) {
+        if (children === null) {
+          setLoading(true);
+          setError(null);
+          try {
+            const loaded = await fetchTree(node.path);
+            setChildren(loaded);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to load";
+            setError(msg);
+          } finally {
+            setLoading(false);
+          }
+        }
+        setExpanded(true);
+      } else {
+        setExpanded(false);
+      }
+    }, [isDir, expanded, children, node, onSelect]);
+    const iconName = isDir ? expanded ? "folder-opened" : "folder" : getFileIcon(node.name);
+    const meta = isDir ? node.child_count !== void 0 ? `${node.child_count}` : "" : node.size !== null ? formatBytes(node.size) : "";
+    return /* @__PURE__ */ u4("div", { children: [
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          className: [
+            "file-tree__item",
+            isDir ? "file-tree__item--dir" : "file-tree__item--file",
+            isSelected ? "file-tree__item--selected" : ""
+          ].filter(Boolean).join(" "),
+          style: { paddingLeft: `${depth * 16}px` },
+          onClick: toggle,
+          title: node.path,
+          children: [
+            /* @__PURE__ */ u4(
+              "span",
+              {
+                className: `codicon codicon-${expanded && isDir ? "chevron-down" : isDir ? "chevron-right" : "blank"} file-tree__chevron`
+              }
+            ),
+            /* @__PURE__ */ u4("span", { className: `codicon codicon-${iconName} file-tree__icon` }),
+            /* @__PURE__ */ u4("span", { className: "file-tree__name", children: node.name }),
+            meta && /* @__PURE__ */ u4("span", { className: "file-tree__meta", children: meta })
+          ]
+        }
+      ),
+      loading && /* @__PURE__ */ u4(
+        "div",
+        {
+          className: "file-tree__loading",
+          style: { paddingLeft: `${(depth + 1) * 16}px` },
+          children: "Loading\u2026"
+        }
+      ),
+      error && /* @__PURE__ */ u4(
+        "div",
+        {
+          className: "file-tree__error",
+          style: { paddingLeft: `${(depth + 1) * 16}px` },
+          children: [
+            error === "auth" ? "Authenticate to browse files" : "Failed to load",
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                className: "file-tree__retry",
+                onClick: (e5) => {
+                  e5.stopPropagation();
+                  setError(null);
+                  setChildren(null);
+                  setExpanded(false);
+                },
+                children: "Retry"
+              }
+            )
+          ]
+        }
+      ),
+      expanded && !loading && children && children.length > 0 && /* @__PURE__ */ u4("div", { children: children.map((child) => /* @__PURE__ */ u4(
+        TreeItem,
+        {
+          node: child,
+          depth: depth + 1,
+          selectedPath,
+          onSelect
+        },
+        child.path
+      )) }),
+      expanded && !loading && children && children.length === 0 && /* @__PURE__ */ u4(
+        "div",
+        {
+          className: "file-tree__empty",
+          style: { paddingLeft: `${(depth + 1) * 16}px` },
+          children: "Empty folder"
+        }
+      )
+    ] });
+  }
+  function getFileIcon(name) {
+    const ext = name.split(".").pop()?.toLowerCase() ?? "";
+    const iconMap = {
+      ts: "symbol-misc",
+      tsx: "symbol-misc",
+      js: "symbol-misc",
+      jsx: "symbol-misc",
+      json: "json",
+      md: "markdown",
+      txt: "file-text",
+      html: "code",
+      css: "symbol-color",
+      scss: "symbol-color",
+      svg: "file-media",
+      png: "file-media",
+      jpg: "file-media",
+      jpeg: "file-media",
+      gif: "file-media",
+      webp: "file-media",
+      sh: "terminal",
+      yaml: "list-tree",
+      yml: "list-tree",
+      toml: "list-tree",
+      lock: "lock",
+      gitignore: "git-commit",
+      env: "key"
+    };
+    return iconMap[ext] ?? "file";
+  }
+  function FileTree({ onFileSelect }) {
+    const [rootChildren, setRootChildren] = d2(null);
+    const [loading, setLoading] = d2(true);
+    const [error, setError] = d2(null);
+    const [selectedPath, setSelectedPath] = d2(null);
+    const load = q2(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const children = await fetchTree("");
+        setRootChildren(children);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to load";
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+    y2(() => {
+      load();
+    }, [load]);
+    const handleSelect = q2(
+      (node) => {
+        setSelectedPath(node.path);
+        onFileSelect?.(node);
+      },
+      [onFileSelect]
+    );
+    if (loading) {
+      return /* @__PURE__ */ u4("div", { className: "file-tree file-tree__loading", children: "Loading workspace\u2026" });
+    }
+    if (error) {
+      return /* @__PURE__ */ u4("div", { className: "file-tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__error", children: [
+        error === "auth" ? "Authenticate to browse files" : "Failed to load workspace",
+        /* @__PURE__ */ u4("button", { className: "file-tree__retry", onClick: load, children: "Retry" })
+      ] }) });
+    }
+    if (!rootChildren || rootChildren.length === 0) {
+      return /* @__PURE__ */ u4("div", { className: "file-tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__empty", children: "No files found" }) });
+    }
+    return /* @__PURE__ */ u4("div", { className: "file-tree", children: rootChildren.map((node) => /* @__PURE__ */ u4(
+      TreeItem,
+      {
+        node,
+        depth: 0,
+        selectedPath,
+        onSelect: handleSelect
+      },
+      node.path
+    )) });
+  }
+
+  // runtime/web/frontend/src/panels/workspace-panel-helpers.ts
+  var CODE_EXTS = /* @__PURE__ */ new Set([
+    "ts",
+    "tsx",
+    "js",
+    "jsx",
+    "json",
+    "css",
+    "html",
+    "py",
+    "sh",
+    "yaml",
+    "yml",
+    "toml",
+    "txt",
+    "xml",
+    "env",
+    "ini",
+    "conf",
+    "scss"
+  ]);
+  var MARKDOWN_EXTS = /* @__PURE__ */ new Set(["md", "mdx"]);
+  var IMAGE_EXTS = /* @__PURE__ */ new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
+  var DOT_COLORS = [
+    "#4fc1ff",
+    "#a8cc8c",
+    "#f4b942",
+    "#e06c75",
+    "#c678dd",
+    "#56b6c2",
+    "#e5c07b",
+    "#61afef",
+    "#98c379",
+    "#e06c75"
+  ];
+  function getExt(name) {
+    return name.split(".").pop()?.toLowerCase() ?? "";
+  }
+  function getFallbackPreviewKind(name) {
+    const ext = getExt(name);
+    if (CODE_EXTS.has(ext)) return "code";
+    if (MARKDOWN_EXTS.has(ext)) return "markdown";
+    if (IMAGE_EXTS.has(ext)) return "image";
+    return "binary";
+  }
+  function getWorkspaceFileText(payload) {
+    return typeof payload?.text === "string" ? payload.text : null;
+  }
+  function getWorkspacePreviewKind(name, payload) {
+    if (payload?.kind === "image") return "image";
+    if (payload?.kind === "binary") return "binary";
+    const contentType = payload?.content_type?.toLowerCase() ?? "";
+    if (contentType.includes("markdown")) return "markdown";
+    if (contentType.startsWith("image/")) return "image";
+    return getFallbackPreviewKind(name);
+  }
+  function buildFolderChartSegments(children, totalSize, maxSlices = 6) {
+    if (!children?.length) return [];
+    const total = totalSize ?? children.reduce((sum, child) => sum + Math.max(0, child.size ?? 0), 0);
+    if (total <= 0) return [];
+    const sorted = [...children].filter((child) => (child.size ?? 0) > 0).sort((a4, b6) => (b6.size ?? 0) - (a4.size ?? 0));
+    if (!sorted.length) return [];
+    const top = sorted.slice(0, Math.max(1, maxSlices));
+    const remainder = sorted.slice(top.length).reduce((sum, child) => sum + (child.size ?? 0), 0);
+    const segments = top.map((child, index) => ({
+      color: DOT_COLORS[index % DOT_COLORS.length],
+      label: child.type === "dir" ? `\u{1F4C1} ${child.name}` : child.name,
+      pct: (child.size ?? 0) / total * 100,
+      size: child.size ?? 0,
+      type: child.type
+    }));
+    if (remainder > 0) {
+      segments.push({
+        color: "rgba(255,255,255,0.28)",
+        label: "Other",
+        pct: remainder / total * 100,
+        size: remainder,
+        type: "other"
+      });
+    }
+    return segments;
+  }
+
+  // runtime/web/frontend/src/panels/WorkspacePanel.tsx
+  function formatBytes2(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  }
+  function getErrorMessage(value, fallback) {
+    if (value && typeof value === "object") {
+      if ("error" in value && typeof value.error === "string" && value.error.trim()) return value.error;
+      if ("message" in value && typeof value.message === "string" && value.message.trim()) return value.message;
+    }
+    return fallback;
+  }
+  async function readJsonSafely(response) {
+    const text = await response.text();
+    if (!text.trim()) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+  function makeTreeNodeFromMutation(type, value) {
+    if (!value.path || !value.name) return null;
+    return {
+      name: value.name,
+      path: value.path,
+      type,
+      size: typeof value.size === "number" ? value.size : null,
+      mtime: value.mtime ?? null
+    };
+  }
+  function renderChartSegment(segment, index, segments) {
+    const radius = 44;
+    const circumference = 2 * Math.PI * radius;
+    const prior = segments.slice(0, index).reduce((sum, item) => sum + item.pct, 0);
+    const dash = segment.pct / 100 * circumference;
+    const dashOffset = -(prior / 100 * circumference);
+    return /* @__PURE__ */ u4(
+      "circle",
+      {
+        cx: "60",
+        cy: "60",
+        r: radius,
+        fill: "none",
+        stroke: segment.color,
+        strokeDasharray: `${dash} ${Math.max(0, circumference - dash)}`,
+        strokeDashoffset: dashOffset,
+        strokeLinecap: "butt",
+        strokeWidth: "18",
+        transform: "rotate(-90 60 60)"
+      },
+      `${segment.label}-${segment.color}`
+    );
+  }
+  function FilePreview({ node, onMutate }) {
+    const [preview, setPreview] = d2(null);
+    const [status, setStatus] = d2("loading");
+    const [errorMessage, setErrorMessage] = d2("Failed to load preview");
+    const [isDeleting, setIsDeleting] = d2(false);
+    y2(() => {
+      setPreview(null);
+      setStatus("loading");
+      setErrorMessage("Failed to load preview");
+      if (node.size !== null && node.size > 1e6) {
+        setStatus("too-large");
+        return;
+      }
+      const controller = new AbortController();
+      fetch(`/workspace/file?path=${encodeURIComponent(node.path)}`, {
+        credentials: "same-origin",
+        signal: controller.signal
+      }).then(async (res) => {
+        const data = await readJsonSafely(res);
+        if (!res.ok) {
+          throw new Error(getErrorMessage(data, `HTTP ${res.status}`));
+        }
+        setPreview(data ?? null);
+        setStatus("done");
+      }).catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setErrorMessage(err instanceof Error ? err.message : "Failed to load preview");
+        setStatus("error");
+      });
+      return () => controller.abort();
+    }, [node.path, node.size]);
+    const kind = getWorkspacePreviewKind(node.name, preview);
+    const content = getWorkspaceFileText(preview);
+    const encodedPath = encodeURIComponent(node.path);
+    const rawUrl = preview?.url ?? `/workspace/raw?path=${encodedPath}`;
+    const downloadUrl = `/workspace/raw?path=${encodedPath}&download=1`;
+    const copyPath = q2(() => {
+      navigator.clipboard.writeText(node.path).catch(() => {
+      });
+    }, [node.path]);
+    const handleDelete = q2(async () => {
+      if (isDeleting) return;
+      const confirmed = window.confirm(`Delete ${node.name}? This cannot be undone.`);
+      if (!confirmed) return;
+      setIsDeleting(true);
+      try {
+        const response = await fetch(`/workspace/file?path=${encodeURIComponent(node.path)}`, {
+          method: "DELETE",
+          credentials: "same-origin"
+        });
+        const data = await readJsonSafely(response);
+        if (!response.ok) {
+          throw new Error(getErrorMessage(data, "Failed to delete file"));
+        }
+        onMutate({ nextNode: null });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Failed to delete file");
+      } finally {
+        setIsDeleting(false);
+      }
+    }, [isDeleting, node.name, node.path, onMutate]);
+    return /* @__PURE__ */ u4("div", { className: "workspace__preview-info", children: [
+      /* @__PURE__ */ u4("div", { className: "workspace__preview-name", children: node.name }),
+      /* @__PURE__ */ u4("div", { className: "workspace__preview-path", children: node.path }),
+      node.size !== null && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: formatBytes2(node.size) }),
+      node.mtime && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: [
+        "Modified: ",
+        new Date(node.mtime).toLocaleString()
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "workspace__preview-actions", children: [
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "workspace__preview-action-btn",
+            onClick: copyPath,
+            title: "Copy path",
+            children: [
+              /* @__PURE__ */ u4("span", { className: "codicon codicon-copy" }),
+              "Copy path"
+            ]
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "a",
+          {
+            className: "workspace__preview-action-btn",
+            href: downloadUrl,
+            title: "Download",
+            children: [
+              /* @__PURE__ */ u4("span", { className: "codicon codicon-cloud-download" }),
+              "Download"
+            ]
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "workspace__preview-action-btn workspace__preview-action-btn--danger",
+            disabled: isDeleting,
+            onClick: handleDelete,
+            title: "Delete file",
+            children: [
+              /* @__PURE__ */ u4("span", { className: "codicon codicon-trash" }),
+              isDeleting ? "Deleting\u2026" : "Delete"
+            ]
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "workspace__preview-content", children: [
+        status === "loading" && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--loading", children: "Loading\u2026" }),
+        status === "too-large" && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--warn", children: "File too large to preview" }),
+        status === "error" && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--error", children: errorMessage }),
+        status === "done" && preview?.truncated && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--warn", children: "Preview truncated to fit the pane" }),
+        status === "done" && kind === "image" && /* @__PURE__ */ u4("div", { className: "workspace__preview-image", children: /* @__PURE__ */ u4("img", { src: rawUrl, alt: node.name }) }),
+        status === "done" && kind === "binary" && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--warn", children: "Binary file \u2014 cannot preview" }),
+        status === "done" && kind === "code" && content !== null && /* @__PURE__ */ u4("pre", { className: "workspace__preview-code", children: content }),
+        status === "done" && kind === "markdown" && content !== null && /* @__PURE__ */ u4(
+          "div",
+          {
+            className: "workspace__preview-markdown",
+            dangerouslySetInnerHTML: {
+              __html: g4(content, { async: false })
+            }
+          }
+        )
+      ] })
+    ] });
+  }
+  function FolderPreview({ node, onMutate }) {
+    const [children, setChildren] = d2(null);
+    const [totalSize, setTotalSize] = d2(null);
+    const [status, setStatus] = d2("loading");
+    const [showAll, setShowAll] = d2(false);
+    const [viewMode, setViewMode] = d2("list");
+    const [actionBusy, setActionBusy] = d2(null);
+    const uploadInputRef = A2(null);
+    y2(() => {
+      setChildren(null);
+      setTotalSize(null);
+      setStatus("loading");
+      setShowAll(false);
+      const controller = new AbortController();
+      const treeFetch = fetch(
+        `/workspace/tree?path=${encodeURIComponent(node.path)}&max=100`,
+        { credentials: "same-origin", signal: controller.signal }
+      ).then((r4) => {
+        if (!r4.ok) throw new Error(`HTTP ${r4.status}`);
+        return r4.json();
+      });
+      const statFetch = fetch(
+        `/workspace/stat?path=${encodeURIComponent(node.path)}`,
+        { credentials: "same-origin", signal: controller.signal }
+      ).then((r4) => {
+        if (!r4.ok) return null;
+        return r4.json();
+      }).catch(() => null);
+      Promise.all([treeFetch, statFetch]).then(([treeData, statData]) => {
+        const kids = treeData.root?.children ?? [];
+        const sorted = [...kids].sort((a4, b6) => {
+          const sa = a4.size ?? 0;
+          const sb = b6.size ?? 0;
+          return sb - sa;
+        });
+        setChildren(sorted);
+        const sizeFromStat = statData?.size ?? null;
+        if (sizeFromStat !== null) {
+          setTotalSize(sizeFromStat);
+        } else {
+          const sum = kids.reduce((acc, k5) => acc + (k5.size ?? 0), 0);
+          setTotalSize(sum);
+        }
+        setStatus("done");
+      }).catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setStatus("error");
+      });
+      return () => controller.abort();
+    }, [node.path]);
+    const MAX_VISIBLE = 10;
+    const visible = children ? showAll ? children : children.slice(0, MAX_VISIBLE) : [];
+    const hiddenCount = children ? Math.max(0, children.length - MAX_VISIBLE) : 0;
+    const total = totalSize ?? children?.reduce((a4, c4) => a4 + (c4.size ?? 0), 0) ?? 0;
+    const chartSegments = buildFolderChartSegments(children, totalSize);
+    const zipUrl = `/workspace/download?path=${encodeURIComponent(node.path)}`;
+    const handleCreateFile = q2(async () => {
+      if (actionBusy) return;
+      const name = window.prompt("New file name", "untitled.txt")?.trim();
+      if (!name) return;
+      setActionBusy("create");
+      try {
+        const response = await fetch("/workspace/file", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: node.path, name, content: "" })
+        });
+        const data = await readJsonSafely(response);
+        if (!response.ok) {
+          throw new Error(getErrorMessage(data, "Failed to create file"));
+        }
+        onMutate({ nextNode: makeTreeNodeFromMutation("file", data ?? {}) });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Failed to create file");
+      } finally {
+        setActionBusy(null);
+      }
+    }, [actionBusy, node.path, onMutate]);
+    const handleUploadFiles = q2(async (files) => {
+      if (!files?.length || actionBusy) return;
+      setActionBusy("upload");
+      try {
+        let lastUploadedNode = null;
+        for (const file of Array.from(files)) {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch(`/workspace/upload?path=${encodeURIComponent(node.path)}`, {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData
+          });
+          const data = await readJsonSafely(response);
+          if (!response.ok) {
+            throw new Error(getErrorMessage(data, `Failed to upload ${file.name}`));
+          }
+          lastUploadedNode = makeTreeNodeFromMutation("file", data ?? {});
+        }
+        if (lastUploadedNode) {
+          onMutate({ nextNode: lastUploadedNode });
+        }
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Failed to upload file");
+      } finally {
+        if (uploadInputRef.current) uploadInputRef.current.value = "";
+        setActionBusy(null);
+      }
+    }, [actionBusy, node.path, onMutate]);
+    return /* @__PURE__ */ u4("div", { className: "workspace__preview-info", children: [
+      /* @__PURE__ */ u4("div", { className: "workspace__preview-name workspace__preview-name--wrap", children: [
+        /* @__PURE__ */ u4("span", { className: "codicon codicon-folder-opened", style: { marginRight: "4px" } }),
+        node.name
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "workspace__folder-actions", children: [
+        /* @__PURE__ */ u4("button", { className: "workspace__folder-action-btn", disabled: actionBusy !== null, onClick: handleCreateFile, title: "New file", children: [
+          /* @__PURE__ */ u4("span", { className: "codicon codicon-new-file" }),
+          actionBusy === "create" ? "Creating\u2026" : "New file"
+        ] }),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "workspace__folder-action-btn",
+            disabled: actionBusy !== null,
+            onClick: () => uploadInputRef.current?.click(),
+            title: "Upload files",
+            children: [
+              /* @__PURE__ */ u4("span", { className: "codicon codicon-cloud-upload" }),
+              actionBusy === "upload" ? "Uploading\u2026" : "Upload"
+            ]
+          }
+        ),
+        /* @__PURE__ */ u4("a", { className: "workspace__folder-action-btn", href: zipUrl, title: "Download as zip", children: [
+          /* @__PURE__ */ u4("span", { className: "codicon codicon-cloud-download" }),
+          "Download zip"
+        ] }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            ref: uploadInputRef,
+            hidden: true,
+            multiple: true,
+            type: "file",
+            onChange: (event) => void handleUploadFiles(event.currentTarget.files)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "workspace__preview-path", children: node.path }),
+      /* @__PURE__ */ u4("div", { className: "workspace__folder-desc", children: "Folder selected \u2014 create a file, upload files, or download a zip archive." }),
+      status === "loading" && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--loading", children: "Loading\u2026" }),
+      status === "error" && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta workspace__preview-meta--error", children: "Failed to load folder info" }),
+      status === "done" && /* @__PURE__ */ u4(S, { children: [
+        /* @__PURE__ */ u4("div", { className: "workspace__folder-toolbar", children: [
+          totalSize !== null && /* @__PURE__ */ u4("div", { className: "workspace__folder-total", children: [
+            "Total: ",
+            formatBytes2(totalSize)
+          ] }),
+          /* @__PURE__ */ u4("div", { className: "workspace__folder-view-toggle", role: "tablist", "aria-label": "Folder preview view", children: [
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                className: `workspace__folder-view-btn${viewMode === "list" ? " workspace__folder-view-btn--active" : ""}`,
+                onClick: () => setViewMode("list"),
+                type: "button",
+                children: [
+                  /* @__PURE__ */ u4("span", { className: "codicon codicon-list-tree" }),
+                  "List"
+                ]
+              }
+            ),
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                className: `workspace__folder-view-btn${viewMode === "chart" ? " workspace__folder-view-btn--active" : ""}`,
+                onClick: () => setViewMode("chart"),
+                type: "button",
+                children: [
+                  /* @__PURE__ */ u4("span", { className: "codicon codicon-pie-chart" }),
+                  "Chart"
+                ]
+              }
+            )
+          ] })
+        ] }),
+        viewMode === "list" ? /* @__PURE__ */ u4("div", { className: "workspace__folder-breakdown", children: [
+          visible.map((child, i6) => {
+            const pct = total > 0 && child.size !== null ? (child.size / total * 100).toFixed(0) : null;
+            const color = DOT_COLORS[i6 % DOT_COLORS.length];
+            return /* @__PURE__ */ u4("div", { className: "workspace__folder-breakdown-item", children: [
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  className: "workspace__folder-breakdown-dot",
+                  style: { backgroundColor: color }
+                }
+              ),
+              /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-name", title: child.name, children: [
+                child.type === "dir" ? "\u{1F4C1} " : "",
+                child.name
+              ] }),
+              /* @__PURE__ */ u4("span", { className: `workspace__folder-breakdown-size${child.type === "dir" ? " workspace__folder-breakdown-size--dir" : ""}`, children: child.size !== null ? formatBytes2(child.size) : "\u2014" }),
+              pct !== null && /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-pct", children: [
+                pct,
+                "%"
+              ] })
+            ] }, child.path);
+          }),
+          !showAll && hiddenCount > 0 && /* @__PURE__ */ u4(
+            "button",
+            {
+              className: "workspace__folder-breakdown-more",
+              onClick: () => setShowAll(true),
+              children: [
+                "and ",
+                hiddenCount,
+                " more\u2026"
+              ]
+            }
+          ),
+          children && children.length === 0 && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: "Empty folder" })
+        ] }) : /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-wrap", children: chartSegments.length > 0 ? /* @__PURE__ */ u4(S, { children: [
+          /* @__PURE__ */ u4("div", { className: "workspace__folder-chart", children: [
+            /* @__PURE__ */ u4("svg", { viewBox: "0 0 120 120", "aria-label": "Folder size chart", children: [
+              /* @__PURE__ */ u4("circle", { cx: "60", cy: "60", r: "44", fill: "none", stroke: "rgba(255,255,255,0.08)", strokeWidth: "18" }),
+              chartSegments.map((segment, index) => renderChartSegment(segment, index, chartSegments))
+            ] }),
+            /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-center", children: [
+              /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-total", children: formatBytes2(totalSize ?? total) }),
+              /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-label", children: "Total size" })
+            ] })
+          ] }),
+          /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-legend", children: chartSegments.map((segment) => /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-legend-item", children: [
+            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-dot", style: { backgroundColor: segment.color } }),
+            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-name", title: segment.label, children: segment.label }),
+            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-size", children: formatBytes2(segment.size) }),
+            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-pct", children: [
+              segment.pct.toFixed(0),
+              "%"
+            ] })
+          ] }, `${segment.label}-${segment.type}`)) })
+        ] }) : /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: "Nothing sizeable to chart" }) })
+      ] })
+    ] });
+  }
+  function WorkspacePanel() {
+    const [topHeight, setTopHeight] = d2(() => Number(localStorage.getItem("piclaw-workspace-split")) || 260);
+    const containerRef = A2(null);
+    const heightRef = A2(topHeight);
+    const [selectedNode, setSelectedNode] = d2(null);
+    const [treeVersion, setTreeVersion] = d2(0);
+    const handleMutation = q2((payload) => {
+      setTreeVersion((current) => current + 1);
+      setSelectedNode(payload.nextNode);
+    }, []);
+    const onDragStart = q2((e5) => {
+      e5.preventDefault();
+      e5.stopPropagation();
+      const startY = e5.clientY;
+      const startH = heightRef.current;
+      const onMove = (ev) => {
+        const delta = ev.clientY - startY;
+        const containerH = containerRef.current?.getBoundingClientRect().height || 500;
+        const next = Math.max(60, Math.min(containerH - 60, startH + delta));
+        heightRef.current = next;
+        setTopHeight(next);
+      };
+      const onUp = () => {
+        localStorage.setItem("piclaw-workspace-split", String(heightRef.current));
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "row-resize";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    }, []);
+    return /* @__PURE__ */ u4("div", { ref: containerRef, className: "workspace", children: [
+      /* @__PURE__ */ u4("div", { className: "workspace__pane-top", style: { height: `${topHeight}px` }, children: [
+        /* @__PURE__ */ u4("div", { className: "workspace__section-header workspace__section-header--padded", children: "Files" }),
+        /* @__PURE__ */ u4(FileTree, { onFileSelect: setSelectedNode }, treeVersion)
+      ] }),
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          className: "workspace__drag-handle",
+          onMouseDown: onDragStart
+        }
+      ),
+      /* @__PURE__ */ u4("div", { className: "workspace__pane-bottom", children: [
+        /* @__PURE__ */ u4("div", { className: "workspace__preview-header", children: "Preview" }),
+        selectedNode ? selectedNode.type === "dir" ? /* @__PURE__ */ u4(FolderPreview, { node: selectedNode, onMutate: handleMutation }) : /* @__PURE__ */ u4(FilePreview, { node: selectedNode, onMutate: handleMutation }) : /* @__PURE__ */ u4("div", { className: "workspace__preview-empty", children: "Select a file to preview" })
+      ] })
+    ] });
+  }
+
+  // runtime/web/frontend/src/panels/SearchPanel.tsx
+  function formatTime(ts) {
+    if (!ts) return "";
+    try {
+      const d5 = new Date(ts);
+      return d5.toLocaleString(void 0, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch {
+      return ts;
+    }
+  }
+  function getSnippet(result) {
+    return result.text ?? result.content ?? "";
+  }
+  function getTimestamp(result) {
+    return result.created_at ?? result.timestamp ?? "";
+  }
+  function SearchPanel() {
+    const [query, setQuery] = d2("");
+    const [results, setResults] = d2([]);
+    const [status, setStatus] = d2("idle");
+    const debounceRef = A2(null);
+    const abortRef = A2(null);
+    const doSearch = q2(async (q5) => {
+      if (!q5.trim()) {
+        setResults([]);
+        setStatus("idle");
+        return;
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStatus("loading");
+      try {
+        const url = `/search?q=${encodeURIComponent(q5)}&limit=50&offset=0&scope=all`;
+        const res = await fetch(url, {
+          credentials: "same-origin",
+          signal: controller.signal
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const items = data.results ?? data.messages ?? data.items ?? [];
+        setResults(items);
+        setStatus("done");
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setResults([]);
+        setStatus("error");
+      }
+    }, []);
+    const handleInput = (e5) => {
+      const val = e5.target.value;
+      setQuery(val);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        doSearch(val);
+      }, 300);
+    };
+    y2(() => {
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (abortRef.current) abortRef.current.abort();
+      };
+    }, []);
+    const renderBody = () => {
+      if (!query.trim()) {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: "Type to search messages" });
+      }
+      if (status === "loading") {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: "Searching\u2026" });
+      }
+      if (status === "error") {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty search-panel__empty--error", children: "Search failed. Try again." });
+      }
+      if (results.length === 0) {
+        return /* @__PURE__ */ u4("div", { className: "search-panel__empty", children: [
+          "No results for \u201C",
+          query,
+          "\u201D"
+        ] });
+      }
+      return /* @__PURE__ */ u4("ul", { className: "search-panel__results", children: results.map((r4) => /* @__PURE__ */ u4(
+        "li",
+        {
+          className: "search-panel__item",
+          "data-message-id": r4.id,
+          onClick: () => {
+            console.log("[search] navigate to message:", r4.id);
+          },
+          children: [
+            /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) }),
+            getTimestamp(r4) && /* @__PURE__ */ u4("span", { className: "search-panel__item-time", children: formatTime(getTimestamp(r4)) })
+          ]
+        },
+        r4.id
+      )) });
+    };
+    return /* @__PURE__ */ u4("div", { className: "search-panel", children: [
+      /* @__PURE__ */ u4("div", { className: "search-panel__input-wrapper", children: [
+        /* @__PURE__ */ u4("span", { className: "search-panel__icon", "aria-hidden": "true", children: "\u{1F50D}" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "text",
+            className: "search-panel__input",
+            placeholder: "Search messages\u2026",
+            value: query,
+            onInput: handleInput,
+            spellcheck: false,
+            autocomplete: "off"
+          }
+        )
+      ] }),
+      renderBody()
+    ] });
+  }
+
+  // runtime/web/frontend/src/panels/AddonsPanel.tsx
+  function AddonsPanel() {
+    const [addons, setAddons] = d2([]);
+    const [source, setSource] = d2("");
+    const [status, setStatus] = d2("loading");
+    const [filter, setFilter] = d2("");
+    const [actionState, setActionState] = d2({});
+    const loadAddons = q2(async () => {
+      setStatus("loading");
+      try {
+        const res = await fetch("/agent/addons", { credentials: "same-origin" });
+        if (res.status === 401) {
+          setStatus("error");
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setAddons(Array.isArray(data.addons) ? data.addons : []);
+        setSource(data.source ?? (data.sources ? data.sources.join(", ") : ""));
+        setStatus("done");
+      } catch {
+        setStatus("error");
+      }
+    }, []);
+    y2(() => {
+      loadAddons();
+    }, [loadAddons]);
+    const handleInstall = q2(async (slug) => {
+      setActionState((prev) => ({ ...prev, [slug]: "installing" }));
+      try {
+        const res = await fetch("/agent/addons/install", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: slug })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await loadAddons();
+      } catch {
+      } finally {
+        setActionState((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+      }
+    }, [loadAddons]);
+    const handleUninstall = q2(async (slug) => {
+      setActionState((prev) => ({ ...prev, [slug]: "uninstalling" }));
+      try {
+        const res = await fetch("/agent/addons/uninstall", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: slug })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await loadAddons();
+      } catch {
+      } finally {
+        setActionState((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+      }
+    }, [loadAddons]);
+    const filteredAddons = addons.filter((addon) => {
+      if (!filter) return true;
+      const q5 = filter.toLowerCase();
+      return addon.name.toLowerCase().includes(q5) || addon.description.toLowerCase().includes(q5) || addon.tags.some((t4) => t4.toLowerCase().includes(q5));
+    });
+    if (status === "loading") {
+      return /* @__PURE__ */ u4("div", { className: "addons-panel", children: /* @__PURE__ */ u4("div", { className: "addons-panel__empty", children: "Loading catalog\u2026" }) });
+    }
+    if (status === "error") {
+      return /* @__PURE__ */ u4("div", { className: "addons-panel", children: /* @__PURE__ */ u4("div", { className: "addons-panel__empty addons-panel__empty--error", children: [
+        "Failed to load catalog.",
+        " ",
+        /* @__PURE__ */ u4("button", { className: "addons-panel__retry", onClick: loadAddons, children: "Retry" })
+      ] }) });
+    }
+    return /* @__PURE__ */ u4("div", { className: "addons-panel", children: [
+      /* @__PURE__ */ u4("div", { className: "addons-panel__filter", children: /* @__PURE__ */ u4(
+        "input",
+        {
+          className: "addons-panel__filter-input",
+          type: "text",
+          placeholder: "Filter add-ons\u2026",
+          value: filter,
+          onInput: (e5) => setFilter(e5.target.value)
+        }
+      ) }),
+      source && /* @__PURE__ */ u4("div", { className: "addons-panel__source", children: [
+        "Catalog from ",
+        source
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "addons-panel__list", children: filteredAddons.length === 0 && filter ? /* @__PURE__ */ u4("div", { className: "addons-panel__empty", children: [
+        "No add-ons match \u201C",
+        filter,
+        "\u201D"
+      ] }) : filteredAddons.length === 0 ? /* @__PURE__ */ u4("div", { className: "addons-panel__empty", children: "No add-ons available" }) : filteredAddons.map((addon) => /* @__PURE__ */ u4(
+        AddonCard,
+        {
+          addon,
+          actionState: actionState[addon.slug],
+          onInstall: handleInstall,
+          onUninstall: handleUninstall
+        },
+        addon.slug
+      )) })
+    ] });
+  }
+  function AddonCard({ addon, actionState, onInstall, onUninstall }) {
+    const displayVersion = addon.installedVersion ?? addon.version;
+    const isExtSkill = addon.type === "extension+skill";
+    const busy = !!actionState;
+    const skills = Array.isArray(addon.skills) ? addon.skills.filter((s4) => typeof s4 === "object" && s4 !== null && "name" in s4) : [];
+    return /* @__PURE__ */ u4("div", { className: "addons-panel__card", children: [
+      /* @__PURE__ */ u4("div", { className: "addons-panel__card-header", children: [
+        /* @__PURE__ */ u4("div", { className: "addons-panel__card-info", children: [
+          /* @__PURE__ */ u4("span", { className: "addons-panel__card-name", children: addon.name }),
+          /* @__PURE__ */ u4("span", { className: `addons-panel__card-type ${isExtSkill ? "addons-panel__card-type--skill" : "addons-panel__card-type--ext"}`, children: isExtSkill ? "EXTENSION + SKILL" : "EXTENSION" }),
+          displayVersion && /* @__PURE__ */ u4("span", { className: "addons-panel__card-version", children: displayVersion }),
+          addon.installKind && /* @__PURE__ */ u4("span", { className: "addons-panel__card-kind", children: addon.installKind })
+        ] }),
+        addon.hasUpdate ? /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "addons-panel__card-action addons-panel__card-action--update",
+            disabled: busy,
+            onClick: () => onInstall(addon.slug),
+            children: actionState === "installing" ? "Updating\u2026" : "Update"
+          }
+        ) : addon.installed ? /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "addons-panel__card-action addons-panel__card-action--uninstall",
+            disabled: busy,
+            onClick: () => onUninstall(addon.slug),
+            children: actionState === "uninstalling" ? "Removing\u2026" : "Uninstall"
+          }
+        ) : /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "addons-panel__card-action addons-panel__card-action--install",
+            disabled: busy,
+            onClick: () => onInstall(addon.slug),
+            children: actionState === "installing" ? "Installing\u2026" : "Install"
+          }
+        )
+      ] }),
+      addon.description && /* @__PURE__ */ u4("div", { className: "addons-panel__card-desc", children: addon.description }),
+      (addon.tags.length > 0 || skills.length > 0) && /* @__PURE__ */ u4("div", { className: "addons-panel__card-tags", children: [
+        addon.tags.map((tag) => /* @__PURE__ */ u4("span", { className: "addons-panel__tag", children: tag }, tag)),
+        skills.map((skill) => /* @__PURE__ */ u4("span", { className: "addons-panel__skill", children: [
+          "\u{1F4C4} ",
+          skill.name
+        ] }, skill.name))
+      ] })
+    ] });
+  }
+
+  // runtime/web/frontend/src/panels/PanelRouter.tsx
+  function PanelRouter({ activePanel }) {
+    switch (activePanel) {
+      case "explorer":
+      case "files":
+        return /* @__PURE__ */ u4(WorkspacePanel, {});
+      case "search":
+        return /* @__PURE__ */ u4(SearchPanel, {});
+      case "extensions":
+        return /* @__PURE__ */ u4(AddonsPanel, {});
+      case "agent":
+        return /* @__PURE__ */ u4(Placeholder, { text: "Chat is always visible \u2192" });
+      case "settings":
+        return /* @__PURE__ */ u4(Placeholder, { text: "Settings panels" });
+      default:
+        return /* @__PURE__ */ u4(Placeholder, { text: "Select a panel" });
+    }
+  }
+  function Placeholder({ text }) {
+    return /* @__PURE__ */ u4("div", { className: "panel-placeholder", children: text });
+  }
+
   // runtime/web/frontend/src/components/MessageList.tsx
   function relativeTime(isoDate) {
     const delta = Date.now() - new Date(isoDate).getTime();
@@ -8002,7 +8492,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const terminalMaximized = useSignal(false);
     const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
     const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
-    const websocket = T2(() => new WebSocketManager(), []);
+    const sseRef = A2(null);
     const termDragRef = A2(null);
     y2(() => {
       localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
@@ -8017,15 +8507,19 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value));
     }, [terminalHeight.value]);
     y2(() => {
-      const unsub = websocket.onStatusChange((s4) => {
-        connectionStatus.value = s4;
-      });
-      websocket.connect();
-      return () => {
-        unsub();
-        websocket.disconnect();
+      const es = new EventSource("/sse/stream");
+      sseRef.current = es;
+      es.onopen = () => {
+        connectionStatus.value = "connected";
       };
-    }, [connectionStatus, websocket]);
+      es.onerror = () => {
+        connectionStatus.value = "disconnected";
+      };
+      return () => {
+        es.close();
+        sseRef.current = null;
+      };
+    }, [connectionStatus]);
     y2(() => {
       const h5 = (e5) => {
         if (e5.ctrlKey && !e5.shiftKey && !e5.altKey && (e5.code === "Backquote" || e5.key === "`" || e5.key === "\xBA" || e5.key === "Dead")) {
@@ -8136,9 +8630,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           themeControl.setMode("light");
         } },
         // Session
-        { id: "session.reconnect", label: "Reconnect WebSocket", category: "session", handler: () => {
-          websocket.disconnect();
-          websocket.connect();
+        { id: "session.reconnect", label: "Reconnect", category: "session", handler: () => {
+          if (sseRef.current) sseRef.current.close();
+          const es = new EventSource("/sse/stream");
+          sseRef.current = es;
+          es.onopen = () => {
+            connectionStatus.value = "connected";
+          };
+          es.onerror = () => {
+            connectionStatus.value = "disconnected";
+          };
         } },
         // General
         { id: "general.commandPalette", label: "Open Command Palette", category: "general", keybinding: "Ctrl+Shift+P", handler: () => {
@@ -8150,7 +8651,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ];
       cmds.forEach((c4) => commandRegistry.register(c4));
       return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
-    }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl, websocket]);
+    }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl]);
     const handlePanelChange = q2((id) => {
       if (id === "agent") {
         activePanel.value = id;

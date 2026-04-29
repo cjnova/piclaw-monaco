@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 
+interface AddonSkill {
+  name: string;
+}
+
 interface Addon {
   slug: string;
   name: string;
   version: string | null;
   type: string;
   description: string;
-  path: string;
   tags: string[];
-  skills: string[];
+  skills: AddonSkill[];
   installed: boolean;
   installedVersion: string | null;
   hasUpdate: boolean;
@@ -24,7 +27,10 @@ interface AddonsResponse {
 
 export function AddonsPanel() {
   const [addons, setAddons] = useState<Addon[]>([]);
+  const [source, setSource] = useState<string>("");
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
+  const [filter, setFilter] = useState<string>("");
+  const [actionState, setActionState] = useState<Record<string, "installing" | "uninstalling">>({});
 
   const loadAddons = useCallback(async () => {
     setStatus("loading");
@@ -37,6 +43,7 @@ export function AddonsPanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: AddonsResponse = await res.json();
       setAddons(Array.isArray(data.addons) ? data.addons : []);
+      setSource(data.source ?? (data.sources ? data.sources.join(", ") : ""));
       setStatus("done");
     } catch {
       setStatus("error");
@@ -47,10 +54,64 @@ export function AddonsPanel() {
     loadAddons();
   }, [loadAddons]);
 
+  const handleInstall = useCallback(async (slug: string) => {
+    setActionState((prev) => ({ ...prev, [slug]: "installing" }));
+    try {
+      const res = await fetch("/agent/addons/install", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: slug }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadAddons();
+    } catch {
+      // ignore, just refresh
+    } finally {
+      setActionState((prev) => {
+        const next = { ...prev };
+        delete next[slug];
+        return next;
+      });
+    }
+  }, [loadAddons]);
+
+  const handleUninstall = useCallback(async (slug: string) => {
+    setActionState((prev) => ({ ...prev, [slug]: "uninstalling" }));
+    try {
+      const res = await fetch("/agent/addons/uninstall", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: slug }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadAddons();
+    } catch {
+      // ignore, just refresh
+    } finally {
+      setActionState((prev) => {
+        const next = { ...prev };
+        delete next[slug];
+        return next;
+      });
+    }
+  }, [loadAddons]);
+
+  const filteredAddons = addons.filter((addon) => {
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return (
+      addon.name.toLowerCase().includes(q) ||
+      addon.description.toLowerCase().includes(q) ||
+      addon.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
   if (status === "loading") {
     return (
       <div className="addons-panel">
-        <div className="addons-panel__empty">Loading addons…</div>
+        <div className="addons-panel__empty">Loading catalog…</div>
       </div>
     );
   }
@@ -59,7 +120,7 @@ export function AddonsPanel() {
     return (
       <div className="addons-panel">
         <div className="addons-panel__empty addons-panel__empty--error">
-          Failed to load addons.{" "}
+          Failed to load catalog.{" "}
           <button className="addons-panel__retry" onClick={loadAddons}>
             Retry
           </button>
@@ -68,63 +129,111 @@ export function AddonsPanel() {
     );
   }
 
-  const installed = addons.filter((a) => a.installed);
-  const available = addons.filter((a) => !a.installed);
-
   return (
     <div className="addons-panel">
-      {installed.length > 0 && (
-        <>
-          <div className="addons-panel__section-header">Installed</div>
-          <ul className="addons-panel__list">
-            {installed.map((addon) => (
-              <AddonItem key={addon.slug} addon={addon} />
-            ))}
-          </ul>
-        </>
+      <div className="addons-panel__filter">
+        <input
+          className="addons-panel__filter-input"
+          type="text"
+          placeholder="Filter add-ons…"
+          value={filter}
+          onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
+        />
+      </div>
+      {source && (
+        <div className="addons-panel__source">Catalog from {source}</div>
       )}
-      {available.length > 0 && (
-        <>
-          <div className="addons-panel__section-header">Available</div>
-          <ul className="addons-panel__list">
-            {available.map((addon) => (
-              <AddonItem key={addon.slug} addon={addon} />
-            ))}
-          </ul>
-        </>
-      )}
-      {addons.length === 0 && (
-        <div className="addons-panel__empty">No addons installed</div>
-      )}
+      <div className="addons-panel__list">
+        {filteredAddons.length === 0 && filter ? (
+          <div className="addons-panel__empty">No add-ons match &ldquo;{filter}&rdquo;</div>
+        ) : filteredAddons.length === 0 ? (
+          <div className="addons-panel__empty">No add-ons available</div>
+        ) : (
+          filteredAddons.map((addon) => (
+            <AddonCard
+              key={addon.slug}
+              addon={addon}
+              actionState={actionState[addon.slug]}
+              onInstall={handleInstall}
+              onUninstall={handleUninstall}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
-function AddonItem({ addon }: { addon: Addon }) {
+interface AddonCardProps {
+  addon: Addon;
+  actionState?: "installing" | "uninstalling";
+  onInstall: (slug: string) => void;
+  onUninstall: (slug: string) => void;
+}
+
+function AddonCard({ addon, actionState, onInstall, onUninstall }: AddonCardProps) {
   const displayVersion = addon.installedVersion ?? addon.version;
+  const isExtSkill = addon.type === "extension+skill";
+  const busy = !!actionState;
+
+  const skills: AddonSkill[] = Array.isArray(addon.skills)
+    ? addon.skills.filter((s): s is AddonSkill => typeof s === "object" && s !== null && "name" in s)
+    : [];
 
   return (
-    <li className="addons-panel__item">
-      <span className="addons-panel__item-icon codicon codicon-extensions" aria-hidden="true" />
-      <div className="addons-panel__item-info">
-        <div className="addons-panel__item-header">
-          <span className="addons-panel__item-name">{addon.name}</span>
+    <div className="addons-panel__card">
+      <div className="addons-panel__card-header">
+        <div className="addons-panel__card-info">
+          <span className="addons-panel__card-name">{addon.name}</span>
+          <span className={`addons-panel__card-type ${isExtSkill ? "addons-panel__card-type--skill" : "addons-panel__card-type--ext"}`}>
+            {isExtSkill ? "EXTENSION + SKILL" : "EXTENSION"}
+          </span>
           {displayVersion && (
-            <span className="addons-panel__item-version">{displayVersion}</span>
+            <span className="addons-panel__card-version">{displayVersion}</span>
           )}
-          {addon.hasUpdate && (
-            <span className="addons-panel__item-update-badge" title="Update available">↑</span>
+          {addon.installKind && (
+            <span className="addons-panel__card-kind">{addon.installKind}</span>
           )}
         </div>
-        {addon.description && (
-          <div className="addons-panel__item-desc">{addon.description}</div>
+        {addon.hasUpdate ? (
+          <button
+            className="addons-panel__card-action addons-panel__card-action--update"
+            disabled={busy}
+            onClick={() => onInstall(addon.slug)}
+          >
+            {actionState === "installing" ? "Updating…" : "Update"}
+          </button>
+        ) : addon.installed ? (
+          <button
+            className="addons-panel__card-action addons-panel__card-action--uninstall"
+            disabled={busy}
+            onClick={() => onUninstall(addon.slug)}
+          >
+            {actionState === "uninstalling" ? "Removing…" : "Uninstall"}
+          </button>
+        ) : (
+          <button
+            className="addons-panel__card-action addons-panel__card-action--install"
+            disabled={busy}
+            onClick={() => onInstall(addon.slug)}
+          >
+            {actionState === "installing" ? "Installing…" : "Install"}
+          </button>
         )}
       </div>
-      <span
-        className={`addons-panel__item-status${addon.installed ? " addons-panel__item-status--enabled" : ""}`}
-        title={addon.installed ? "Installed" : "Not installed"}
-        aria-label={addon.installed ? "Installed" : "Not installed"}
-      />
-    </li>
+      {addon.description && (
+        <div className="addons-panel__card-desc">{addon.description}</div>
+      )}
+      {(addon.tags.length > 0 || skills.length > 0) && (
+        <div className="addons-panel__card-tags">
+          {addon.tags.map((tag) => (
+            <span key={tag} className="addons-panel__tag">{tag}</span>
+          ))}
+          {skills.map((skill) => (
+            <span key={skill.name} className="addons-panel__skill">📄 {skill.name}</span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

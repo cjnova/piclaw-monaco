@@ -66,6 +66,8 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
       onSelect(node);
       return;
     }
+    // For directories: always call onSelect so preview pane shows folder info
+    onSelect(node);
     if (!expanded) {
       // Expand: load children if not yet loaded
       if (children === null) {
@@ -85,7 +87,6 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
     } else {
       setExpanded(false);
     }
-    onSelect(node);
   }, [isDir, expanded, children, node, onSelect]);
 
   const iconName = isDir
@@ -242,9 +243,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   const handleSelect = useCallback(
     (node: TreeNode) => {
       setSelectedPath(node.path);
-      if (node.type === "file") {
-        onFileSelect?.(node);
-      }
+      onFileSelect?.(node);
     },
     [onFileSelect]
   );
