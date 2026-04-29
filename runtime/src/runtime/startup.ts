@@ -310,7 +310,7 @@ export async function startWebChannel(queue: AgentQueue, agentPool: AgentPool): 
   const web = new WebChannel({ queue, agentPool });
   await web.start();
   registerLazyViewerRoutes();
-  freezeExtensionRoutes();
+  // freezeExtensionRoutes(); // Moved to session.ts — workspace extensions register routes during session init
   captureStartupMemorySnapshot(agentPool, { label: "post-web-start" });
   queueStartupSessionWarmup(agentPool, resolveStartupSessionWarmupOptions());
   runWebStartupRecoveryBootstrap(web);
