@@ -8,10 +8,10 @@ import { registerToolStatusHintProvider } from "../tool-status-hints.js";
 import {
   deleteKeychainEntry,
   getKeychainEntry,
-  listAllKeychainEntries,
+  listAllKeychainEntries,   // async — includes external provider entries
   listInjectableKeychainEntries,
   listInjectableKeychainEnvNames,
-  listKeychainEntries,
+  listKeychainEntries,      // sync — internal only (used for prompt hints)
   setKeychainEntry,
 } from "../secure/keychain.js";
 

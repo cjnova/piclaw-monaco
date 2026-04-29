@@ -194,3 +194,94 @@ This is intended to steer the agent toward the `ssh` tool and addon-provided `pr
 - Entry names can be hierarchical (`github/foo/bar`).
 - The keychain uses the current master key for all entries; rotating keys requires re-encrypting entries (not yet automated).
 - Avoid logging secrets. The tool runner resolves keychain values only at execution time.
+
+## External keychain providers
+
+Extensions can register platform-native or third-party secret management backends as fallback providers. Secrets are still looked up in the internal encrypted keychain first; external providers are queried only when an entry is not found locally.
+
+### Lookup order
+
+```
+1. Internal SQLite keychain (encrypted, always checked first)
+2. Registered external providers (in registration order)
+```
+
+### Registering a provider
+
+Extensions register providers during initialization via `registerKeychainProvider()`:
+
+```typescript
+import { registerKeychainProvider } from "../secure/keychain-providers.js";
+
+registerKeychainProvider({
+  id: "macos-keychain",
+  label: "macOS Keychain",
+
+  async get(name) {
+    // Shell out to `security find-generic-password` or use a native binding.
+    // Return { name, type, secret, username? } if found, or null.
+    const result = await lookupMacOSKeychain(name);
+    return result ?? null;
+  },
+
+  async list() {
+    // Return metadata (name + type) for discoverable entries.
+    // No secrets are returned here.
+    return [
+      { name: "github/token", type: "token", source: "macos-keychain" },
+    ];
+  },
+
+  // Optional: allow the agent to store secrets in this backend.
+  async set(entry) {
+    await storeMacOSKeychain(entry.name, entry.secret);
+    return true;
+  },
+
+  // Optional: allow the agent to delete secrets from this backend.
+  async delete(name) {
+    return await deleteMacOSKeychain(name);
+  },
+});
+```
+
+### Provider interface
+
+| Method | Required | Signature | Purpose |
+|--------|----------|-----------|----------|
+| `get` | ✅ | `(name: string) => Promise<Entry \| null>` | Retrieve a secret by name |
+| `list` | ✅ | `() => Promise<Metadata[]>` | List available entries (no secrets) |
+| `set` | optional | `(entry: Entry) => Promise<boolean>` | Store a secret |
+| `delete` | optional | `(name: string) => Promise<boolean>` | Remove a secret |
+
+### What's seamless
+
+All existing keychain consumers work without changes:
+
+- **`keychain list`** — shows internal + external entries (deduplicated by name)
+- **`keychain get`** — falls back to external providers when internal lookup misses
+- **Bash env injection** — `buildInjectedShellEnv()` resolves external secrets through the same `getKeychainEntry()` path
+- **SSH key resolution** — works through external providers
+- **Placeholder resolution** — `keychain:name` placeholders resolve transparently
+- **Agent prompt hints** — external entries appear in the injected env list
+
+### Error handling
+
+- Providers that throw during `get()` or `list()` are skipped with a warning log; other providers continue to be queried.
+- A broken provider never blocks lookups — the system degrades gracefully.
+
+### Example use cases
+
+| Provider | Backend | What it enables |
+|----------|---------|------------------|
+| `macos-keychain` | macOS `security` CLI | Bridge secrets from the system keychain on dev machines |
+| `1password` | 1Password CLI (`op`) | Resolve secrets from team vaults |
+| `azure-keyvault` | Azure Key Vault REST API | Production secrets from managed identity |
+| `hashicorp-vault` | Vault HTTP API | Enterprise secret management |
+| `bitwarden` | Bitwarden CLI (`bw`) | Personal password manager integration |
+
+### Lifecycle
+
+- Providers are registered at extension load time and persist for the process lifetime.
+- `unregisterKeychainProvider(id)` removes a provider (useful during extension shutdown).
+- Provider state is in-memory only — the registry is rebuilt on each process start.
