@@ -93,6 +93,9 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 - [x] Layout persists across refreshes (localStorage)
 - [x] CI: build + typecheck on every push/PR
 - [x] Code review hardening pass (delta CPU stats, stale state detection, CSRF, AbortController, noopener)
+- [x] Refactored all inline styles to BEM CSS classes
+- [x] Switched system metrics to builtin `/agent/system-metrics` (CPU, RAM, RSS, SWP)
+- [x] Terminal sends `clear` on panel close
 
 ### New Keyboard Shortcuts (Wave 9)
 
