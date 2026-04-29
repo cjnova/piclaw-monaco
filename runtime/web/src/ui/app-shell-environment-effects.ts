@@ -102,6 +102,30 @@ export function scheduleResumeLayoutSettling(
   };
 }
 
+export function applyBrandingIconLinks(
+  documentLike: { getElementById?: (id: string) => any } | null | undefined,
+  version: string | number,
+): void {
+  if (!documentLike?.getElementById) return;
+  const buster = encodeURIComponent(String(version || '0'));
+  const nextById: Record<string, string> = {
+    'dynamic-manifest': `/manifest.json?v=${buster}`,
+    'dynamic-favicon': `/favicon.ico?v=${buster}`,
+    'dynamic-apple-touch-icon': `/apple-touch-icon.png?v=${buster}`,
+    'dynamic-apple-touch-icon-180': `/apple-touch-icon-180x180.png?v=${buster}`,
+    'dynamic-apple-touch-icon-167': `/apple-touch-icon-167x167.png?v=${buster}`,
+    'dynamic-apple-touch-icon-152': `/apple-touch-icon-152x152.png?v=${buster}`,
+    'dynamic-apple-touch-icon-precomposed': `/apple-touch-icon-precomposed.png?v=${buster}`,
+  };
+
+  for (const [id, href] of Object.entries(nextById)) {
+    const link = documentLike.getElementById(id);
+    if (link && link.href !== href) {
+      link.href = href;
+    }
+  }
+}
+
 export function useAppShellEnvironmentEffects(options: UseAppShellEnvironmentEffectsOptions) {
   const {
     isRenameBranchFormOpen,
@@ -220,17 +244,11 @@ export function useAppShellEnvironmentEffects(options: UseAppShellEnvironmentEff
       brandingRef.current.title = title;
     }
 
-    const favicon = document.getElementById('dynamic-favicon') as HTMLLinkElement | null;
-    if (!favicon) return;
-
-    // The server already serves /favicon.ico as the agent avatar PNG (with
-    // WebP→PNG conversion).  We only need to cache-bust the URL so the
-    // browser refetches when the avatar changes.
     const avatarKey = avatarUrl ? `${avatarUrl}|${avatarVersion || ''}` : '';
     if (brandingRef.current.avatarBase !== avatarKey) {
       brandingRef.current.avatarBase = avatarKey;
       const buster = avatarVersion || Date.now();
-      favicon.href = `/favicon.ico?v=${buster}`;
+      applyBrandingIconLinks(document, buster);
     }
   }, [brandingRef]);
 

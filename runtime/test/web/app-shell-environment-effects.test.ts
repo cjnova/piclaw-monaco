@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'bun:test';
 
 import {
   RESUME_LAYOUT_SETTLING_CLASS,
+  applyBrandingIconLinks,
   persistBtwSession,
   scheduleResumeLayoutSettling,
   shouldApplyBrandingDocumentTitle,
@@ -71,6 +72,30 @@ test('scheduleResumeLayoutSettling applies and later clears the settling class',
   expect(classes.has(RESUME_LAYOUT_SETTLING_CLASS)).toBe(true);
   queued.shift()?.();
   expect(classes.has(RESUME_LAYOUT_SETTLING_CLASS)).toBe(false);
+});
+
+test('applyBrandingIconLinks updates manifest, favicon, and apple-touch hrefs with a shared cache buster', () => {
+  const links = new Map<string, { href: string }>([
+    ['dynamic-manifest', { href: '/manifest.json' }],
+    ['dynamic-favicon', { href: '/favicon.ico' }],
+    ['dynamic-apple-touch-icon', { href: '/apple-touch-icon.png' }],
+    ['dynamic-apple-touch-icon-180', { href: '/apple-touch-icon-180x180.png' }],
+    ['dynamic-apple-touch-icon-167', { href: '/apple-touch-icon-167x167.png' }],
+    ['dynamic-apple-touch-icon-152', { href: '/apple-touch-icon-152x152.png' }],
+    ['dynamic-apple-touch-icon-precomposed', { href: '/apple-touch-icon-precomposed.png' }],
+  ]);
+
+  applyBrandingIconLinks({
+    getElementById: (id: string) => links.get(id) || null,
+  }, '2026-04-29T14:00:00.000Z');
+
+  expect(links.get('dynamic-manifest')?.href).toBe('/manifest.json?v=2026-04-29T14%3A00%3A00.000Z');
+  expect(links.get('dynamic-favicon')?.href).toBe('/favicon.ico?v=2026-04-29T14%3A00%3A00.000Z');
+  expect(links.get('dynamic-apple-touch-icon')?.href).toBe('/apple-touch-icon.png?v=2026-04-29T14%3A00%3A00.000Z');
+  expect(links.get('dynamic-apple-touch-icon-180')?.href).toBe('/apple-touch-icon-180x180.png?v=2026-04-29T14%3A00%3A00.000Z');
+  expect(links.get('dynamic-apple-touch-icon-167')?.href).toBe('/apple-touch-icon-167x167.png?v=2026-04-29T14%3A00%3A00.000Z');
+  expect(links.get('dynamic-apple-touch-icon-152')?.href).toBe('/apple-touch-icon-152x152.png?v=2026-04-29T14%3A00%3A00.000Z');
+  expect(links.get('dynamic-apple-touch-icon-precomposed')?.href).toBe('/apple-touch-icon-precomposed.png?v=2026-04-29T14%3A00%3A00.000Z');
 });
 
 test('persistBtwSession clears storage when no session exists', () => {

@@ -73,6 +73,67 @@ function createAssistantMessage(text: string) {
   } as const;
 }
 
+test("runAgentPrompt emits turn-aware observability log metadata for turn and tool steps", async () => {
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-obs" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_start" } });
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "thinking..." } });
+        listener({ type: "message_end", message: { role: "assistant", content: [{ type: "toolCall", id: "tool-1", name: "read" }], stopReason: "toolUse", usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } } });
+        listener({ type: "tool_execution_start", toolCallId: "tool-1", toolName: "read", args: { path: "README.md" } });
+        listener({ type: "tool_execution_end", toolCallId: "tool-1", toolName: "read", isError: false, durationMs: 12 });
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_start" } });
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "done" } });
+        listener({ type: "message_end", message: createAssistantMessage("done") });
+      }
+    }
+    async abort() {}
+  }
+
+  const session = new StubSession();
+  const logs: Array<Record<string, unknown>> = [];
+  const turnCoordinator = new AgentTurnCoordinator({
+    takeAttachments: () => [],
+    touchSession: () => {},
+    recordMessageUsage: () => {},
+  });
+
+  const result = await runAgentPrompt("test", "web:default", {
+    timeoutMs: 0,
+    turnId: "turn-obs-1",
+  }, {
+    getOrCreateRuntime: async () => createRuntime(session) as any,
+    turnCoordinator,
+    clearAttachments: () => {},
+    takeAttachments: () => [],
+    logsDir: createTestLogsDir(),
+    setActiveForkBaseLeaf: () => {},
+    clearActiveForkBaseLeaf: () => {},
+    onInfo: (_message, details) => logs.push(details),
+    onWarn: (_message, details) => logs.push(details),
+  });
+
+  expect(result.status).toBe("success");
+  expect(logs).toEqual(expect.arrayContaining([
+    expect.objectContaining({ operation: "run_agent.prompt", turnId: "turn-obs-1", sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "tool.call.start", turnId: "turn-obs-1", toolCallId: "tool-1", sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "tool.call.end", turnId: "turn-obs-1", toolCallId: "tool-1", durationMs: 12, sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "run_agent.prompt_resolved", turnId: "turn-obs-1", sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "run_agent.complete", turnId: "turn-obs-1", sessionLeafId: "leaf-obs" }),
+  ]));
+});
+
 test("runAgentPrompt aggregates deltas and returns pending attachments", async () => {
   const attachments = getAttachmentRegistry();
   attachments.clear("web:default");

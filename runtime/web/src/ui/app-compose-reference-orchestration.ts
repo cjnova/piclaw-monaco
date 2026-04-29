@@ -6,6 +6,7 @@ import {
   removeStringRef,
 } from './app-shell-ref-utils.js';
 import { scrollToTimelineMessage } from './app-timeline-actions.js';
+import { buildChatWindowUrl } from './chat-window.js';
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 
@@ -20,6 +21,66 @@ export function resolveComposeSubmitErrorDetail(message: unknown): string {
   return 'Could not send your message.';
 }
 
+export interface ActivateComposeMessageRefOptions {
+  id: unknown;
+  targetChatJid?: string | null;
+  currentChatJid: string;
+  currentHashtag?: string | null;
+  searchQuery?: string | null;
+  searchOpen?: boolean;
+  setCurrentHashtag?: (value: string | null) => void;
+  setSearchQuery?: (value: string | null) => void;
+  setSearchOpen?: (open: boolean) => void;
+  setMessageRefs: StateSetter<string[]>;
+  navigate?: (url: string, options?: unknown) => void;
+  chatOnlyMode?: boolean;
+  baseHref?: string;
+}
+
+export function activateComposeMessageRef(options: ActivateComposeMessageRefOptions): boolean {
+  const {
+    id,
+    targetChatJid = null,
+    currentChatJid,
+    currentHashtag = null,
+    searchQuery = null,
+    searchOpen = false,
+    setCurrentHashtag,
+    setSearchQuery,
+    setSearchOpen,
+    setMessageRefs,
+    navigate,
+    chatOnlyMode,
+    baseHref = typeof window !== 'undefined' ? window.location.href : 'http://localhost/',
+  } = options;
+
+  const normalizedId = String(id ?? '').trim();
+  if (!normalizedId) return false;
+
+  const resolvedTargetChatJid = typeof targetChatJid === 'string' && targetChatJid.trim()
+    ? targetChatJid.trim()
+    : currentChatJid;
+  const shouldSwitchChat = resolvedTargetChatJid !== currentChatJid;
+  const shouldExitSearchContext = Boolean(searchOpen || searchQuery || currentHashtag);
+
+  if (!shouldSwitchChat && !shouldExitSearchContext) {
+    setMessageRefs((prev) => appendUniqueStringRef(prev, normalizedId));
+    return true;
+  }
+
+  setMessageRefs([normalizedId]);
+  setCurrentHashtag?.(null);
+  setSearchQuery?.(null);
+  setSearchOpen?.(false);
+
+  if (shouldSwitchChat && typeof navigate === 'function') {
+    const nextUrl = buildChatWindowUrl(baseHref, resolvedTargetChatJid, { chatOnly: chatOnlyMode });
+    navigate(nextUrl);
+  }
+
+  return true;
+}
+
 interface UseComposeReferenceOrchestrationOptions {
   setIntentToast: StateSetter<any>;
   intentToastTimerRef: RefBox<ReturnType<typeof setTimeout> | null>;
@@ -30,6 +91,15 @@ interface UseComposeReferenceOrchestrationOptions {
   setFileRefs: StateSetter<string[]>;
   setMessageRefs: StateSetter<string[]>;
   currentChatJid: string;
+  currentHashtag: string | null;
+  searchQuery: string | null;
+  searchOpen: boolean;
+  setCurrentHashtag: (value: string | null) => void;
+  setSearchQuery: (value: string | null) => void;
+  setSearchOpen: (open: boolean) => void;
+  navigate?: (url: string, options?: unknown) => void;
+  chatOnlyMode?: boolean;
+  baseHref?: string;
   getThread: (id: string | number, chatJid: string) => Promise<any>;
   setPosts: StateSetter<any[] | null>;
 }
@@ -45,6 +115,15 @@ export function useComposeReferenceOrchestration(options: UseComposeReferenceOrc
     setFileRefs,
     setMessageRefs,
     currentChatJid,
+    currentHashtag,
+    searchQuery,
+    searchOpen,
+    setCurrentHashtag,
+    setSearchQuery,
+    setSearchOpen,
+    navigate,
+    chatOnlyMode,
+    baseHref,
     getThread,
     setPosts,
   } = options;
@@ -117,9 +196,23 @@ export function useComposeReferenceOrchestration(options: UseComposeReferenceOrc
     if (activeId) addFileRef(activeId);
   }, [addFileRef, tabStripActiveId]);
 
-  const addMessageRef = useCallback((id: unknown) => {
-    setMessageRefs((prev) => appendUniqueStringRef(prev, id));
-  }, [setMessageRefs]);
+  const addMessageRef = useCallback((id: unknown, targetChatJid: string | null = null) => {
+    activateComposeMessageRef({
+      id,
+      targetChatJid,
+      currentChatJid,
+      currentHashtag,
+      searchQuery,
+      searchOpen,
+      setCurrentHashtag,
+      setSearchQuery,
+      setSearchOpen,
+      setMessageRefs,
+      navigate,
+      chatOnlyMode,
+      baseHref,
+    });
+  }, [baseHref, chatOnlyMode, currentChatJid, currentHashtag, navigate, searchOpen, searchQuery, setCurrentHashtag, setMessageRefs, setSearchOpen, setSearchQuery]);
 
   const scrollToMessage = useCallback(async (id: string | number, targetChatJid: string | null = null) => {
     await scrollToTimelineMessage({

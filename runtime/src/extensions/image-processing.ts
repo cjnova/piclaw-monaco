@@ -706,6 +706,7 @@ async function executeImageProcess(
 
 const HINT = [
   "## Image Processing",
+  "Prefer image_process over bash or ad-hoc scripts when the task is to edit workspace images.",
   "Use image_process for comprehensive image manipulation. 30+ operations including:",
   "- Geometry: resize, crop, rotate, flip, extend/pad, affine transform, trim",
   "- Format: convert (PNG/JPEG/WebP/AVIF/TIFF/GIF), optimize, svg_render, tile (deep zoom)",
@@ -715,6 +716,7 @@ const HINT = [
   "- Compose: composite, text overlay",
   "- Animation: frames (extract), spritesheet_to_gif (assemble)",
   "- Inspect: info, metadata",
+  "Great for icons, favicons, logos, screenshots, avatars, transparent PNGs, and GIF workflows.",
   "Non-destructive by default. Preserves transparency and animation.",
 ].join("\n");
 
@@ -732,8 +734,13 @@ export const imageProcessing: ExtensionFactory = (pi: ExtensionAPI) => {
       "composite, greyscale, modulate (brightness/saturation/hue), contrast, gamma, tint, normalize, negate, CLAHE, " +
       "threshold, median denoise, extend/pad, extract_channel, remove_alpha, unflatten, text overlay, svg_render, " +
       "affine transform, tile (deep zoom), metadata inspection, extract frames from animated GIFs, spritesheet_to_gif. " +
+      "Useful for icons, favicons, logos, screenshots, avatars, transparent PNGs, and GIF workflows. " +
       "Non-destructive by default. Preserves transparency and animation. Quality configurable.",
-    promptSnippet: "image_process: full image manipulation — resize, crop, convert, optimize, color adjust, denoise, text overlay, SVG render, animated GIF, tiles, and more.",
+    promptSnippet: "image_process: edit workspace images/icons/screenshots — resize, crop, rotate, convert, optimize, preserve transparency, inspect metadata, and build GIF/tile assets.",
+    promptGuidelines: [
+      "Prefer image_process over bash or hand-rolled scripts for image editing tasks such as icons, favicons, logos, screenshots, avatars, transparent PNGs, and GIFs.",
+      "Use action='info' or action='metadata' when you need dimensions, alpha/transparency, format, or other image properties before editing.",
+    ],
     parameters: ImageProcessSchema,
     execute: executeImageProcess,
   });
