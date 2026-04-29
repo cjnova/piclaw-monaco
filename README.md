@@ -2,7 +2,7 @@
 
 ![PiClaw](docs/icon-256.png)
 
-PiClaw packages the [Pi Coding Agent](https://github.com/badlogic/pi-mono) into a self-hosted workspace with a streaming web UI, persistent state, multi-provider LLM support, and a practical built-in toolset.
+PiClaw packages the [Pi Coding Agent](https://github.com/badlogic/pi-mono) into a self-hosted workspace with a streaming web UI, persistent state, multi-provider LLM support, and a practical built-in toolset that includes [many add-ons](https://rcarmo.github.io/piclaw-addons/).
 
 It is for people who want one stateful agent workspace they can run locally or in a container without stitching together half a dozen separate services.
 
