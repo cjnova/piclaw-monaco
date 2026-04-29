@@ -1159,22 +1159,26 @@
 
   // runtime/web/frontend/src/components/Sidebar.tsx
   function Sidebar({ title, collapsed, onToggleCollapse, children }) {
-    return /* @__PURE__ */ u4("aside", { className: "sidebar", style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
-      /* @__PURE__ */ u4("header", { className: "sidebar__header", children: [
-        /* @__PURE__ */ u4("span", { className: "sidebar__title", children: title.toUpperCase() }),
+    return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#181825" }, children: [
+      /* @__PURE__ */ u4("header", { style: { height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }, children: [
+        /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600, flex: 1 }, children: title.toUpperCase() }),
         onToggleCollapse && /* @__PURE__ */ u4(
-          "button",
+          "span",
           {
-            type: "button",
-            className: "sidebar__collapse-btn",
             onClick: onToggleCollapse,
             title: collapsed ? "Expand sidebar" : "Collapse sidebar",
-            "aria-label": collapsed ? "Expand sidebar" : "Collapse sidebar",
-            children: collapsed ? "\u203A" : "\u2039"
+            style: { cursor: "pointer", color: "#6c7086", fontSize: "16px", lineHeight: 1, padding: "2px 4px", borderRadius: "3px", background: "none", border: "none" },
+            onMouseEnter: (e4) => {
+              e4.target.style.color = "#cdd6f4";
+            },
+            onMouseLeave: (e4) => {
+              e4.target.style.color = "#6c7086";
+            },
+            children: "\u2039"
           }
         )
       ] }),
-      /* @__PURE__ */ u4("div", { className: "sidebar__content", style: { flex: 1, overflow: "auto" }, children })
+      /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto" }, children })
     ] });
   }
 
@@ -1457,8 +1461,11 @@
     const activePanel = useSignal("agent");
     const paletteVisible = useSignal(false);
     const terminalVisible = useSignal(false);
+    const terminalHeight = useSignal(200);
+    const terminalMaximized = useSignal(false);
     const sidebarCollapsed = useSignal(false);
     const websocket = T2(() => new WebSocketManager(), []);
+    const terminalDragRef = A2(null);
     y2(() => {
       const unsubscribe = websocket.onStatusChange((s4) => {
         connectionStatus.value = s4;
@@ -1494,9 +1501,11 @@
       const cmds = [
         { id: "nav.explorer", label: "Show Explorer", category: "navigation", keybinding: "Ctrl+Shift+E", handler: () => {
           activePanel.value = "explorer";
+          sidebarCollapsed.value = false;
         } },
         { id: "nav.agent", label: "Show Agent", category: "navigation", keybinding: "Ctrl+Shift+A", handler: () => {
           activePanel.value = "agent";
+          sidebarCollapsed.value = false;
         } },
         { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal", keybinding: "Ctrl+`", handler: () => {
           terminalVisible.value = !terminalVisible.value;
@@ -1508,46 +1517,106 @@
       cmds.forEach((c4) => commandRegistry.register(c4));
       return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible, sidebarCollapsed]);
+    const handlePanelChange = q2((id) => {
+      if (sidebarCollapsed.value) {
+        sidebarCollapsed.value = false;
+      }
+      activePanel.value = id;
+    }, [activePanel, sidebarCollapsed]);
     const toggleSidebar = q2(() => {
       sidebarCollapsed.value = !sidebarCollapsed.value;
     }, [sidebarCollapsed]);
     const connected = connectionStatus.value === "connected";
+    const onTerminalDragStart = q2((e4) => {
+      e4.preventDefault();
+      terminalDragRef.current = { startY: e4.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
+      const onMove = (ev) => {
+        if (!terminalDragRef.current) return;
+        const delta = terminalDragRef.current.startY - ev.clientY;
+        const next = Math.max(100, Math.min(window.innerHeight * 0.8, terminalDragRef.current.startH + delta));
+        terminalHeight.value = next;
+        terminalMaximized.value = false;
+      };
+      const onUp = () => {
+        terminalDragRef.current = null;
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "row-resize";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    }, [terminalHeight, terminalMaximized]);
+    const tHeight = terminalMaximized.value ? "calc(100% - 56px)" : `${terminalHeight.value}px`;
     return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }, children: [
-      /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: (id) => {
-        activePanel.value = id;
-      } }),
+      /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
       /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
         /* @__PURE__ */ u4("div", { style: { height: "24px", display: "flex", alignItems: "center", padding: "0 12px", background: "#181825", borderBottom: "1px solid #313244", fontSize: "12px", flexShrink: 0 }, children: [
           /* @__PURE__ */ u4("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8", marginRight: "6px" } }),
           /* @__PURE__ */ u4("span", { style: { color: "#6c7086" }, children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: sidebarCollapsed.value ? (
-          // No sidebar — just main panel
-          /* @__PURE__ */ u4("div", { style: { width: "100%", height: "100%", overflow: "auto" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
-        ) : (
-          // SplitPane: sidebar | main
-          /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 500, children: [
-            /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, collapsed: false, onToggleCollapse: toggleSidebar, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
-              activePanel.value,
-              " content..."
-            ] }) }),
-            /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
-          ] })
-        ) }),
-        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: "200px", flexShrink: 0, borderTop: "1px solid #313244", background: "#11111b", display: "flex", flexDirection: "column" }, children: [
+        /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: sidebarCollapsed.value ? /* @__PURE__ */ u4("div", { style: { width: "100%", height: "100%", overflow: "auto" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) : /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: Math.round(window.innerWidth * 0.5), children: [
+          /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, collapsed: false, onToggleCollapse: toggleSidebar, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
+            activePanel.value,
+            " content..."
+          ] }) }),
+          /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
+        ] }) }),
+        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tHeight, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }, children: [
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              style: { height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0 },
+              onMouseDown: onTerminalDragStart,
+              onMouseEnter: (e4) => {
+                e4.target.style.background = "#89b4fa";
+              },
+              onMouseLeave: (e4) => {
+                e4.target.style.background = "#313244";
+              }
+            }
+          ),
           /* @__PURE__ */ u4("div", { style: { height: "32px", background: "#181825", borderBottom: "1px solid #313244", display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }, children: [
             /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: "Terminal" }),
-            /* @__PURE__ */ u4(
-              "span",
-              {
-                style: { marginLeft: "auto", cursor: "pointer", color: "#6c7086", fontSize: "16px", lineHeight: 1, padding: "4px" },
-                onClick: () => {
-                  terminalVisible.value = false;
-                },
-                title: "Close terminal (Ctrl+`)",
-                children: "\u2715"
-              }
-            )
+            /* @__PURE__ */ u4("div", { style: { marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }, children: [
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  onClick: () => {
+                    terminalMaximized.value = !terminalMaximized.value;
+                  },
+                  onMouseEnter: (e4) => {
+                    e4.target.style.color = "#cdd6f4";
+                  },
+                  onMouseLeave: (e4) => {
+                    e4.target.style.color = "#6c7086";
+                  },
+                  title: terminalMaximized.value ? "Restore" : "Maximize",
+                  children: terminalMaximized.value ? "\u229F" : "\u229E"
+                }
+              ),
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  style: { cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" },
+                  onClick: () => {
+                    terminalVisible.value = false;
+                    terminalMaximized.value = false;
+                  },
+                  onMouseEnter: (e4) => {
+                    e4.target.style.color = "#cdd6f4";
+                  },
+                  onMouseLeave: (e4) => {
+                    e4.target.style.color = "#6c7086";
+                  },
+                  title: "Close (Ctrl+`)",
+                  children: "\u2715"
+                }
+              )
+            ] })
           ] }),
           /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", overflow: "auto" }, children: "$ xterm.js will mount here (Wave 9)" })
         ] })
