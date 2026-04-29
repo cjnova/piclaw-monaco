@@ -118,6 +118,7 @@ export {
   getDeferredQueuedFollowups,
   setDeferredQueuedFollowups,
   getChatCompactionBackoff,
+  getAllChatCompactionBackoffs,
   setChatCompactionBackoff,
   clearChatCompactionBackoff,
 } from "./db/chat-cursors.js";

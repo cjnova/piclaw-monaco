@@ -184,6 +184,28 @@ export function setDeferredQueuedFollowups(chatJid: string, items: DeferredQueue
   `).run(chatJid, payload);
 }
 
+function readCompactionBackoffStateRow(
+  chatJid: string,
+  row:
+    | {
+        compaction_failure_count: number | null;
+        compaction_last_failed_at: string | null;
+        compaction_backoff_until: string | null;
+        compaction_last_error: string | null;
+      }
+    | null
+    | undefined,
+): ChatCompactionBackoffState | null {
+  if (!row?.compaction_failure_count || !row.compaction_last_failed_at || !row.compaction_backoff_until) return null;
+  return {
+    chatJid,
+    failureCount: Number(row.compaction_failure_count),
+    lastFailedAt: row.compaction_last_failed_at,
+    backoffUntil: row.compaction_backoff_until,
+    lastErrorMessage: row.compaction_last_error ?? null,
+  };
+}
+
 export function getChatCompactionBackoff(chatJid: string): ChatCompactionBackoffState | null {
   const db = getDb();
   const row = db.prepare(`
@@ -200,14 +222,30 @@ export function getChatCompactionBackoff(chatJid: string): ChatCompactionBackoff
     compaction_backoff_until: string | null;
     compaction_last_error: string | null;
   } | undefined;
-  if (!row?.compaction_failure_count || !row.compaction_last_failed_at || !row.compaction_backoff_until) return null;
-  return {
-    chatJid,
-    failureCount: Number(row.compaction_failure_count),
-    lastFailedAt: row.compaction_last_failed_at,
-    backoffUntil: row.compaction_backoff_until,
-    lastErrorMessage: row.compaction_last_error ?? null,
-  };
+  return readCompactionBackoffStateRow(chatJid, row);
+}
+
+export function getAllChatCompactionBackoffs(): ChatCompactionBackoffState[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      chat_jid,
+      compaction_failure_count,
+      compaction_last_failed_at,
+      compaction_backoff_until,
+      compaction_last_error
+    FROM chat_cursors
+    WHERE compaction_backoff_until IS NOT NULL
+  `).all() as Array<{
+    chat_jid: string;
+    compaction_failure_count: number | null;
+    compaction_last_failed_at: string | null;
+    compaction_backoff_until: string | null;
+    compaction_last_error: string | null;
+  }>;
+  return rows
+    .map((row) => readCompactionBackoffStateRow(row.chat_jid, row))
+    .filter((row): row is ChatCompactionBackoffState => Boolean(row));
 }
 
 export function setChatCompactionBackoff(

@@ -24,6 +24,7 @@ import { startToolOutputCleanup } from "../tool-output.js";
 import { createUuid } from "../utils/ids.js";
 import { createLogger } from "../utils/logger.js";
 import { patchConsoleTimestamps } from "./console-timestamps.js";
+import { startExternalProgressWatchdogMonitor } from "./progress-watchdog-supervisor.js";
 import type { RuntimeState } from "./state.js";
 import { launchWorkspaceIndexProcess } from "../workspace-index-process.js";
 import { SystemMetricsSampler } from "../channels/web/agent/system-metrics.js";
@@ -154,6 +155,7 @@ export function initializeRuntimeEnvironment(state: RuntimeState): void {
   bootstrapWorkspaceFromSkel();
 
   initDatabase();
+  startExternalProgressWatchdogMonitor();
   const cleanedOrphans = cleanupOrphanedActiveChatArtifacts();
   if (cleanedOrphans > 0) {
     log.info("Cleaned orphaned active chat artifacts at startup", {

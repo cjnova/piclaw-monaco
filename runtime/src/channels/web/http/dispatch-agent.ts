@@ -19,6 +19,7 @@ import {
   handleRestartAddonRuntime,
   handleUninstallAddon,
 } from "../handlers/addons.js";
+import { getCompactionSettingsData, resetCompactionBackoff, saveCompactionSettings } from "../handlers/compaction-settings.js";
 import { getGeneralSettingsData, saveGeneralSettings } from "../handlers/general-settings.js";
 import { getQuickActionsSettingsData, saveQuickActionsSettings } from "../handlers/quick-actions-settings.js";
 import { getWorkspaceSettingsData, saveWorkspaceSettings } from "../handlers/workspace-settings.js";
@@ -294,6 +295,7 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
 
       return channel.json({
         ...getGeneralSettingsData(),
+        ...getCompactionSettingsData(),
         quickActions: getQuickActionsSettingsData(),
         workspaceSettings: getWorkspaceSettingsData(),
         runtimePlatform: process.platform,
@@ -361,6 +363,37 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return channel.json({ error: message || "Failed to save workspace settings." }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/settings/compaction",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({}));
+        const saved = saveCompactionSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
+        return channel.json({ ok: true, settings: saved });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message || "Failed to save compaction settings." }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/settings/compaction/reset-backoff",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const chatJid = typeof body.chatJid === "string" ? body.chatJid.trim() : "";
+        if (!chatJid) {
+          return channel.json({ error: "Provide chatJid." }, 400);
+        }
+        return channel.json({ ok: true, settings: resetCompactionBackoff(chatJid) });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message || "Failed to reset compaction backoff." }, 400);
       }
     },
   },

@@ -1,0 +1,259 @@
+// @ts-nocheck
+/**
+ * settings/compaction.ts — Compaction and watchdog settings pane.
+ */
+import { html, useState, useEffect, useCallback, useMemo, useRef } from '../../vendor/preact-htm.js';
+import { NumberStepper } from './number-stepper.js';
+
+function normalizeCompactionSettings(data = {}) {
+    return {
+        compactionTimeoutSec: data.compactionTimeoutSec ?? 180,
+        compactionBackoffBaseMin: data.compactionBackoffBaseMin ?? 15,
+        compactionBackoffMaxMin: data.compactionBackoffMaxMin ?? 360,
+        progressWatchdogTimeoutSec: data.progressWatchdogTimeoutSec ?? 120,
+        compactionBackoffs: Array.isArray(data.compactionBackoffs) ? data.compactionBackoffs : [],
+        progressWatchdogPhases: Array.isArray(data.progressWatchdogPhases) ? data.progressWatchdogPhases : [],
+    };
+}
+
+function formatIso(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '—';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return raw;
+    return parsed.toLocaleString();
+}
+
+export function CompactionSection({ settingsData, setStatus, mergeSettingsData }) {
+    const [compactionTimeoutSec, setCompactionTimeoutSec] = useState(180);
+    const [compactionBackoffBaseMin, setCompactionBackoffBaseMin] = useState(15);
+    const [compactionBackoffMaxMin, setCompactionBackoffMaxMin] = useState(360);
+    const [progressWatchdogTimeoutSec, setProgressWatchdogTimeoutSec] = useState(120);
+    const [compactionBackoffs, setCompactionBackoffs] = useState([]);
+    const [progressWatchdogPhases, setProgressWatchdogPhases] = useState([]);
+    const [appliedHint, setAppliedHint] = useState(false);
+    const savedSnapshotRef = useRef('');
+    const saveTimerRef = useRef(null);
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
+
+    const applyIncoming = useCallback((data) => {
+        const next = normalizeCompactionSettings(data);
+        setCompactionTimeoutSec(next.compactionTimeoutSec);
+        setCompactionBackoffBaseMin(next.compactionBackoffBaseMin);
+        setCompactionBackoffMaxMin(next.compactionBackoffMaxMin);
+        setProgressWatchdogTimeoutSec(next.progressWatchdogTimeoutSec);
+        setCompactionBackoffs(next.compactionBackoffs);
+        setProgressWatchdogPhases(next.progressWatchdogPhases);
+        savedSnapshotRef.current = JSON.stringify({
+            compactionTimeoutSec: next.compactionTimeoutSec,
+            compactionBackoffBaseMin: next.compactionBackoffBaseMin,
+            compactionBackoffMaxMin: next.compactionBackoffMaxMin,
+            progressWatchdogTimeoutSec: next.progressWatchdogTimeoutSec,
+        });
+    }, []);
+
+    useEffect(() => {
+        applyIncoming(settingsData || {});
+    }, [settingsData, applyIncoming]);
+
+    const currentSnapshot = useMemo(() => JSON.stringify({
+        compactionTimeoutSec,
+        compactionBackoffBaseMin,
+        compactionBackoffMaxMin,
+        progressWatchdogTimeoutSec,
+    }), [compactionTimeoutSec, compactionBackoffBaseMin, compactionBackoffMaxMin, progressWatchdogTimeoutSec]);
+
+    useEffect(() => {
+        if (currentSnapshot === savedSnapshotRef.current) return;
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(async () => {
+            if (!mountedRef.current) return;
+            const active = document.activeElement;
+            if (active && active.closest?.('.settings-number-stepper')) return;
+            try {
+                setStatus?.('Saving compaction settings…', 'info');
+                const response = await fetch('/agent/settings/compaction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: currentSnapshot,
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!mountedRef.current) return;
+                if (!response.ok || !payload?.ok || !payload?.settings) {
+                    setStatus?.(payload?.error || 'Failed to save compaction settings.', 'error');
+                    return;
+                }
+                savedSnapshotRef.current = currentSnapshot;
+                mergeSettingsData?.(payload.settings);
+                applyIncoming({ ...(settingsData || {}), ...(payload.settings || {}) });
+                setStatus?.('Compaction settings saved.', 'success');
+                setAppliedHint(true);
+                setTimeout(() => {
+                    if (mountedRef.current) {
+                        setAppliedHint(false);
+                        setStatus?.(null);
+                    }
+                }, 4000);
+            } catch (error) {
+                console.warn('[settings/compaction] Failed to persist compaction settings.', error);
+                if (mountedRef.current) setStatus?.('Failed to save compaction settings.', 'error');
+            }
+        }, 800);
+        return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+    }, [currentSnapshot, mergeSettingsData, setStatus, applyIncoming, settingsData]);
+
+    const resetBackoff = useCallback(async (chatJid) => {
+        try {
+            setStatus?.(`Clearing compaction suppression for ${chatJid}…`, 'info');
+            const response = await fetch('/agent/settings/compaction/reset-backoff', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatJid }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok || !payload?.settings) {
+                setStatus?.(payload?.error || 'Failed to clear compaction suppression.', 'error');
+                return;
+            }
+            mergeSettingsData?.(payload.settings);
+            applyIncoming({ ...(settingsData || {}), ...(payload.settings || {}) });
+            setStatus?.(`Cleared compaction suppression for ${chatJid}.`, 'success');
+        } catch (error) {
+            console.warn('[settings/compaction] Failed to clear compaction suppression.', error);
+            setStatus?.('Failed to clear compaction suppression.', 'error');
+        }
+    }, [applyIncoming, mergeSettingsData, setStatus, settingsData]);
+
+    return html`
+        <div class="settings-section">
+            ${appliedHint && html`
+                <div class="settings-general-applied-notice" role="status" aria-live="polite">
+                    Compaction settings applied. Existing turns keep their current timers; new turns use the updated values.
+                </div>
+            `}
+
+            <h3>Automatic compaction</h3>
+            <div class="settings-row">
+                <label>Compaction timeout (sec)</label>
+                <${NumberStepper}
+                    label="compaction timeout"
+                    value=${compactionTimeoutSec}
+                    min=${1}
+                    max=${3600}
+                    fallback=${180}
+                    width="90px"
+                    onChange=${setCompactionTimeoutSec}
+                />
+                <span class="settings-hint" style="margin:0">Abort a stuck pre-prompt/manual compaction instead of hanging forever.</span>
+            </div>
+            <div class="settings-row">
+                <label>Failure backoff base (min)</label>
+                <${NumberStepper}
+                    label="compaction backoff base"
+                    value=${compactionBackoffBaseMin}
+                    min=${1}
+                    max=${24 * 60}
+                    fallback=${15}
+                    width="90px"
+                    onChange=${setCompactionBackoffBaseMin}
+                />
+                <span class="settings-hint" style="margin:0">First suppression window after a compaction failure.</span>
+            </div>
+            <div class="settings-row">
+                <label>Failure backoff max (min)</label>
+                <${NumberStepper}
+                    label="compaction backoff max"
+                    value=${compactionBackoffMaxMin}
+                    min=${1}
+                    max=${7 * 24 * 60}
+                    fallback=${360}
+                    width="90px"
+                    onChange=${setCompactionBackoffMaxMin}
+                />
+                <span class="settings-hint" style="margin:0">Upper bound for exponential suppression after repeated failures.</span>
+            </div>
+
+            <h3 style="margin-top:20px">Stall watchdog</h3>
+            <div class="settings-row">
+                <label>Watchdog timeout (sec)</label>
+                <${NumberStepper}
+                    label="watchdog timeout"
+                    value=${progressWatchdogTimeoutSec}
+                    min=${0}
+                    max=${3600}
+                    fallback=${120}
+                    width="90px"
+                    onChange=${setProgressWatchdogTimeoutSec}
+                />
+                <span class="settings-hint" style="margin:0">0 disables the watchdog. A helper process terminates the runtime if an active phase stops heartbeating.</span>
+            </div>
+
+            <h3 style="margin-top:20px">Active compaction suppressions</h3>
+            ${compactionBackoffs.length === 0 ? html`
+                <p class="settings-hint">No chats are currently under compaction backoff.</p>
+            ` : html`
+                <div class="settings-table-wrapper">
+                    <table class="settings-table">
+                        <thead>
+                            <tr>
+                                <th>Chat</th>
+                                <th>Failures</th>
+                                <th>Suppressed until</th>
+                                <th>Last error</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${compactionBackoffs.map((entry) => html`
+                                <tr>
+                                    <td><code>${entry.chatJid}</code></td>
+                                    <td>${entry.failureCount}</td>
+                                    <td>${formatIso(entry.backoffUntil)}</td>
+                                    <td title=${entry.lastErrorMessage || ''}>${entry.lastErrorMessage || '—'}</td>
+                                    <td>
+                                        <button class="settings-secondary-btn" onClick=${() => resetBackoff(entry.chatJid)}>
+                                            Clear
+                                        </button>
+                                    </td>
+                                </tr>
+                            `)}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+
+            <h3 style="margin-top:20px">Live watchdog phases</h3>
+            ${progressWatchdogPhases.length === 0 ? html`
+                <p class="settings-hint">No active tracked phases right now.</p>
+            ` : html`
+                <div class="settings-table-wrapper">
+                    <table class="settings-table">
+                        <thead>
+                            <tr>
+                                <th>Chat</th>
+                                <th>Phase</th>
+                                <th>Started</th>
+                                <th>Last heartbeat</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${progressWatchdogPhases.map((entry) => html`
+                                <tr>
+                                    <td><code>${entry.chatJid}</code></td>
+                                    <td>${entry.phase}</td>
+                                    <td>${formatIso(entry.startedAt)}</td>
+                                    <td>${formatIso(entry.lastProgressAt)}</td>
+                                </tr>
+                            `)}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+        </div>
+    `;
+}

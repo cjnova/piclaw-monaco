@@ -20,8 +20,8 @@ export function requestOpenSettingsDialog(options: OpenSettingsDialogOptions = {
     } else {
       delete (window as any)[OPEN_SECTION_FLAG];
     }
-  } catch {
-    // Best effort only.
+  } catch (error) {
+    console.debug('[settings-dialog-events] failed to record open request flags', error);
   }
   window.dispatchEvent(new CustomEvent('piclaw:open-settings', {
     detail: section ? { section } : undefined,
@@ -40,8 +40,8 @@ export function consumeRequestedSettingsOpenState(): { open: boolean; section: s
   try {
     (window as any)[OPEN_REQUEST_FLAG] = false;
     delete (window as any)[OPEN_SECTION_FLAG];
-  } catch {
-    // Best effort only.
+  } catch (error) {
+    console.debug('[settings-dialog-events] failed to clear open request flags', error);
   }
   return { open, section };
 }

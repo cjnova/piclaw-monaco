@@ -194,6 +194,10 @@ const toolsConfig =
   piclawConfig.tools && typeof piclawConfig.tools === "object"
     ? (piclawConfig.tools as Record<string, unknown>)
     : piclawConfig;
+const compactionConfig =
+  piclawConfig.compaction && typeof piclawConfig.compaction === "object"
+    ? (piclawConfig.compaction as Record<string, unknown>)
+    : piclawConfig;
 
 // Extract individual settings from the JSON config, trying multiple key aliases.
 const configAppToken = pickString(pushoverConfig, ["appToken", "app_token", "PUSHOVER_APP_TOKEN"]);
@@ -775,6 +779,30 @@ const configTurnMaxToolUseMessages = pickNumber(piclawConfig, [
   "tool_use_budget",
   "PICLAW_TURN_MAX_TOOL_USE_MESSAGES",
 ]);
+const configCompactionTimeoutMs = pickNumber(compactionConfig, [
+  "timeoutMs",
+  "timeout_ms",
+  "compactionTimeoutMs",
+  "PICLAW_COMPACTION_TIMEOUT_MS",
+]);
+const configCompactionBackoffBaseMs = pickNumber(compactionConfig, [
+  "backoffBaseMs",
+  "backoff_base_ms",
+  "compactionBackoffBaseMs",
+  "PICLAW_COMPACTION_BACKOFF_BASE_MS",
+]);
+const configCompactionBackoffMaxMs = pickNumber(compactionConfig, [
+  "backoffMaxMs",
+  "backoff_max_ms",
+  "compactionBackoffMaxMs",
+  "PICLAW_COMPACTION_BACKOFF_MAX_MS",
+]);
+const configProgressWatchdogTimeoutMs = pickNumber(compactionConfig, [
+  "progressWatchdogTimeoutMs",
+  "progress_watchdog_timeout_ms",
+  "watchdogTimeoutMs",
+  "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
+]);
 const configAdditionalDefaultTools = pickStringArray(toolsConfig, [
   "additionalDefaultTools",
   "additional_default_tools",
@@ -802,6 +830,13 @@ export interface SessionStorageConfig {
   maxSizeBytes: number;
   maxLines: number;
   autoRotate: boolean;
+}
+
+export interface CompactionRuntimeConfig {
+  timeoutMs: number;
+  backoffBaseMs: number;
+  backoffMaxMs: number;
+  progressWatchdogTimeoutMs: number;
 }
 
 const sessionMaxSizeMb =
@@ -901,6 +936,115 @@ export function setToolUseMessageBudget(budget: number): number {
   process.env.PICLAW_TURN_MAX_TOOL_USE_MESSAGES = String(nextBudget);
   TOOL_USE_MESSAGE_BUDGET = nextBudget;
   return TOOL_USE_MESSAGE_BUDGET;
+}
+
+const DEFAULT_COMPACTION_TIMEOUT_MS = 180_000;
+const DEFAULT_COMPACTION_BACKOFF_BASE_MS = 15 * 60_000;
+const DEFAULT_COMPACTION_BACKOFF_MAX_MS = 6 * 60 * 60_000;
+const DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS = 120_000;
+
+let COMPACTION_RUNTIME_CONFIG: CompactionRuntimeConfig = Object.seal({
+  timeoutMs: Number.isFinite(configCompactionTimeoutMs) && (configCompactionTimeoutMs ?? 0) > 0
+    ? Math.round(Number(configCompactionTimeoutMs))
+    : DEFAULT_COMPACTION_TIMEOUT_MS,
+  backoffBaseMs: Number.isFinite(configCompactionBackoffBaseMs) && (configCompactionBackoffBaseMs ?? 0) > 0
+    ? Math.round(Number(configCompactionBackoffBaseMs))
+    : DEFAULT_COMPACTION_BACKOFF_BASE_MS,
+  backoffMaxMs: Number.isFinite(configCompactionBackoffMaxMs) && (configCompactionBackoffMaxMs ?? 0) > 0
+    ? Math.round(Number(configCompactionBackoffMaxMs))
+    : DEFAULT_COMPACTION_BACKOFF_MAX_MS,
+  progressWatchdogTimeoutMs: Number.isFinite(configProgressWatchdogTimeoutMs)
+    ? Math.max(0, Math.round(Number(configProgressWatchdogTimeoutMs)))
+    : DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS,
+});
+
+function parsePositiveDurationMs(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.round(parsed));
+}
+
+function parseOptionalNonNegativeDurationMs(value: unknown, fallback: number): number {
+  const trimmed = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (trimmed && ["0", "off", "false", "disabled", "no"].includes(trimmed)) return 0;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.round(parsed));
+}
+
+export function getCompactionRuntimeConfig(): Readonly<CompactionRuntimeConfig> {
+  return Object.freeze({
+    timeoutMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_TIMEOUT_MS, COMPACTION_RUNTIME_CONFIG.timeoutMs),
+    backoffBaseMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS, COMPACTION_RUNTIME_CONFIG.backoffBaseMs),
+    backoffMaxMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS, COMPACTION_RUNTIME_CONFIG.backoffMaxMs),
+    progressWatchdogTimeoutMs: parseOptionalNonNegativeDurationMs(
+      process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
+      COMPACTION_RUNTIME_CONFIG.progressWatchdogTimeoutMs,
+    ),
+  });
+}
+
+export function setCompactionRuntimeConfig(patch: {
+  timeoutMs?: number;
+  backoffBaseMs?: number;
+  backoffMaxMs?: number;
+  progressWatchdogTimeoutMs?: number;
+}): Readonly<CompactionRuntimeConfig> {
+  const current = getCompactionRuntimeConfig();
+  const next: CompactionRuntimeConfig = {
+    timeoutMs: patch.timeoutMs === undefined ? current.timeoutMs : parsePositiveDurationMs(patch.timeoutMs, current.timeoutMs),
+    backoffBaseMs: patch.backoffBaseMs === undefined ? current.backoffBaseMs : parsePositiveDurationMs(patch.backoffBaseMs, current.backoffBaseMs),
+    backoffMaxMs: patch.backoffMaxMs === undefined ? current.backoffMaxMs : parsePositiveDurationMs(patch.backoffMaxMs, current.backoffMaxMs),
+    progressWatchdogTimeoutMs: patch.progressWatchdogTimeoutMs === undefined
+      ? current.progressWatchdogTimeoutMs
+      : parseOptionalNonNegativeDurationMs(patch.progressWatchdogTimeoutMs, current.progressWatchdogTimeoutMs),
+  };
+
+  if (next.backoffMaxMs < next.backoffBaseMs) {
+    next.backoffMaxMs = next.backoffBaseMs;
+  }
+
+  const config = readJsonConfig(getConfigPath());
+  const compaction =
+    config.compaction && typeof config.compaction === "object"
+      ? { ...(config.compaction as Record<string, unknown>) }
+      : {};
+  const clearKeys = [
+    "timeoutMs",
+    "timeout_ms",
+    "compactionTimeoutMs",
+    "backoffBaseMs",
+    "backoff_base_ms",
+    "compactionBackoffBaseMs",
+    "backoffMaxMs",
+    "backoff_max_ms",
+    "compactionBackoffMaxMs",
+    "progressWatchdogTimeoutMs",
+    "progress_watchdog_timeout_ms",
+    "watchdogTimeoutMs",
+    "PICLAW_COMPACTION_TIMEOUT_MS",
+    "PICLAW_COMPACTION_BACKOFF_BASE_MS",
+    "PICLAW_COMPACTION_BACKOFF_MAX_MS",
+    "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
+  ];
+  for (const key of clearKeys) {
+    delete compaction[key];
+    delete config[key];
+  }
+  compaction.timeoutMs = next.timeoutMs;
+  compaction.backoffBaseMs = next.backoffBaseMs;
+  compaction.backoffMaxMs = next.backoffMaxMs;
+  compaction.progressWatchdogTimeoutMs = next.progressWatchdogTimeoutMs;
+  config.compaction = compaction;
+  writeJsonConfig(getConfigPath(), config);
+
+  process.env.PICLAW_COMPACTION_TIMEOUT_MS = String(next.timeoutMs);
+  process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS = String(next.backoffBaseMs);
+  process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS = String(next.backoffMaxMs);
+  process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS = String(next.progressWatchdogTimeoutMs);
+
+  COMPACTION_RUNTIME_CONFIG = Object.seal(next);
+  return getCompactionRuntimeConfig();
 }
 
 // ---------------------------------------------------------------------------
