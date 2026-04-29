@@ -317,6 +317,11 @@
     var i5 = p2(t2++, 3);
     !c2.__s && C2(i5.__H, u5) && (i5.__ = n3, i5.u = u5, r2.__H.__h.push(i5));
   }
+  function A2(n3) {
+    return o2 = 5, T2(function() {
+      return { current: n3 };
+    }, []);
+  }
   function T2(n3, r4) {
     var u5 = p2(t2++, 7);
     return C2(u5.__H, r4) && (u5.__ = n3(), u5.__H = r4, u5.__h = n3), u5.__;
@@ -1147,6 +1152,99 @@
     }) });
   }
 
+  // runtime/web/frontend/src/components/SplitPane.tsx
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+  function SplitPane({ direction, initialSize, minSize, maxSize, children, onResize }) {
+    const normalizedInitialSize = T2(() => clamp(initialSize, minSize, maxSize), [initialSize, minSize, maxSize]);
+    const [firstSize, setFirstSize] = d2(normalizedInitialSize);
+    const [isCollapsed, setIsCollapsed] = d2(false);
+    const [isDragging, setIsDragging] = d2(false);
+    const dragStartPositionRef = A2(0);
+    const dragStartSizeRef = A2(normalizedInitialSize);
+    const restoreSizeRef = A2(normalizedInitialSize);
+    const [firstChild, secondChild] = children;
+    y2(() => {
+      const clamped = clamp(normalizedInitialSize, minSize, maxSize);
+      setFirstSize(clamped);
+      restoreSizeRef.current = clamped;
+      setIsCollapsed(false);
+    }, [normalizedInitialSize, minSize, maxSize]);
+    y2(() => {
+      if (!isDragging) {
+        return;
+      }
+      const axis = direction === "horizontal" ? "clientX" : "clientY";
+      const handleMouseMove = (event) => {
+        const currentPosition = event[axis];
+        const delta = currentPosition - dragStartPositionRef.current;
+        const nextSize = clamp(dragStartSizeRef.current + delta, minSize, maxSize);
+        setFirstSize(nextSize);
+        if (nextSize > 0) {
+          restoreSizeRef.current = nextSize;
+        }
+        onResize?.(nextSize);
+      };
+      const handleMouseUp = () => {
+        setIsDragging(false);
+      };
+      const previousUserSelect = document.body.style.userSelect;
+      const previousCursor = document.body.style.cursor;
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = direction === "horizontal" ? "col-resize" : "row-resize";
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.body.style.userSelect = previousUserSelect;
+        document.body.style.cursor = previousCursor;
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
+    }, [direction, isDragging, maxSize, minSize, onResize]);
+    const handleMouseDown = (event) => {
+      event.preventDefault();
+      const axis = direction === "horizontal" ? "clientX" : "clientY";
+      dragStartPositionRef.current = event[axis];
+      dragStartSizeRef.current = firstSize;
+      if (isCollapsed) {
+        setIsCollapsed(false);
+      }
+      setIsDragging(true);
+    };
+    const handleDoubleClick = () => {
+      if (isCollapsed) {
+        const restored = clamp(restoreSizeRef.current || normalizedInitialSize, minSize, maxSize);
+        setFirstSize(restored);
+        setIsCollapsed(false);
+        onResize?.(restored);
+        return;
+      }
+      if (firstSize > 0) {
+        restoreSizeRef.current = firstSize;
+      }
+      setFirstSize(0);
+      setIsCollapsed(true);
+      onResize?.(0);
+    };
+    const firstPaneStyle = direction === "horizontal" ? { width: `${firstSize}px`, minWidth: `${firstSize}px`, maxWidth: `${firstSize}px` } : { height: `${firstSize}px`, minHeight: `${firstSize}px`, maxHeight: `${firstSize}px` };
+    return /* @__PURE__ */ u4("div", { className: `split-pane split-pane--${direction}`, children: [
+      /* @__PURE__ */ u4("div", { className: "split-pane__first", style: firstPaneStyle, children: firstChild }),
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          className: `split-handle split-handle--${direction}`,
+          onMouseDown: handleMouseDown,
+          onDblClick: handleDoubleClick,
+          role: "separator",
+          "aria-orientation": direction === "horizontal" ? "vertical" : "horizontal",
+          "aria-label": "Resize panels"
+        }
+      ),
+      /* @__PURE__ */ u4("div", { className: "split-pane__second", children: secondChild })
+    ] });
+  }
+
   // runtime/web/frontend/src/panels/PanelRouter.tsx
   var PANEL_CONTENT = {
     explorer: {
@@ -1224,7 +1322,10 @@
           ),
           /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
+        /* @__PURE__ */ u4("div", { className: "shell-main-layout", children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 400, children: [
+          /* @__PURE__ */ u4("aside", { className: "shell-sidebar", children: "Sidebar area" }),
+          /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
+        ] }) })
       ] })
     ] });
   }
