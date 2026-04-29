@@ -3,7 +3,7 @@ import { Icon } from "./Icon";
 const PANELS = [
   { id: "explorer", icon: "files", label: "Workspace" },
   { id: "search", icon: "search", label: "Search" },
-  { id: "extensions", icon: "extensions", label: "Extensions" },
+  { id: "extensions", icon: "extensions", label: "Addons" },
   { id: "agent", icon: "hubot", label: "Agent" },
   { id: "settings", icon: "gear", label: "Settings", alignBottom: true },
 ] as const;

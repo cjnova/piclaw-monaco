@@ -21,7 +21,7 @@ const PANEL_CONTENT: Record<string, PanelContent> = {
     description: "Coming soon...",
   },
   extensions: {
-    title: "🧩 Extensions Panel",
+    title: "🧩 Addons",
     description: "Coming soon...",
   },
   agent: {
