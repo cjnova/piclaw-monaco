@@ -12,12 +12,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -u 1000 -s /bin/bash agent
+# Use existing bun user (uid 1000) as non-root runtime user
 
 COPY --from=build /app /app
 WORKDIR /app
 
-USER agent
+USER bun
 EXPOSE 8080
 
 CMD ["bun", "run", "runtime/src/index.ts", "--port", "8080"]
