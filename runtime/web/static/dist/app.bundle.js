@@ -1081,7 +1081,7 @@
     { id: "explorer", icon: "files", label: "Workspace" },
     { id: "search", icon: "search", label: "Search" },
     { id: "extensions", icon: "extensions", label: "Addons" },
-    { id: "agent", icon: "hubot", label: "Agent" },
+    { id: "agent", icon: "dashboard", label: "Dashboards" },
     { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
   function ActivityBar({ activePanel, onPanelChange }) {
@@ -7319,6 +7319,140 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       mtime: value.mtime ?? null
     };
   }
+  function nameHash(name) {
+    let h5 = 2166136261;
+    for (let i6 = 0; i6 < name.length; i6++) {
+      h5 ^= name.charCodeAt(i6);
+      h5 = h5 * 16777619 >>> 0;
+    }
+    return h5;
+  }
+  function polarToCartesian(cx, cy, r4, angleDeg) {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r4 * Math.cos(rad), y: cy + r4 * Math.sin(rad) };
+  }
+  function describeArc(cx, cy, innerR, outerR, startAngle, endAngle) {
+    const span = endAngle - startAngle;
+    if (span >= 359.9) {
+      const mid = startAngle + 180;
+      return `${describeArc(cx, cy, innerR, outerR, startAngle, mid)} ${describeArc(cx, cy, innerR, outerR, mid, startAngle + 359.8)}`;
+    }
+    const s1 = polarToCartesian(cx, cy, outerR, startAngle);
+    const e1 = polarToCartesian(cx, cy, outerR, endAngle);
+    const s22 = polarToCartesian(cx, cy, innerR, endAngle);
+    const e22 = polarToCartesian(cx, cy, innerR, startAngle);
+    const largeArc = span > 180 ? 1 : 0;
+    return [
+      `M ${s1.x.toFixed(3)} ${s1.y.toFixed(3)}`,
+      `A ${outerR} ${outerR} 0 ${largeArc} 1 ${e1.x.toFixed(3)} ${e1.y.toFixed(3)}`,
+      `L ${s22.x.toFixed(3)} ${s22.y.toFixed(3)}`,
+      `A ${innerR} ${innerR} 0 ${largeArc} 0 ${e22.x.toFixed(3)} ${e22.y.toFixed(3)}`,
+      "Z"
+    ].join(" ");
+  }
+  var RING_SPECS = [
+    { innerR: 38, outerR: 68 },
+    { innerR: 71, outerR: 90 },
+    { innerR: 93, outerR: 108 }
+  ];
+  var GAP_DEG = 1.5;
+  var MAX_SLICES = 14;
+  var SB_CX = 120;
+  var SB_CY = 120;
+  function buildArcSegments(nodes, ring, startAngle, endAngle, parentHue) {
+    if (ring >= RING_SPECS.length) return [];
+    const { innerR, outerR } = RING_SPECS[ring];
+    const totalRange = endAngle - startAngle;
+    if (totalRange <= GAP_DEG * 2) return [];
+    const valid = nodes.filter((n4) => (n4.size ?? 0) > 0).sort((a4, b6) => (b6.size ?? 0) - (a4.size ?? 0)).slice(0, MAX_SLICES);
+    if (!valid.length) return [];
+    const totalSize = valid.reduce((s4, n4) => s4 + (n4.size ?? 0), 0);
+    if (totalSize <= 0) return [];
+    const segments = [];
+    let angle = startAngle + GAP_DEG / 2;
+    for (const node of valid) {
+      const size = node.size ?? 0;
+      const fraction = size / totalSize;
+      const segRange = totalRange * fraction - GAP_DEG;
+      if (segRange < 1.5) {
+        angle += totalRange * fraction;
+        continue;
+      }
+      const segEnd = angle + segRange;
+      const hue = ring === 0 ? nameHash(node.name) % 360 : parentHue ?? nameHash(node.name) % 360;
+      const lightness = ring === 0 ? 58 : ring === 1 ? 46 : 36;
+      const color = `hsl(${hue}, 68%, ${lightness}%)`;
+      segments.push({
+        d: describeArc(SB_CX, SB_CY, innerR, outerR, angle, segEnd),
+        color,
+        label: node.name,
+        size,
+        ring
+      });
+      if (node.children?.length) {
+        segments.push(...buildArcSegments(node.children, ring + 1, angle, segEnd, hue));
+      }
+      angle = segEnd + GAP_DEG;
+    }
+    return segments;
+  }
+  function SunburstChart({ root: root2, totalSize }) {
+    const children = root2.children ?? [];
+    const arcs = buildArcSegments(children, 0, 0, 360);
+    return /* @__PURE__ */ u4("div", { className: "workspace__sunburst", children: /* @__PURE__ */ u4("svg", { viewBox: "0 0 240 240", "aria-label": "Folder size sunburst chart", children: [
+      RING_SPECS.map((spec, i6) => /* @__PURE__ */ u4(
+        "circle",
+        {
+          cx: SB_CX,
+          cy: SB_CY,
+          r: (spec.innerR + spec.outerR) / 2,
+          fill: "none",
+          stroke: "rgba(255,255,255,0.04)",
+          strokeWidth: spec.outerR - spec.innerR
+        },
+        i6
+      )),
+      arcs.map((arc, i6) => /* @__PURE__ */ u4(
+        "path",
+        {
+          d: arc.d,
+          fill: arc.color,
+          stroke: "rgba(0,0,0,0.35)",
+          strokeWidth: "0.6",
+          opacity: "0.92",
+          children: /* @__PURE__ */ u4("title", { children: [
+            arc.label,
+            " \u2014 ",
+            formatBytes2(arc.size)
+          ] })
+        },
+        i6
+      )),
+      /* @__PURE__ */ u4("circle", { cx: SB_CX, cy: SB_CY, r: "35", fill: "rgba(20,20,30,0.88)" }),
+      /* @__PURE__ */ u4(
+        "text",
+        {
+          x: SB_CX,
+          y: SB_CY - 5,
+          textAnchor: "middle",
+          dominantBaseline: "auto",
+          className: "workspace__sunburst-total",
+          children: formatBytes2(totalSize)
+        }
+      ),
+      /* @__PURE__ */ u4(
+        "text",
+        {
+          x: SB_CX,
+          y: SB_CY + 9,
+          textAnchor: "middle",
+          dominantBaseline: "auto",
+          className: "workspace__sunburst-label",
+          children: "total"
+        }
+      )
+    ] }) });
+  }
   function renderChartSegment(segment, index, segments) {
     const radius = 44;
     const circumference = 2 * Math.PI * radius;
@@ -7472,6 +7606,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
   function FolderPreview({ node, onMutate }) {
     const [children, setChildren] = d2(null);
+    const [sunburstRoot, setSunburstRoot] = d2(null);
     const [totalSize, setTotalSize] = d2(null);
     const [status, setStatus] = d2("loading");
     const [showAll, setShowAll] = d2(false);
@@ -7480,12 +7615,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const uploadInputRef = A2(null);
     y2(() => {
       setChildren(null);
+      setSunburstRoot(null);
       setTotalSize(null);
       setStatus("loading");
       setShowAll(false);
       const controller = new AbortController();
       const treeFetch = fetch(
-        `/workspace/tree?path=${encodeURIComponent(node.path)}&max=100`,
+        `/workspace/tree?path=${encodeURIComponent(node.path)}&depth=3`,
         { credentials: "same-origin", signal: controller.signal }
       ).then((r4) => {
         if (!r4.ok) throw new Error(`HTTP ${r4.status}`);
@@ -7499,13 +7635,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         return r4.json();
       }).catch(() => null);
       Promise.all([treeFetch, statFetch]).then(([treeData, statData]) => {
-        const kids = treeData.root?.children ?? [];
+        const root2 = treeData.root;
+        const kids = root2?.children ?? [];
         const sorted = [...kids].sort((a4, b6) => {
           const sa = a4.size ?? 0;
           const sb = b6.size ?? 0;
           return sb - sa;
         });
         setChildren(sorted);
+        setSunburstRoot(root2 ?? null);
         const sizeFromStat = statData?.size ?? null;
         if (sizeFromStat !== null) {
           setTotalSize(sizeFromStat);
@@ -7689,7 +7827,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             }
           ),
           children && children.length === 0 && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: "Empty folder" })
-        ] }) : /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-wrap", children: chartSegments.length > 0 ? /* @__PURE__ */ u4(S, { children: [
+        ] }) : /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-wrap", children: sunburstRoot && (totalSize ?? 0) > 0 ? /* @__PURE__ */ u4(SunburstChart, { root: sunburstRoot, totalSize: totalSize ?? 0 }) : chartSegments.length > 0 ? /* @__PURE__ */ u4(S, { children: [
           /* @__PURE__ */ u4("div", { className: "workspace__folder-chart", children: [
             /* @__PURE__ */ u4("svg", { viewBox: "0 0 120 120", "aria-label": "Folder size chart", children: [
               /* @__PURE__ */ u4("circle", { cx: "60", cy: "60", r: "44", fill: "none", stroke: "rgba(255,255,255,0.08)", strokeWidth: "18" }),
@@ -8052,8 +8190,54 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
 
+  // runtime/web/frontend/src/panels/AgentPanel.tsx
+  function extractDisplayName(extensionPath) {
+    const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
+    return withoutPrefix.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  }
+  function AgentPanel({ onPageSelect }) {
+    const pages = useSignal([]);
+    const loading = useSignal(true);
+    y2(() => {
+      fetch("/api/extension-routes", { credentials: "same-origin" }).then((res) => res.json()).then((routes) => {
+        pages.value = routes.filter((r4) => r4.prefix.endsWith("-page"));
+        loading.value = false;
+      }).catch(() => {
+        loading.value = false;
+      });
+    }, []);
+    if (loading.value) {
+      return /* @__PURE__ */ u4("div", { className: "agent-panel", children: /* @__PURE__ */ u4("div", { className: "agent-panel__empty", children: "Loading\u2026" }) });
+    }
+    if (pages.value.length === 0) {
+      return /* @__PURE__ */ u4("div", { className: "agent-panel", children: /* @__PURE__ */ u4("div", { className: "agent-panel__empty", children: "No extension pages available. Install addons with page routes." }) });
+    }
+    return /* @__PURE__ */ u4("div", { className: "agent-panel", children: /* @__PURE__ */ u4("ul", { className: "agent-panel__list", children: pages.value.map((page) => {
+      const name = extractDisplayName(page.extensionPath);
+      return /* @__PURE__ */ u4(
+        "li",
+        {
+          className: "agent-panel__item",
+          onClick: () => onPageSelect(page.prefix, name),
+          role: "button",
+          tabIndex: 0,
+          onKeyDown: (e5) => {
+            if (e5.key === "Enter" || e5.key === " ") {
+              onPageSelect(page.prefix, name);
+            }
+          },
+          children: [
+            /* @__PURE__ */ u4("i", { className: "agent-panel__item-icon codicon codicon-browser" }),
+            /* @__PURE__ */ u4("span", { className: "agent-panel__item-name", children: name })
+          ]
+        },
+        page.prefix
+      );
+    }) }) });
+  }
+
   // runtime/web/frontend/src/panels/PanelRouter.tsx
-  function PanelRouter({ activePanel }) {
+  function PanelRouter({ activePanel, onPageSelect }) {
     switch (activePanel) {
       case "explorer":
       case "files":
@@ -8063,7 +8247,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       case "extensions":
         return /* @__PURE__ */ u4(AddonsPanel, {});
       case "agent":
-        return /* @__PURE__ */ u4(Placeholder, { text: "Chat is always visible \u2192" });
+        return /* @__PURE__ */ u4(AgentPanel, { onPageSelect: onPageSelect ?? (() => {
+        }) });
       case "settings":
         return /* @__PURE__ */ u4(Placeholder, { text: "Settings panels" });
       default:
@@ -8340,8 +8525,21 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
 
   // runtime/web/frontend/src/panels/ChatPanel.tsx
+  function extractDisplayName2(extensionPath) {
+    const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
+    return withoutPrefix.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  }
   function ChatPanel({ onOpenPalette } = {}) {
     const textareaRef = A2(null);
+    const activeTab = useSignal("chat");
+    const extensionPages = useSignal([]);
+    y2(() => {
+      fetch("/api/extension-routes", { credentials: "include" }).then((res) => res.json()).then((routes) => {
+        const pages2 = routes.filter((r4) => r4.prefix.endsWith("-page"));
+        extensionPages.value = pages2;
+      }).catch(() => {
+      });
+    }, []);
     const handleInput = (e5) => {
       const el = e5.target;
       if (el.value === "/") {
@@ -8355,33 +8553,70 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
       el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
     };
+    const pages = extensionPages.value;
+    const showTabs = pages.length > 0;
     return /* @__PURE__ */ u4("section", { className: "chat", children: [
-      /* @__PURE__ */ u4("div", { className: "chat__messages", children: /* @__PURE__ */ u4(MessageList, {}) }),
-      /* @__PURE__ */ u4("div", { className: "chat__compose", children: [
-        /* @__PURE__ */ u4(
-          "textarea",
-          {
-            ref: textareaRef,
-            className: "chat__input",
-            placeholder: "Type a message...",
-            rows: 1,
-            onInput: handleInput,
-            onKeyDown: (e5) => {
-              if (e5.key === "Enter" && !e5.shiftKey) {
-                e5.preventDefault();
-              }
-            }
-          }
-        ),
+      showTabs && /* @__PURE__ */ u4("div", { className: "chat-tabs", children: [
         /* @__PURE__ */ u4(
           "button",
           {
             type: "button",
-            className: "chat__send-btn",
-            children: "Send"
+            className: `chat-tabs__tab${activeTab.value === "chat" ? " chat-tabs__tab--active" : ""}`,
+            onClick: () => {
+              activeTab.value = "chat";
+            },
+            children: "Chat"
           }
-        )
-      ] })
+        ),
+        pages.map((page) => /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: `chat-tabs__tab${activeTab.value === page.prefix ? " chat-tabs__tab--active" : ""}`,
+            onClick: () => {
+              activeTab.value = page.prefix;
+            },
+            children: extractDisplayName2(page.extensionPath)
+          },
+          page.prefix
+        ))
+      ] }),
+      activeTab.value === "chat" ? /* @__PURE__ */ u4(S, { children: [
+        /* @__PURE__ */ u4("div", { className: "chat__messages", children: /* @__PURE__ */ u4(MessageList, {}) }),
+        /* @__PURE__ */ u4("div", { className: "chat__compose", children: [
+          /* @__PURE__ */ u4(
+            "textarea",
+            {
+              ref: textareaRef,
+              className: "chat__input",
+              placeholder: "Type a message...",
+              rows: 1,
+              onInput: handleInput,
+              onKeyDown: (e5) => {
+                if (e5.key === "Enter" && !e5.shiftKey) {
+                  e5.preventDefault();
+                }
+              }
+            }
+          ),
+          /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              className: "chat__send-btn",
+              children: "Send"
+            }
+          )
+        ] })
+      ] }) : /* @__PURE__ */ u4(
+        "iframe",
+        {
+          className: "chat-tabs__iframe",
+          src: activeTab.value,
+          sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
+          title: extractDisplayName2(pages.find((p6) => p6.prefix === activeTab.value)?.extensionPath ?? "")
+        }
+      )
     ] });
   }
 
@@ -8492,6 +8727,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const terminalMaximized = useSignal(false);
     const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
     const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
+    const extensionPageUrl = useSignal(null);
+    const extensionPageName = useSignal(null);
     const sseRef = A2(null);
     const termDragRef = A2(null);
     y2(() => {
@@ -8559,7 +8796,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         if (e5.ctrlKey && e5.shiftKey && e5.key.toLowerCase() === "a") {
           e5.preventDefault();
           activePanel.value = "agent";
-          sidebarCollapsed.value = true;
+          sidebarCollapsed.value = false;
           return;
         }
         if (e5.ctrlKey && !e5.shiftKey && e5.key === ",") {
@@ -8587,9 +8824,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           activePanel.value = "extensions";
           sidebarCollapsed.value = false;
         } },
-        { id: "nav.agent", label: "Show Agent", category: "navigation", keybinding: "Ctrl+Shift+A", handler: () => {
+        { id: "nav.agent", label: "Show Dashboards", category: "navigation", keybinding: "Ctrl+Shift+A", handler: () => {
           activePanel.value = "agent";
-          sidebarCollapsed.value = true;
+          sidebarCollapsed.value = false;
         } },
         { id: "nav.settings", label: "Show Settings", category: "navigation", keybinding: "Ctrl+,", handler: () => {
           activePanel.value = "settings";
@@ -8653,11 +8890,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl]);
     const handlePanelChange = q2((id) => {
-      if (id === "agent") {
-        activePanel.value = id;
-        sidebarCollapsed.value = true;
-        return;
-      }
       if (id === activePanel.value) {
         sidebarCollapsed.value = !sidebarCollapsed.value;
       } else {
@@ -8665,8 +8897,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         sidebarCollapsed.value = false;
       }
     }, [activePanel, sidebarCollapsed]);
+    const handlePageSelect = q2((url, name) => {
+      extensionPageUrl.value = url;
+      extensionPageName.value = name;
+    }, [extensionPageUrl, extensionPageName]);
+    const handleBackToChat = q2(() => {
+      extensionPageUrl.value = null;
+      extensionPageName.value = null;
+    }, [extensionPageUrl, extensionPageName]);
     const connected = connectionStatus.value === "connected";
-    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Agent", settings: "Settings" };
+    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
     const onTermDragStart = q2((e5) => {
       e5.preventDefault();
       termDragRef.current = { startY: e5.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
@@ -8702,7 +8942,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 minWidth: sidebarCollapsed.value ? 0 : 150,
                 maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5)
               },
-              children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
+              children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value, onPageSelect: handlePageSelect }) })
             }
           ),
           !sidebarCollapsed.value && /* @__PURE__ */ u4(
@@ -8729,7 +8969,33 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
+          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: extensionPageUrl.value ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
+            /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
+              /* @__PURE__ */ u4(
+                "button",
+                {
+                  type: "button",
+                  className: "extension-frame__back-btn",
+                  onClick: handleBackToChat,
+                  children: [
+                    /* @__PURE__ */ u4("i", { className: "codicon codicon-arrow-left" }),
+                    " ",
+                    "\u2190 Back to Chat"
+                  ]
+                }
+              ),
+              /* @__PURE__ */ u4("span", { className: "extension-frame__title", children: extensionPageName.value })
+            ] }),
+            /* @__PURE__ */ u4(
+              "iframe",
+              {
+                className: "extension-frame__iframe",
+                src: extensionPageUrl.value,
+                sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
+                title: extensionPageName.value ?? "Extension Page"
+              }
+            )
+          ] }) : /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
             paletteVisible.value = true;
           } }) })
         ] }),

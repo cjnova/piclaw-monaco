@@ -4,7 +4,7 @@ const PANELS = [
   { id: "explorer", icon: "files", label: "Workspace" },
   { id: "search", icon: "search", label: "Search" },
   { id: "extensions", icon: "extensions", label: "Addons" },
-  { id: "agent", icon: "hubot", label: "Agent" },
+  { id: "agent", icon: "dashboard", label: "Dashboards" },
   { id: "settings", icon: "gear", label: "Settings", alignBottom: true },
 ] as const;
 

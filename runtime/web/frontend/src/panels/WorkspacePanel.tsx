@@ -55,6 +55,200 @@ function makeTreeNodeFromMutation(
   };
 }
 
+// ─── Sunburst helpers ───────────────────────────────────────────────────────
+
+interface SunburstNode {
+  name: string;
+  path: string;
+  type: "dir" | "file";
+  size: number | null;
+  children?: SunburstNode[];
+}
+
+function nameHash(name: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+function colorFromName(name: string, ring: number): string {
+  const hue = nameHash(name) % 360;
+  const lightness = ring === 0 ? 58 : ring === 1 ? 46 : 36;
+  return `hsl(${hue}, 68%, ${lightness}%)`;
+}
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function describeArc(
+  cx: number,
+  cy: number,
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  endAngle: number
+): string {
+  const span = endAngle - startAngle;
+  if (span >= 359.9) {
+    const mid = startAngle + 180;
+    return `${describeArc(cx, cy, innerR, outerR, startAngle, mid)} ${describeArc(cx, cy, innerR, outerR, mid, startAngle + 359.8)}`;
+  }
+  const s1 = polarToCartesian(cx, cy, outerR, startAngle);
+  const e1 = polarToCartesian(cx, cy, outerR, endAngle);
+  const s2 = polarToCartesian(cx, cy, innerR, endAngle);
+  const e2 = polarToCartesian(cx, cy, innerR, startAngle);
+  const largeArc = span > 180 ? 1 : 0;
+  return [
+    `M ${s1.x.toFixed(3)} ${s1.y.toFixed(3)}`,
+    `A ${outerR} ${outerR} 0 ${largeArc} 1 ${e1.x.toFixed(3)} ${e1.y.toFixed(3)}`,
+    `L ${s2.x.toFixed(3)} ${s2.y.toFixed(3)}`,
+    `A ${innerR} ${innerR} 0 ${largeArc} 0 ${e2.x.toFixed(3)} ${e2.y.toFixed(3)}`,
+    "Z",
+  ].join(" ");
+}
+
+const RING_SPECS = [
+  { innerR: 38, outerR: 68 },
+  { innerR: 71, outerR: 90 },
+  { innerR: 93, outerR: 108 },
+] as const;
+
+const GAP_DEG = 1.5;
+const MAX_SLICES = 14;
+const SB_CX = 120;
+const SB_CY = 120;
+
+interface ArcSegment {
+  d: string;
+  color: string;
+  label: string;
+  size: number;
+  ring: number;
+}
+
+function buildArcSegments(
+  nodes: SunburstNode[],
+  ring: number,
+  startAngle: number,
+  endAngle: number,
+  parentHue?: number
+): ArcSegment[] {
+  if (ring >= RING_SPECS.length) return [];
+  const { innerR, outerR } = RING_SPECS[ring];
+  const totalRange = endAngle - startAngle;
+  if (totalRange <= GAP_DEG * 2) return [];
+
+  const valid = nodes
+    .filter((n) => (n.size ?? 0) > 0)
+    .sort((a, b) => (b.size ?? 0) - (a.size ?? 0))
+    .slice(0, MAX_SLICES);
+  if (!valid.length) return [];
+
+  const totalSize = valid.reduce((s, n) => s + (n.size ?? 0), 0);
+  if (totalSize <= 0) return [];
+
+  const segments: ArcSegment[] = [];
+  let angle = startAngle + GAP_DEG / 2;
+
+  for (const node of valid) {
+    const size = node.size ?? 0;
+    const fraction = size / totalSize;
+    const segRange = totalRange * fraction - GAP_DEG;
+    if (segRange < 1.5) {
+      angle += totalRange * fraction;
+      continue;
+    }
+    const segEnd = angle + segRange;
+    const hue = ring === 0 ? nameHash(node.name) % 360 : (parentHue ?? nameHash(node.name) % 360);
+    const lightness = ring === 0 ? 58 : ring === 1 ? 46 : 36;
+    const color = `hsl(${hue}, 68%, ${lightness}%)`;
+
+    segments.push({
+      d: describeArc(SB_CX, SB_CY, innerR, outerR, angle, segEnd),
+      color,
+      label: node.name,
+      size,
+      ring,
+    });
+
+    if (node.children?.length) {
+      segments.push(...buildArcSegments(node.children, ring + 1, angle, segEnd, hue));
+    }
+
+    angle = segEnd + GAP_DEG;
+  }
+
+  return segments;
+}
+
+interface SunburstChartProps {
+  root: SunburstNode;
+  totalSize: number;
+}
+
+function SunburstChart({ root, totalSize }: SunburstChartProps) {
+  const children = root.children ?? [];
+  const arcs = buildArcSegments(children, 0, 0, 360);
+
+  return (
+    <div className="workspace__sunburst">
+      <svg viewBox="0 0 240 240" aria-label="Folder size sunburst chart">
+        {/* Background rings */}
+        {RING_SPECS.map((spec, i) => (
+          <circle
+            key={i}
+            cx={SB_CX}
+            cy={SB_CY}
+            r={(spec.innerR + spec.outerR) / 2}
+            fill="none"
+            stroke="rgba(255,255,255,0.04)"
+            strokeWidth={spec.outerR - spec.innerR}
+          />
+        ))}
+        {/* Arc segments */}
+        {arcs.map((arc, i) => (
+          <path
+            key={i}
+            d={arc.d}
+            fill={arc.color}
+            stroke="rgba(0,0,0,0.35)"
+            strokeWidth="0.6"
+            opacity="0.92"
+          >
+            <title>{arc.label} — {formatBytes(arc.size)}</title>
+          </path>
+        ))}
+        {/* Center circle */}
+        <circle cx={SB_CX} cy={SB_CY} r="35" fill="rgba(20,20,30,0.88)" />
+        {/* Center text */}
+        <text
+          x={SB_CX}
+          y={SB_CY - 5}
+          textAnchor="middle"
+          dominantBaseline="auto"
+          className="workspace__sunburst-total"
+        >
+          {formatBytes(totalSize)}
+        </text>
+        <text
+          x={SB_CX}
+          y={SB_CY + 9}
+          textAnchor="middle"
+          dominantBaseline="auto"
+          className="workspace__sunburst-label"
+        >
+          total
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function renderChartSegment(segment: FolderChartSegment, index: number, segments: FolderChartSegment[]) {
   const radius = 44;
   const circumference = 2 * Math.PI * radius;
@@ -255,6 +449,7 @@ interface FolderPreviewProps {
 
 function FolderPreview({ node, onMutate }: FolderPreviewProps) {
   const [children, setChildren] = useState<ChildInfo[] | null>(null);
+  const [sunburstRoot, setSunburstRoot] = useState<SunburstNode | null>(null);
   const [totalSize, setTotalSize] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "done">("loading");
   const [showAll, setShowAll] = useState(false);
@@ -264,17 +459,18 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
 
   useEffect(() => {
     setChildren(null);
+    setSunburstRoot(null);
     setTotalSize(null);
     setStatus("loading");
     setShowAll(false);
 
     const controller = new AbortController();
     const treeFetch = fetch(
-      `/workspace/tree?path=${encodeURIComponent(node.path)}&max=100`,
+      `/workspace/tree?path=${encodeURIComponent(node.path)}&depth=3`,
       { credentials: "same-origin", signal: controller.signal }
     ).then((r) => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json() as Promise<{ root: { children?: ChildInfo[] } }>;
+      return r.json() as Promise<{ root: SunburstNode }>;
     });
 
     const statFetch = fetch(
@@ -287,13 +483,15 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
 
     Promise.all([treeFetch, statFetch])
       .then(([treeData, statData]) => {
-        const kids = treeData.root?.children ?? [];
+        const root = treeData.root;
+        const kids = (root?.children ?? []) as ChildInfo[];
         const sorted = [...kids].sort((a, b) => {
           const sa = a.size ?? 0;
           const sb = b.size ?? 0;
           return sb - sa;
         });
         setChildren(sorted);
+        setSunburstRoot(root ?? null);
         const sizeFromStat = statData?.size ?? null;
         if (sizeFromStat !== null) {
           setTotalSize(sizeFromStat);
@@ -495,7 +693,9 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
             </div>
           ) : (
             <div className="workspace__folder-chart-wrap">
-              {chartSegments.length > 0 ? (
+              {sunburstRoot && (totalSize ?? 0) > 0 ? (
+                <SunburstChart root={sunburstRoot} totalSize={totalSize ?? 0} />
+              ) : chartSegments.length > 0 ? (
                 <>
                   <div className="workspace__folder-chart">
                     <svg viewBox="0 0 120 120" aria-label="Folder size chart">

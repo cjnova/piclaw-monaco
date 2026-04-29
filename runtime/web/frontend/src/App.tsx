@@ -21,6 +21,8 @@ function AppContent() {
   const terminalMaximized = useSignal(false);
   const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
   const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
+  const extensionPageUrl = useSignal<string | null>(null);
+  const extensionPageName = useSignal<string | null>(null);
   const sseRef = useRef<EventSource | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
@@ -87,7 +89,7 @@ function AppContent() {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "a") {
         e.preventDefault();
         activePanel.value = "agent";
-        sidebarCollapsed.value = true;
+        sidebarCollapsed.value = false;
         return;
       }
       if (e.ctrlKey && !e.shiftKey && e.key === ",") {
@@ -107,7 +109,7 @@ function AppContent() {
       { id: "nav.explorer", label: "Show Explorer", category: "navigation" as const, keybinding: "Ctrl+Shift+E", handler: () => { activePanel.value = "explorer"; sidebarCollapsed.value = false; } },
       { id: "nav.search", label: "Show Search", category: "navigation" as const, keybinding: "Ctrl+Shift+F", handler: () => { activePanel.value = "search"; sidebarCollapsed.value = false; } },
       { id: "nav.extensions", label: "Show Addons", category: "navigation" as const, keybinding: "Ctrl+Shift+X", handler: () => { activePanel.value = "extensions"; sidebarCollapsed.value = false; } },
-      { id: "nav.agent", label: "Show Agent", category: "navigation" as const, keybinding: "Ctrl+Shift+A", handler: () => { activePanel.value = "agent"; sidebarCollapsed.value = true; } },
+      { id: "nav.agent", label: "Show Dashboards", category: "navigation" as const, keybinding: "Ctrl+Shift+A", handler: () => { activePanel.value = "agent"; sidebarCollapsed.value = false; } },
       { id: "nav.settings", label: "Show Settings", category: "navigation" as const, keybinding: "Ctrl+,", handler: () => { activePanel.value = "settings"; sidebarCollapsed.value = false; } },
       { id: "sidebar.toggle", label: "Toggle Sidebar", category: "navigation" as const, keybinding: "Ctrl+B", handler: () => { sidebarCollapsed.value = !sidebarCollapsed.value; } },
       // Terminal
@@ -132,12 +134,6 @@ function AppContent() {
   }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl]);
 
   const handlePanelChange = useCallback((id: string) => {
-    if (id === "agent") {
-      activePanel.value = id;
-      sidebarCollapsed.value = true;
-      return;
-    }
-
     if (id === activePanel.value) {
       sidebarCollapsed.value = !sidebarCollapsed.value;
     } else {
@@ -146,8 +142,18 @@ function AppContent() {
     }
   }, [activePanel, sidebarCollapsed]);
 
+  const handlePageSelect = useCallback((url: string, name: string) => {
+    extensionPageUrl.value = url;
+    extensionPageName.value = name;
+  }, [extensionPageUrl, extensionPageName]);
+
+  const handleBackToChat = useCallback(() => {
+    extensionPageUrl.value = null;
+    extensionPageName.value = null;
+  }, [extensionPageUrl, extensionPageName]);
+
   const connected = connectionStatus.value === "connected";
-  const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Agent", settings: "Settings" };
+  const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
 
   const onTermDragStart = useCallback((e: MouseEvent) => {
     e.preventDefault();
@@ -188,7 +194,7 @@ function AppContent() {
             }}
           >
             <Sidebar title={PANEL_NAMES[activePanel.value] || activePanel.value}>
-              <PanelRouter activePanel={activePanel.value} />
+              <PanelRouter activePanel={activePanel.value} onPageSelect={handlePageSelect} />
             </Sidebar>
           </div>
           {!sidebarCollapsed.value && (
@@ -215,7 +221,29 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
+            {extensionPageUrl.value ? (
+              <div className="extension-frame">
+                <div className="extension-frame__header">
+                  <button
+                    type="button"
+                    className="extension-frame__back-btn"
+                    onClick={handleBackToChat}
+                  >
+                    <i className="codicon codicon-arrow-left" />
+                    {" "}← Back to Chat
+                  </button>
+                  <span className="extension-frame__title">{extensionPageName.value}</span>
+                </div>
+                <iframe
+                  className="extension-frame__iframe"
+                  src={extensionPageUrl.value}
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                  title={extensionPageName.value ?? "Extension Page"}
+                />
+              </div>
+            ) : (
+              <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
+            )}
           </div>
         </div>
 

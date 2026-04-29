@@ -1,12 +1,42 @@
-import { useRef } from "preact/hooks";
+import { useRef, useEffect } from "preact/hooks";
+import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
+
+interface ExtensionRoute {
+  prefix: string;
+  extensionPath: string;
+}
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
 }
 
+function extractDisplayName(extensionPath: string): string {
+  // e.g. "piclaw-fleet" → "Fleet", "piclaw-board" → "Board"
+  const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
+  // Capitalize first letter of each word
+  return withoutPrefix
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const activeTab = useSignal<string>("chat");
+  const extensionPages = useSignal<ExtensionRoute[]>([]);
+
+  useEffect(() => {
+    fetch("/api/extension-routes", { credentials: "include" })
+      .then((res) => res.json())
+      .then((routes: ExtensionRoute[]) => {
+        const pages = routes.filter((r) => r.prefix.endsWith("-page"));
+        extensionPages.value = pages;
+      })
+      .catch(() => {
+        // silently ignore if endpoint not available
+      });
+  }, []);
 
   const handleInput = (e: Event) => {
     const el = e.target as HTMLTextAreaElement;
@@ -23,34 +53,70 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
   };
 
+  const pages = extensionPages.value;
+  const showTabs = pages.length > 0;
+
   return (
     <section className="chat">
-      {/* Chat content */}
-      <div className="chat__messages">
-        <MessageList />
-      </div>
+      {showTabs && (
+        <div className="chat-tabs">
+          <button
+            type="button"
+            className={`chat-tabs__tab${activeTab.value === "chat" ? " chat-tabs__tab--active" : ""}`}
+            onClick={() => { activeTab.value = "chat"; }}
+          >
+            Chat
+          </button>
+          {pages.map((page) => (
+            <button
+              key={page.prefix}
+              type="button"
+              className={`chat-tabs__tab${activeTab.value === page.prefix ? " chat-tabs__tab--active" : ""}`}
+              onClick={() => { activeTab.value = page.prefix; }}
+            >
+              {extractDisplayName(page.extensionPath)}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className="chat__compose">
-        <textarea
-          ref={textareaRef}
-          className="chat__input"
-          placeholder="Type a message..."
-          rows={1}
-          onInput={handleInput}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              // TODO: send message
-            }
-          }}
+      {activeTab.value === "chat" ? (
+        <>
+          {/* Chat content */}
+          <div className="chat__messages">
+            <MessageList />
+          </div>
+
+          <div className="chat__compose">
+            <textarea
+              ref={textareaRef}
+              className="chat__input"
+              placeholder="Type a message..."
+              rows={1}
+              onInput={handleInput}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  // TODO: send message
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="chat__send-btn"
+            >
+              Send
+            </button>
+          </div>
+        </>
+      ) : (
+        <iframe
+          className="chat-tabs__iframe"
+          src={activeTab.value}
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+          title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
         />
-        <button
-          type="button"
-          className="chat__send-btn"
-        >
-          Send
-        </button>
-      </div>
+      )}
     </section>
   );
 }

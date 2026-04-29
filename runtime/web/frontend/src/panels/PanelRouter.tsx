@@ -1,12 +1,14 @@
 import { WorkspacePanel } from "./WorkspacePanel";
 import { SearchPanel } from "./SearchPanel";
 import { AddonsPanel } from "./AddonsPanel";
+import { AgentPanel } from "./AgentPanel";
 
 interface PanelRouterProps {
   activePanel: string;
+  onPageSelect?: (url: string, name: string) => void;
 }
 
-export function PanelRouter({ activePanel }: PanelRouterProps) {
+export function PanelRouter({ activePanel, onPageSelect }: PanelRouterProps) {
   switch (activePanel) {
     case "explorer":
     case "files":
@@ -16,7 +18,7 @@ export function PanelRouter({ activePanel }: PanelRouterProps) {
     case "extensions":
       return <AddonsPanel />;
     case "agent":
-      return <Placeholder text="Chat is always visible →" />;
+      return <AgentPanel onPageSelect={onPageSelect ?? (() => {})} />;
     case "settings":
       return <Placeholder text="Settings panels" />;
     default:
