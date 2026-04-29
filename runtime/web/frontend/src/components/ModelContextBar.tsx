@@ -44,8 +44,9 @@ const FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
 function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number | null; tokens: number | null; contextWindow: number | null; onClick: (e: MouseEvent) => void }) {
   const p = percent ?? 0;
   const color = p > 95 ? "#f38ba8" : p > 80 ? "#f9e2af" : "#a6e3a1";
-  const tokensK = tokens != null ? `${(tokens / 1000).toFixed(0)}k` : "--";
-  const totalK = contextWindow != null ? `${(contextWindow / 1000).toFixed(0)}k` : "--";
+  const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(0)}k`;
+  const tokensK = tokens != null ? fmtTokens(tokens) : "--";
+  const totalK = contextWindow != null ? fmtTokens(contextWindow) : "--";
 
   return (
     <span
@@ -276,7 +277,7 @@ export function ModelContextBar() {
         >
           {models.value.map((entry) => {
             const isCurrent = entry.id === activeModel;
-            const ctxK = entry.context_window ? `${(entry.context_window / 1000).toFixed(0)}k` : "";
+            const ctxK = entry.context_window ? (entry.context_window >= 1000000 ? `${(entry.context_window / 1000000).toFixed(1)}M` : `${(entry.context_window / 1000).toFixed(0)}k`) : "";
             return (
               <div
                 key={entry.id}
@@ -333,11 +334,9 @@ export function ModelContextBar() {
         }}
         title={`${modelName}${thinkingLevel ? ` • ${thinkingLevel}` : ""} — click to switch model`}
       >
-        <span style={{ opacity: 0.8 }}>
-          {modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}
-        </span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px", fontWeight: 600 }}>
-          {modelName.split("/").pop() || modelName}
+        <span style={{ display: "inline-flex", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "220px" }}>
+          <span style={{ opacity: 0.8 }}>{modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}</span>
+          <span style={{ fontWeight: 600 }}>{modelName.split("/").pop() || modelName}</span>
         </span>
         {thinkingLevel && (
           <span

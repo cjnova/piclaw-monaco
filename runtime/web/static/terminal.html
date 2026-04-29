@@ -132,12 +132,38 @@
       // Connect WebSocket
       const wsPath = (sessionInfo && sessionInfo.ws_path) || '/terminal/ws';
       const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + wsPath;
+      let activeWs = null;
+      let reconnectTimer = null;
+
+      const sendToActiveSocket = (payload) => {
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+          activeWs.send(JSON.stringify(payload));
+        }
+      };
+
+      const inputDisposable = terminal.onData((data) => {
+        sendToActiveSocket({ type: 'input', data });
+      });
+
+      const resizeDisposable = terminal.onResize(({ cols, rows }) => {
+        sendToActiveSocket({ type: 'resize', cols, rows });
+      });
+
+      const clearReconnectTimer = () => {
+        if (reconnectTimer !== null) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+      };
 
       function connect() {
+        clearReconnectTimer();
         const ws = new WebSocket(wsUrl);
+        activeWs = ws;
         setStatus(false, 'Connecting...');
 
         ws.addEventListener('open', () => {
+          if (activeWs !== ws) return;
           setStatus(true, 'Connected');
           const dims = fitAddon.proposeDimensions();
           if (dims) {
@@ -165,28 +191,29 @@
         });
 
         ws.addEventListener('close', () => {
+          if (activeWs !== ws) return;
+          activeWs = null;
           setStatus(false, 'Reconnecting...');
-          setTimeout(connect, 3000);
+          clearReconnectTimer();
+          reconnectTimer = setTimeout(connect, 3000);
         });
 
         ws.addEventListener('error', (err) => {
           console.error('[terminal] websocket error:', err);
         });
-
-        terminal.onData((data) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'input', data }));
-          }
-        });
-
-        terminal.onResize(({ cols, rows }) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-          }
-        });
       }
 
       connect();
+
+      window.addEventListener('beforeunload', () => {
+        clearReconnectTimer();
+        inputDisposable.dispose();
+        resizeDisposable.dispose();
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+          activeWs.close();
+        }
+        activeWs = null;
+      }, { once: true });
     }
 
     main().catch((err) => {

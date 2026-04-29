@@ -5461,8 +5461,9 @@ For tests, pass a Ghostty instance directly:
   function ContextRing({ percent, tokens, contextWindow, onClick }) {
     const p6 = percent ?? 0;
     const color = p6 > 95 ? "#f38ba8" : p6 > 80 ? "#f9e2af" : "#a6e3a1";
-    const tokensK = tokens != null ? `${(tokens / 1e3).toFixed(0)}k` : "--";
-    const totalK = contextWindow != null ? `${(contextWindow / 1e3).toFixed(0)}k` : "--";
+    const fmtTokens = (n4) => n4 >= 1e6 ? `${(n4 / 1e6).toFixed(1)}M` : `${(n4 / 1e3).toFixed(0)}k`;
+    const tokensK = tokens != null ? fmtTokens(tokens) : "--";
+    const totalK = contextWindow != null ? fmtTokens(contextWindow) : "--";
     return /* @__PURE__ */ u4(
       "span",
       {
@@ -5658,7 +5659,7 @@ For tests, pass a Ghostty instance directly:
               },
               children: models.value.map((entry) => {
                 const isCurrent = entry.id === activeModel;
-                const ctxK = entry.context_window ? `${(entry.context_window / 1e3).toFixed(0)}k` : "";
+                const ctxK = entry.context_window ? entry.context_window >= 1e6 ? `${(entry.context_window / 1e6).toFixed(1)}M` : `${(entry.context_window / 1e3).toFixed(0)}k` : "";
                 return /* @__PURE__ */ u4(
                   "div",
                   {
@@ -5711,8 +5712,10 @@ For tests, pass a Ghostty instance directly:
               },
               title: `${modelName}${thinkingLevel ? ` \u2022 ${thinkingLevel}` : ""} \u2014 click to switch model`,
               children: [
-                /* @__PURE__ */ u4("span", { style: { opacity: 0.8 }, children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
-                /* @__PURE__ */ u4("span", { style: { overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px", fontWeight: 600 }, children: modelName.split("/").pop() || modelName }),
+                /* @__PURE__ */ u4("span", { style: { display: "inline-flex", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "220px" }, children: [
+                  /* @__PURE__ */ u4("span", { style: { opacity: 0.8 }, children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
+                  /* @__PURE__ */ u4("span", { style: { fontWeight: 600 }, children: modelName.split("/").pop() || modelName })
+                ] }),
                 thinkingLevel && /* @__PURE__ */ u4(
                   "span",
                   {
