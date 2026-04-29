@@ -1295,43 +1295,80 @@
     ] }) });
   }
 
-  // runtime/web/frontend/src/panels/PanelRouter.tsx
-  var PANEL_CONTENT = {
-    explorer: {
-      title: "\u{1F4C1} Workspace",
-      description: "File tree will appear here"
-    },
-    files: {
-      title: "\u{1F4C1} Workspace",
-      description: "File tree will appear here"
-    },
-    search: {
-      title: "\u{1F50D} Search",
-      description: "Search input and results"
-    },
-    extensions: {
-      title: "\u{1F9E9} Addons",
-      description: "Installed addons list"
-    },
-    agent: {
-      title: "\u{1F916} Agent",
-      description: "Chat is always visible \u2192"
-    },
-    settings: {
-      title: "\u2699\uFE0F Settings",
-      description: "Settings panels"
-    }
-  };
-  var FALLBACK_PANEL = {
-    title: "\u{1F4C1} Workspace",
-    description: "File tree will appear here"
-  };
-  function PanelRouter({ activePanel }) {
-    const panel = PANEL_CONTENT[activePanel] ?? FALLBACK_PANEL;
-    return /* @__PURE__ */ u4("section", { "aria-live": "polite", style: { height: "100%", padding: "12px" }, children: [
-      /* @__PURE__ */ u4("div", { style: { color: "#cdd6f4", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }, children: panel.title }),
-      /* @__PURE__ */ u4("p", { style: { color: "#a6adc8", fontSize: "13px", margin: 0 }, children: panel.description })
+  // runtime/web/frontend/src/panels/WorkspacePanel.tsx
+  function WorkspacePanel() {
+    const topHeight = useSignal(Number(localStorage.getItem("piclaw-workspace-split")) || 60);
+    const dragRef = A2(null);
+    const onDragStart = q2((e4) => {
+      e4.preventDefault();
+      const container = e4.target.parentElement;
+      if (!container) return;
+      const containerH = container.getBoundingClientRect().height;
+      dragRef.current = { startY: e4.clientY, startH: topHeight.value };
+      const onMove = (ev) => {
+        if (!dragRef.current || !container) return;
+        const delta = ev.clientY - dragRef.current.startY;
+        const pct = (dragRef.current.startH / 100 * containerH + delta) / containerH * 100;
+        topHeight.value = Math.max(20, Math.min(80, pct));
+      };
+      const onUp = () => {
+        dragRef.current = null;
+        localStorage.setItem("piclaw-workspace-split", String(topHeight.value));
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "row-resize";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    }, [topHeight]);
+    return /* @__PURE__ */ u4("div", { style: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }, children: [
+      /* @__PURE__ */ u4("div", { style: { height: `${topHeight.value}%`, overflow: "auto", padding: "8px 0" }, className: "sidebar__content", children: /* @__PURE__ */ u4("div", { style: { padding: "0 12px", fontSize: "12px", color: "#6c7086" }, children: [
+        /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: "#89b4fa", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
+        /* @__PURE__ */ u4("div", { style: { color: "#6c7086" }, children: "File tree will appear here" })
+      ] }) }),
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          style: { height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0, transition: "background 0.15s" },
+          onMouseDown: onDragStart,
+          onMouseEnter: (e4) => {
+            e4.target.style.background = "#89b4fa";
+          },
+          onMouseLeave: (e4) => {
+            e4.target.style.background = "#313244";
+          }
+        }
+      ),
+      /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto", padding: "8px 12px" }, className: "sidebar__content", children: [
+        /* @__PURE__ */ u4("div", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }, children: "Preview" }),
+        /* @__PURE__ */ u4("div", { style: { fontSize: "12px", color: "#6c7086" }, children: "Select a file to preview" })
+      ] })
     ] });
+  }
+
+  // runtime/web/frontend/src/panels/PanelRouter.tsx
+  function PanelRouter({ activePanel }) {
+    switch (activePanel) {
+      case "explorer":
+      case "files":
+        return /* @__PURE__ */ u4(WorkspacePanel, {});
+      case "search":
+        return /* @__PURE__ */ u4(Placeholder, { text: "Search input and results" });
+      case "extensions":
+        return /* @__PURE__ */ u4(Placeholder, { text: "Installed addons list" });
+      case "agent":
+        return /* @__PURE__ */ u4(Placeholder, { text: "Chat is always visible \u2192" });
+      case "settings":
+        return /* @__PURE__ */ u4(Placeholder, { text: "Settings panels" });
+      default:
+        return /* @__PURE__ */ u4(Placeholder, { text: "Select a panel" });
+    }
+  }
+  function Placeholder({ text }) {
+    return /* @__PURE__ */ u4("div", { style: { padding: "12px", color: "#6c7086", fontSize: "12px" }, children: text });
   }
 
   // runtime/web/frontend/src/panels/ChatPanel.tsx

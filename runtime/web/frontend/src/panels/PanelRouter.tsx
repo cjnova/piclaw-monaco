@@ -1,51 +1,31 @@
+import { WorkspacePanel } from "./WorkspacePanel";
+
 interface PanelRouterProps {
   activePanel: string;
 }
 
-interface PanelContent {
-  title: string;
-  description: string;
+export function PanelRouter({ activePanel }: PanelRouterProps) {
+  switch (activePanel) {
+    case "explorer":
+    case "files":
+      return <WorkspacePanel />;
+    case "search":
+      return <Placeholder text="Search input and results" />;
+    case "extensions":
+      return <Placeholder text="Installed addons list" />;
+    case "agent":
+      return <Placeholder text="Chat is always visible →" />;
+    case "settings":
+      return <Placeholder text="Settings panels" />;
+    default:
+      return <Placeholder text="Select a panel" />;
+  }
 }
 
-const PANEL_CONTENT: Record<string, PanelContent> = {
-  explorer: {
-    title: "📁 Workspace",
-    description: "File tree will appear here",
-  },
-  files: {
-    title: "📁 Workspace",
-    description: "File tree will appear here",
-  },
-  search: {
-    title: "🔍 Search",
-    description: "Search input and results",
-  },
-  extensions: {
-    title: "🧩 Addons",
-    description: "Installed addons list",
-  },
-  agent: {
-    title: "🤖 Agent",
-    description: "Chat is always visible →",
-  },
-  settings: {
-    title: "⚙️ Settings",
-    description: "Settings panels",
-  },
-};
-
-const FALLBACK_PANEL: PanelContent = {
-  title: "📁 Workspace",
-  description: "File tree will appear here",
-};
-
-export function PanelRouter({ activePanel }: PanelRouterProps) {
-  const panel = PANEL_CONTENT[activePanel] ?? FALLBACK_PANEL;
-
+function Placeholder({ text }: { text: string }) {
   return (
-    <section aria-live="polite" style={{ height: "100%", padding: "12px" }}>
-      <div style={{ color: "#cdd6f4", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>{panel.title}</div>
-      <p style={{ color: "#a6adc8", fontSize: "13px", margin: 0 }}>{panel.description}</p>
-    </section>
+    <div style={{ padding: "12px", color: "#6c7086", fontSize: "12px" }}>
+      {text}
+    </div>
   );
 }
