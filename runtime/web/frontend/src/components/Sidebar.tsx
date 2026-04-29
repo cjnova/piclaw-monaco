@@ -1,61 +1,30 @@
-import type { ComponentChildren, VNode } from "preact";
-import { useState } from "preact/hooks";
-import { Icon } from "./Icon";
-
-export interface SidebarAction {
-  icon: string;
-  label: string;
-  onClick: () => void;
-}
+import type { ComponentChildren } from "preact";
 
 interface SidebarProps {
   title: string;
-  actions?: SidebarAction[];
-  children?: ComponentChildren;
-  onCollapse?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  children: ComponentChildren;
 }
 
-export function Sidebar({ title, actions = [], children, onCollapse }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  const handleCollapse = () => {
-    setCollapsed(!collapsed);
-    onCollapse?.();
-  };
-
-  if (collapsed) {
-    return null;
-  }
-
+export function Sidebar({ title, collapsed, onToggleCollapse, children }: SidebarProps) {
   return (
-    <aside className="sidebar" style={{ minWidth: "200px" }}>
+    <aside className="sidebar" style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <header className="sidebar__header">
-        <h2 className="sidebar__title">{title}</h2>
-        <div className="sidebar__actions">
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              className="sidebar__action-btn"
-              title={action.label}
-              aria-label={action.label}
-              onClick={action.onClick}
-            >
-              <Icon name={action.icon} size={16} />
-            </button>
-          ))}
+        <span className="sidebar__title">{title.toUpperCase()}</span>
+        {onToggleCollapse && (
           <button
             type="button"
-            className="sidebar__action-btn"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
-            onClick={handleCollapse}
+            className="sidebar__collapse-btn"
+            onClick={onToggleCollapse}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <Icon name="chevron-left" size={16} />
+            {collapsed ? "›" : "‹"}
           </button>
-        </div>
+        )}
       </header>
-      <div className="sidebar__content">
+      <div className="sidebar__content" style={{ flex: 1, overflow: "auto" }}>
         {children}
       </div>
     </aside>

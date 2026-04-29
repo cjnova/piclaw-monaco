@@ -1158,64 +1158,24 @@
   }
 
   // runtime/web/frontend/src/components/Sidebar.tsx
-  function Sidebar({ title, actions = [], children, onCollapse }) {
-    const [collapsed, setCollapsed] = d2(false);
-    const handleCollapse = () => {
-      setCollapsed(!collapsed);
-      onCollapse?.();
-    };
-    if (collapsed) {
-      return null;
-    }
-    return /* @__PURE__ */ u4("aside", { className: "sidebar", style: { minWidth: "200px" }, children: [
+  function Sidebar({ title, collapsed, onToggleCollapse, children }) {
+    return /* @__PURE__ */ u4("aside", { className: "sidebar", style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
       /* @__PURE__ */ u4("header", { className: "sidebar__header", children: [
-        /* @__PURE__ */ u4("h2", { className: "sidebar__title", children: title }),
-        /* @__PURE__ */ u4("div", { className: "sidebar__actions", children: [
-          actions.map((action) => /* @__PURE__ */ u4(
-            "button",
-            {
-              type: "button",
-              className: "sidebar__action-btn",
-              title: action.label,
-              "aria-label": action.label,
-              onClick: action.onClick,
-              children: /* @__PURE__ */ u4(Icon, { name: action.icon, size: 16 })
-            },
-            action.label
-          )),
-          /* @__PURE__ */ u4(
-            "button",
-            {
-              type: "button",
-              className: "sidebar__action-btn",
-              title: "Collapse sidebar",
-              "aria-label": "Collapse sidebar",
-              onClick: handleCollapse,
-              children: /* @__PURE__ */ u4(Icon, { name: "chevron-left", size: 16 })
-            }
-          )
-        ] })
+        /* @__PURE__ */ u4("span", { className: "sidebar__title", children: title.toUpperCase() }),
+        onToggleCollapse && /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "sidebar__collapse-btn",
+            onClick: onToggleCollapse,
+            title: collapsed ? "Expand sidebar" : "Collapse sidebar",
+            "aria-label": collapsed ? "Expand sidebar" : "Collapse sidebar",
+            children: collapsed ? "\u203A" : "\u2039"
+          }
+        )
       ] }),
-      /* @__PURE__ */ u4("div", { className: "sidebar__content", children })
+      /* @__PURE__ */ u4("div", { className: "sidebar__content", style: { flex: 1, overflow: "auto" }, children })
     ] });
-  }
-
-  // runtime/web/frontend/src/components/BottomPanel.tsx
-  function BottomPanel({ visible, children }) {
-    return /* @__PURE__ */ u4(
-      "section",
-      {
-        className: `bottom-panel ${visible ? "is-visible" : "is-hidden"}`,
-        "aria-hidden": !visible,
-        children: [
-          /* @__PURE__ */ u4("header", { className: "bottom-panel__tabbar", children: [
-            /* @__PURE__ */ u4("button", { type: "button", className: "bottom-panel__tab is-active", "aria-selected": "true", children: "TERMINAL" }),
-            /* @__PURE__ */ u4("button", { type: "button", className: "bottom-panel__new-tab", "aria-label": "New terminal tab", children: "+" })
-          ] }),
-          /* @__PURE__ */ u4("div", { className: "bottom-panel__content", children })
-        ]
-      }
-    );
   }
 
   // runtime/web/frontend/src/services/CommandRegistry.ts
@@ -1497,6 +1457,7 @@
     const activePanel = useSignal("agent");
     const paletteVisible = useSignal(false);
     const terminalVisible = useSignal(false);
+    const sidebarCollapsed = useSignal(false);
     const websocket = T2(() => new WebSocketManager(), []);
     y2(() => {
       const unsubscribe = websocket.onStatusChange((status) => {
@@ -1509,8 +1470,8 @@
       };
     }, [connectionStatus, websocket]);
     y2(() => {
-      const handleWindowKeyDown = (event) => {
-        if (event.ctrlKey && !event.shiftKey && (event.code === "Backquote" || event.key === "`" || event.key === "\xBA" || event.key === "Dead")) {
+      const handleKeyDown = (event) => {
+        if (event.ctrlKey && !event.shiftKey && !event.altKey && (event.code === "Backquote" || event.key === "`" || event.key === "\xBA" || event.key === "\\" || event.key === "Dead")) {
           event.preventDefault();
           event.stopPropagation();
           terminalVisible.value = !terminalVisible.value;
@@ -1520,10 +1481,14 @@
           event.preventDefault();
           paletteVisible.value = !paletteVisible.value;
         }
+        if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "b") {
+          event.preventDefault();
+          sidebarCollapsed.value = !sidebarCollapsed.value;
+        }
       };
-      window.addEventListener("keydown", handleWindowKeyDown, true);
-      return () => window.removeEventListener("keydown", handleWindowKeyDown, true);
-    }, [paletteVisible, terminalVisible]);
+      window.addEventListener("keydown", handleKeyDown, true);
+      return () => window.removeEventListener("keydown", handleKeyDown, true);
+    }, [paletteVisible, terminalVisible, sidebarCollapsed]);
     y2(() => {
       const commands = [
         { id: "nav.explorer", label: "Show Explorer", category: "navigation", keybinding: "Ctrl+Shift+E", handler: () => {
@@ -1534,33 +1499,53 @@
         } },
         { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal", keybinding: "Ctrl+`", handler: () => {
           terminalVisible.value = !terminalVisible.value;
+        } },
+        { id: "sidebar.toggle", label: "Toggle Sidebar", category: "navigation", keybinding: "Ctrl+B", handler: () => {
+          sidebarCollapsed.value = !sidebarCollapsed.value;
         } }
       ];
       commands.forEach((c4) => commandRegistry.register(c4));
       return () => commands.forEach((c4) => commandRegistry.unregister(c4.id));
-    }, [activePanel, terminalVisible]);
+    }, [activePanel, terminalVisible, sidebarCollapsed]);
     const connected = connectionStatus.value === "connected";
     return /* @__PURE__ */ u4("div", { className: "shell-root", children: [
-      /* @__PURE__ */ u4(
-        ActivityBar,
-        {
-          activePanel: activePanel.value,
-          onPanelChange: (id) => {
-            activePanel.value = id;
-          }
-        }
-      ),
-      /* @__PURE__ */ u4("div", { className: "shell-content", style: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }, children: [
+      /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: (id) => {
+        activePanel.value = id;
+      } }),
+      /* @__PURE__ */ u4("div", { style: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }, children: [
         /* @__PURE__ */ u4("header", { className: "shell-status", children: [
           /* @__PURE__ */ u4("span", { className: `shell-status__dot ${connected ? "is-connected" : "is-disconnected"}`, title: connected ? "Connected" : "Disconnected" }),
           /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
-          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 400, children: [
-            /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, children: null }),
-            /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
-          ] }) }),
-          /* @__PURE__ */ u4(BottomPanel, { visible: terminalVisible.value, children: /* @__PURE__ */ u4("div", { style: { padding: "12px", color: "#6c7086", fontFamily: "monospace", fontSize: "13px" }, children: "Terminal will be mounted here (xterm.js \u2014 Wave 9)" }) })
+        /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: sidebarCollapsed.value ? 0 : 250, minSize: 150, maxSize: 800, children: [
+          /* @__PURE__ */ u4(
+            Sidebar,
+            {
+              title: activePanel.value,
+              collapsed: sidebarCollapsed.value,
+              onToggleCollapse: () => {
+                sidebarCollapsed.value = !sidebarCollapsed.value;
+              },
+              children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
+                activePanel.value,
+                " content here..."
+              ] })
+            }
+          ),
+          /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
+        ] }) }),
+        terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: "200px", borderTop: "1px solid #313244", background: "#11111b", display: "flex", flexDirection: "column" }, children: [
+          /* @__PURE__ */ u4("div", { style: { height: "32px", background: "#181825", borderBottom: "1px solid #313244", display: "flex", alignItems: "center", padding: "0 12px", gap: "8px" }, children: [
+            /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px" }, children: "Terminal" }),
+            /* @__PURE__ */ u4("span", { style: { marginLeft: "auto", cursor: "pointer", color: "#6c7086", fontSize: "14px" }, onClick: () => {
+              terminalVisible.value = false;
+            }, children: "\u2715" })
+          ] }),
+          /* @__PURE__ */ u4("div", { style: { flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }, children: [
+            "$ xterm.js will mount here (Wave 9)",
+            /* @__PURE__ */ u4("br", {}),
+            /* @__PURE__ */ u4("span", { style: { color: "#6c7086" }, children: "Press Ctrl+` or Ctrl+\xBA to toggle this panel" })
+          ] })
         ] })
       ] }),
       /* @__PURE__ */ u4(CommandPalette, { visible: paletteVisible.value, onClose: () => {
