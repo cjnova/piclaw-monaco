@@ -120,7 +120,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | 012-task-tree-view-component | File tree component in Workspace sidebar | ⏳ |
 | 015-task-message-list-component | Chat message list in Agent panel | ⏳ |
 | 029-task-extensions-api-endpoint | Backend API for installed extensions | ⏳ |
-| 037-task-search-backend | Backend search endpoint (ripgrep) | ⏳ |
+| 037-task-search-backend | Backend search endpoint (ripgrep) | ✅ (uses existing /search) |
+| 038-task-search-sidebar-ui | Search input + results UI in sidebar | ✅ |
 
 ### Wave 11+ — Full Functionality
 
@@ -134,8 +135,6 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | 025-task-terminal-keybindings | Terminal keyboard shortcuts |
 | 030-task-extensions-list-component | Addons list UI |
 | 032-task-extension-details-component | Addon details view |
-| 038-task-search-sidebar-ui | Search input + toggles UI |
-| 039-task-search-results-component | Search results grouped by file |
 
 ### Future (V2)
 
