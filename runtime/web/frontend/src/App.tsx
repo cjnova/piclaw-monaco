@@ -3,6 +3,7 @@ import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
 import { WebSocketManager } from "./api/websocket";
 import { ActivityBar } from "./components/ActivityBar";
+import { Sidebar } from "./components/Sidebar";
 import { SplitPane } from "./components/SplitPane";
 import { PanelRouter } from "./panels";
 
@@ -45,7 +46,8 @@ export function App() {
         </header>
         <div className="shell-main-layout">
           <SplitPane direction="horizontal" initialSize={250} minSize={150} maxSize={400}>
-            <aside className="shell-sidebar">Sidebar area</aside>
+            <Sidebar title={activePanel.value}>
+            </Sidebar>
             <PanelRouter activePanel={activePanel.value} />
           </SplitPane>
         </div>
