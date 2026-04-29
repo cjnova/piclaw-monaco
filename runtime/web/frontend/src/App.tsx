@@ -18,33 +18,24 @@ export function App() {
   const terminalMaximized = useSignal(false);
   const sidebarCollapsed = useSignal(false);
   const websocket = useMemo(() => new WebSocketManager(), []);
-  const terminalDragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
-    const unsubscribe = websocket.onStatusChange((s) => { connectionStatus.value = s; });
+    const unsub = websocket.onStatusChange((s) => { connectionStatus.value = s; });
     websocket.connect();
-    return () => { unsubscribe(); websocket.disconnect(); };
+    return () => { unsub(); websocket.disconnect(); };
   }, [connectionStatus, websocket]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.code === "Backquote" || e.key === "`" || e.key === "º" || e.key === "Dead")) {
-        e.preventDefault(); e.stopPropagation();
-        terminalVisible.value = !terminalVisible.value;
-        return;
+    const h = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.code === "Backquote" || e.key === "`" || e.key === "\u00BA" || e.key === "Dead")) {
+        e.preventDefault(); e.stopPropagation(); terminalVisible.value = !terminalVisible.value; return;
       }
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        paletteVisible.value = !paletteVisible.value;
-        return;
-      }
-      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        sidebarCollapsed.value = !sidebarCollapsed.value;
-      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "p") { e.preventDefault(); paletteVisible.value = !paletteVisible.value; return; }
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "b") { e.preventDefault(); sidebarCollapsed.value = !sidebarCollapsed.value; }
     };
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
   }, [paletteVisible, terminalVisible, sidebarCollapsed]);
 
   useEffect(() => {
@@ -58,110 +49,89 @@ export function App() {
     return () => cmds.forEach((c) => commandRegistry.unregister(c.id));
   }, [activePanel, terminalVisible, sidebarCollapsed]);
 
-  // Activity bar click: if sidebar is collapsed, unfold it
   const handlePanelChange = useCallback((id: string) => {
-    if (sidebarCollapsed.value) {
-      sidebarCollapsed.value = false;
-    }
+    sidebarCollapsed.value = false;
     activePanel.value = id;
   }, [activePanel, sidebarCollapsed]);
 
   const toggleSidebar = useCallback(() => { sidebarCollapsed.value = !sidebarCollapsed.value; }, [sidebarCollapsed]);
   const connected = connectionStatus.value === "connected";
 
-  // Terminal resize by dragging top edge
-  const onTerminalDragStart = useCallback((e: MouseEvent) => {
+  const onTermDragStart = useCallback((e: MouseEvent) => {
     e.preventDefault();
-    terminalDragRef.current = { startY: e.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
+    termDragRef.current = { startY: e.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
+    terminalMaximized.value = false;
     const onMove = (ev: MouseEvent) => {
-      if (!terminalDragRef.current) return;
-      const delta = terminalDragRef.current.startY - ev.clientY;
-      const next = Math.max(100, Math.min(window.innerHeight * 0.8, terminalDragRef.current.startH + delta));
+      if (!termDragRef.current) return;
+      const next = Math.max(100, Math.min(window.innerHeight * 0.8, termDragRef.current.startH + (termDragRef.current.startY - ev.clientY)));
       terminalHeight.value = next;
-      terminalMaximized.value = false;
     };
-    const onUp = () => {
-      terminalDragRef.current = null;
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "row-resize";
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+    const onUp = () => { termDragRef.current = null; document.body.style.userSelect = ""; document.body.style.cursor = ""; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+    document.body.style.userSelect = "none"; document.body.style.cursor = "row-resize";
+    document.addEventListener("mousemove", onMove); document.addEventListener("mouseup", onUp);
   }, [terminalHeight, terminalMaximized]);
 
-  const tHeight = terminalMaximized.value ? "calc(100% - 56px)" : `${terminalHeight.value}px`;
+  const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
 
   return (
     <div style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }}>
       <ActivityBar activePanel={activePanel.value} onPanelChange={handlePanelChange} />
-
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-        {/* Status bar */}
-        <div style={{ height: "24px", display: "flex", alignItems: "center", padding: "0 12px", background: "#181825", borderBottom: "1px solid #313244", fontSize: "12px", flexShrink: 0 }}>
-          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8", marginRight: "6px" }} />
-          <span style={{ color: "#6c7086" }}>{connected ? "Connected" : "Disconnected"}</span>
-        </div>
-
-        {/* Middle: Sidebar + Main */}
+        {/* Main area */}
         <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden" }}>
           {sidebarCollapsed.value ? (
-            <div style={{ width: "100%", height: "100%", overflow: "auto" }}>
-              <PanelRouter activePanel={activePanel.value} />
-            </div>
+            <div style={{ width: "100%", height: "100%" }}><PanelRouter activePanel={activePanel.value} /></div>
           ) : (
             <SplitPane direction="horizontal" initialSize={250} minSize={150} maxSize={Math.round(window.innerWidth * 0.5)}>
               <Sidebar title={activePanel.value} collapsed={false} onToggleCollapse={toggleSidebar}>
-                <div style={{ padding: "8px 12px", color: "#6c7086", fontSize: "12px" }}>
-                  {activePanel.value} content...
-                </div>
+                <div style={{ padding: "8px 12px", color: "#6c7086", fontSize: "12px" }}>{activePanel.value} content...</div>
               </Sidebar>
               <PanelRouter activePanel={activePanel.value} />
             </SplitPane>
           )}
         </div>
 
-        {/* Terminal dock — full width, resizable, maximize */}
+        {/* Terminal dock */}
         {terminalVisible.value && (
-          <div style={{ height: tHeight, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }}>
-            {/* Resize handle */}
-            <div
-              style={{ height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0 }}
-              onMouseDown={onTerminalDragStart}
+          <div style={{ height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }}>
+            <div style={{ height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0 }}
+              onMouseDown={onTermDragStart}
               onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#89b4fa"; }}
-              onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "#313244"; }}
-            />
-            {/* Tab bar */}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "#313244"; }} />
             <div style={{ height: "32px", background: "#181825", borderBottom: "1px solid #313244", display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }}>
               <span style={{ fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }}>Terminal</span>
               <div style={{ marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }}>
-                <span
-                  style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
+                <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
                   onClick={() => { terminalMaximized.value = !terminalMaximized.value; }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
-                  title={terminalMaximized.value ? "Restore" : "Maximize"}
-                >{terminalMaximized.value ? "⊟" : "⊞"}</span>
-                <span
-                  style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
+                  title={terminalMaximized.value ? "Restore" : "Maximize"}>{terminalMaximized.value ? "\u229F" : "\u229E"}</span>
+                <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
                   onClick={() => { terminalVisible.value = false; terminalMaximized.value = false; }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
-                  title="Close (Ctrl+`)"
-                >✕</span>
+                  title="Close (Ctrl+`)">&#x2715;</span>
               </div>
             </div>
-            {/* Terminal content */}
-            <div style={{ flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", overflow: "auto" }}>
-              $ xterm.js will mount here (Wave 9)
-            </div>
+            <div style={{ flex: 1, padding: "12px", color: "#a6adc8", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", overflow: "auto" }}>$ xterm.js (Wave 9)</div>
           </div>
         )}
-      </div>
 
+        {/* Status bar — bottom edge, always visible */}
+        <div style={{ height: "22px", display: "flex", alignItems: "center", padding: "0 8px", background: "#181825", borderTop: "1px solid #313244", fontSize: "11px", flexShrink: 0, gap: "12px" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: connected ? "#a6e3a1" : "#f38ba8" }} />
+            <span style={{ color: "#6c7086" }}>{connected ? "Connected" : "Disconnected"}</span>
+          </span>
+          {!terminalVisible.value && (
+            <span style={{ cursor: "pointer", color: "#6c7086", marginLeft: "auto" }}
+              onClick={() => { terminalVisible.value = true; }}
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
+              title="Open Terminal (Ctrl+`)">Terminal</span>
+          )}
+        </div>
+      </div>
       <CommandPalette visible={paletteVisible.value} onClose={() => { paletteVisible.value = false; }} />
     </div>
   );
