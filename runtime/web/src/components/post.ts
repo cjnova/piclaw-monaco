@@ -11,6 +11,7 @@ import { buildAdaptiveCardSubmissionFallbackText, describeAdaptiveCardSubmission
 import { buildGeneratedWidgetPayload, canRenderGeneratedWidget } from '../ui/generated-widget.js';
 import { ImageModal } from './image-modal.js';
 import { FilePill } from './file-pill.js';
+import { buildSpeakablePostText, getSpeechPlaybackState, isSpeechSynthesisSupported, speakPostText, stopSpeechPlayback, subscribeSpeechPlayback } from './post-speech.ts';
 import { copyPlainTextSelectionFromElement, readSessionStorageFlagBestEffort, resolveLinkPreviewSiteName, writeClipboardDataViaExecCommand, writeClipboardTextBestEffort, writeSessionStorageFlagBestEffort } from './post-runtime-safety.js';
 
 /**
@@ -842,6 +843,7 @@ function highlightHtml(html, query) {
 export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMessage, agentName, agentAvatarUrl, userName, userAvatarUrl, userAvatarBackground, onDelete, isThreadReply, isThreadPrev, isThreadNext, isRemoving, highlightQuery, onFileRef, onOpenWidget, onOpenAttachmentPreview }) {
     const [zoomedImage, setZoomedImage] = useState(null);
     const [copyState, setCopyState] = useState('idle');
+    const [speechPlaybackState, setSpeechPlaybackState] = useState(() => getSpeechPlaybackState());
     const contentRef = useRef(null);
     const copyResetTimerRef = useRef(null);
 
@@ -919,6 +921,9 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
     }, [displayContent, hideRenderedFallback, highlightQueryText]);
 
     const markdownCopyPayload = useMemo(() => buildPostMarkdownCopyPayload(post), [post]);
+    const speechSupported = useMemo(() => isSpeechSynthesisSupported(), []);
+    const speakableText = useMemo(() => buildSpeakablePostText(post), [post]);
+    const isSpeakingThisPost = Boolean(speechPlaybackState.speaking && speechPlaybackState.activePostId === post.id);
 
     const handleImageClick = (e, mediaId) => {
         e.stopPropagation();
@@ -943,6 +948,15 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
             copyResetTimerRef.current = null;
             setCopyState('idle');
         }, CODE_COPY_RESET_MS);
+    };
+
+    const handleSpeakClick = (e) => {
+        e.stopPropagation();
+        if (isSpeakingThisPost) {
+            stopSpeechPlayback();
+            return;
+        }
+        speakPostText(post.id, speakableText);
     };
 
     const resolveInlineAttachments = (content, attachments) => {
@@ -1064,6 +1078,12 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
         return enhanceCodeBlocks(contentRef.current);
     }, [renderedHtml]);
 
+    useEffect(() => {
+        return subscribeSpeechPlayback((nextState) => {
+            setSpeechPlaybackState(nextState);
+        });
+    }, []);
+
     useEffect(() => () => {
         if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current);
     }, []);
@@ -1120,6 +1140,19 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
             </div>
             <div class="post-body">
                 <div class="post-actions">
+                    ${isAgent && speechSupported && speakableText && html`
+                        <button
+                            class=${`post-action-btn post-speak-btn${isSpeakingThisPost ? ' is-active' : ''}`}
+                            type="button"
+                            title=${isSpeakingThisPost ? 'Stop reading aloud' : 'Read aloud'}
+                            aria-label=${isSpeakingThisPost ? 'Stop reading aloud' : 'Read aloud'}
+                            onClick=${handleSpeakClick}
+                        >
+                            ${isSpeakingThisPost
+                                ? html`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>`
+                                : html`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18 6a8.5 8.5 0 0 1 0 12"></path></svg>`}
+                        </button>
+                    `}
                     <button
                         class=${`post-action-btn post-copy-btn${copyState === 'success' ? ' is-success' : copyState === 'error' ? ' is-error' : ''}`}
                         type="button"

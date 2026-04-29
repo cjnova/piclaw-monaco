@@ -303,6 +303,11 @@
     border-color: color-mix(in srgb, var(--success-color) 45%, var(--border-color));
 }
 
+.post-speak-btn.is-active {
+    color: var(--success-color);
+    border-color: color-mix(in srgb, var(--success-color) 45%, var(--border-color));
+}
+
 .post-copy-btn.is-error {
     color: var(--danger-color);
     border-color: color-mix(in srgb, var(--danger-color) 45%, var(--border-color));
