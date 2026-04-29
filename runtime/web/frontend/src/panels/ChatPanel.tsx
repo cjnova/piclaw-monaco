@@ -1,4 +1,5 @@
 import { useRef } from "preact/hooks";
+import { MessageList } from "../components/MessageList";
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
@@ -26,10 +27,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     <section className="chat">
       {/* Chat content */}
       <div className="chat__messages">
-        <div className="chat__empty">
-          <h1 className="chat__empty-title">🤖 Chat</h1>
-          <p className="chat__empty-subtitle">Messages will appear here</p>
-        </div>
+        <MessageList />
       </div>
 
       <div className="chat__compose">

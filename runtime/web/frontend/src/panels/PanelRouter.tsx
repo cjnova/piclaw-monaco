@@ -1,5 +1,6 @@
 import { WorkspacePanel } from "./WorkspacePanel";
 import { SearchPanel } from "./SearchPanel";
+import { AddonsPanel } from "./AddonsPanel";
 
 interface PanelRouterProps {
   activePanel: string;
@@ -13,7 +14,7 @@ export function PanelRouter({ activePanel }: PanelRouterProps) {
     case "search":
       return <SearchPanel />;
     case "extensions":
-      return <Placeholder text="Installed addons list" />;
+      return <AddonsPanel />;
     case "agent":
       return <Placeholder text="Chat is always visible →" />;
     case "settings":

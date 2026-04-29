@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef } from "preact/hooks";
+import { FileTree, type TreeNode } from "../components/FileTree";
 
 export function WorkspacePanel() {
-  const [topHeight, setTopHeight] = useState(() => Number(localStorage.getItem("piclaw-workspace-split")) || 200);
+  const [topHeight, setTopHeight] = useState(() => Number(localStorage.getItem("piclaw-workspace-split")) || 260);
   const containerRef = useRef<HTMLDivElement>(null);
   const heightRef = useRef(topHeight);
+  const [selectedFile, setSelectedFile] = useState<TreeNode | null>(null);
 
   const onDragStart = useCallback((e: MouseEvent) => {
     e.preventDefault();
@@ -34,10 +36,8 @@ export function WorkspacePanel() {
   return (
     <div ref={containerRef} className="workspace">
       <div className="workspace__pane-top" style={{ height: `${topHeight}px` }}>
-        <div className="workspace__section">
-          <div className="workspace__section-header">Files</div>
-          <div className="workspace__section-empty">File tree will appear here</div>
-        </div>
+        <div className="workspace__section-header workspace__section-header--padded">Files</div>
+        <FileTree onFileSelect={setSelectedFile} />
       </div>
       <div
         className="workspace__drag-handle"
@@ -45,7 +45,26 @@ export function WorkspacePanel() {
       />
       <div className="workspace__pane-bottom">
         <div className="workspace__preview-header">Preview</div>
-        <div className="workspace__preview-empty">Select a file to preview</div>
+        {selectedFile ? (
+          <div className="workspace__preview-info">
+            <div className="workspace__preview-name">{selectedFile.name}</div>
+            <div className="workspace__preview-path">{selectedFile.path}</div>
+            {selectedFile.size !== null && (
+              <div className="workspace__preview-meta">
+                Size: {selectedFile.size < 1024
+                  ? `${selectedFile.size} B`
+                  : selectedFile.size < 1048576
+                  ? `${(selectedFile.size / 1024).toFixed(1)} KB`
+                  : `${(selectedFile.size / 1048576).toFixed(1)} MB`}
+              </div>
+            )}
+            {selectedFile.mtime && (
+              <div className="workspace__preview-meta">Modified: {selectedFile.mtime}</div>
+            )}
+          </div>
+        ) : (
+          <div className="workspace__preview-empty">Select a file to preview</div>
+        )}
       </div>
     </div>
   );
