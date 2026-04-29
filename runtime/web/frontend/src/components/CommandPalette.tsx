@@ -6,6 +6,7 @@ import { useTheme } from "../theme/ThemeProvider";
 interface CommandPaletteProps {
   visible: boolean;
   onClose: () => void;
+  onCommand?: (cmd: string) => void;
 }
 
 interface BackendCommand {
@@ -36,13 +37,15 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
   template: "#89dceb",
 };
 
-export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
+export function CommandPalette({ visible, onClose, onCommand }: CommandPaletteProps) {
   const theme = useTheme();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch backend commands when palette opens
   useEffect(() => {
@@ -55,8 +58,10 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
       inputRef.current?.focus();
     }, 0);
 
+    const controller = new AbortController();
+
     // Fetch real piclaw commands from backend
-    fetch("/agent/commands", { credentials: "same-origin" })
+    fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ commands: BackendCommand[] }>;
@@ -65,11 +70,15 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
         setBackendCommands(data.commands ?? []);
       })
       .catch((err) => {
+        if (err.name === "AbortError") return;
         console.warn("[CommandPalette] Failed to fetch backend commands:", err);
         setBackendCommands([]);
       });
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [visible]);
 
   // Merge local UI commands (first) with backend commands (after)
@@ -119,6 +128,15 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     return null;
   }
 
+  const executeBackendCommand = (label: string) => {
+    navigator.clipboard.writeText(label).catch(() => {});
+    if (onCommand) onCommand(label);
+    // Show brief visual indicator
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    setCopiedLabel(label);
+    copiedTimerRef.current = setTimeout(() => setCopiedLabel(null), 1500);
+  };
+
   const executeSelected = () => {
     const command = results[selectedIndex];
     if (!command) return;
@@ -126,8 +144,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     if (command.handler) {
       command.handler();
     } else if (command.isBackend) {
-      // Backend commands: log for now (chat wiring not yet implemented)
-      console.info("[CommandPalette] Backend command selected:", command.label);
+      executeBackendCommand(command.label);
     }
     onClose();
   };
@@ -242,6 +259,17 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
+        {copiedLabel && (
+          <div style={{
+            padding: "4px 12px",
+            fontSize: "11px",
+            color: "#a6e3a1",
+            background: "rgba(166,227,161,0.08)",
+            borderBottom: `1px solid ${theme.border}`,
+          }}>
+            Copied to clipboard: <strong>{copiedLabel}</strong>
+          </div>
+        )}
         <ul ref={listRef} className="command-palette__results" role="listbox" aria-label="Commands">
           {results.map((command, index) => {
             const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? theme.textMuted;
@@ -255,7 +283,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
                   if (command.handler) {
                     command.handler();
                   } else if (command.isBackend) {
-                    console.info("[CommandPalette] Backend command selected:", command.label);
+                    executeBackendCommand(command.label);
                   }
                   onClose();
                 }}

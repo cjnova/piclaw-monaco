@@ -31,18 +31,15 @@ const CATPPUCCIN_MOCHA_THEME: ITheme = {
 };
 
 interface TerminalSessionInfo {
-  enabled: boolean;
   ws_path: string;
-  font_family?: string;
-  active?: boolean;
 }
 
 function getTerminalClientId(): string {
   const key = "piclaw-terminal-client-id";
-  let id = localStorage.getItem(key);
+  let id = sessionStorage.getItem(key);
   if (!id) {
     id = crypto.randomUUID();
-    localStorage.setItem(key, id);
+    sessionStorage.setItem(key, id);
   }
   return id;
 }
@@ -65,8 +62,6 @@ type ConnStatus = "connecting" | "connected" | "error" | "retrying";
 export function TerminalComponent() {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const mountedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [connStatus, setConnStatus] = useState<ConnStatus>("connecting");
@@ -135,7 +130,6 @@ export function TerminalComponent() {
 
       // Load FitAddon
       fitAddon = new FitAddon();
-      fitAddonRef.current = fitAddon;
       terminal.loadAddon(fitAddon);
 
       // Mount terminal to DOM — container needs non-zero dimensions
@@ -153,7 +147,6 @@ export function TerminalComponent() {
       // Connect WebSocket
       const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + wsPath + (wsPath.includes("?") ? "&" : "?") + `client=${clientId}`;
       ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
 
       const connectTimeout = setTimeout(() => {
         if (ws && ws.readyState !== WebSocket.OPEN && mountedRef.current) {
@@ -266,13 +259,11 @@ export function TerminalComponent() {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       if (ws) {
         ws.close();
-        wsRef.current = null;
       }
       if (terminal) {
         terminal.dispose();
         terminalRef.current = null;
       }
-      fitAddonRef.current = null;
     };
   }, []);
 

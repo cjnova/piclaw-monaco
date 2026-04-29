@@ -57,13 +57,13 @@ export function SystemStats() {
         if (res.ok) {
           stats.value = await res.json() as StatsData;
         }
-      } catch {
-        // keep showing previous or null
+      } catch (err) {
+        console.warn("[SystemStats] fetch failed:", err);
       }
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 3_000);
+    const interval = setInterval(fetchStats, 10_000);
     return () => clearInterval(interval);
   }, [stats]);
 

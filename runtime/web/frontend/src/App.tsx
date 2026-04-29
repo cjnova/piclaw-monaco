@@ -116,8 +116,8 @@ function AppContent() {
       { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal" as const, keybinding: "Ctrl+`", handler: () => { terminalVisible.value = !terminalVisible.value; } },
       { id: "terminal.maximize", label: "Maximize Terminal", category: "terminal" as const, handler: () => { terminalVisible.value = true; terminalMaximized.value = true; } },
       { id: "terminal.restore", label: "Restore Terminal", category: "terminal" as const, handler: () => { terminalMaximized.value = false; } },
-      { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "_blank"); } },
-      { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); } },
+      { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); } },
+      { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); } },
       { id: "terminal.close", label: "Close Terminal", category: "terminal" as const, handler: () => { terminalVisible.value = false; terminalMaximized.value = false; } },
       // Theme
       { id: "theme.toggleDarkLight", label: "Toggle Dark/Light Theme", category: "theme" as const, handler: () => { themeControl.toggleMode(); } },
@@ -231,12 +231,12 @@ function AppContent() {
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
                   title={terminalMaximized.value ? "Restore" : "Maximize"}><i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} style={{ fontSize: "14px" }} /></span>
                 <span style={{ cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" }}
-                  onClick={() => { window.open("/static/terminal.html", "_blank"); }}
+                  onClick={() => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
                   title="Open in new tab"><i className="codicon codicon-link-external" style={{ fontSize: "14px" }} /></span>
                 <span style={{ cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" }}
-                  onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); }}
+                  onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = theme.text; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = theme.textMuted; }}
                   title="Pop out to window"><i className="codicon codicon-multiple-windows" style={{ fontSize: "14px" }} /></span>

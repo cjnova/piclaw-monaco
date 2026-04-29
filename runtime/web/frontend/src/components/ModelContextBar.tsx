@@ -22,19 +22,21 @@ interface AgentContext {
 interface ModelInfo {
   current: string | null;
   models: string[];
-  model_options: { id: string; label?: string; provider?: string }[];
+  model_options: { id: string; label?: string; provider?: string; context_window?: number }[];
   thinking_level: string | null;
   thinking_level_label: string | null;
   supports_thinking: boolean;
   available_thinking_levels: string[];
 }
 
-const FALLBACK_MODELS = [
-  "github-copilot/claude-sonnet-4.6",
-  "github-copilot/claude-opus-4.6",
-  "github-copilot/gpt-5.3-codex",
-  "github-copilot/o4-mini",
-  "github-copilot/gemini-2.5-pro",
+interface ModelEntry { id: string; context_window?: number }
+
+const FALLBACK_MODELS: ModelEntry[] = [
+  { id: "github-copilot/claude-sonnet-4.6", context_window: 200000 },
+  { id: "github-copilot/claude-opus-4.6", context_window: 1000000 },
+  { id: "github-copilot/gpt-5.3-codex", context_window: 1000000 },
+  { id: "github-copilot/o4-mini", context_window: 200000 },
+  { id: "github-copilot/gemini-2.5-pro", context_window: 1048576 },
 ];
 
 const FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
@@ -64,9 +66,10 @@ export function ModelContextBar() {
   const agentStatus = useSignal<AgentStatus | null>(null);
   const agentContext = useSignal<AgentContext | null>(null);
   const error = useSignal<boolean>(false);
+  const lastSuccessAt = useSignal<number>(0);
   const showPicker = useSignal<boolean>(false);
   const showThinkingPicker = useSignal<boolean>(false);
-  const models = useSignal<string[]>([]);
+  const models = useSignal<ModelEntry[]>([]);
   const thinkingLevels = useSignal<string[]>([]);
   const currentModel = useSignal<string | null>(null);
 
@@ -77,10 +80,12 @@ export function ModelContextBar() {
         if (res.ok) {
           agentStatus.value = await res.json() as AgentStatus;
           error.value = false;
+          lastSuccessAt.value = Date.now();
         } else {
           error.value = true;
         }
-      } catch {
+      } catch (err) {
+        console.warn("[ModelContextBar] status fetch failed:", err);
         error.value = true;
       }
     };
@@ -97,8 +102,8 @@ export function ModelContextBar() {
         if (res.ok) {
           agentContext.value = await res.json() as AgentContext;
         }
-      } catch {
-        // silently ignore
+      } catch (err) {
+        console.warn("[ModelContextBar] context fetch failed:", err);
       }
     };
 
@@ -151,41 +156,45 @@ export function ModelContextBar() {
       return;
     }
 
-    // Fetch models list
+    // Show immediately with cached/fallback data, fetch in background
+    showPicker.value = true;
+    if (!models.value.length) models.value = FALLBACK_MODELS;
+
     try {
       const res = await fetch("/agent/models");
       if (res.ok) {
         const info = await res.json() as ModelInfo;
-        models.value = info.models?.length
-          ? info.models
-          : (info.model_options?.map(o => o.id) ?? FALLBACK_MODELS);
+        const entries: ModelEntry[] = info.model_options?.length
+          ? info.model_options.map(o => ({ id: o.id, context_window: o.context_window }))
+          : (info.models?.length ? info.models.map(id => ({ id })) : FALLBACK_MODELS);
+        models.value = entries;
         currentModel.value = info.current ?? modelName;
         thinkingLevels.value = info.available_thinking_levels?.length
           ? info.available_thinking_levels
           : FALLBACK_THINKING_LEVELS;
-      } else {
-        models.value = FALLBACK_MODELS;
-        currentModel.value = modelName;
-        thinkingLevels.value = FALLBACK_THINKING_LEVELS;
       }
-    } catch {
-      models.value = FALLBACK_MODELS;
-      currentModel.value = modelName;
-      thinkingLevels.value = FALLBACK_THINKING_LEVELS;
+    } catch (err) {
+      console.warn("[ModelContextBar] models fetch failed:", err);
     }
-
-    showPicker.value = true;
   };
 
-  const handleSelectModel = (id: string) => {
-    fetch("/agent/web:default/message", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: `/model ${id}` }),
-    }).catch(() => {});
-    currentModel.value = id;
-    showPicker.value = false;
+  const handleSelectModel = async (id: string) => {
+    try {
+      const res = await fetch("/agent/web:default/message", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `/model ${id}` }),
+      });
+      if (res.ok) {
+        currentModel.value = id;
+        showPicker.value = false;
+      } else {
+        console.warn("[ModelContextBar] model switch failed:", res.status);
+      }
+    } catch (err) {
+      console.warn("[ModelContextBar] model switch error:", err);
+    }
   };
 
   const handleThinkingClick = (e: MouseEvent) => {
@@ -194,18 +203,29 @@ export function ModelContextBar() {
     showPicker.value = false;
   };
 
-  const handleSelectThinking = (level: string) => {
-    fetch("/agent/web:default/message", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: `/thinking ${level}` }),
-    }).catch(() => {});
-    showThinkingPicker.value = false;
+  const handleSelectThinking = async (level: string) => {
+    try {
+      const res = await fetch("/agent/web:default/message", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `/thinking ${level}` }),
+      });
+      if (res.ok) {
+        showThinkingPicker.value = false;
+      } else {
+        console.warn("[ModelContextBar] thinking switch failed:", res.status);
+      }
+    } catch (err) {
+      console.warn("[ModelContextBar] thinking switch error:", err);
+    }
   };
 
-  // Show mockup when not connected
-  const isConnected = !error.value || !!agentStatus.value;
+  // Show mockup when not connected.
+  // If last successful fetch was > 30s ago and we now have an error, treat as stale/disconnected.
+  const isConnected = error.value
+    ? (lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value <= 30_000)
+    : true;
   const modelName = isConnected
     ? (agentStatus.value?.data?.model ?? currentModel.value ?? "github-copilot/claude-sonnet-4.6")
     : "github-copilot/claude-sonnet-4.6";
@@ -254,14 +274,15 @@ export function ModelContextBar() {
             scrollbarColor: "#45475a transparent",
           }}
         >
-          {models.value.map((id) => {
-            const isCurrent = id === activeModel;
+          {models.value.map((entry) => {
+            const isCurrent = entry.id === activeModel;
+            const ctxK = entry.context_window ? `${(entry.context_window / 1000).toFixed(0)}k` : "";
             return (
               <div
-                key={id}
-                onClick={() => handleSelectModel(id)}
+                key={entry.id}
+                onClick={() => handleSelectModel(entry.id)}
                 style={{
-                  padding: "6px 12px",
+                  padding: "5px 12px",
                   fontSize: "12px",
                   cursor: "pointer",
                   color: isCurrent ? "#cba6f7" : "#cdd6f4",
@@ -270,8 +291,6 @@ export function ModelContextBar() {
                   alignItems: "center",
                   gap: "6px",
                   whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
                   transition: "background 0.1s",
                 }}
                 onMouseEnter={(e) => {
@@ -288,7 +307,8 @@ export function ModelContextBar() {
                 <span style={{ width: "12px", flexShrink: 0, textAlign: "center" }}>
                   {isCurrent ? "✓" : ""}
                 </span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{id}</span>
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{entry.id}</span>
+                {ctxK && <span style={{ color: "#9399b2", fontSize: "10px", flexShrink: 0 }}>{ctxK}</span>}
               </div>
             );
           })}
@@ -313,10 +333,10 @@ export function ModelContextBar() {
         }}
         title={`${modelName}${thinkingLevel ? ` • ${thinkingLevel}` : ""} — click to switch model`}
       >
-        <span style={{ opacity: 1, marginRight: "4px" }}>
-          {modelName.includes("/") ? modelName.split("/")[0] + " /" : ""}
+        <span style={{ opacity: 0.8 }}>
+          {modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}
         </span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px", fontWeight: 600 }}>
           {modelName.split("/").pop() || modelName}
         </span>
         {thinkingLevel && (

@@ -5108,10 +5108,10 @@ For tests, pass a Ghostty instance directly:
   };
   function getTerminalClientId() {
     const key = "piclaw-terminal-client-id";
-    let id = localStorage.getItem(key);
+    let id = sessionStorage.getItem(key);
     if (!id) {
       id = crypto.randomUUID();
-      localStorage.setItem(key, id);
+      sessionStorage.setItem(key, id);
     }
     return id;
   }
@@ -5129,8 +5129,6 @@ For tests, pass a Ghostty instance directly:
   function TerminalComponent() {
     const containerRef = A2(null);
     const terminalRef = A2(null);
-    const fitAddonRef = A2(null);
-    const wsRef = A2(null);
     const mountedRef = A2(false);
     const retryTimerRef = A2(null);
     const [connStatus, setConnStatus] = d2("connecting");
@@ -5184,7 +5182,6 @@ For tests, pass a Ghostty instance directly:
         });
         terminalRef.current = terminal;
         fitAddon = new wA();
-        fitAddonRef.current = fitAddon;
         terminal.loadAddon(fitAddon);
         terminal.open(containerRef.current);
         try {
@@ -5196,7 +5193,6 @@ For tests, pass a Ghostty instance directly:
         fitAddon.observeResize();
         const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + wsPath + (wsPath.includes("?") ? "&" : "?") + `client=${clientId}`;
         ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
         const connectTimeout = setTimeout(() => {
           if (ws && ws.readyState !== WebSocket.OPEN && mountedRef.current) {
             ws.close();
@@ -5293,13 +5289,11 @@ For tests, pass a Ghostty instance directly:
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         if (ws) {
           ws.close();
-          wsRef.current = null;
         }
         if (terminal) {
           terminal.dispose();
           terminalRef.current = null;
         }
-        fitAddonRef.current = null;
       };
     }, []);
     const showOverlay = connStatus !== "connected";
@@ -5430,11 +5424,12 @@ For tests, pass a Ghostty instance directly:
           if (res.ok) {
             stats.value = await res.json();
           }
-        } catch {
+        } catch (err) {
+          console.warn("[SystemStats] fetch failed:", err);
         }
       };
       fetchStats();
-      const interval = setInterval(fetchStats, 3e3);
+      const interval = setInterval(fetchStats, 1e4);
       return () => clearInterval(interval);
     }, [stats]);
     return /* @__PURE__ */ u4(
@@ -5456,11 +5451,11 @@ For tests, pass a Ghostty instance directly:
 
   // runtime/web/frontend/src/components/ModelContextBar.tsx
   var FALLBACK_MODELS = [
-    "github-copilot/claude-sonnet-4.6",
-    "github-copilot/claude-opus-4.6",
-    "github-copilot/gpt-5.3-codex",
-    "github-copilot/o4-mini",
-    "github-copilot/gemini-2.5-pro"
+    { id: "github-copilot/claude-sonnet-4.6", context_window: 2e5 },
+    { id: "github-copilot/claude-opus-4.6", context_window: 1e6 },
+    { id: "github-copilot/gpt-5.3-codex", context_window: 1e6 },
+    { id: "github-copilot/o4-mini", context_window: 2e5 },
+    { id: "github-copilot/gemini-2.5-pro", context_window: 1048576 }
   ];
   var FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
   function ContextRing({ percent, tokens, contextWindow, onClick }) {
@@ -5490,6 +5485,7 @@ For tests, pass a Ghostty instance directly:
     const agentStatus = useSignal(null);
     const agentContext = useSignal(null);
     const error = useSignal(false);
+    const lastSuccessAt = useSignal(0);
     const showPicker = useSignal(false);
     const showThinkingPicker = useSignal(false);
     const models = useSignal([]);
@@ -5502,10 +5498,12 @@ For tests, pass a Ghostty instance directly:
           if (res.ok) {
             agentStatus.value = await res.json();
             error.value = false;
+            lastSuccessAt.value = Date.now();
           } else {
             error.value = true;
           }
-        } catch {
+        } catch (err) {
+          console.warn("[ModelContextBar] status fetch failed:", err);
           error.value = true;
         }
       };
@@ -5520,7 +5518,8 @@ For tests, pass a Ghostty instance directly:
           if (res.ok) {
             agentContext.value = await res.json();
           }
-        } catch {
+        } catch (err) {
+          console.warn("[ModelContextBar] context fetch failed:", err);
         }
       };
       fetchContext();
@@ -5565,52 +5564,62 @@ For tests, pass a Ghostty instance directly:
         showPicker.value = false;
         return;
       }
+      showPicker.value = true;
+      if (!models.value.length) models.value = FALLBACK_MODELS;
       try {
         const res = await fetch("/agent/models");
         if (res.ok) {
           const info = await res.json();
-          models.value = info.models?.length ? info.models : info.model_options?.map((o4) => o4.id) ?? FALLBACK_MODELS;
+          const entries = info.model_options?.length ? info.model_options.map((o4) => ({ id: o4.id, context_window: o4.context_window })) : info.models?.length ? info.models.map((id) => ({ id })) : FALLBACK_MODELS;
+          models.value = entries;
           currentModel.value = info.current ?? modelName;
           thinkingLevels.value = info.available_thinking_levels?.length ? info.available_thinking_levels : FALLBACK_THINKING_LEVELS;
-        } else {
-          models.value = FALLBACK_MODELS;
-          currentModel.value = modelName;
-          thinkingLevels.value = FALLBACK_THINKING_LEVELS;
         }
-      } catch {
-        models.value = FALLBACK_MODELS;
-        currentModel.value = modelName;
-        thinkingLevels.value = FALLBACK_THINKING_LEVELS;
+      } catch (err) {
+        console.warn("[ModelContextBar] models fetch failed:", err);
       }
-      showPicker.value = true;
     };
-    const handleSelectModel = (id) => {
-      fetch("/agent/web:default/message", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: `/model ${id}` })
-      }).catch(() => {
-      });
-      currentModel.value = id;
-      showPicker.value = false;
+    const handleSelectModel = async (id) => {
+      try {
+        const res = await fetch("/agent/web:default/message", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: `/model ${id}` })
+        });
+        if (res.ok) {
+          currentModel.value = id;
+          showPicker.value = false;
+        } else {
+          console.warn("[ModelContextBar] model switch failed:", res.status);
+        }
+      } catch (err) {
+        console.warn("[ModelContextBar] model switch error:", err);
+      }
     };
     const handleThinkingClick = (e5) => {
       e5.stopPropagation();
       showThinkingPicker.value = !showThinkingPicker.value;
       showPicker.value = false;
     };
-    const handleSelectThinking = (level) => {
-      fetch("/agent/web:default/message", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: `/thinking ${level}` })
-      }).catch(() => {
-      });
-      showThinkingPicker.value = false;
+    const handleSelectThinking = async (level) => {
+      try {
+        const res = await fetch("/agent/web:default/message", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: `/thinking ${level}` })
+        });
+        if (res.ok) {
+          showThinkingPicker.value = false;
+        } else {
+          console.warn("[ModelContextBar] thinking switch failed:", res.status);
+        }
+      } catch (err) {
+        console.warn("[ModelContextBar] thinking switch error:", err);
+      }
     };
-    const isConnected = !error.value || !!agentStatus.value;
+    const isConnected = error.value ? lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value <= 3e4 : true;
     const modelName = isConnected ? agentStatus.value?.data?.model ?? currentModel.value ?? "github-copilot/claude-sonnet-4.6" : "github-copilot/claude-sonnet-4.6";
     const thinkingLevel = isConnected ? agentStatus.value?.data?.thinking_level ?? "" : "medium";
     const contextPercent = isConnected ? agentContext.value?.percent ?? null : 42;
@@ -5647,14 +5656,15 @@ For tests, pass a Ghostty instance directly:
                 scrollbarWidth: "thin",
                 scrollbarColor: "#45475a transparent"
               },
-              children: models.value.map((id) => {
-                const isCurrent = id === activeModel;
+              children: models.value.map((entry) => {
+                const isCurrent = entry.id === activeModel;
+                const ctxK = entry.context_window ? `${(entry.context_window / 1e3).toFixed(0)}k` : "";
                 return /* @__PURE__ */ u4(
                   "div",
                   {
-                    onClick: () => handleSelectModel(id),
+                    onClick: () => handleSelectModel(entry.id),
                     style: {
-                      padding: "6px 12px",
+                      padding: "5px 12px",
                       fontSize: "12px",
                       cursor: "pointer",
                       color: isCurrent ? "#cba6f7" : "#cdd6f4",
@@ -5663,8 +5673,6 @@ For tests, pass a Ghostty instance directly:
                       alignItems: "center",
                       gap: "6px",
                       whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
                       transition: "background 0.1s"
                     },
                     onMouseEnter: (e5) => {
@@ -5675,10 +5683,11 @@ For tests, pass a Ghostty instance directly:
                     },
                     children: [
                       /* @__PURE__ */ u4("span", { style: { width: "12px", flexShrink: 0, textAlign: "center" }, children: isCurrent ? "\u2713" : "" }),
-                      /* @__PURE__ */ u4("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: id })
+                      /* @__PURE__ */ u4("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" }, children: entry.id }),
+                      ctxK && /* @__PURE__ */ u4("span", { style: { color: "#9399b2", fontSize: "10px", flexShrink: 0 }, children: ctxK })
                     ]
                   },
-                  id
+                  entry.id
                 );
               })
             }
@@ -5702,8 +5711,8 @@ For tests, pass a Ghostty instance directly:
               },
               title: `${modelName}${thinkingLevel ? ` \u2022 ${thinkingLevel}` : ""} \u2014 click to switch model`,
               children: [
-                /* @__PURE__ */ u4("span", { style: { opacity: 1, marginRight: "4px" }, children: modelName.includes("/") ? modelName.split("/")[0] + " /" : "" }),
-                /* @__PURE__ */ u4("span", { style: { overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }, children: modelName.split("/").pop() || modelName }),
+                /* @__PURE__ */ u4("span", { style: { opacity: 0.8 }, children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
+                /* @__PURE__ */ u4("span", { style: { overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px", fontWeight: 600 }, children: modelName.split("/").pop() || modelName }),
                 thinkingLevel && /* @__PURE__ */ u4(
                   "span",
                   {
@@ -5824,13 +5833,15 @@ For tests, pass a Ghostty instance directly:
     skill: "#a6e3a1",
     template: "#89dceb"
   };
-  function CommandPalette({ visible, onClose }) {
+  function CommandPalette({ visible, onClose, onCommand }) {
     const theme = useTheme();
     const [query, setQuery] = d2("");
     const [selectedIndex, setSelectedIndex] = d2(0);
     const [backendCommands, setBackendCommands] = d2([]);
+    const [copiedLabel, setCopiedLabel] = d2(null);
     const inputRef = A2(null);
     const listRef = A2(null);
+    const copiedTimerRef = A2(null);
     y2(() => {
       if (!visible) return;
       setQuery("");
@@ -5838,16 +5849,21 @@ For tests, pass a Ghostty instance directly:
       const timer = window.setTimeout(() => {
         inputRef.current?.focus();
       }, 0);
-      fetch("/agent/commands", { credentials: "same-origin" }).then((res) => {
+      const controller = new AbortController();
+      fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal }).then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       }).then((data) => {
         setBackendCommands(data.commands ?? []);
       }).catch((err) => {
+        if (err.name === "AbortError") return;
         console.warn("[CommandPalette] Failed to fetch backend commands:", err);
         setBackendCommands([]);
       });
-      return () => window.clearTimeout(timer);
+      return () => {
+        window.clearTimeout(timer);
+        controller.abort();
+      };
     }, [visible]);
     const allCommands = T2(() => {
       const localCmds = commandRegistry.getAll().map((cmd) => ({
@@ -5883,13 +5899,21 @@ For tests, pass a Ghostty instance directly:
     if (!visible) {
       return null;
     }
+    const executeBackendCommand = (label) => {
+      navigator.clipboard.writeText(label).catch(() => {
+      });
+      if (onCommand) onCommand(label);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      setCopiedLabel(label);
+      copiedTimerRef.current = setTimeout(() => setCopiedLabel(null), 1500);
+    };
     const executeSelected = () => {
       const command = results[selectedIndex];
       if (!command) return;
       if (command.handler) {
         command.handler();
       } else if (command.isBackend) {
-        console.info("[CommandPalette] Backend command selected:", command.label);
+        executeBackendCommand(command.label);
       }
       onClose();
     };
@@ -5996,6 +6020,16 @@ For tests, pass a Ghostty instance directly:
               onKeyDown: handleKeyDown
             }
           ),
+          copiedLabel && /* @__PURE__ */ u4("div", { style: {
+            padding: "4px 12px",
+            fontSize: "11px",
+            color: "#a6e3a1",
+            background: "rgba(166,227,161,0.08)",
+            borderBottom: `1px solid ${theme.border}`
+          }, children: [
+            "Copied to clipboard: ",
+            /* @__PURE__ */ u4("strong", { children: copiedLabel })
+          ] }),
           /* @__PURE__ */ u4("ul", { ref: listRef, className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
             results.map((command, index) => {
               const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? theme.textMuted;
@@ -6009,7 +6043,7 @@ For tests, pass a Ghostty instance directly:
                     if (command.handler) {
                       command.handler();
                     } else if (command.isBackend) {
-                      console.info("[CommandPalette] Backend command selected:", command.label);
+                      executeBackendCommand(command.label);
                     }
                     onClose();
                   },
@@ -6384,10 +6418,10 @@ For tests, pass a Ghostty instance directly:
           terminalMaximized.value = false;
         } },
         { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal", handler: () => {
-          window.open("/static/terminal.html", "_blank");
+          window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
         } },
         { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal", handler: () => {
-          window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
+          window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
         } },
         { id: "terminal.close", label: "Close Terminal", category: "terminal", handler: () => {
           terminalVisible.value = false;
@@ -6534,7 +6568,7 @@ For tests, pass a Ghostty instance directly:
                 {
                   style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
-                    window.open("/static/terminal.html", "_blank");
+                    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
                   },
                   onMouseEnter: (e5) => {
                     e5.target.style.color = theme.text;
@@ -6551,7 +6585,7 @@ For tests, pass a Ghostty instance directly:
                 {
                   style: { cursor: "pointer", color: theme.textMuted, fontSize: "14px", padding: "2px 4px" },
                   onClick: () => {
-                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
+                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
                   },
                   onMouseEnter: (e5) => {
                     e5.target.style.color = theme.text;
