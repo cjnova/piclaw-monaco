@@ -6,6 +6,8 @@ interface SplitPaneProps {
   initialSize: number;
   minSize: number;
   maxSize: number;
+  minSecondSize?: number;
+  collapseSecond?: boolean;
   children: [ComponentChildren, ComponentChildren];
   onResize?: (size: number) => void;
 }
@@ -14,12 +16,22 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function SplitPane({ direction, initialSize, minSize, maxSize, children, onResize }: SplitPaneProps) {
+export function SplitPane({
+  direction,
+  initialSize,
+  minSize,
+  maxSize,
+  minSecondSize = 0,
+  collapseSecond = false,
+  children,
+  onResize,
+}: SplitPaneProps) {
   const normalizedInitialSize = useMemo(() => clamp(initialSize, minSize, maxSize), [initialSize, minSize, maxSize]);
   const [firstSize, setFirstSize] = useState<number>(normalizedInitialSize);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const dragStartPositionRef = useRef(0);
   const dragStartSizeRef = useRef(normalizedInitialSize);
   const restoreSizeRef = useRef(normalizedInitialSize);
@@ -43,7 +55,11 @@ export function SplitPane({ direction, initialSize, minSize, maxSize, children, 
     const handleMouseMove = (event: MouseEvent) => {
       const currentPosition = event[axis];
       const delta = currentPosition - dragStartPositionRef.current;
-      const nextSize = clamp(dragStartSizeRef.current + delta, minSize, maxSize);
+      const containerSize = direction === "horizontal"
+        ? rootRef.current?.getBoundingClientRect().width ?? 0
+        : rootRef.current?.getBoundingClientRect().height ?? 0;
+      const maxAllowedFirst = containerSize > 0 ? Math.max(minSize, containerSize - minSecondSize) : maxSize;
+      const nextSize = clamp(dragStartSizeRef.current + delta, minSize, Math.min(maxSize, maxAllowedFirst));
       setFirstSize(nextSize);
       if (nextSize > 0) {
         restoreSizeRef.current = nextSize;
@@ -70,7 +86,7 @@ export function SplitPane({ direction, initialSize, minSize, maxSize, children, 
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [direction, isDragging, maxSize, minSize, onResize]);
+  }, [direction, isDragging, maxSize, minSecondSize, minSize, onResize]);
 
   const handleMouseDown = (event: MouseEvent) => {
     event.preventDefault();
@@ -104,12 +120,14 @@ export function SplitPane({ direction, initialSize, minSize, maxSize, children, 
     onResize?.(0);
   };
 
-  const firstPaneStyle = direction === "horizontal"
-    ? { width: `${firstSize}px`, minWidth: `${firstSize}px`, maxWidth: `${firstSize}px` }
-    : { height: `${firstSize}px`, minHeight: `${firstSize}px`, maxHeight: `${firstSize}px` };
+  const firstPaneStyle = collapseSecond
+    ? undefined
+    : direction === "horizontal"
+      ? { width: `${firstSize}px`, minWidth: `${firstSize}px`, maxWidth: `${firstSize}px` }
+      : { height: `${firstSize}px`, minHeight: `${firstSize}px`, maxHeight: `${firstSize}px` };
 
   return (
-    <div className={`split-pane split-pane--${direction}`}>
+    <div ref={rootRef} className={`split-pane split-pane--${direction} ${collapseSecond ? "is-second-collapsed" : ""}`}>
       <div className="split-pane__first" style={firstPaneStyle}>
         {firstChild}
       </div>
@@ -120,6 +138,7 @@ export function SplitPane({ direction, initialSize, minSize, maxSize, children, 
         role="separator"
         aria-orientation={direction === "horizontal" ? "vertical" : "horizontal"}
         aria-label="Resize panels"
+        aria-hidden={collapseSecond}
       />
       <div className="split-pane__second">
         {secondChild}
