@@ -100,6 +100,7 @@
     "@mariozechner/pi-coding-agent": "0.68.1",
     "@preact/signals": "2.5.1",
     "@simplewebauthn/server": "13.3.0",
+    "@vscode/codicons": "^0.0.45",
     "@whiskeysockets/baileys": "7.0.0-rc.9",
     "adaptivecards": "3.0.6",
     "beautiful-mermaid": "1.1.3",
