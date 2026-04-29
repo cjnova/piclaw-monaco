@@ -141,6 +141,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | wire-settings-panel-to-piclaw-config | Full settings panel (General, Providers, Models, Appearance, etc.) | ⏳ |
 | adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
 | wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
+| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ⏳ |
 
 ### Wave 11 — Full Functionality
 
