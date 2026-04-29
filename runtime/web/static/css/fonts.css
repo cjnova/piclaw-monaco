@@ -57,3 +57,12 @@ body {
 code, pre, .monospace {
   font-family: var(--font-mono);
 }
+
+/* Heavier font weight in light theme for readability */
+@media (prefers-color-scheme: light) {
+  body {
+    font-weight: 500;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
