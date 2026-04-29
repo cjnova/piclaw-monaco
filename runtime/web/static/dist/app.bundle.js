@@ -1200,6 +1200,24 @@
     ] });
   }
 
+  // runtime/web/frontend/src/components/BottomPanel.tsx
+  function BottomPanel({ visible, children }) {
+    return /* @__PURE__ */ u4(
+      "section",
+      {
+        className: `bottom-panel ${visible ? "is-visible" : "is-hidden"}`,
+        "aria-hidden": !visible,
+        children: [
+          /* @__PURE__ */ u4("header", { className: "bottom-panel__tabbar", children: [
+            /* @__PURE__ */ u4("button", { type: "button", className: "bottom-panel__tab is-active", "aria-selected": "true", children: "TERMINAL" }),
+            /* @__PURE__ */ u4("button", { type: "button", className: "bottom-panel__new-tab", "aria-label": "New terminal tab", children: "+" })
+          ] }),
+          /* @__PURE__ */ u4("div", { className: "bottom-panel__content", children })
+        ]
+      }
+    );
+  }
+
   // runtime/web/frontend/src/services/CommandRegistry.ts
   var CommandRegistry = class {
     commands = /* @__PURE__ */ new Map();
@@ -1492,8 +1510,9 @@
     }, [connectionStatus, websocket]);
     y2(() => {
       const handleWindowKeyDown = (event) => {
-        if (event.ctrlKey && (event.code === "Backquote" || event.key === "`" || event.key === "Dead")) {
+        if (event.ctrlKey && !event.shiftKey && (event.code === "Backquote" || event.key === "`" || event.key === "\xBA" || event.key === "Dead")) {
           event.preventDefault();
+          event.stopPropagation();
           terminalVisible.value = !terminalVisible.value;
           return;
         }
@@ -1502,46 +1521,23 @@
           paletteVisible.value = !paletteVisible.value;
         }
       };
-      window.addEventListener("keydown", handleWindowKeyDown);
-      return () => {
-        window.removeEventListener("keydown", handleWindowKeyDown);
-      };
-    }, [paletteVisible]);
+      window.addEventListener("keydown", handleWindowKeyDown, true);
+      return () => window.removeEventListener("keydown", handleWindowKeyDown, true);
+    }, [paletteVisible, terminalVisible]);
     y2(() => {
       const commands = [
-        {
-          id: "navigation.show-explorer",
-          label: "Show Explorer",
-          category: "navigation",
-          keybinding: "Ctrl+Shift+E",
-          handler: () => {
-            activePanel.value = "explorer";
-          }
-        },
-        {
-          id: "navigation.show-agent",
-          label: "Show Agent",
-          category: "navigation",
-          keybinding: "Ctrl+Shift+A",
-          handler: () => {
-            activePanel.value = "agent";
-          }
-        },
-        {
-          id: "terminal.toggle",
-          label: "Toggle Terminal",
-          category: "terminal",
-          keybinding: "Ctrl+`",
-          handler: () => {
-            terminalVisible.value = !terminalVisible.value;
-            console.log(`[command] terminal ${terminalVisible.value ? "shown" : "hidden"}`);
-          }
-        }
+        { id: "nav.explorer", label: "Show Explorer", category: "navigation", keybinding: "Ctrl+Shift+E", handler: () => {
+          activePanel.value = "explorer";
+        } },
+        { id: "nav.agent", label: "Show Agent", category: "navigation", keybinding: "Ctrl+Shift+A", handler: () => {
+          activePanel.value = "agent";
+        } },
+        { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal", keybinding: "Ctrl+`", handler: () => {
+          terminalVisible.value = !terminalVisible.value;
+        } }
       ];
-      commands.forEach((command) => commandRegistry.register(command));
-      return () => {
-        commands.forEach((command) => commandRegistry.unregister(command.id));
-      };
+      commands.forEach((c4) => commandRegistry.register(c4));
+      return () => commands.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible]);
     const connected = connectionStatus.value === "connected";
     return /* @__PURE__ */ u4("div", { className: "shell-root", children: [
@@ -1554,32 +1550,22 @@
           }
         }
       ),
-      /* @__PURE__ */ u4("main", { className: "shell-content", children: [
+      /* @__PURE__ */ u4("div", { className: "shell-content", style: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }, children: [
         /* @__PURE__ */ u4("header", { className: "shell-status", children: [
-          /* @__PURE__ */ u4(
-            "span",
-            {
-              className: `shell-status__dot ${connected ? "is-connected" : "is-disconnected"}`,
-              "aria-label": connected ? "connected" : "disconnected",
-              title: connected ? "Connected" : "Disconnected"
-            }
-          ),
+          /* @__PURE__ */ u4("span", { className: `shell-status__dot ${connected ? "is-connected" : "is-disconnected"}`, title: connected ? "Connected" : "Disconnected" }),
           /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
         ] }),
-        /* @__PURE__ */ u4("div", { className: "shell-main-layout", children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 400, children: [
-          /* @__PURE__ */ u4(Sidebar, { title: activePanel.value }),
-          /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
-        ] }) })
+        /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }, children: [
+          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden" }, children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 400, children: [
+            /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, children: null }),
+            /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
+          ] }) }),
+          /* @__PURE__ */ u4(BottomPanel, { visible: terminalVisible.value, children: /* @__PURE__ */ u4("div", { style: { padding: "12px", color: "#6c7086", fontFamily: "monospace", fontSize: "13px" }, children: "Terminal will be mounted here (xterm.js \u2014 Wave 9)" }) })
+        ] })
       ] }),
-      /* @__PURE__ */ u4(
-        CommandPalette,
-        {
-          visible: paletteVisible.value,
-          onClose: () => {
-            paletteVisible.value = false;
-          }
-        }
-      )
+      /* @__PURE__ */ u4(CommandPalette, { visible: paletteVisible.value, onClose: () => {
+        paletteVisible.value = false;
+      } })
     ] });
   }
 
