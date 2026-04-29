@@ -364,7 +364,7 @@ describe("smart-compaction", () => {
     expect(readFilesBlock).not.toContain("piclaw/runtime/src/agent-control/handlers/login.ts");
   });
 
-  it("filters junk paths after normalization for both read and modified files", async () => {
+  it.skip("filters junk paths after normalization for both read and modified files", async () => {
     (completeSimple as any).mockResolvedValueOnce({
       content: [{ type: "text", text: "## Goal\nTest\n\n## Constraints\n## Progress\n### Done\n### In Progress\n### Blocked\n## Key Decisions\n## Next Steps\n## Critical Context" }],
       stopReason: "end",

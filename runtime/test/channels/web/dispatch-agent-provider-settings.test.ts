@@ -4,6 +4,7 @@ import { join } from "path";
 
 import { createTempWorkspace, setEnv } from "../../helpers.js";
 import { handleAgentRoutes } from "../../../src/channels/web/http/dispatch-agent.js";
+import { initDatabase } from "../../../src/db.js";
 
 let restoreEnv: (() => void) | null = null;
 let cleanupWorkspace: (() => void) | null = null;
@@ -37,7 +38,9 @@ describe("dispatch-agent settings-data providers", () => {
       PICLAW_STORE: ws.store,
       PICLAW_DATA: ws.data,
       PICLAW_PI_AGENT_DIR: piAgentDir,
+      PICLAW_DB_IN_MEMORY: "1",
     });
+    initDatabase();
 
     const channel = {
       json: (body: unknown, status = 200) => new Response(JSON.stringify(body), {

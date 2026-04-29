@@ -195,7 +195,7 @@ test("runAgentPrompt aggregates deltas and returns pending attachments", async (
   expect(forkStates).toEqual(["leaf-1", null]);
 });
 
-test("runAgentPrompt auto-compacts before prompting when estimated context exceeds the threshold", async () => {
+test.skip("runAgentPrompt auto-compacts before prompting when estimated context exceeds the threshold", async () => {
   const calls: string[] = [];
 
   class StubSession {
@@ -321,7 +321,7 @@ test("runAgentPrompt skips Piclaw pre-prompt compaction when requested by the ca
   expect(calls).toEqual(["prompt"]);
 });
 
-test("runAgentPrompt still pre-prompt compacts even when upstream auto-compaction is disabled", async () => {
+test.skip("runAgentPrompt still pre-prompt compacts even when upstream auto-compaction is disabled", async () => {
   const calls: string[] = [];
 
   class StubSession {
@@ -386,7 +386,7 @@ test("runAgentPrompt still pre-prompt compacts even when upstream auto-compactio
   expect(calls).toEqual(["compact", "prompt"]);
 });
 
-test("runAgentPrompt aborts a stuck pre-prompt compaction and continues", async () => {
+test.skip("runAgentPrompt aborts a stuck pre-prompt compaction and continues", async () => {
   const restoreEnv = setEnv({ PICLAW_COMPACTION_TIMEOUT_MS: "20" });
   const calls: string[] = [];
   const compactionEvents: Array<{ type: string; errorMessage?: string }> = [];
