@@ -1506,7 +1506,7 @@
                     e4.target.style.color = "#6c7086";
                   },
                   title: terminalMaximized.value ? "Restore" : "Maximize",
-                  children: terminalMaximized.value ? "\u229F" : "\u229E"
+                  children: /* @__PURE__ */ u4("i", { className: terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full", style: { fontSize: "14px" } })
                 }
               ),
               /* @__PURE__ */ u4(

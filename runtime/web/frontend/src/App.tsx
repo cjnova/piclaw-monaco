@@ -139,7 +139,7 @@ export function App() {
                   onClick={() => { terminalMaximized.value = !terminalMaximized.value; }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
                   onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "#6c7086"; }}
-                  title={terminalMaximized.value ? "Restore" : "Maximize"}>{terminalMaximized.value ? "\u229F" : "\u229E"}</span>
+                  title={terminalMaximized.value ? "Restore" : "Maximize"}><i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} style={{ fontSize: "14px" }} /></span>
                 <span style={{ cursor: "pointer", color: "#6c7086", fontSize: "14px", padding: "2px 4px" }}
                   onClick={() => { window.open(window.location.href, "_blank"); }}
                   onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "#cdd6f4"; }}
