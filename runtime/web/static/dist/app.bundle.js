@@ -1152,15 +1152,198 @@
     }) });
   }
 
+  // runtime/web/frontend/src/components/Sidebar.tsx
+  function Sidebar({ title, actions = [], children, onCollapse }) {
+    const [collapsed, setCollapsed] = d2(false);
+    const handleCollapse = () => {
+      setCollapsed(!collapsed);
+      onCollapse?.();
+    };
+    if (collapsed) {
+      return null;
+    }
+    return /* @__PURE__ */ u4("aside", { className: "sidebar", style: { minWidth: "200px" }, children: [
+      /* @__PURE__ */ u4("header", { className: "sidebar__header", children: [
+        /* @__PURE__ */ u4("h2", { className: "sidebar__title", children: title }),
+        /* @__PURE__ */ u4("div", { className: "sidebar__actions", children: [
+          actions.map((action) => /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              className: "sidebar__action-btn",
+              title: action.label,
+              "aria-label": action.label,
+              onClick: action.onClick,
+              children: /* @__PURE__ */ u4(Icon, { name: action.icon, size: 16 })
+            },
+            action.label
+          )),
+          /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              className: "sidebar__action-btn",
+              title: "Collapse sidebar",
+              "aria-label": "Collapse sidebar",
+              onClick: handleCollapse,
+              children: /* @__PURE__ */ u4(Icon, { name: "chevron-left", size: 16 })
+            }
+          )
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "sidebar__content", children })
+    ] });
+  }
+
+  // runtime/web/frontend/src/services/CommandRegistry.ts
+  var CommandRegistry = class {
+    commands = /* @__PURE__ */ new Map();
+    register(cmd) {
+      this.commands.set(cmd.id, cmd);
+    }
+    unregister(id) {
+      this.commands.delete(id);
+    }
+    search(query) {
+      const normalizedQuery = query.trim().toLowerCase();
+      if (!normalizedQuery) {
+        return this.getAll();
+      }
+      return this.getAll().filter((command) => command.label.toLowerCase().includes(normalizedQuery));
+    }
+    execute(id) {
+      const command = this.commands.get(id);
+      if (!command) {
+        return;
+      }
+      command.handler();
+    }
+    getAll() {
+      return Array.from(this.commands.values());
+    }
+  };
+  var commandRegistry = new CommandRegistry();
+
+  // runtime/web/frontend/src/components/CommandPalette.tsx
+  function CommandPalette({ visible, onClose }) {
+    const [query, setQuery] = d2("");
+    const [selectedIndex, setSelectedIndex] = d2(0);
+    const inputRef = A2(null);
+    const results = T2(() => commandRegistry.search(query), [query]);
+    y2(() => {
+      if (!visible) {
+        return;
+      }
+      setQuery("");
+      setSelectedIndex(0);
+      const timer = window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }, [visible]);
+    y2(() => {
+      setSelectedIndex((current) => {
+        if (results.length === 0) {
+          return 0;
+        }
+        return Math.min(current, results.length - 1);
+      });
+    }, [results]);
+    if (!visible) {
+      return null;
+    }
+    const executeSelected = () => {
+      const command = results[selectedIndex];
+      if (!command) {
+        return;
+      }
+      commandRegistry.execute(command.id);
+      onClose();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setSelectedIndex((current) => {
+          if (results.length === 0) {
+            return 0;
+          }
+          return (current + 1) % results.length;
+        });
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setSelectedIndex((current) => {
+          if (results.length === 0) {
+            return 0;
+          }
+          return (current - 1 + results.length) % results.length;
+        });
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        executeSelected();
+      }
+    };
+    return /* @__PURE__ */ u4("div", { className: "command-palette-backdrop", onClick: onClose, children: /* @__PURE__ */ u4("div", { className: "command-palette", onClick: (event) => event.stopPropagation(), children: [
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          ref: inputRef,
+          className: "command-palette__input",
+          placeholder: "Type a command...",
+          value: query,
+          onInput: (event) => setQuery(event.target.value),
+          onKeyDown: handleKeyDown
+        }
+      ),
+      /* @__PURE__ */ u4("ul", { className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
+        results.map((command, index) => /* @__PURE__ */ u4(
+          "li",
+          {
+            className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
+            onMouseDown: (event) => event.preventDefault(),
+            onClick: () => {
+              commandRegistry.execute(command.id);
+              onClose();
+            },
+            children: [
+              /* @__PURE__ */ u4("span", { className: "command-palette__label", children: command.label }),
+              /* @__PURE__ */ u4("span", { className: "command-palette__keybinding", children: command.keybinding ?? "" })
+            ]
+          },
+          command.id
+        )),
+        results.length === 0 && /* @__PURE__ */ u4("li", { className: "command-palette__empty", children: "No matching commands" })
+      ] })
+    ] }) });
+  }
+
   // runtime/web/frontend/src/components/SplitPane.tsx
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
-  function SplitPane({ direction, initialSize, minSize, maxSize, children, onResize }) {
+  function SplitPane({
+    direction,
+    initialSize,
+    minSize,
+    maxSize,
+    minSecondSize = 0,
+    collapseSecond = false,
+    children,
+    onResize
+  }) {
     const normalizedInitialSize = T2(() => clamp(initialSize, minSize, maxSize), [initialSize, minSize, maxSize]);
     const [firstSize, setFirstSize] = d2(normalizedInitialSize);
     const [isCollapsed, setIsCollapsed] = d2(false);
     const [isDragging, setIsDragging] = d2(false);
+    const rootRef = A2(null);
     const dragStartPositionRef = A2(0);
     const dragStartSizeRef = A2(normalizedInitialSize);
     const restoreSizeRef = A2(normalizedInitialSize);
@@ -1179,7 +1362,9 @@
       const handleMouseMove = (event) => {
         const currentPosition = event[axis];
         const delta = currentPosition - dragStartPositionRef.current;
-        const nextSize = clamp(dragStartSizeRef.current + delta, minSize, maxSize);
+        const containerSize = direction === "horizontal" ? rootRef.current?.getBoundingClientRect().width ?? 0 : rootRef.current?.getBoundingClientRect().height ?? 0;
+        const maxAllowedFirst = containerSize > 0 ? Math.max(minSize, containerSize - minSecondSize) : maxSize;
+        const nextSize = clamp(dragStartSizeRef.current + delta, minSize, Math.min(maxSize, maxAllowedFirst));
         setFirstSize(nextSize);
         if (nextSize > 0) {
           restoreSizeRef.current = nextSize;
@@ -1201,7 +1386,7 @@
         window.removeEventListener("mousemove", handleMouseMove);
         window.removeEventListener("mouseup", handleMouseUp);
       };
-    }, [direction, isDragging, maxSize, minSize, onResize]);
+    }, [direction, isDragging, maxSize, minSecondSize, minSize, onResize]);
     const handleMouseDown = (event) => {
       event.preventDefault();
       const axis = direction === "horizontal" ? "clientX" : "clientY";
@@ -1227,8 +1412,8 @@
       setIsCollapsed(true);
       onResize?.(0);
     };
-    const firstPaneStyle = direction === "horizontal" ? { width: `${firstSize}px`, minWidth: `${firstSize}px`, maxWidth: `${firstSize}px` } : { height: `${firstSize}px`, minHeight: `${firstSize}px`, maxHeight: `${firstSize}px` };
-    return /* @__PURE__ */ u4("div", { className: `split-pane split-pane--${direction}`, children: [
+    const firstPaneStyle = collapseSecond ? void 0 : direction === "horizontal" ? { width: `${firstSize}px`, minWidth: `${firstSize}px`, maxWidth: `${firstSize}px` } : { height: `${firstSize}px`, minHeight: `${firstSize}px`, maxHeight: `${firstSize}px` };
+    return /* @__PURE__ */ u4("div", { ref: rootRef, className: `split-pane split-pane--${direction} ${collapseSecond ? "is-second-collapsed" : ""}`, children: [
       /* @__PURE__ */ u4("div", { className: "split-pane__first", style: firstPaneStyle, children: firstChild }),
       /* @__PURE__ */ u4(
         "div",
@@ -1238,7 +1423,8 @@
           onDblClick: handleDoubleClick,
           role: "separator",
           "aria-orientation": direction === "horizontal" ? "vertical" : "horizontal",
-          "aria-label": "Resize panels"
+          "aria-label": "Resize panels",
+          "aria-hidden": collapseSecond
         }
       ),
       /* @__PURE__ */ u4("div", { className: "split-pane__second", children: secondChild })
@@ -1288,6 +1474,8 @@
   function App() {
     const connectionStatus = useSignal("disconnected");
     const activePanel = useSignal("agent");
+    const paletteVisible = useSignal(false);
+    const terminalVisible = useSignal(false);
     const websocket = T2(() => new WebSocketManager(), []);
     y2(() => {
       const unsubscribe = websocket.onStatusChange((status) => {
@@ -1299,6 +1487,54 @@
         websocket.disconnect();
       };
     }, [connectionStatus, websocket]);
+    y2(() => {
+      const handleWindowKeyDown = (event) => {
+        if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "p") {
+          event.preventDefault();
+          paletteVisible.value = !paletteVisible.value;
+        }
+      };
+      window.addEventListener("keydown", handleWindowKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleWindowKeyDown);
+      };
+    }, [paletteVisible]);
+    y2(() => {
+      const commands = [
+        {
+          id: "navigation.show-explorer",
+          label: "Show Explorer",
+          category: "navigation",
+          keybinding: "Ctrl+Shift+E",
+          handler: () => {
+            activePanel.value = "explorer";
+          }
+        },
+        {
+          id: "navigation.show-agent",
+          label: "Show Agent",
+          category: "navigation",
+          keybinding: "Ctrl+Shift+A",
+          handler: () => {
+            activePanel.value = "agent";
+          }
+        },
+        {
+          id: "terminal.toggle",
+          label: "Toggle Terminal",
+          category: "terminal",
+          keybinding: "Ctrl+`",
+          handler: () => {
+            terminalVisible.value = !terminalVisible.value;
+            console.log(`[command] terminal ${terminalVisible.value ? "shown" : "hidden"}`);
+          }
+        }
+      ];
+      commands.forEach((command) => commandRegistry.register(command));
+      return () => {
+        commands.forEach((command) => commandRegistry.unregister(command.id));
+      };
+    }, [activePanel, terminalVisible]);
     const connected = connectionStatus.value === "connected";
     return /* @__PURE__ */ u4("div", { className: "shell-root", children: [
       /* @__PURE__ */ u4(
@@ -1323,10 +1559,19 @@
           /* @__PURE__ */ u4("span", { className: "shell-status__text", children: connected ? "Connected" : "Disconnected" })
         ] }),
         /* @__PURE__ */ u4("div", { className: "shell-main-layout", children: /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: 400, children: [
-          /* @__PURE__ */ u4("aside", { className: "shell-sidebar", children: "Sidebar area" }),
+          /* @__PURE__ */ u4(Sidebar, { title: activePanel.value }),
           /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
         ] }) })
-      ] })
+      ] }),
+      /* @__PURE__ */ u4(
+        CommandPalette,
+        {
+          visible: paletteVisible.value,
+          onClose: () => {
+            paletteVisible.value = false;
+          }
+        }
+      )
     ] });
   }
 

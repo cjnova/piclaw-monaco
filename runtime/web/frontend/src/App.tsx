@@ -4,12 +4,16 @@ import type { ConnectionStatus } from "./api/types";
 import { WebSocketManager } from "./api/websocket";
 import { ActivityBar } from "./components/ActivityBar";
 import { Sidebar } from "./components/Sidebar";
+import { CommandPalette } from "./components/CommandPalette";
 import { SplitPane } from "./components/SplitPane";
 import { PanelRouter } from "./panels";
+import { commandRegistry } from "./services";
 
 export function App() {
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
   const activePanel = useSignal("agent");
+  const paletteVisible = useSignal(false);
+  const terminalVisible = useSignal(false);
   const websocket = useMemo(() => new WebSocketManager(), []);
 
   useEffect(() => {
@@ -24,6 +28,60 @@ export function App() {
       websocket.disconnect();
     };
   }, [connectionStatus, websocket]);
+
+  useEffect(() => {
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        paletteVisible.value = !paletteVisible.value;
+      }
+    };
+
+    window.addEventListener("keydown", handleWindowKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown);
+    };
+  }, [paletteVisible]);
+
+  useEffect(() => {
+    const commands = [
+      {
+        id: "navigation.show-explorer",
+        label: "Show Explorer",
+        category: "navigation" as const,
+        keybinding: "Ctrl+Shift+E",
+        handler: () => {
+          activePanel.value = "explorer";
+        },
+      },
+      {
+        id: "navigation.show-agent",
+        label: "Show Agent",
+        category: "navigation" as const,
+        keybinding: "Ctrl+Shift+A",
+        handler: () => {
+          activePanel.value = "agent";
+        },
+      },
+      {
+        id: "terminal.toggle",
+        label: "Toggle Terminal",
+        category: "terminal" as const,
+        keybinding: "Ctrl+`",
+        handler: () => {
+          terminalVisible.value = !terminalVisible.value;
+          console.log(`[command] terminal ${terminalVisible.value ? "shown" : "hidden"}`);
+        },
+      },
+    ];
+
+    commands.forEach((command) => commandRegistry.register(command));
+
+    return () => {
+      commands.forEach((command) => commandRegistry.unregister(command.id));
+    };
+  }, [activePanel, terminalVisible]);
 
   const connected = connectionStatus.value === "connected";
 
@@ -52,6 +110,12 @@ export function App() {
           </SplitPane>
         </div>
       </main>
+      <CommandPalette
+        visible={paletteVisible.value}
+        onClose={() => {
+          paletteVisible.value = false;
+        }}
+      />
     </div>
   );
 }
