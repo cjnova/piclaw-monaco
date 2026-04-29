@@ -19,16 +19,27 @@ export interface ManifestRequestContext {
   ensureAvatarCache(kind: "agent", source: string): Promise<ManifestIconMeta | null>;
 }
 
-/** Build and return the web app manifest JSON (or HEAD headers only). */
-export async function handleManifestRequest(req: Request, ctx: ManifestRequestContext): Promise<Response> {
-  const encoder = new TextEncoder();
-  const baseName = ctx.assistantName || "PiClaw";
-  const icons: Array<{ src: string; sizes: string; type: string; purpose?: string }> = [
+function buildDefaultManifestIcons(): Array<{ src: string; sizes: string; type: string; purpose?: string }> {
+  return [
     { src: "/static/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
     { src: "/static/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
     { src: "/static/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
     { src: "/static/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
   ];
+}
+
+function buildAvatarManifestIcons(version: string): Array<{ src: string; sizes: string; type: string; purpose?: string }> {
+  return [
+    { src: `/avatar/agent?format=png&size=192&v=${version}`, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+    { src: `/avatar/agent?format=png&size=512&v=${version}`, sizes: "512x512", type: "image/png", purpose: "any maskable" },
+  ];
+}
+
+/** Build and return the web app manifest JSON (or HEAD headers only). */
+export async function handleManifestRequest(req: Request, ctx: ManifestRequestContext): Promise<Response> {
+  const encoder = new TextEncoder();
+  const baseName = ctx.assistantName || "PiClaw";
+  let icons: Array<{ src: string; sizes: string; type: string; purpose?: string }> = buildDefaultManifestIcons();
 
   if (ctx.assistantAvatar) {
     try {
@@ -36,12 +47,7 @@ export async function handleManifestRequest(req: Request, ctx: ManifestRequestCo
       if (meta) {
         const versionSource = meta.updatedAt || new Date().toISOString();
         const version = encodeURIComponent(versionSource);
-        icons.unshift({
-          src: `/avatar/agent?v=${version}`,
-          sizes: "any",
-          type: meta.contentType || "image/png",
-          purpose: "any maskable",
-        });
+        icons = buildAvatarManifestIcons(version);
       }
     } catch (error) {
       log.warn("Failed to prepare agent avatar for manifest", {

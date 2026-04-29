@@ -217,13 +217,17 @@ export async function ensureAvatarCache(kind: AvatarKind, source: string): Promi
 
   const extension = guessExtension(loaded.contentType, sanitized);
 
-  // Optimize avatar: resize to standard dimensions, strip EXIF, convert to WebP.
+  // Optimize avatar: resize, strip EXIF, convert to WebP. Agent avatars are
+  // kept at 512px so manifest / install surfaces can derive proper 192/512
+  // raster variants without the browser falling back to undersized icons.
   let avatarData: Buffer | Uint8Array = loaded.data;
   let contentType = normalizeContentType(loaded.contentType) || guessContentTypeFromExtension(extension);
   let effectiveExtension = extension;
   try {
     const { processAvatar } = await import("../../../utils/image-processing.js");
-    const processed = await processAvatar(Buffer.from(loaded.data));
+    const processed = await processAvatar(Buffer.from(loaded.data), {
+      size: kind === "agent" ? 512 : 256,
+    });
     if (processed) {
       avatarData = processed.data;
       contentType = processed.mimeType;
@@ -267,24 +271,40 @@ export async function buildAvatarResponse(kind: AvatarKind, source: string, req:
   const file = Bun.file(meta.file);
   if (!(await file.exists())) return null;
 
-  // Support ?format=png for favicon use — Safari cannot render WebP favicons.
+  // Support ?format=png and ?size=<n> for favicon / manifest / install icon use.
   const url = new URL(req.url, "http://localhost");
-  const wantsPng = url.searchParams.get("format") === "png" && (meta.contentType === "image/webp" || meta.file.endsWith(".webp"));
-  if (wantsPng) {
+  const requestedFormat = String(url.searchParams.get("format") || "").trim().toLowerCase();
+  const wantsPng = requestedFormat === "png";
+  const requestedSizeRaw = Number(url.searchParams.get("size"));
+  const requestedSize = Number.isFinite(requestedSizeRaw) && requestedSizeRaw > 0
+    ? Math.max(16, Math.min(1024, Math.round(requestedSizeRaw)))
+    : null;
+  const needsRasterTransform = Boolean(requestedSize) || (wantsPng && (meta.contentType === "image/webp" || meta.file.endsWith(".webp")));
+  if (needsRasterTransform) {
     try {
       const sharp = (await import("sharp")).default;
-      const pngBuf = await sharp(meta.file).png().toBuffer();
-      return new Response(new Uint8Array(pngBuf), {
-        status: 200,
-        headers: {
-          "Content-Type": "image/png",
-          "Content-Length": String(pngBuf.byteLength),
-          "Cache-Control": "no-cache",
-        },
-      });
+      let pipeline = sharp(meta.file);
+      if (requestedSize) {
+        pipeline = pipeline.resize(requestedSize, requestedSize, {
+          fit: "contain",
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+          withoutEnlargement: false,
+        });
+      }
+      if (wantsPng || requestedSize) {
+        const pngBuf = await pipeline.png().toBuffer();
+        return new Response(new Uint8Array(pngBuf), {
+          status: 200,
+          headers: {
+            "Content-Type": "image/png",
+            "Content-Length": String(pngBuf.byteLength),
+            "Cache-Control": "no-cache",
+          },
+        });
+      }
     } catch (e) {
       // sharp unavailable — fall through to original format
-      log.debug("PNG conversion unavailable for favicon", { err: e });
+      log.debug("Raster avatar transform unavailable; serving original format", { err: e, requestedSize, requestedFormat });
     }
   }
 
