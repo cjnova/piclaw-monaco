@@ -10,6 +10,38 @@ import { AgentQueue } from "../../../src/queue.js";
 import { waitFor } from "../../helpers.js";
 
 describe("web recovery helpers", () => {
+  test("recoverInflightRuns clears stale preflight markers before handling inflight runs", () => {
+    const clearedPreflight: string[] = [];
+    const clearedInflight: string[] = [];
+
+    const ctx: WebRecoveryContext = {
+      assistantName: "Pi",
+      defaultAgentId: "default",
+      enqueue: async () => {},
+      processChat: async () => {},
+      now: () => new Date("2026-01-01T00:05:00Z").getTime(),
+    };
+
+    const store: WebRecoveryStore = {
+      getPreflightRuns: () => [{ chatJid: "web:preflight", prevTs: "t0", messageId: "m0", startedAt: "2026-01-01T00:03:00Z" }],
+      getInflightRuns: () => [{ chatJid: "web:inflight", prevTs: "t1", messageId: "m1", startedAt: "2026-01-01T00:04:00Z" }],
+      transaction: (run) => run(),
+      getAgentReplyStateAfter: () => "none",
+      clearChatPreflight: (chatJid) => { clearedPreflight.push(chatJid); },
+      clearInflightMarker: (chatJid) => { clearedInflight.push(chatJid); },
+      rollbackInflightRun: () => {},
+      getAllChatCursors: () => ({}),
+      getKnownChatJids: () => [],
+      getDeferredQueuedFollowups: () => [],
+      getMessagesSince: () => [],
+    };
+
+    recoverInflightRuns(ctx, store);
+
+    expect(clearedPreflight).toEqual(["web:preflight"]);
+    expect(clearedInflight).toEqual(["web:inflight"]);
+  });
+
   test("recoverInflightRuns preserves terminal/partial output and marks no-output runs as interrupted without replay", async () => {
     const now = new Date("2026-01-01T00:05:00Z");
     const inflights = [

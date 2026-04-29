@@ -281,6 +281,26 @@ test("agent control queue, compact, and abort commands", async () => {
   expect(compactCorruption.message).toContain("prunes orphaned tool-result blocks and corrupt image blocks automatically");
   session.compactError = null;
 
+  const originalCompact = session.compact.bind(session);
+  const restoreTimeoutEnv = setEnv({ PICLAW_COMPACTION_TIMEOUT_MS: "20" });
+  try {
+    session.compact = async () => {
+      session.compactCalls += 1;
+      session.isCompacting = true;
+      await new Promise(() => {});
+      return { tokensBefore: 0, firstKeptEntryId: null, summary: "" } as any;
+    };
+    const compactTimeout = await applyControlCommand(runtime as any, registry, { type: "compact", raw: "/compact" });
+    expect(compactTimeout.status).toBe("error");
+    expect(compactTimeout.message).toContain("Compaction timed out");
+    expect(compactTimeout.message).toContain("session was not rewritten");
+    expect(session.abortCompactionCalls).toBe(1);
+  } finally {
+    restoreTimeoutEnv();
+    session.compact = originalCompact;
+    session.isCompacting = false;
+  }
+
   const autoCompact = await applyControlCommand(runtime as any, registry, { type: "auto_compact", enabled: true, raw: "/auto-compact on" });
   expect(autoCompact.message).toContain("on");
   expect(session.autoCompactionEnabled).toBe(true);
@@ -299,9 +319,10 @@ test("agent control queue, compact, and abort commands", async () => {
   expect(listTrackedProcesses()).not.toContain(999999);
 
   session.isCompacting = true;
+  const abortCompactionCallsBeforeAbort = session.abortCompactionCalls;
   const abortCompaction = await applyControlCommand(runtime as any, registry, { type: "abort", raw: "/abort" });
   expect(abortCompaction.message).toContain("Compaction aborted");
-  expect(session.abortCompactionCalls).toBe(1);
+  expect(session.abortCompactionCalls).toBe(abortCompactionCallsBeforeAbort + 1);
   expect(session.abortCalls).toBe(1);
   session.isCompacting = false;
 

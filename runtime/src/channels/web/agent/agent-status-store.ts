@@ -2,7 +2,7 @@
  * channels/web/agent-status-store.ts – in-memory + persisted web agent status state.
  */
 
-import { getInflightRuns, type InflightRun } from "../../../db.js";
+import { getInflightRuns, getPreflightRuns, type InflightRun, type PreflightRun } from "../../../db.js";
 
 interface AgentStatusStateStore {
   load(): void;
@@ -12,6 +12,7 @@ interface AgentStatusStateStore {
 }
 
 interface AgentStatusInflightStore {
+  getPreflightRuns?: () => Array<Pick<PreflightRun, "chatJid" | "startedAt">>;
   getInflightRuns(): Array<Pick<InflightRun, "chatJid" | "startedAt">>;
 }
 
@@ -35,16 +36,21 @@ function hasCurrentRuntimeGeneration(status: Record<string, unknown> | null | un
   return status[STATUS_RUNTIME_GENERATION_KEY] === STATUS_RUNTIME_GENERATION;
 }
 
-function buildRestartRecoveryStatus(inflight: Pick<InflightRun, "startedAt">): Record<string, unknown> {
+function buildRestartRecoveryStatus(
+  pending: Pick<InflightRun, "startedAt"> | Pick<PreflightRun, "startedAt">,
+  phase: "preflight" | "inflight",
+): Record<string, unknown> {
   return {
     type: "intent",
     kind: "info",
     intent_key: "recovery",
     source: "startup_recovery",
-    title: "Recovering interrupted response",
-    detail: "Reconstructing runtime state from the persisted inflight marker.",
+    title: phase === "preflight" ? "Recovering interrupted pre-prompt work" : "Recovering interrupted response",
+    detail: phase === "preflight"
+      ? "Clearing a persisted preflight marker before the prompt started."
+      : "Reconstructing runtime state from the persisted inflight marker.",
     blocking: true,
-    started_at: inflight.startedAt,
+    started_at: pending.startedAt,
     [STATUS_RUNTIME_GENERATION_KEY]: STATUS_RUNTIME_GENERATION,
   };
 }
@@ -55,7 +61,7 @@ export class AgentStatusStore {
 
   constructor(
     private readonly state: AgentStatusStateStore,
-    private readonly inflightStore: AgentStatusInflightStore = { getInflightRuns },
+    private readonly inflightStore: AgentStatusInflightStore = { getPreflightRuns, getInflightRuns },
   ) {}
 
   load(): void {
@@ -101,8 +107,11 @@ export class AgentStatusStore {
     if (active) return active;
 
     const inflight = this.inflightStore.getInflightRuns().find((entry) => entry.chatJid === chatJid);
-    if (!inflight) return null;
-    return buildRestartRecoveryStatus(inflight);
+    if (inflight) return buildRestartRecoveryStatus(inflight, "inflight");
+
+    const preflight = this.inflightStore.getPreflightRuns?.().find((entry) => entry.chatJid === chatJid);
+    if (!preflight) return null;
+    return buildRestartRecoveryStatus(preflight, "preflight");
   }
 
   clearPersistedStatuses(): void {

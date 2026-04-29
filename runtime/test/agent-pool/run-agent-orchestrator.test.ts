@@ -197,6 +197,69 @@ test("runAgentPrompt auto-compacts before prompting when estimated context excee
   expect(calls).toEqual(["compact", "prompt"]);
 });
 
+test("runAgentPrompt skips Piclaw pre-prompt compaction when requested by the caller", async () => {
+  const calls: string[] = [];
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({
+        messages: [
+          { role: "user", content: "x".repeat(200) },
+        ],
+      }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({
+        ...DEFAULT_COMPACTION_SETTINGS,
+        enabled: true,
+        reserveTokens: 10,
+      }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      calls.push("compact");
+    }
+    async prompt() {
+      calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "done" } });
+      }
+    }
+    async abort() {}
+  }
+
+  const session = new StubSession();
+  const turnCoordinator = new AgentTurnCoordinator({
+    takeAttachments: () => [],
+    touchSession: () => {},
+    recordMessageUsage: () => {},
+  });
+
+  const result = await runAgentPrompt("test", "web:default", { timeoutMs: 0, skipPrePromptCompaction: true }, {
+    getOrCreateRuntime: async () => createRuntime(session) as any,
+    turnCoordinator,
+    clearAttachments: () => {},
+    takeAttachments: () => [],
+    logsDir: createTestLogsDir(),
+    setActiveForkBaseLeaf: () => {},
+    clearActiveForkBaseLeaf: () => {},
+  });
+
+  expect(result.status).toBe("success");
+  expect(calls).toEqual(["prompt"]);
+});
+
 test("runAgentPrompt still pre-prompt compacts even when upstream auto-compaction is disabled", async () => {
   const calls: string[] = [];
 

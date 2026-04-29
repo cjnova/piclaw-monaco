@@ -155,6 +155,65 @@ describe("deferred queued follow-ups", () => {
 });
 
 // ---------------------------------------------------------------------------
+// beginChatPreflight / promoteChatPreflightToInflight
+// ---------------------------------------------------------------------------
+
+describe("chat preflight lifecycle", () => {
+  test("records preflight without advancing the cursor", () => {
+    const chatJid = jid("preflight-basic");
+    db.setChatCursor(chatJid, "2024-03-20T00:00:00.000Z");
+
+    db.beginChatPreflight(chatJid, {
+      prevTs: "2024-03-20T00:00:00.000Z",
+      messageId: "msg-preflight-1",
+      startedAt: "2024-03-20T00:00:00.001Z",
+    });
+
+    expect(db.getChatCursor(chatJid)).toBe("2024-03-20T00:00:00.000Z");
+    expect(db.getInflightRuns().filter((r) => r.chatJid === chatJid)).toHaveLength(0);
+    expect(db.getPreflightRuns().filter((r) => r.chatJid === chatJid)).toEqual([
+      {
+        chatJid,
+        prevTs: "2024-03-20T00:00:00.000Z",
+        messageId: "msg-preflight-1",
+        startedAt: "2024-03-20T00:00:00.001Z",
+      },
+    ]);
+
+    db.clearChatPreflight(chatJid);
+  });
+
+  test("promotes preflight into inflight state in one step", () => {
+    const chatJid = jid("preflight-promote");
+    db.setChatCursor(chatJid, "2024-03-21T00:00:00.000Z");
+
+    db.beginChatPreflight(chatJid, {
+      prevTs: "2024-03-21T00:00:00.000Z",
+      messageId: "msg-preflight-2",
+      startedAt: "2024-03-21T00:00:00.001Z",
+    });
+    db.promoteChatPreflightToInflight(chatJid, "2024-03-21T00:01:00.000Z", {
+      prevTs: "2024-03-21T00:00:00.000Z",
+      messageId: "msg-preflight-2",
+      startedAt: "2024-03-21T00:00:00.001Z",
+    });
+
+    expect(db.getPreflightRuns().filter((r) => r.chatJid === chatJid)).toHaveLength(0);
+    expect(db.getChatCursor(chatJid)).toBe("2024-03-21T00:01:00.000Z");
+    expect(db.getInflightRuns().filter((r) => r.chatJid === chatJid)).toEqual([
+      {
+        chatJid,
+        prevTs: "2024-03-21T00:00:00.000Z",
+        messageId: "msg-preflight-2",
+        startedAt: "2024-03-21T00:00:00.001Z",
+      },
+    ]);
+
+    db.endChatRun(chatJid);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // beginChatRun
 // ---------------------------------------------------------------------------
 
