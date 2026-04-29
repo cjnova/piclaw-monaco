@@ -11,6 +11,7 @@ import {
   resolveComposeModelPickerState,
   buildReturnedQueuedDraft,
   parseQueuedContent,
+  returnQueuedFollowupToEditor,
   resolveComposePrefillRequest,
   resolveComposeSubmitButtonState,
   resolveComposeAbortButtonState,
@@ -189,6 +190,65 @@ test('buildReturnedQueuedDraft restores refs and preserves attachment markers in
       { id: '784', label: 'image.png', raw: 'attachment:784 (image.png)' },
     ],
   });
+});
+
+test('returnQueuedFollowupToEditor restores compose state before removing the queue item', () => {
+  const calls: string[] = [];
+  const textarea = {
+    value: '',
+    selectionStart: 0,
+    selectionEnd: 0,
+    focus: () => { calls.push('focus'); },
+  };
+  const timeoutCallbacks: Array<() => void> = [];
+
+  const result = returnQueuedFollowupToEditor({
+    queuedItem: {
+      row_id: 7,
+      content: [
+        'Channel: web',
+        '',
+        'Rui Carmo @ 2026-04-13T08:40:35.008Z:',
+        '  Please check this later.',
+        '  ',
+        '  Files:',
+        '  - notes/todo.md',
+      ].join('\n'),
+    },
+    setSubmitError: (value: string | null) => { calls.push(`error:${String(value)}`); },
+    setSubmitNotice: (value: string | null) => { calls.push(`notice:${String(value)}`); },
+    setMediaFiles: (value: unknown[]) => { calls.push(`media:${Array.isArray(value) ? value.length : 'x'}`); },
+    onSetFileRefs: (value: string[]) => { calls.push(`files:${value.join(',')}`); },
+    onSetMessageRefs: (value: string[]) => { calls.push(`messages:${value.join(',')}`); },
+    setContent: (value: string) => { calls.push(`content:${value}`); },
+    textareaRef: { current: textarea },
+    resizeTextarea: () => { calls.push('resize'); },
+    scheduleRaf: (callback: () => void) => { calls.push('raf'); callback(); },
+    scheduleTimeout: (callback: () => void) => { calls.push('timeout'); timeoutCallbacks.push(callback); return 0 as any; },
+    onRemoveQueuedFollowup: () => { calls.push('remove'); },
+    logger: { info: () => undefined, warn: () => undefined },
+  });
+
+  expect(result).toBe(true);
+  expect(calls).toEqual([
+    'error:null',
+    'notice:null',
+    'media:0',
+    'files:notes/todo.md',
+    'messages:',
+    'content:Please check this later.',
+    'raf',
+    'resize',
+    'focus',
+    'timeout',
+  ]);
+  expect(textarea.value).toBe('Please check this later.');
+  expect(textarea.selectionStart).toBe('Please check this later.'.length);
+  expect(textarea.selectionEnd).toBe('Please check this later.'.length);
+
+  timeoutCallbacks[0]?.();
+  expect(calls).toContain('remove');
+  expect(calls.indexOf('content:Please check this later.')).toBeLessThan(calls.indexOf('remove'));
 });
 
 test('model picker helpers expose searchable names and formatted context windows', () => {
