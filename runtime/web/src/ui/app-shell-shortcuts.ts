@@ -1,5 +1,5 @@
 import { useEffect } from '../vendor/preact-htm.js';
-import { watchChatSwitchShortcuts, watchDockToggleShortcut, watchZenModeShortcuts, watchSettingsShortcut } from './app-browser-events.js';
+import { watchChatSwitchShortcuts, watchDockToggleShortcut, watchKeyboardHelpShortcut, watchZenModeShortcuts, watchSettingsShortcut } from './app-browser-events.js';
 import { isLikelySafariBrowser } from './app-pane-runtime-orchestration.js';
 
 export function shouldWatchDockShortcut(options: {
@@ -58,6 +58,6 @@ export function useAppShellShortcuts(options: {
     });
   }, [nextChat, previousChat]);
 
-  // Cmd/Ctrl+, → open settings
+  useEffect(() => watchKeyboardHelpShortcut(), []);
   useEffect(() => watchSettingsShortcut(), []);
 }

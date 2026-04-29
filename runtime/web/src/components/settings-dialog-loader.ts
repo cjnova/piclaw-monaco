@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { html, useEffect, useState } from '../vendor/preact-htm.js';
+import { consumeRequestedSettingsOpenState, normalizeSettingsSectionId, requestOpenSettingsDialog } from './settings-dialog-events.js';
 
-export function openSettingsDialog() {
-    window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
+export function openSettingsDialog(options = {}) {
+    requestOpenSettingsDialog(options);
 }
 
 export function preloadSettingsDialog() {
@@ -13,8 +14,21 @@ export function SettingsDialogLoader() {
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
-        const handler = () => setOpen(true);
+        const handler = (event) => {
+            const section = normalizeSettingsSectionId(event?.detail?.section);
+            if (section) {
+                try { window.__piclawSettingsRequestedSection = section; } catch (e) { void e; }
+            }
+            setOpen(true);
+        };
         window.addEventListener('piclaw:open-settings', handler);
+        const pending = consumeRequestedSettingsOpenState();
+        if (pending.open) {
+            if (pending.section) {
+                try { window.__piclawSettingsRequestedSection = pending.section; } catch (e) { void e; }
+            }
+            setOpen(true);
+        }
         return () => window.removeEventListener('piclaw:open-settings', handler);
     }, []);
 

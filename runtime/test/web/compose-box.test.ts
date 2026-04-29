@@ -94,6 +94,12 @@ test('slash autocomplete exposes the local /meters HUD command with a descriptio
   expect(meters?.description).toContain('CPU/RAM HUD');
 });
 
+test('slash autocomplete exposes the local /help keyboard shortcut pane command', () => {
+  const help = SLASH_COMMANDS.find((item) => item.name === '/help');
+  expect(help).toBeTruthy();
+  expect(help?.description).toContain('keyboard shortcuts');
+});
+
 test('resolveComposePrefillRequest applies new non-search prefill tokens exactly once', () => {
   expect(resolveComposePrefillRequest({ token: 'tok-1', text: '/login' }, '', false)).toEqual({
     shouldApply: true,

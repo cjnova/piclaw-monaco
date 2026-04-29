@@ -12,6 +12,7 @@ import { useConnectionStatusPresentation } from '../ui/connection-status.js';
 import { FilePill } from './file-pill.js';
 import { refreshAgentModelStateBestEffort } from './compose-model-refresh.js';
 import { renderMarkdown } from '../markdown.js';
+import { requestOpenSettingsDialog } from './settings-dialog-events.js';
 import {
     describeSpeechRecognitionError,
     extractSpeechRecognitionText,
@@ -80,6 +81,7 @@ export const SLASH_COMMANDS = [
   { name: "/login", description: "Login to an AI model provider (OAuth or API key)" },
   { name: "/logout", description: "Logout from an AI model provider" },
   { name: "/settings", description: "Open the settings pane" },
+  { name: "/help", description: "Open keyboard shortcuts help" },
   { name: "/commands", description: "List available commands" },
   { name: "/skill:", description: "Run a workspace skill (e.g. /skill:visual-artifact-generator, /skill:web-search)" },
 ];
@@ -1530,12 +1532,18 @@ export function ComposeBox({
     };
 
     const handleSubmit = async (overrideContent, submitMode, submitOptions = {}) => {
-        // Client-side interception for /settings — open dialog immediately
+        // Client-side interception for UI-only shortcuts.
         const rawInput = typeof overrideContent === 'string' ? overrideContent : content;
         if (/^\/settings\s*$/i.test(rawInput.trim())) {
             setContent('');
             requestAnimationFrame(() => resizeTextarea());
-            window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
+            requestOpenSettingsDialog();
+            return;
+        }
+        if (/^\/help\s*$/i.test(rawInput.trim())) {
+            setContent('');
+            requestAnimationFrame(() => resizeTextarea());
+            requestOpenSettingsDialog({ section: 'keyboard' });
             return;
         }
 

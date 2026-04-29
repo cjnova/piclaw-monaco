@@ -1,0 +1,47 @@
+export interface OpenSettingsDialogOptions {
+  section?: string | null;
+}
+
+const OPEN_REQUEST_FLAG = '__piclawSettingsOpenRequested';
+const OPEN_SECTION_FLAG = '__piclawSettingsRequestedSection';
+
+export function normalizeSettingsSectionId(value: unknown): string | null {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return normalized ? normalized : null;
+}
+
+export function requestOpenSettingsDialog(options: OpenSettingsDialogOptions = {}): void {
+  if (typeof window === 'undefined') return;
+  const section = normalizeSettingsSectionId(options.section);
+  try {
+    (window as any)[OPEN_REQUEST_FLAG] = true;
+    if (section) {
+      (window as any)[OPEN_SECTION_FLAG] = section;
+    } else {
+      delete (window as any)[OPEN_SECTION_FLAG];
+    }
+  } catch {
+    // Best effort only.
+  }
+  window.dispatchEvent(new CustomEvent('piclaw:open-settings', {
+    detail: section ? { section } : undefined,
+  }));
+}
+
+export function peekRequestedSettingsSection(): string | null {
+  if (typeof window === 'undefined') return null;
+  return normalizeSettingsSectionId((window as any)[OPEN_SECTION_FLAG]);
+}
+
+export function consumeRequestedSettingsOpenState(): { open: boolean; section: string | null } {
+  if (typeof window === 'undefined') return { open: false, section: null };
+  const open = Boolean((window as any)[OPEN_REQUEST_FLAG]);
+  const section = peekRequestedSettingsSection();
+  try {
+    (window as any)[OPEN_REQUEST_FLAG] = false;
+    delete (window as any)[OPEN_SECTION_FLAG];
+  } catch {
+    // Best effort only.
+  }
+  return { open, section };
+}

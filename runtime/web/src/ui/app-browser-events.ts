@@ -1,3 +1,6 @@
+import { requestOpenSettingsDialog } from '../components/settings-dialog-events.js';
+import { matchesKeyboardShortcutAction } from './keyboard-shortcuts.js';
+
 interface DocumentEventTargetLike {
   addEventListener(type: string, listener: (event: any) => void): void;
   removeEventListener(type: string, listener: (event: any) => void): void;
@@ -82,16 +85,16 @@ export function watchPaneOpenEvents(callbacks: PaneOpenEventCallbacks, runtime: 
   };
 }
 
-/** Register the Ctrl+` dock toggle shortcut. */
+/** Register the dock toggle shortcut. */
 export function watchDockToggleShortcut(onToggle?: () => void, runtime: RuntimeLike = {}): () => void {
   const doc = runtime.document ?? (typeof document !== 'undefined' ? document : null);
   if (!doc) return () => {};
 
-  const onKeyDown = (event: { ctrlKey?: boolean; key?: string; preventDefault?: () => void }) => {
-    if (event?.ctrlKey && event.key === '`') {
-      event.preventDefault?.();
-      onToggle?.();
-    }
+  const onKeyDown = (event: { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean; key?: string; preventDefault?: () => void; target?: unknown }) => {
+    if (isEditableKeyboardTarget(event?.target)) return;
+    if (!matchesKeyboardShortcutAction(event, 'toggleDock')) return;
+    event.preventDefault?.();
+    onToggle?.();
   };
 
   doc.addEventListener('keydown', onKeyDown);
@@ -121,9 +124,9 @@ export function watchZenModeShortcuts(callbacks: ZenModeShortcutCallbacks, runti
     ? callbacks.isZenModeActive
     : () => Boolean(callbacks?.zenMode);
 
-  const onKeyDown = (event: { ctrlKey?: boolean; shiftKey?: boolean; key?: string; preventDefault?: () => void; target?: unknown }) => {
+  const onKeyDown = (event: { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean; key?: string; preventDefault?: () => void; target?: unknown }) => {
     if (isEditableKeyboardTarget(event?.target)) return;
-    if (event?.ctrlKey && event.shiftKey && (event.key === 'Z' || event.key === 'z')) {
+    if (matchesKeyboardShortcutAction(event, 'toggleZenMode')) {
       event.preventDefault?.();
       toggleZenMode?.();
       return;
@@ -144,14 +147,12 @@ export function watchChatSwitchShortcuts(callbacks: ChatSwitchShortcutCallbacks,
 
   const onKeyDown = (event: { ctrlKey?: boolean; shiftKey?: boolean; metaKey?: boolean; altKey?: boolean; key?: string; preventDefault?: () => void; target?: unknown }) => {
     if (isEditableKeyboardTarget(event?.target)) return;
-    if (!event?.ctrlKey || !event?.shiftKey || event?.metaKey || event?.altKey) return;
-    // Shift+[ = '{' and Shift+] = '}' on macOS; also accept the unshifted forms
-    if (event.key === '[' || event.key === '{') {
+    if (matchesKeyboardShortcutAction(event, 'previousChat')) {
       event.preventDefault?.();
       callbacks?.previousChat?.();
       return;
     }
-    if (event.key === ']' || event.key === '}') {
+    if (matchesKeyboardShortcutAction(event, 'nextChat')) {
       event.preventDefault?.();
       callbacks?.nextChat?.();
     }
@@ -161,24 +162,32 @@ export function watchChatSwitchShortcuts(callbacks: ChatSwitchShortcutCallbacks,
   return () => doc.removeEventListener('keydown', onKeyDown);
 }
 
-/** Register browser settings shortcuts.
- *
- * Cmd/Ctrl+, is the conventional app-settings shortcut, but some browsers
- * reserve it for their own preferences UI before page code can act.
- * Support Alt+, as a browser-safe fallback while keeping the canonical chord.
- */
+/** Register browser settings shortcuts. */
 export function watchSettingsShortcut(runtime: RuntimeLike = {}): () => void {
   const doc = runtime.document ?? (typeof document !== 'undefined' ? document : null);
   if (!doc) return () => {};
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (isEditableKeyboardTarget(event?.target)) return;
-    if (event.shiftKey) return;
-    const isPrimaryShortcut = (event.metaKey || event.ctrlKey) && !event.altKey && event.key === ',';
-    const isAltFallback = event.altKey && !event.metaKey && !event.ctrlKey && event.key === ',';
-    if (!isPrimaryShortcut && !isAltFallback) return;
+    if (!matchesKeyboardShortcutAction(event, 'openSettings')) return;
     event.preventDefault();
-    window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
+    requestOpenSettingsDialog();
+  };
+
+  doc.addEventListener('keydown', onKeyDown as EventListener);
+  return () => doc.removeEventListener('keydown', onKeyDown as EventListener);
+}
+
+/** Register the keyboard-help shortcut. */
+export function watchKeyboardHelpShortcut(runtime: RuntimeLike = {}): () => void {
+  const doc = runtime.document ?? (typeof document !== 'undefined' ? document : null);
+  if (!doc) return () => {};
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (isEditableKeyboardTarget(event?.target)) return;
+    if (!matchesKeyboardShortcutAction(event, 'openHelp')) return;
+    event.preventDefault();
+    requestOpenSettingsDialog({ section: 'keyboard' });
   };
 
   doc.addEventListener('keydown', onKeyDown as EventListener);

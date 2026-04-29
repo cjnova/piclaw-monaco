@@ -33,12 +33,13 @@ perf('module-eval-start');
 import { html, useState, useEffect, useCallback, useRef } from '../vendor/preact-htm.js';
 import { BodyPortal } from './body-portal.js';
 import { getRegisteredSettingsPanes } from './settings/pane-registry.js';
+import { consumeRequestedSettingsOpenState, normalizeSettingsSectionId, peekRequestedSettingsSection, requestOpenSettingsDialog } from './settings-dialog-events.js';
 // General is statically imported — it's always the first visible section.
 import { GeneralSection } from './settings/general.js';
 perf('imports-done');
 
 type SettingsSectionComponent = unknown;
-type BuiltinSectionId = 'general' | 'sessions' | 'workspace' | 'providers' | 'models' | 'theme' | 'quick-actions' | 'keychain' | 'tools' | 'addons';
+type BuiltinSectionId = 'general' | 'sessions' | 'keyboard' | 'workspace' | 'providers' | 'models' | 'theme' | 'quick-actions' | 'keychain' | 'tools' | 'addons';
 
 const builtinSectionComponentCache = new Map<BuiltinSectionId, SettingsSectionComponent>();
 const builtinSectionLoadPromiseCache = new Map<BuiltinSectionId, Promise<SettingsSectionComponent>>();
@@ -49,6 +50,7 @@ builtinSectionComponentCache.set('general', GeneralSection);
 const BUILTIN_SECTION_LOADERS: Record<BuiltinSectionId, () => Promise<SettingsSectionComponent>> = {
     general: () => Promise.resolve(GeneralSection),
     sessions: () => import('./settings/sessions.js').then(mod => mod.SessionsSection),
+    keyboard: () => import('./settings/keyboard.js').then(mod => mod.KeyboardSection),
     workspace: () => import('./settings/workspace.js').then(mod => mod.WorkspaceSection),
     providers: () => import('./settings/providers.js').then(mod => mod.ProvidersSection),
     models: () => import('./settings/models.js').then(mod => mod.ModelsSection),
@@ -107,6 +109,7 @@ function renderSectionLoading(label = 'Loading…') {
 const iconGeneral = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M8.5 5.9L9.6 2.3h4.8l1.1 3.6 3.7-.8 2.4 4.1-2.6 2.8 2.6 2.8-2.4 4.1-3.7-.8-1.1 3.6H9.6l-1.1-3.6-3.7.8-2.4-4.1L5 12 2.4 9.2l2.4-4.1z"/></svg>`;
 const iconSessions = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
 const iconWorkspace = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
+const iconKeyboard = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01"/><path d="M10 9h.01"/><path d="M14 9h.01"/><path d="M18 9h.01"/><path d="M8 13h.01"/><path d="M12 13h.01"/><path d="M16 13h.01"/><path d="M7 17h10"/></svg>`;
 const iconProviders = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`;
 const iconModels = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="14" height="10" rx="2"/><circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none"/><line x1="12" y1="9" x2="12" y2="5"/><circle cx="12" cy="4" r="1.5"/></svg>`;
 const iconAppearance = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 2-.9 2-2 0-.53-.21-1.01-.55-1.36-.34-.36-.55-.84-.55-1.37 0-1.1.9-2 2-2h2.36c3.08 0 5.64-2.56 5.64-5.64C22.9 5.85 18.05 2 12 2z"/><circle cx="8" cy="10" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="16" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg>`;
@@ -119,6 +122,7 @@ const iconAddons = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="no
 const BUILTIN_SECTIONS = [
     { id: 'general', label: 'General', icon: iconGeneral, searchable: false, order: 10 },
     { id: 'sessions', label: 'Sessions', icon: iconSessions, searchable: false, order: 12 },
+    { id: 'keyboard', label: 'Keyboard', icon: iconKeyboard, searchable: true, placeholder: 'Filter shortcuts…', order: 14 },
     { id: 'workspace', label: 'Workspace', icon: iconWorkspace, searchable: false, order: 15 },
     { id: 'providers', label: 'Providers', icon: iconProviders, searchable: false, order: 20 },
     { id: 'models', label: 'Models', icon: iconModels, searchable: true, placeholder: 'Filter models…', order: 30 },
@@ -131,7 +135,7 @@ const BUILTIN_SECTIONS = [
 
 export function SettingsDialogContent({ onClose }) {
     perf('SettingsDialogContent-render-start');
-    const [activeSection, setActiveSection] = useState('general');
+    const [activeSection, setActiveSection] = useState(() => peekRequestedSettingsSection() || 'general');
     const [settingsData, setSettingsData] = useState(_settingsDataCache);
     const [statusMessage, setStatusMessage] = useState(null);
     const [filter, setFilter] = useState('');
@@ -153,6 +157,18 @@ export function SettingsDialogContent({ onClose }) {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [onClose]);
+
+    useEffect(() => {
+        const onOpenSettings = (event) => {
+            const requestedSection = typeof event?.detail?.section === 'string' ? event.detail.section.trim() : '';
+            if (requestedSection) {
+                setActiveSection(requestedSection);
+                setFilter('');
+            }
+        };
+        window.addEventListener('piclaw:open-settings', onOpenSettings);
+        return () => window.removeEventListener('piclaw:open-settings', onOpenSettings);
+    }, []);
 
     // Re-render when extension panes register
     useEffect(() => {
@@ -277,6 +293,7 @@ export function SettingsDialogContent({ onClose }) {
         switch (activeSection) {
             case 'general': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'sessions': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
+            case 'keyboard': return html`<${Comp} filter=${filter} setStatus=${setStatus} />`;
             case 'workspace': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'providers': return html`<${Comp} providers=${settingsData?.providers} setStatus=${setStatus} />`;
             case 'models': return html`<${Comp} filter=${filter} />`;
@@ -337,21 +354,27 @@ export function SettingsDialogContent({ onClose }) {
 export function SettingsDialog() {
     const [open, setOpen] = useState(false);
     useEffect(() => {
-        const handler = () => setOpen(true);
+        const handler = (event) => {
+            const section = normalizeSettingsSectionId(event?.detail?.section);
+            if (section) {
+                try { window.__piclawSettingsRequestedSection = section; } catch (e) { void e; }
+            }
+            setOpen(true);
+        };
         window.addEventListener('piclaw:open-settings', handler);
-        return () => window.removeEventListener('piclaw:open-settings', handler);
-    }, []);
-    // Also check a global flag in case the event fired before we mounted
-    useEffect(() => {
-        if ((window as any).__piclawSettingsOpenRequested) {
-            (window as any).__piclawSettingsOpenRequested = false;
+        const pending = consumeRequestedSettingsOpenState();
+        if (pending.open) {
+            if (pending.section) {
+                try { window.__piclawSettingsRequestedSection = pending.section; } catch (e) { void e; }
+            }
             setOpen(true);
         }
+        return () => window.removeEventListener('piclaw:open-settings', handler);
     }, []);
     if (!open) return null;
     return html`<${BodyPortal} className="settings-portal"><${SettingsDialogContent} onClose=${() => setOpen(false)} /><//>`;
 }
 
-export function openSettingsDialog() {
-    window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
+export function openSettingsDialog(options = {}) {
+    requestOpenSettingsDialog(options);
 }

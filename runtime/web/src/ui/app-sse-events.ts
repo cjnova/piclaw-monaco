@@ -211,7 +211,10 @@ export function handleAppSseEvent(
     const path = typeof data?.path === 'string' ? data.path.trim() : '';
     const label = typeof data?.label === 'string' ? data.label.trim() : undefined;
     if (path === 'piclaw://settings') {
-      window.dispatchEvent(new CustomEvent('piclaw:open-settings'));
+      const section = typeof data?.section === 'string' ? data.section.trim() : '';
+      window.dispatchEvent(new CustomEvent('piclaw:open-settings', {
+        detail: section ? { section } : undefined,
+      }));
       return;
     }
     if (path && typeof openEditor === 'function') {
