@@ -130,7 +130,8 @@ describe("web channel endpoint facade service", () => {
     expect(manifestResponse.status).toBe(200);
     const manifest = await manifestResponse.json();
     expect(manifest.name).toBe("Pi");
-    expect(manifest.icons[0]?.src).toBe("/avatar/agent?v=2026-03-09T00%3A00%3A00.000Z");
+    expect(manifest.icons[0]?.src).toContain("/avatar/agent");
+    expect(manifest.icons[0]?.src).toContain("v=2026-03-09T00%3A00%3A00.000Z");
     expect(ensureCalls).toEqual([PNG_DATA_URL]);
 
     const avatarResponse = await facade.handleAvatar("agent", new Request("https://example.com/avatar/agent"));

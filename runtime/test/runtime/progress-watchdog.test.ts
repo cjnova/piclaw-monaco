@@ -3,22 +3,27 @@ import { afterEach, expect, test } from "bun:test";
 import {
   beginTrackedPhase,
   endTrackedPhase,
+  flushProgressWatchdogState,
   getTrackedPhasesSnapshot,
   heartbeatTrackedPhase,
   resetProgressWatchdogForTests,
   scanForStalls,
+  setProgressWatchdogSnapshotPublisher,
   setProgressWatchdogTerminationHook,
+  setProgressWatchdogTimeoutForTests,
 } from "../../src/runtime/progress-watchdog.js";
-import { setEnv } from "../helpers.js";
 
-let restoreEnv: (() => void) | null = null;
+let restoreTimeoutOverride: (() => void) | null = null;
 let restoreTerminationHook: (() => void) | null = null;
+let restoreSnapshotPublisher: (() => void) | null = null;
 
 afterEach(() => {
+  restoreSnapshotPublisher?.();
+  restoreSnapshotPublisher = null;
   restoreTerminationHook?.();
   restoreTerminationHook = null;
-  restoreEnv?.();
-  restoreEnv = null;
+  restoreTimeoutOverride?.();
+  restoreTimeoutOverride = null;
   resetProgressWatchdogForTests();
 });
 
@@ -38,7 +43,7 @@ test("progress watchdog records and clears tracked phases", () => {
 });
 
 test("progress watchdog heartbeat refreshes the active phase", () => {
-  restoreEnv = setEnv({ PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: "50" });
+  restoreTimeoutOverride = setProgressWatchdogTimeoutForTests(50);
   beginTrackedPhase("web:test", "prompt", { source: "test" });
   const started = getTrackedPhasesSnapshot()[0];
   expect(started).toBeTruthy();
@@ -50,8 +55,29 @@ test("progress watchdog heartbeat refreshes the active phase", () => {
   expect(after?.metadata).toMatchObject({ source: "test", eventType: "message_update" });
 });
 
+test("progress watchdog publishes heartbeat snapshots when phases change", () => {
+  const snapshots: Array<{ shuttingDown: boolean; entries: string[] }> = [];
+  restoreSnapshotPublisher = setProgressWatchdogSnapshotPublisher((snapshot) => {
+    snapshots.push({
+      shuttingDown: snapshot.shuttingDown,
+      entries: snapshot.entries.map((entry) => `${entry.chatJid}:${entry.phase}`),
+    });
+  });
+
+  beginTrackedPhase("web:test", "prompt");
+  heartbeatTrackedPhase("web:test", "streaming");
+  flushProgressWatchdogState();
+  endTrackedPhase("web:test");
+
+  expect(snapshots).toEqual([
+    { shuttingDown: false, entries: ["web:test:prompt"] },
+    { shuttingDown: false, entries: ["web:test:streaming"] },
+    { shuttingDown: false, entries: [] },
+  ]);
+});
+
 test("progress watchdog reports and terminates stalled phases", () => {
-  restoreEnv = setEnv({ PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: "25" });
+  restoreTimeoutOverride = setProgressWatchdogTimeoutForTests(25);
   const stalls: any[] = [];
   restoreTerminationHook = setProgressWatchdogTerminationHook((stall) => {
     stalls.push(stall);

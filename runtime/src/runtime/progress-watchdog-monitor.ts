@@ -1,14 +1,11 @@
-import { readFileSync } from "node:fs";
-
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
-import type { PersistedProgressWatchdogState, ProgressWatchdogEntry } from "./progress-watchdog.js";
+import type { ProgressWatchdogEntry, ProgressWatchdogSnapshot } from "./progress-watchdog.js";
 
 const log = createLogger("runtime.progress-watchdog-monitor");
 const DEFAULT_MONITOR_GRACE_MS = 5_000;
 const DEFAULT_MONITOR_SCAN_MS = 2_000;
 
 export interface ProgressWatchdogMonitorArgs {
-  statePath: string;
   parentPid: number;
   scanMs: number;
   graceMs: number;
@@ -34,10 +31,9 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
-export function readPersistedProgressWatchdogState(statePath: string): PersistedProgressWatchdogState | null {
+export function parseProgressWatchdogSnapshotLine(line: string): ProgressWatchdogSnapshot | null {
   try {
-    const raw = readFileSync(statePath, "utf8");
-    const parsed = JSON.parse(raw) as PersistedProgressWatchdogState;
+    const parsed = JSON.parse(line) as ProgressWatchdogSnapshot;
     if (!parsed || typeof parsed !== "object") return null;
     return parsed;
   } catch {
@@ -45,18 +41,18 @@ export function readPersistedProgressWatchdogState(statePath: string): Persisted
   }
 }
 
-export function evaluatePersistedProgressWatchdogState(
-  state: PersistedProgressWatchdogState | null | undefined,
+export function evaluateProgressWatchdogSnapshot(
+  snapshot: ProgressWatchdogSnapshot | null | undefined,
   now = Date.now(),
 ): ProgressWatchdogMonitorEvaluation {
-  if (!state || state.shuttingDown) {
+  if (!snapshot || snapshot.shuttingDown) {
     return { stalledEntry: null, timeoutMs: 0 };
   }
-  const timeoutMs = Number.isFinite(state.timeoutMs) ? Math.max(0, Number(state.timeoutMs)) : 0;
+  const timeoutMs = Number.isFinite(snapshot.timeoutMs) ? Math.max(0, Number(snapshot.timeoutMs)) : 0;
   if (timeoutMs <= 0) {
     return { stalledEntry: null, timeoutMs };
   }
-  const entries = Array.isArray(state.entries) ? state.entries : [];
+  const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
   const stalledEntry = entries.find((entry) => {
     const lastProgressAt = Number(entry?.lastProgressAt);
     if (!Number.isFinite(lastProgressAt)) return false;
@@ -95,22 +91,12 @@ async function terminateParentProcess(parentPid: number, graceMs: number): Promi
 }
 
 export function parseProgressWatchdogMonitorArgs(args = process.argv.slice(2)): ProgressWatchdogMonitorArgs {
-  let statePath = "";
   let parentPid = Number.NaN;
   let scanMs = DEFAULT_MONITOR_SCAN_MS;
   let graceMs = DEFAULT_MONITOR_GRACE_MS;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === "--state" && typeof args[index + 1] === "string") {
-      statePath = args[index + 1] || "";
-      index += 1;
-      continue;
-    }
-    if (arg.startsWith("--state=")) {
-      statePath = arg.slice("--state=".length);
-      continue;
-    }
     if (arg === "--parent-pid" && typeof args[index + 1] === "string") {
       parentPid = Number(args[index + 1]);
       index += 1;
@@ -139,11 +125,9 @@ export function parseProgressWatchdogMonitorArgs(args = process.argv.slice(2)): 
     }
   }
 
-  if (!statePath.trim()) throw new Error("Missing --state <path> for progress-watchdog monitor.");
   if (!Number.isFinite(parentPid) || parentPid <= 0) throw new Error("Missing valid --parent-pid <pid> for progress-watchdog monitor.");
 
   return {
-    statePath: statePath.trim(),
     parentPid,
     scanMs: Math.max(250, scanMs),
     graceMs: Math.max(250, graceMs),
@@ -153,14 +137,47 @@ export function parseProgressWatchdogMonitorArgs(args = process.argv.slice(2)): 
 export async function runProgressWatchdogMonitorFromArgs(args = process.argv.slice(2)): Promise<void> {
   const options = parseProgressWatchdogMonitorArgs(args);
 
-  while (true) {
-    if (!isPidAlive(options.parentPid)) return;
+  let latestSnapshot: ProgressWatchdogSnapshot | null = null;
+  let streamEnded = false;
+  let buffer = "";
 
-    const state = readPersistedProgressWatchdogState(options.statePath);
-    if (state?.pid && Number.isFinite(state.pid) && state.pid !== options.parentPid) {
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk: string | Buffer) => {
+    buffer += String(chunk);
+    while (true) {
+      const newlineIndex = buffer.indexOf("\n");
+      if (newlineIndex === -1) break;
+      const rawLine = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const line = rawLine.trim();
+      if (!line) continue;
+      const parsed = parseProgressWatchdogSnapshotLine(line);
+      if (!parsed) {
+        debugSuppressedError(log, "Failed to parse progress-watchdog heartbeat snapshot line.", new Error("Invalid progress-watchdog snapshot line."), {
+          operation: "progress_watchdog_monitor.parse_line",
+        });
+        continue;
+      }
+      latestSnapshot = parsed;
+    }
+  });
+  process.stdin.on("end", () => {
+    streamEnded = true;
+  });
+  process.stdin.on("close", () => {
+    streamEnded = true;
+  });
+  process.stdin.resume();
+
+  while (true) {
+    if (streamEnded || !isPidAlive(options.parentPid)) return;
+
+    const currentSnapshot: ProgressWatchdogSnapshot | null = latestSnapshot;
+    const currentSnapshotPid = currentSnapshot ? (currentSnapshot as ProgressWatchdogSnapshot).pid : Number.NaN;
+    if (Number.isFinite(currentSnapshotPid) && currentSnapshotPid !== options.parentPid) {
       return;
     }
-    const evaluation = evaluatePersistedProgressWatchdogState(state, Date.now());
+    const evaluation = evaluateProgressWatchdogSnapshot(currentSnapshot, Date.now());
     if (evaluation.stalledEntry) {
       log.error("External progress-watchdog monitor detected a stale heartbeat; terminating the runtime.", {
         operation: "progress_watchdog_monitor.stall",
