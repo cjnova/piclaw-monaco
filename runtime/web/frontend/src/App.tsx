@@ -3,6 +3,7 @@ import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
 import { WebSocketManager } from "./api/websocket";
 import { ActivityBar } from "./components/ActivityBar";
+import { PanelRouter } from "./panels";
 
 export function App() {
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
@@ -32,7 +33,7 @@ export function App() {
           activePanel.value = id;
         }}
       />
-      <main className="shell-content" aria-live="polite">
+      <main className="shell-content">
         <header className="shell-status">
           <span
             className={`shell-status__dot ${connected ? "is-connected" : "is-disconnected"}`}
@@ -41,9 +42,7 @@ export function App() {
           />
           <span className="shell-status__text">{connected ? "Connected" : "Disconnected"}</span>
         </header>
-        <section className="shell-panel-placeholder">
-          <h1>{activePanel.value}</h1>
-        </section>
+        <PanelRouter activePanel={activePanel.value} />
       </main>
     </div>
   );
