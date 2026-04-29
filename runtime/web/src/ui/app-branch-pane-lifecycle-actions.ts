@@ -139,11 +139,13 @@ export interface RenameCurrentBranchActionOptions {
 export async function renameCurrentBranchAction(options: RenameCurrentBranchActionOptions): Promise<void> {
   const {
     hasWindow = typeof window !== 'undefined',
+    baseHref = hasWindow ? window.location.href : 'http://localhost/',
     ...rest
   } = options;
 
   await renameCurrentBranch({
     hasWindow,
+    baseHref: String(baseHref || '').trim() || (hasWindow ? window.location.href : 'http://localhost/'),
     ...rest,
   });
 }
@@ -664,7 +666,6 @@ export function useBranchPaneLifecycle(options: UseBranchPaneLifecycleOptions) {
       refreshActiveChatAgents,
       refreshCurrentChatBranches,
       navigate,
-      baseHref: '',
       chatOnlyMode,
       showIntentToast,
       closeRenameForm: closeRenameCurrentBranchForm,
