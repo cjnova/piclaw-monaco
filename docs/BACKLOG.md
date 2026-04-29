@@ -240,6 +240,7 @@ When **file** selected: action bar shows `[+] create [✏️] edit [🗑] delete
 ## Recent Fixes (2026-04-29 afternoon)
 
 - Light theme refined: softer grays (#f3f3f3 bg, #e8e8e8 sidebar), VS Code blue accent (#0078d4)
+- Light theme readability: darker text (#1a1a1a), muted (#4a4a4a), font-weight 500, antialiased
 - Workspace split position now persists across refreshes (ref-based localStorage save)
 - Terminal pop-out/new-tab opens terminal-only page (/static/terminal.html)
 - Activity Bar: click same icon = toggle sidebar, click different = switch + open
