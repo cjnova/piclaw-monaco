@@ -413,12 +413,17 @@ function createSchema(database: Database): void {
       value TEXT NOT NULL
     );
 
-    -- Per-chat cursor and inflight-run tracking.
+    -- Per-chat cursor, preflight, and inflight-run tracking.
     -- cursor_ts        : ISO timestamp of the last fully-processed message.
-    -- inflight_*       : set atomically with the cursor advance before runAgent();
-    --                    cleared by endChatRun/endChatRunWithError after the run.
-    --                    If still set on startup the process died mid-run and
-    --                    the cursor must be rolled back to inflight_prev_ts.
+    -- preflight_*      : set while pre-prompt work (like compaction) is running
+    --                    before the user message is consumed into inflight state.
+    --                    If still set on startup the message remains pending and
+    --                    the marker can be cleared without cursor rollback.
+    -- inflight_*       : set atomically with the cursor advance immediately
+    --                    before prompt execution begins; cleared by endChatRun /
+    --                    endChatRunWithError after the run. If still set on
+    --                    startup the process died mid-run and the cursor must be
+    --                    rolled back to inflight_prev_ts.
     -- failed_*         : set atomically by endChatRunWithError when a run errors;
     --                    cleared atomically by endChatRun on success, or by
     --                    clearFailedRun on model switch. Because these columns
@@ -427,6 +432,9 @@ function createSchema(database: Database): void {
     CREATE TABLE IF NOT EXISTS chat_cursors (
       chat_jid             TEXT PRIMARY KEY,
       cursor_ts            TEXT NOT NULL DEFAULT '',
+      preflight_prev_ts    TEXT,
+      preflight_message_id TEXT,
+      preflight_started_at TEXT,
       inflight_prev_ts     TEXT,
       inflight_message_id  TEXT,
       inflight_started_at  TEXT,
@@ -669,17 +677,20 @@ function ensureChatBranchConstraints(database: Database): void {
  * repeatedly – SQLite ignores the statement if the column already exists
  * (we catch the error).
  */
-function ensureChatCursorFailedColumns(database: Database): void {
+function ensureChatCursorColumns(database: Database): void {
   const cols = new Set(
     (database.prepare("PRAGMA table_info(chat_cursors)").all() as Array<{ name: string }>)
       .map((r) => r.name)
   );
   const toAdd: Array<[string, string]> = [
-    ["failed_prev_ts",     "TEXT"],
-    ["failed_ts",          "TEXT"],
-    ["failed_message_id",  "TEXT"],
-    ["failed_thread_root", "INTEGER"],
-    ["failed_created_at",  "TEXT"],
+    ["preflight_prev_ts",    "TEXT"],
+    ["preflight_message_id", "TEXT"],
+    ["preflight_started_at", "TEXT"],
+    ["failed_prev_ts",       "TEXT"],
+    ["failed_ts",            "TEXT"],
+    ["failed_message_id",    "TEXT"],
+    ["failed_thread_root",   "INTEGER"],
+    ["failed_created_at",    "TEXT"],
     ["queued_followups_json", "TEXT"],
   ];
   for (const [col, type] of toAdd) {
@@ -688,7 +699,7 @@ function ensureChatCursorFailedColumns(database: Database): void {
         database.exec(`ALTER TABLE chat_cursors ADD COLUMN ${col} ${type}`);
       } catch (err) {
         debugSuppressedError(log, "Chat-cursor migration raced an already-updated schema state.", err, {
-          operation: "db.ensure_chat_cursor_failed_columns.add_column",
+          operation: "db.ensure_chat_cursor_columns.add_column",
           column: col,
           type,
         });
@@ -817,7 +828,7 @@ export function initDatabase(): void {
   ensureScheduledTaskColumns(db);
   ensureWebSessionColumns(db);
   ensureFts(db);
-  ensureChatCursorFailedColumns(db);
+  ensureChatCursorColumns(db);
   migrateChatCursors(db);
   dropChatBranchDisplayName(db);
   ensureRemotePeerBaseUrl(db);

@@ -100,12 +100,16 @@ export {
   getAllChatCursors,
   getInflightMessageId,
   setChatCursor,
+  beginChatPreflight,
+  clearChatPreflight,
+  promoteChatPreflightToInflight,
   beginChatRun,
   endChatRun,
   endChatRunWithError,
   rollbackChatRunWithError,
   getFailedRun,
   clearFailedRun,
+  getPreflightRuns,
   getInflightRuns,
   rollbackInflightRun,
   clearInflightMarker,
@@ -114,7 +118,7 @@ export {
   getDeferredQueuedFollowups,
   setDeferredQueuedFollowups,
 } from "./db/chat-cursors.js";
-export type { InflightRun, DeferredQueuedFollowupRecord, AgentReplyState } from "./db/chat-cursors.js";
+export type { PreflightRun, InflightRun, DeferredQueuedFollowupRecord, AgentReplyState } from "./db/chat-cursors.js";
 export {
   storeTokenUsage,
   getTokenUsageTotals,

@@ -33,6 +33,13 @@ import {
   waitForSessionIdle,
 } from "./prompt-utils.js";
 import {
+  DEFAULT_FALLBACK_CONTEXT_WINDOW,
+  estimateContextTokensFromSession,
+  getModelContextWindow,
+  maybeAutoCompactSessionBeforePrompt,
+  runCompactionWithTimeout,
+} from "./compaction.js";
+import {
   inspectBlankTurnSessionDelta,
   isBlankTurnSessionDelta,
   snapshotSessionEntryCount,
@@ -40,6 +47,11 @@ import {
 import type { AgentTurnCoordinator } from "./turn-coordinator.js";
 import type { AgentOutput, AgentRecoveryDiagnosticEntry, AgentRecoveryMetadata, RetrySettingsProvider, RunAgentOptions } from "./contracts.js";
 import { isPendingShutdown } from "../runtime/shutdown-registry.js";
+import {
+  beginTrackedPhase,
+  heartbeatTrackedPhase,
+  endTrackedPhase,
+} from "../runtime/progress-watchdog.js";
 
 const log = createLogger("agent-pool.run-orchestrator");
 
@@ -128,241 +140,11 @@ async function maybeAutoRotateSession(
   return session;
 }
 
-function estimateMessageTokens(message: any): number {
-  if (!message || typeof message !== "object") return 0;
-
-  const countText = (value: unknown): number => {
-    if (typeof value === "string") return value.length;
-    if (!Array.isArray(value)) return 0;
-    let chars = 0;
-    for (const block of value) {
-      if (!block || typeof block !== "object") continue;
-      if (block.type === "text" && typeof block.text === "string") chars += block.text.length;
-      if (block.type === "thinking" && typeof block.thinking === "string") chars += block.thinking.length;
-      if (block.type === "toolCall") {
-        chars += typeof block.name === "string" ? block.name.length : 0;
-        if (block.arguments !== undefined) chars += JSON.stringify(block.arguments).length;
-      }
-      if (block.type === "image") chars += 4800;
-    }
-    return chars;
-  };
-
-  switch (message.role) {
-    case "assistant":
-    case "custom":
-    case "toolResult":
-      return Math.ceil(countText(message.content) / 4);
-    case "user":
-      return Math.ceil(countText(message.content) / 4);
-    case "bashExecution": {
-      const chars = (typeof message.command === "string" ? message.command.length : 0)
-        + (typeof message.output === "string" ? message.output.length : 0);
-      return Math.ceil(chars / 4);
-    }
-    case "branchSummary":
-    case "compactionSummary":
-      return Math.ceil(((typeof message.summary === "string" ? message.summary.length : 0)) / 4);
-    default:
-      return 0;
-  }
-}
-
-function estimateContextTokensFromSession(session: AgentSession): number {
-  const usage = session.getContextUsage?.();
-  if (typeof usage?.tokens === "number") return usage.tokens;
-
-  const context = session.sessionManager.buildSessionContext();
-  return context.messages.reduce((total: number, message: any) => total + estimateMessageTokens(message), 0);
-}
-
-/** Fallback context window when the model does not report one.
- *  Conservative enough to trigger compaction before most models overflow. */
-const DEFAULT_FALLBACK_CONTEXT_WINDOW = 128_000;
-
-function getModelContextWindow(session: AgentSession): number | null {
-  const model = session.model as (AgentSession["model"] & { contextLength?: number }) | undefined;
-  const contextWindow = typeof model?.contextWindow === "number"
-    ? model.contextWindow
-    : typeof model?.contextLength === "number"
-      ? model.contextLength
-      : null;
-  if (typeof contextWindow !== "number" || !Number.isFinite(contextWindow) || contextWindow <= 0) {
-    return null;
-  }
-  return contextWindow;
-}
-
 function getSessionStateErrorMessage(session: AgentSession): string | null {
   const errorMessage = (session as AgentSession & {
     agent?: { state?: { errorMessage?: unknown } };
   }).agent?.state?.errorMessage;
   return typeof errorMessage === "string" && errorMessage.trim() ? errorMessage.trim() : null;
-}
-
-const DEFAULT_COMPACTION_TIMEOUT_MS = 180_000;
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(String(value || "").trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function getCompactionTimeoutMs(): number {
-  return parsePositiveInt(process.env.PICLAW_COMPACTION_TIMEOUT_MS, DEFAULT_COMPACTION_TIMEOUT_MS);
-}
-
-async function abortCompactionBestEffort(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<RunAgentOrchestratorOptions, "onWarn">,
-): Promise<void> {
-  try {
-    const compactingSession = session as AgentSession & {
-      abortCompaction?: () => void;
-      abort?: () => Promise<void>;
-    };
-    if (typeof compactingSession.abortCompaction === "function" && session.isCompacting) {
-      compactingSession.abortCompaction();
-      return;
-    }
-    if (typeof compactingSession.abort === "function") {
-      await compactingSession.abort();
-    }
-  } catch (error) {
-    options.onWarn?.("Failed to abort stuck compaction", {
-      operation: "run_agent.abort_stuck_compaction",
-      chatJid,
-      err: error,
-    });
-  }
-}
-
-async function runCompactionWithTimeout(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<RunAgentOrchestratorOptions, "onWarn">,
-  runCompact: () => Promise<unknown>,
-): Promise<{ ok: true } | { ok: false; errorMessage: string }> {
-  const timeoutMs = getCompactionTimeoutMs();
-  if (timeoutMs <= 0) {
-    try {
-      await runCompact();
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, errorMessage: error instanceof Error ? error.message : String(error) };
-    }
-  }
-
-  const compactionOutcome = new Promise<{ ok: true } | { ok: false; errorMessage: string }>((resolve) => {
-    void Promise.resolve()
-      .then(() => runCompact())
-      .then(() => resolve({ ok: true }))
-      .catch((error) => resolve({
-        ok: false,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      }));
-  });
-
-  const timedOut = Symbol("compaction-timeout");
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const timeoutOutcome = new Promise<typeof timedOut>((resolve) => {
-    timeoutId = setTimeout(() => resolve(timedOut), timeoutMs);
-  });
-
-  const outcome = await Promise.race([compactionOutcome, timeoutOutcome]);
-  if (timeoutId) clearTimeout(timeoutId);
-  if (outcome !== timedOut) {
-    return outcome;
-  }
-
-  await abortCompactionBestEffort(session, chatJid, options);
-  return {
-    ok: false,
-    errorMessage: `Compaction timed out after ${formatTimeoutDuration(timeoutMs)}`,
-  };
-}
-
-async function maybeAutoCompactSessionBeforePrompt(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<RunAgentOrchestratorOptions, "onInfo" | "onWarn">,
-  onEvent?: (event: AgentSessionEvent) => void,
-): Promise<void> {
-  if (session.isStreaming || session.isCompacting || session.isRetrying) return;
-  const reportedContextWindow = getModelContextWindow(session);
-  const contextWindow = reportedContextWindow ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
-  if (!reportedContextWindow) {
-    options.onWarn?.("Model does not report contextWindow; using fallback for pre-prompt compaction", {
-      operation: "maybe_auto_compact_session_before_prompt.fallback_context_window",
-      chatJid,
-      fallbackContextWindow: DEFAULT_FALLBACK_CONTEXT_WINDOW,
-      modelId: (session.model as any)?.id ?? null,
-      provider: (session.model as any)?.provider ?? null,
-    });
-  }
-
-  const settingsManager = (session as AgentSession & {
-    settingsManager?: { getCompactionSettings?: () => { enabled?: boolean; reserveTokens?: number } };
-  }).settingsManager;
-  const settings = typeof settingsManager?.getCompactionSettings === "function"
-    ? settingsManager.getCompactionSettings()
-    : null;
-  // Piclaw manages compaction at safe pre-prompt boundaries regardless of
-  // upstream auto-compaction being disabled.  Only bail when there is no
-  // settings object at all (no model / no session).
-  if (!settings) return;
-
-  try {
-    const contextTokens = estimateContextTokensFromSession(session);
-    // Inline threshold check — bypasses upstream settings.enabled flag since
-    // piclaw disables upstream auto-compaction and owns the compaction schedule.
-    const reserveTokens = settings.reserveTokens ?? 16384;
-    if (contextTokens <= contextWindow - reserveTokens) return;
-
-    options.onInfo?.("Auto-compacting session before prompt", {
-      operation: "maybe_auto_compact_session_before_prompt",
-      chatJid,
-      contextTokens,
-      contextWindow,
-      reserveTokens: settings.reserveTokens ?? null,
-    });
-
-    // Upstream 0.67.6 removed compaction_start/end events from the manual
-    // compact() path. Emit them locally so the web UI still shows the
-    // "Compacting context" status pill during what can be a 30-60s operation.
-    onEvent?.({ type: "compaction_start", reason: "threshold" } as AgentSessionEvent);
-    const compactionResult = await runCompactionWithTimeout(
-      session,
-      chatJid,
-      options,
-      async () => await session.compact(),
-    );
-    if (!compactionResult.ok) {
-      const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
-      onEvent?.({
-        type: "compaction_end",
-        reason: "threshold",
-        result: undefined,
-        aborted,
-        willRetry: false,
-        errorMessage: aborted ? undefined : `Pre-prompt compaction failed: ${compactionResult.errorMessage}`,
-      } as AgentSessionEvent);
-      throw new Error(compactionResult.errorMessage);
-    }
-    onEvent?.({
-      type: "compaction_end",
-      reason: "threshold",
-      result: undefined,
-      aborted: false,
-      willRetry: false,
-    } as AgentSessionEvent);
-  } catch (error) {
-    options.onWarn?.("Pre-prompt auto-compaction skipped", {
-      operation: "maybe_auto_compact_session_before_prompt",
-      chatJid,
-      error,
-    });
-  }
 }
 
 interface PromptAttemptResult {
@@ -501,6 +283,23 @@ async function runPromptAttempt(
     "list_scripts",
   ].includes(toolName);
   const wrappedOnEvent = (event: AgentSessionEvent) => {
+    if (event.type === "message_update") {
+      heartbeatTrackedPhase(chatJid, "streaming", { eventType: event.type });
+    } else if (
+      event.type === "tool_execution_start"
+      || event.type === "tool_execution_update"
+      || event.type === "tool_execution_end"
+    ) {
+      heartbeatTrackedPhase(chatJid, "tool_execution", {
+        eventType: event.type,
+        toolName: (event as { toolName?: unknown }).toolName,
+      });
+    } else if (event.type === "compaction_start" || event.type === "compaction_end") {
+      heartbeatTrackedPhase(chatJid, event.type === "compaction_start" ? "preprompt_compaction" : "prompt", {
+        eventType: event.type,
+      });
+    }
+
     // Track session activity for cross-session visibility
     if (event.type === "tool_execution_start") {
       const e = event as { toolCallId?: string; toolName?: string; args?: unknown };
@@ -614,8 +413,10 @@ async function runPromptAttempt(
 
   let promptThrownError: string | null = null;
   try {
+    heartbeatTrackedPhase(chatJid, "prompt", { eventType: "prompt_start" });
     await session.prompt(prompt);
     finishPromptTimeout();
+    heartbeatTrackedPhase(chatJid, "prompt", { eventType: "prompt_resolved" });
     options.onInfo?.("session.prompt() resolved", {
       operation: "run_agent.prompt_resolved",
       chatJid,
@@ -799,7 +600,21 @@ export async function runAgentPrompt(
     session = await maybeAutoRotateSession(session, runtime, chatJid, options);
     modelLabel = session.model ? `${session.model.provider}/${session.model.id}` : null;
     updateSessionModel(chatJid, modelLabel, session.thinkingLevel ?? null);
-    await maybeAutoCompactSessionBeforePrompt(session, chatJid, options, runOptions.onEvent);
+    beginTrackedPhase(chatJid, runOptions.skipPrePromptCompaction ? "prompt" : "preprompt_compaction", {
+      source: "run_agent",
+    });
+    if (!runOptions.skipPrePromptCompaction) {
+      await maybeAutoCompactSessionBeforePrompt(session, chatJid, options, (event) => {
+        if (event.type === "compaction_start") {
+          heartbeatTrackedPhase(chatJid, "preprompt_compaction", { eventType: event.type });
+        } else if (event.type === "compaction_end") {
+          heartbeatTrackedPhase(chatJid, "prompt", { eventType: event.type });
+        }
+        runOptions.onEvent?.(event);
+      });
+    } else {
+      heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preprompt_compaction_skipped" });
+    }
     pruneOrphanToolResults(session, chatJid);
     const forkBaseLeafId = typeof session.sessionManager?.getLeafId === "function"
       ? session.sessionManager.getLeafId()
@@ -997,6 +812,10 @@ export async function runAgentPrompt(
         const retryDelayMs = decision.strategy === "retry"
           ? getAutomaticRecoveryDelayMs(recoveryConfig, recoveryAttemptsUsed)
           : 0;
+        heartbeatTrackedPhase(chatJid, "recovery", {
+          eventType: "recovery_start",
+          attempt: recoveryAttemptsUsed,
+        });
         emitAgentSessionEvent(runOptions.onEvent, {
           type: "recovery_start",
           classifier: decision.classifier,
@@ -1012,11 +831,19 @@ export async function runAgentPrompt(
         });
 
         if (retryDelayMs > 0) {
+          heartbeatTrackedPhase(chatJid, "recovery", {
+            eventType: "recovery_delay",
+            delayMs: retryDelayMs,
+          });
           await sleep(retryDelayMs);
         }
 
         if (decision.strategy === "compact_then_retry") {
           const compactionResult = await runRecoveryCompaction(session, chatJid, runOptions, options);
+          heartbeatTrackedPhase(chatJid, "preprompt_compaction", {
+            eventType: "recovery_compaction",
+            attempt: recoveryAttemptsUsed,
+          });
           if (!compactionResult.ok) {
             const compactDecision = decideAutomaticRecovery({
               config: recoveryConfig,
@@ -1091,6 +918,10 @@ export async function runAgentPrompt(
           }
         }
 
+        heartbeatTrackedPhase(chatJid, "prompt", {
+          eventType: "recovery_retry_ready",
+          attempt: recoveryAttemptsUsed,
+        });
         options.clearAttachments(chatJid);
       }
     });
@@ -1109,6 +940,7 @@ export async function runAgentPrompt(
     });
     return { status: "error", result: null, error: errorMsg };
   } finally {
+    endTrackedPhase(chatJid);
     updateSessionStreaming(chatJid, false);
     toolCallUnsub?.();
     if (sessionCtrl && savedToolNames !== null && originalSetActiveToolsByName) {

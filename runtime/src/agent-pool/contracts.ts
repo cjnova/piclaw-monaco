@@ -84,6 +84,13 @@ export interface RunAgentOptions {
   /** Abort after this many tool calls complete. Undefined means no cap. */
   maxToolCalls?: number;
   /**
+   * Skip Piclaw-managed pre-prompt compaction for this run.
+   *
+   * Used by callers that perform preflight compaction themselves before
+   * promoting a pending message into normal inflight run state.
+   */
+  skipPrePromptCompaction?: boolean;
+  /**
    * If set, the active tool set is clamped to names passing this predicate for
    * the entire run. The predicate is also enforced against any
    * setActiveToolsByName calls made by the agent during the run, preventing

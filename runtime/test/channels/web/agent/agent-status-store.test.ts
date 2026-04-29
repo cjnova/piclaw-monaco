@@ -101,6 +101,28 @@ describe("web agent status store", () => {
     });
   });
 
+  test("get derives a preflight recovery status when only a pre-prompt marker survived restart", () => {
+    const state = {
+      load: () => {},
+      save: () => {},
+      setAgentStatus: () => {},
+      getAgentStatuses: () => ({}),
+    };
+
+    const store = new AgentStatusStore(state, {
+      getPreflightRuns: () => [{ chatJid: "web:prep", startedAt: "2026-03-14T15:00:00.000Z" }],
+      getInflightRuns: () => [],
+    });
+
+    expect(store.get("web:prep")).toMatchObject({
+      type: "intent",
+      intent_key: "recovery",
+      title: "Recovering interrupted pre-prompt work",
+      started_at: "2026-03-14T15:00:00.000Z",
+      source: "startup_recovery",
+    });
+  });
+
   test("clearPersistedStatuses removes legacy router_state entries and clears in-memory state", () => {
     const cleared: string[] = [];
     let saveCount = 0;

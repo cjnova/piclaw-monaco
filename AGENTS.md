@@ -26,5 +26,6 @@
 ## Conventions
 
 - See `skel/AGENTS.md` for the agent operating context and working style
+- For web visuals/SVG diagrams, prefer attached `.svg` files (via `attach_file`) over raw SVG markup in message text; use widget/artifact paths only when interactivity is needed
 - See `WORKITEMS.md` for the workitem lifecycle
 - See `workitems/` for the kanban-style issue tracker

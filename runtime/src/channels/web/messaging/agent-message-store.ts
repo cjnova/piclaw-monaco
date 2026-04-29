@@ -16,6 +16,7 @@ import { createLogger, debugSuppressedError } from "../../../utils/logger.js";
 import { sendStoredAgentReplyWebPushNotification } from "../push/web-push-service.js";
 
 const log = createLogger("web.agent-message-store");
+const SVG_SOURCE_HINT = /(?:<svg[\s>]|&lt;svg[\s>]|&amp;lt;svg[\s>])/i;
 
 function buildAttachmentBlocks(attachments: AttachmentInfo[]): {
   mediaIds: number[];
@@ -45,6 +46,37 @@ function dispatchStoredReplyWebPush(
   });
 }
 
+function maybeWarnOnEscapedSvgSource(
+  params: {
+    chatJid: string;
+    text: string;
+    attachments: AttachmentInfo[];
+    channelName: ChatChannel;
+    extraContentBlocks?: Array<Record<string, unknown>>;
+  },
+  mergedContentBlocks: Array<Record<string, unknown>>,
+): void {
+  if (params.channelName !== "web") return;
+  if (!SVG_SOURCE_HINT.test(params.text || "")) return;
+
+  const hasRenderableVisualBlock = mergedContentBlocks.some((block) => {
+    const type = typeof block?.type === "string" ? block.type : "";
+    if (type === "generated_widget" || type === "image") return true;
+    const mimeType = typeof block?.mime_type === "string" ? block.mime_type : "";
+    return /image\/svg\+xml/i.test(mimeType);
+  });
+  const hasSvgAttachment = params.attachments.some((attachment) => /image\/svg\+xml/i.test(attachment.contentType || ""));
+  if (hasRenderableVisualBlock || hasSvgAttachment) return;
+
+  log.warn("Web agent reply contains SVG source markup; attach the SVG or use a widget/artifact instead of message text.", {
+    operation: "web.agent_message_store.svg_source_guardrail",
+    chatJid: params.chatJid,
+    textPreview: params.text.slice(0, 160),
+    attachmentCount: params.attachments.length,
+    contentBlockTypes: mergedContentBlocks.map((block) => (typeof block?.type === "string" ? block.type : "unknown")),
+  });
+}
+
 /** Persist the accumulated agent turn (text + attachments) to the database. */
 export function storeAgentTurn(
   channel: WebChannelLike,
@@ -70,6 +102,7 @@ export function storeAgentTurn(
     ...contentBlocks,
     ...(Array.isArray(params.extraContentBlocks) ? params.extraContentBlocks.filter((block) => block && typeof block === "object") : []),
   ];
+  maybeWarnOnEscapedSvgSource(params, mergedContentBlocks);
   const formatted = formatOutbound(params.text, params.channelName);
   const resolvedThreadId = params.threadId ?? undefined;
 

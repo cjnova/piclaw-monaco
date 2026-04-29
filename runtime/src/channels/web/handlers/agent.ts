@@ -23,7 +23,9 @@ import {
 import { handleUiThemeCommand } from "../theming/ui-theme-commands.js";
 import { handleUiMetersCommand } from "../ui-meters-commands.js";
 import {
+  beginChatPreflight,
   beginChatRun,
+  clearChatPreflight,
   clearFailedRun,
   endChatRun,
   getChatCursor,
@@ -32,6 +34,7 @@ import {
   getMessageRowIdById,
   getMessagesSince,
   getDb,
+  promoteChatPreflightToInflight,
   rollbackChatRunWithError,
   rollbackInflightRun,
   setChatCursor,
@@ -49,8 +52,14 @@ import "../../../extensions/generic-tool-status-hints.js";
 import { createUuid } from "../../../utils/ids.js";
 import { createLogger } from "../../../utils/logger.js";
 import type { AttachmentInfo } from "../../../agent-pool/attachments.js";
+import { maybeAutoCompactSessionBeforePrompt } from "../../../agent-pool/compaction.js";
 import { checkPendingShutdown } from "../../../runtime/shutdown-registry.js";
 import { DEFAULT_BASE_RETRY_MS, getRetryAtIso } from "../../../queue/retry-policy.js";
+import {
+  beginTrackedPhase,
+  heartbeatTrackedPhase,
+  endTrackedPhase,
+} from "../../../runtime/progress-watchdog.js";
 
 const log = createLogger("web.handlers.agent");
 
@@ -1279,17 +1288,7 @@ export async function processChat(
   const channelName = detectChannel(chatJid);
   const prompt = formatMessages([currentMessage], channelName);
   const lastMessage = currentMessage;
-
-  // Atomically advance the cursor AND write an inflight marker in one SQL
-  // statement. If the process is killed before endChatRun(), the next
-  // startup sees the inflight marker, rolls the cursor back to prevCursor,
-  // and retries this turn.
-  beginChatRun(chatJid, lastMessage.timestamp, {
-    prevTs: prevCursor,
-    messageId: lastMessage.id,
-    startedAt: new Date().toISOString(),
-  });
-
+  const runStartedAt = new Date().toISOString();
   const threadId = lastMessage.timestamp;
 
   const THOUGHT_PREVIEW_LINES = 8;
@@ -1322,13 +1321,21 @@ export async function processChat(
     },
   };
 
-  trackedEmitter.status({
-    thread_id: threadId,
-    agent_id: agentId,
-    type: "thinking",
-    title: "Thinking...",
-    turn_id: turnId,
-  });
+  const hasActiveClients = channel.sse.clients.size > 0;
+  const agentRuntimeConfig = getAgentRuntimeConfig();
+  const timeoutMs = hasActiveClients
+    ? agentRuntimeConfig.timeoutMs
+    : (agentRuntimeConfig.backgroundTimeoutMs > 0 ? agentRuntimeConfig.backgroundTimeoutMs : agentRuntimeConfig.timeoutMs);
+
+  let turnCount = 0;
+  let hadIntermediateOutput = false;
+  let persistedIntermediateOutput = false;
+  let intermediatePersistFailed = false;
+  let lastRecoveryMeta: { attemptsUsed?: number; recovered?: boolean; exhausted?: boolean; lastClassifier?: string | null } | null = null;
+  let sawCompactionEvent = false;
+  let sawRecoveryEvent = false;
+  let lastCompactionErrorMessage: string | null = null;
+  let lastRecoveryOutcome: string | null = null;
 
   const resolvedThreadRootId = resolveThreadRootId(
     channel,
@@ -1336,7 +1343,6 @@ export async function processChat(
     currentMessage.id ?? "",
     effectiveThreadRootId
   );
-
 
   const streamingHandler = createStreamingEventHandler({
     emitter: trackedEmitter,
@@ -1353,6 +1359,20 @@ export async function processChat(
   });
   const trackedStreamingHandler = (event: Record<string, unknown>) => {
     const type = typeof event?.type === "string" ? event.type : "";
+    if (type === "message_update") {
+      heartbeatTrackedPhase(chatJid, "streaming", { eventType: type });
+    } else if (type === "tool_execution_start" || type === "tool_execution_update" || type === "tool_execution_end") {
+      heartbeatTrackedPhase(chatJid, "tool_execution", {
+        eventType: type,
+        toolName: event.toolName,
+      });
+    } else if (type === "compaction_start") {
+      heartbeatTrackedPhase(chatJid, "preprompt_compaction", { eventType: type });
+    } else if (type === "compaction_end") {
+      heartbeatTrackedPhase(chatJid, "prompt", { eventType: type });
+    } else if (type === "recovery_start" || type === "recovery_end") {
+      heartbeatTrackedPhase(chatJid, "recovery", { eventType: type });
+    }
     if (type === "compaction_start" || type === "compaction_end") {
       sawCompactionEvent = true;
     }
@@ -1369,21 +1389,55 @@ export async function processChat(
     streamingHandler(event as any);
   };
 
-  const hasActiveClients = channel.sse.clients.size > 0;
-  const agentRuntimeConfig = getAgentRuntimeConfig();
-  const timeoutMs = hasActiveClients
-    ? agentRuntimeConfig.timeoutMs
-    : (agentRuntimeConfig.backgroundTimeoutMs > 0 ? agentRuntimeConfig.backgroundTimeoutMs : agentRuntimeConfig.timeoutMs);
+  trackedEmitter.status({
+    thread_id: threadId,
+    agent_id: agentId,
+    type: "thinking",
+    title: "Thinking...",
+    turn_id: turnId,
+  });
 
-  let turnCount = 0;
-  let hadIntermediateOutput = false;
-  let persistedIntermediateOutput = false;
-  let intermediatePersistFailed = false;
-  let lastRecoveryMeta: { attemptsUsed?: number; recovered?: boolean; exhausted?: boolean; lastClassifier?: string | null } | null = null;
-  let sawCompactionEvent = false;
-  let sawRecoveryEvent = false;
-  let lastCompactionErrorMessage: string | null = null;
-  let lastRecoveryOutcome: string | null = null;
+  if (typeof channel.agentPool.getSessionForIntrospection === "function") {
+    const session = await channel.agentPool.getSessionForIntrospection(chatJid);
+    beginTrackedPhase(chatJid, "preprompt_compaction", {
+      source: "web.process_chat.preflight",
+      messageId: lastMessage.id,
+    });
+    beginChatPreflight(chatJid, {
+      prevTs: prevCursor,
+      messageId: lastMessage.id,
+      startedAt: runStartedAt,
+    });
+    try {
+      await maybeAutoCompactSessionBeforePrompt(
+        session,
+        chatJid,
+        {
+          onInfo: (message, details) => log.info(message, details),
+          onWarn: (message, details) => log.warn(message, details),
+        },
+        trackedStreamingHandler,
+      );
+    } catch (error) {
+      clearChatPreflight(chatJid);
+      endTrackedPhase(chatJid);
+      throw error;
+    }
+
+    heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preflight_promoted" });
+    promoteChatPreflightToInflight(chatJid, lastMessage.timestamp, {
+      prevTs: prevCursor,
+      messageId: lastMessage.id,
+      startedAt: runStartedAt,
+    });
+  } else {
+    beginChatRun(chatJid, lastMessage.timestamp, {
+      prevTs: prevCursor,
+      messageId: lastMessage.id,
+      startedAt: runStartedAt,
+    });
+  }
+
   const getActiveRecoveryIntent = (): "compaction" | "recovery" | null => {
     const status = channel.getAgentStatus(chatJid);
     if (!status || typeof status !== "object") return null;
@@ -1542,6 +1596,7 @@ export async function processChat(
 
   const output = await channel.agentPool.runAgent(prompt, chatJid, {
     timeoutMs,
+    skipPrePromptCompaction: true,
     onEvent: trackedStreamingHandler,
     onTurnComplete: (turn: { text: string; attachments: unknown[] }) => {
       // Turn boundary: the first turn (index 0) is the original prompt's
@@ -1912,4 +1967,5 @@ export async function processChat(
   }
 
   await finalizeSuccessfulRun();
+  endTrackedPhase(chatJid);
 }
