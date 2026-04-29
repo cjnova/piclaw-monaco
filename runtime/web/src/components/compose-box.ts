@@ -5,7 +5,7 @@ import { getAgentModels, sendAgentMessage, uploadMedia } from '../api.js';
 import { getLocalStorageItem, setLocalStorageItem } from '../utils/storage.js';
 import { buildMentionValue, filterMentionAgents, parseMentionAutocompleteQuery } from '../ui/agent-mentions.js';
 import { shouldOpenSessionSwitcherFromBlankCompose, shouldRouteComposeValueToSessionSwitcher } from '../ui/compose-session-switcher.js';
-import { formatBranchPickerLabel, formatCurrentBranchLabel } from '../ui/branch-lifecycle.js';
+import { formatBranchPickerLabel } from '../ui/branch-lifecycle.js';
 import { buildComposeStatusDotClass } from '../ui/status-dot.js';
 import { getStatusElapsedLabel, isCompactionStatus, resolveStatusPanelTitle } from '../ui/status-duration.js';
 import { useConnectionStatusPresentation } from '../ui/connection-status.js';
@@ -105,6 +105,36 @@ export function getComposeHistoryStorageKey(chatJid = 'web:default') {
     const normalized = typeof chatJid === 'string' && chatJid.trim() ? chatJid.trim() : 'web:default';
     if (normalized === 'web:default') return COMPOSE_HISTORY_STORAGE_KEY;
     return `${COMPOSE_HISTORY_STORAGE_KEY}:${encodeURIComponent(normalized)}`;
+}
+
+export function resolveSessionPopupChats(activeChatAgents, currentChatJid = null) {
+    const seen = new Set();
+    const chats = [];
+    for (const chat of Array.isArray(activeChatAgents) ? activeChatAgents : []) {
+        const chatJid = typeof chat?.chat_jid === 'string' ? chat.chat_jid.trim() : '';
+        if (!chatJid || seen.has(chatJid)) continue;
+        const agentName = typeof chat?.agent_name === 'string' ? chat.agent_name.trim() : '';
+        if (!agentName) continue;
+        seen.add(chatJid);
+        chats.push(chat);
+    }
+    chats.sort((a, b) => {
+        const archivedA = Boolean(a?.archived_at);
+        const archivedB = Boolean(b?.archived_at);
+        if (archivedA !== archivedB) return archivedA ? 1 : -1;
+        const nameA = String(a?.agent_name || '').trim();
+        const nameB = String(b?.agent_name || '').trim();
+        const byName = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+        if (byName !== 0) return byName;
+        const jidA = String(a?.chat_jid || '').trim();
+        const jidB = String(b?.chat_jid || '').trim();
+        return jidA.localeCompare(jidB, undefined, { sensitivity: 'base' });
+    });
+    return chats;
+}
+
+export function isSessionPopupChatEmphasized(chat) {
+    return Boolean(chat?.is_active && !chat?.archived_at);
 }
 
 export function resolveUiOnlyCommandNotice(commandText, response) {
@@ -999,27 +1029,7 @@ export function ComposeBox({
         && currentSessionAgent.chat_jid === (currentSessionAgent.root_chat_jid || currentSessionAgent.chat_jid)
     );
     const isCurrentDefaultRootSession = Boolean(isCurrentRootSession && (currentSessionAgent?.chat_jid || currentChatJid) === 'web:default');
-    const switchableChatAgents = useMemo(() => {
-        const seen = new Set();
-        const chats = [];
-        for (const chat of Array.isArray(activeChatAgents) ? activeChatAgents : []) {
-            const chatJid = typeof chat?.chat_jid === 'string' ? chat.chat_jid.trim() : '';
-            if (!chatJid || chatJid === currentChatJid || seen.has(chatJid)) continue;
-            const agentName = typeof chat?.agent_name === 'string' ? chat.agent_name.trim() : '';
-            if (!agentName) continue;
-            seen.add(chatJid);
-            chats.push(chat);
-        }
-        chats.sort((a, b) => {
-            const archivedA = Boolean(a?.archived_at);
-            const archivedB = Boolean(b?.archived_at);
-            if (archivedA !== archivedB) return archivedA ? 1 : -1;
-            const nameA = (a?.agent_name || '').toLowerCase();
-            const nameB = (b?.agent_name || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-        });
-        return chats;
-    }, [activeChatAgents, currentChatJid]);
+    const switchableChatAgents = useMemo(() => resolveSessionPopupChats(activeChatAgents, currentChatJid), [activeChatAgents, currentChatJid]);
     const hasSwitchableChatAgents = switchableChatAgents.length > 0;
     const canSwitchSession = hasSwitchableChatAgents && typeof onSwitchChat === 'function';
     const canRestoreSession = hasSwitchableChatAgents && typeof onRestoreSession === 'function';
@@ -2586,13 +2596,6 @@ export function ComposeBox({
                         <div class="compose-model-popup" ref=${sessionPopupRef} tabIndex="-1" onKeyDown=${handlePopupKeyboardEvent}>
                             <div class="compose-model-popup-title">Manage sessions & agents</div>
                             <div class="compose-model-popup-menu" role="menu" aria-label="Sessions and agents">
-                                ${html`
-                                    <div class="compose-model-popup-item current" role="note" aria-live="polite">
-                                        ${(() => {
-                                            return formatCurrentBranchLabel(currentSessionAgent, currentChatJid);
-                                        })()}
-                                    </div>
-                                `}
                                 ${!hasSwitchableChatAgents && html`
                                     <div class="compose-model-popup-empty">No other sessions yet.</div>
                                 `}
@@ -2618,7 +2621,7 @@ export function ComposeBox({
                                                 disabled=${archived ? !canRestoreSession : !canSwitchSession}
                                                 title=${archived ? `Restore archived ${`@${chat.agent_name}`}` : `Switch to ${`@${chat.agent_name}`}`}
                                             >
-                                                ${label}
+                                                <span style=${isSessionPopupChatEmphasized(chat) ? 'font-weight:700' : ''}>${label}</span>
                                             </button>
                                             <button
                                                 type="button"

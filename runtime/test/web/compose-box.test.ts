@@ -16,6 +16,8 @@ import {
   resolveComposeSubmitButtonState,
   resolveComposeAbortButtonState,
   isComposeSubmitAbortMode,
+  resolveSessionPopupChats,
+  isSessionPopupChatEmphasized,
   resolveUiOnlyCommandNotice,
 } from '../../web/src/components/compose-box.ts';
 import { CONTROL_COMMAND_DEFINITIONS } from '../../src/agent-control/command-registry.ts';
@@ -99,6 +101,27 @@ test('slash autocomplete exposes the local /help keyboard shortcut pane command'
   const help = SLASH_COMMANDS.find((item) => item.name === '/help');
   expect(help).toBeTruthy();
   expect(help?.description).toContain('keyboard shortcuts');
+});
+
+test('resolveSessionPopupChats keeps the current session in alphabetical order with archived rows last', () => {
+  expect(resolveSessionPopupChats([
+    { chat_jid: 'web:zeta', agent_name: 'Zeta', is_active: false },
+    { chat_jid: 'web:alpha', agent_name: 'Alpha', is_active: true },
+    { chat_jid: 'web:beta', agent_name: 'beta', is_active: false },
+    { chat_jid: 'web:archived', agent_name: 'Archived', archived_at: '2026-04-29T00:00:00Z', is_active: false },
+    { chat_jid: 'web:alpha', agent_name: 'Alpha', is_active: true },
+  ], 'web:alpha').map((chat) => chat.chat_jid)).toEqual([
+    'web:alpha',
+    'web:beta',
+    'web:zeta',
+    'web:archived',
+  ]);
+});
+
+test('isSessionPopupChatEmphasized only highlights active non-archived sessions', () => {
+  expect(isSessionPopupChatEmphasized({ is_active: true, archived_at: null })).toBe(true);
+  expect(isSessionPopupChatEmphasized({ is_active: true, archived_at: '2026-04-29T00:00:00Z' })).toBe(false);
+  expect(isSessionPopupChatEmphasized({ is_active: false, archived_at: null })).toBe(false);
 });
 
 test('resolveComposePrefillRequest applies new non-search prefill tokens exactly once', () => {
