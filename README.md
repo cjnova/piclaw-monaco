@@ -136,6 +136,7 @@ See [WORKITEMS.md](WORKITEMS.md) for board lane definitions and label taxonomy.
 
 ## Credits
 
+- [pi.dev](http://pi.dev) for a stupendously flexible and extensible core
 - [rcarmo/agentbox](https://github.com/rcarmo/agentbox)
 - [qwibitai/nanoclaw](https://github.com/qwibitai/nanoclaw)
 - [badlogic/pi-mono](https://github.com/badlogic/pi-mono)
