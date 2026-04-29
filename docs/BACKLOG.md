@@ -236,3 +236,13 @@ When **file** selected: action bar shows `[+] create [✏️] edit [🗑] delete
 │ r  │                   │  STATUS BAR                         │
 └────┴──────────────────┴────────────────────────────────────┘
 ```
+
+## Recent Fixes (2026-04-29 afternoon)
+
+- Light theme refined: softer grays (#f3f3f3 bg, #e8e8e8 sidebar), VS Code blue accent (#0078d4)
+- Workspace split position now persists across refreshes (ref-based localStorage save)
+- Terminal pop-out/new-tab opens terminal-only page (/static/terminal.html)
+- Activity Bar: click same icon = toggle sidebar, click different = switch + open
+- Sidebar header shows display names (Workspace, Addons) not raw IDs
+- Removed ‹ collapse button from sidebar (Activity Bar is the toggle)
+- All resize handles work: sidebar (horizontal), workspace split (vertical), terminal (vertical)
