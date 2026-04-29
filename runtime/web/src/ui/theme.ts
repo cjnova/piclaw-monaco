@@ -3,7 +3,6 @@ import { getLocalStorageItem, setLocalStorageItem } from '../utils/storage.js';
 
 const THEME_STORAGE_KEY = 'piclaw_theme';
 const TINT_STORAGE_KEY = 'piclaw_tint';
-const CHAT_THEMES_STORAGE_KEY = 'piclaw_chat_themes';
 
 const DEFAULT_LIGHT = {
     bgPrimary: '#ffffff',
@@ -594,33 +593,6 @@ function emitThemeChange() {
     window.dispatchEvent(new CustomEvent('piclaw-theme-change', { detail }));
 }
 
-function getChatThemeMap() {
-    try {
-        const raw = getLocalStorageItem(CHAT_THEMES_STORAGE_KEY);
-        if (!raw) return {};
-        const parsed = JSON.parse(raw);
-        return typeof parsed === 'object' && parsed !== null ? parsed : {};
-    } catch {
-        return {};
-    }
-}
-
-function setChatTheme(chatJid, theme, tint) {
-    const map = getChatThemeMap();
-    if (!theme && !tint) {
-        delete map[chatJid];
-    } else {
-        map[chatJid] = { theme: theme || 'default', tint: tint || null };
-    }
-    setLocalStorageItem(CHAT_THEMES_STORAGE_KEY, JSON.stringify(map));
-}
-
-function getChatTheme(chatJid) {
-    if (!chatJid) return null;
-    const map = getChatThemeMap();
-    return map[chatJid] || null;
-}
-
 function resolveCurrentChatJid() {
     if (typeof window === 'undefined') return 'web:default';
     try {
@@ -679,16 +651,8 @@ function handleSystemThemeChange() {
 export function initTheme() {
     if (typeof window === 'undefined') return () => {};
 
-    // Resolve per-chat theme override first, fall back to global
-    const chatJid = resolveCurrentChatJid();
-    const chatOverride = getChatTheme(chatJid);
-
-    const storedTheme = chatOverride
-        ? normalizeThemeName(chatOverride.theme || 'default')
-        : normalizeThemeName(getLocalStorageItem(THEME_STORAGE_KEY) || 'default');
-    const storedTint = chatOverride
-        ? (chatOverride.tint ? String(chatOverride.tint).trim() : null)
-        : (() => { const raw = getLocalStorageItem(TINT_STORAGE_KEY); return raw ? raw.trim() : null; })();
+    const storedTheme = normalizeThemeName(getLocalStorageItem(THEME_STORAGE_KEY) || 'default');
+    const storedTint = (() => { const raw = getLocalStorageItem(TINT_STORAGE_KEY); return raw ? raw.trim() : null; })();
 
     applyThemeState({ theme: storedTheme, tint: storedTint }, { persist: false });
 
@@ -717,26 +681,18 @@ export function applyThemeFromEvent(payload) {
     if (!payload || typeof payload !== 'object') return;
     const currentChatJid = resolveCurrentChatJid();
     const eventChatJid = payload.chat_jid || payload.chatJid || null;
-    const chatJid = eventChatJid || currentChatJid;
     const theme = payload.theme ?? payload.name ?? payload.colorTheme;
     const tint = payload.tint ?? null;
 
-    // Store per-chat override so future visits to that chat/window restore it.
-    setChatTheme(chatJid, theme || 'default', tint);
-
-    // Only apply immediately when the event targets the current chat (or is a
-    // local/global apply with no explicit chat affinity). This prevents branch
-    // or sibling-window theme events from flipping the active window while the
-    // user switches focus between windows.
+    // /theme and /tint are now instance-wide settings persisted server-side.
+    // Apply immediately for global events and for chat-affined echoes that
+    // target the currently viewed chat.
     if (!eventChatJid || eventChatJid === currentChatJid) {
         applyThemeState({ theme: theme || 'default', tint }, { persist: false });
     }
 
-    // Only update global fallback when the root/default chat changes.
-    if (!eventChatJid || eventChatJid === 'web:default') {
-        setLocalStorageItem(THEME_STORAGE_KEY, theme || 'default');
-        setLocalStorageItem(TINT_STORAGE_KEY, tint || '');
-    }
+    setLocalStorageItem(THEME_STORAGE_KEY, theme || 'default');
+    setLocalStorageItem(TINT_STORAGE_KEY, tint || '');
 }
 
 export function getThemeMode() {

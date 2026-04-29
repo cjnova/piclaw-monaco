@@ -301,7 +301,7 @@ export function SettingsDialogContent({ onClose }) {
             case 'workspace': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'providers': return html`<${Comp} providers=${settingsData?.providers} setStatus=${setStatus} />`;
             case 'models': return html`<${Comp} filter=${filter} />`;
-            case 'theme': return html`<${Comp} themes=${settingsData?.themes} colorKeys=${settingsData?.colorKeys} />`;
+            case 'theme': return html`<${Comp} themes=${settingsData?.themes} colorKeys=${settingsData?.colorKeys} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'quick-actions': return html`<${Comp} filter=${filter} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'keychain': return html`<${Comp} filter=${filter} />`;
             case 'tools': return html`<${Comp} toolsets=${settingsData?.toolsets} filter=${filter} settingsData=${settingsData} mergeSettingsData=${mergeSettingsData} />`;

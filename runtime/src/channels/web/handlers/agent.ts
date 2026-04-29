@@ -13,6 +13,7 @@ import {
   getAgentRuntimeConfig,
   getIdentityConfig,
   getRoutingConfig,
+  setUiThemeConfig,
 } from "../../../core/config.js";
 import { parseControlCommand } from "../../../agent-control/index.js";
 import {
@@ -683,7 +684,8 @@ export async function handleAgentMessage(
 
   if (themeCommand) {
     if (themeCommand.payload) {
-      channel.broadcastEvent("ui_theme", { chat_jid: chatJid, ...themeCommand.payload });
+      setUiThemeConfig({ theme: themeCommand.payload.theme, tint: themeCommand.payload.tint ?? null });
+      channel.broadcastEvent("ui_theme", { ...themeCommand.payload });
     }
 
     const formattedThemeMessage = formatOutbound(themeCommand.message, "web");

@@ -287,7 +287,7 @@ export class UiBridge {
         this.themeByChat.set(chatJid, payload);
         // Persist instance-wide so the theme survives restarts and applies to all clients.
         setUiThemeConfig({ theme: payload.theme, tint: payload.tint ?? null });
-        this.channel.broadcastEvent("ui_theme", { chat_jid: chatJid, ...payload });
+        this.channel.broadcastEvent("ui_theme", { ...payload });
         return { success: true };
       },
       getToolsExpanded: () => false,

@@ -25,6 +25,8 @@ test('saveGeneralSettings persists and applies general settings immediately', as
       composeUploadLimitMb: 24,
       workspaceUploadLimitMb: 256,
       toolUseBudget: 23,
+      uiTheme: 'dracula',
+      uiTint: '#7c3aed',
     });
 
     expect(saved).toMatchObject({
@@ -38,6 +40,8 @@ test('saveGeneralSettings persists and applies general settings immediately', as
       composeUploadLimitMb: 24,
       workspaceUploadLimitMb: 256,
       toolUseBudget: 23,
+      uiTheme: 'dracula',
+      uiTint: '#7c3aed',
     });
     expect(saved.instanceTotp.configured).toBe(false);
     expect(handler.getGeneralSettingsData()).toMatchObject(saved);
@@ -59,6 +63,10 @@ test('saveGeneralSettings persists and applies general settings immediately', as
         terminalEnabled: false,
         composeUploadLimitMb: 24,
         workspaceUploadLimitMb: 256,
+      },
+      ui: {
+        theme: 'dracula',
+        tint: '#7c3aed',
       },
     });
   });

@@ -345,6 +345,7 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
       try {
         const body = await req.json().catch(() => ({}));
         const saved = await saveGeneralSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
+        channel.broadcastEvent("ui_theme", { theme: saved.uiTheme, tint: saved.uiTint });
         return channel.json({ ok: true, settings: saved });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

@@ -70,6 +70,8 @@ export interface GeneralSettingsInput {
   toolUseBudget?: unknown;
   sessionIsolation?: unknown;
   searchMatchMode?: unknown;
+  uiTheme?: unknown;
+  uiTint?: unknown;
 }
 
 function normalizeOptionalString(value: unknown): string | null | undefined {
@@ -214,6 +216,19 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
   const nextSearchMatchMode = typeof input.searchMatchMode === "string" ? input.searchMatchMode.trim().toLowerCase() : undefined;
   if (nextSearchMatchMode === "or" || nextSearchMatchMode === "and") {
     setSearchMatchMode(nextSearchMatchMode as SearchMatchMode);
+  }
+
+  const nextUiTheme = typeof input.uiTheme === "string" ? input.uiTheme.trim().toLowerCase() : undefined;
+  const nextUiTint = input.uiTint === undefined
+    ? undefined
+    : (typeof input.uiTint === "string" && input.uiTint.trim())
+      ? input.uiTint.trim()
+      : null;
+  if (nextUiTheme !== undefined || nextUiTint !== undefined) {
+    setUiThemeConfig({
+      ...(nextUiTheme !== undefined ? { theme: nextUiTheme || "default" } : {}),
+      ...(nextUiTint !== undefined ? { tint: nextUiTint } : {}),
+    });
   }
 
   return getGeneralSettingsData();
