@@ -1297,22 +1297,19 @@
 
   // runtime/web/frontend/src/panels/WorkspacePanel.tsx
   function WorkspacePanel() {
-    const topHeight = useSignal(Number(localStorage.getItem("piclaw-workspace-split")) || 60);
-    const dragRef = A2(null);
+    const topHeight = useSignal(Number(localStorage.getItem("piclaw-workspace-split")) || 200);
+    const containerRef = A2(null);
     const onDragStart = q2((e4) => {
       e4.preventDefault();
-      const container = e4.target.parentElement;
-      if (!container) return;
-      const containerH = container.getBoundingClientRect().height;
-      dragRef.current = { startY: e4.clientY, startH: topHeight.value };
+      const startY = e4.clientY;
+      const startH = topHeight.value;
       const onMove = (ev) => {
-        if (!dragRef.current || !container) return;
-        const delta = ev.clientY - dragRef.current.startY;
-        const pct = (dragRef.current.startH / 100 * containerH + delta) / containerH * 100;
-        topHeight.value = Math.max(20, Math.min(80, pct));
+        const delta = ev.clientY - startY;
+        const containerH = containerRef.current?.getBoundingClientRect().height || 500;
+        const next = Math.max(80, Math.min(containerH - 80, startH + delta));
+        topHeight.value = next;
       };
       const onUp = () => {
-        dragRef.current = null;
         localStorage.setItem("piclaw-workspace-split", String(topHeight.value));
         document.body.style.userSelect = "";
         document.body.style.cursor = "";
@@ -1324,15 +1321,15 @@
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }, [topHeight]);
-    return /* @__PURE__ */ u4("div", { style: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }, children: [
-      /* @__PURE__ */ u4("div", { style: { height: `${topHeight.value}%`, overflow: "auto", padding: "8px 0" }, className: "sidebar__content", children: /* @__PURE__ */ u4("div", { style: { padding: "0 12px", fontSize: "12px", color: "#6c7086" }, children: [
+    return /* @__PURE__ */ u4("div", { ref: containerRef, style: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }, children: [
+      /* @__PURE__ */ u4("div", { style: { height: `${topHeight.value}px`, flexShrink: 0, overflow: "auto", padding: "8px 0" }, className: "sidebar__content", children: /* @__PURE__ */ u4("div", { style: { padding: "0 12px", fontSize: "12px" }, children: [
         /* @__PURE__ */ u4("div", { style: { marginBottom: "8px", color: "#89b4fa", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }, children: "Files" }),
         /* @__PURE__ */ u4("div", { style: { color: "#6c7086" }, children: "File tree will appear here" })
       ] }) }),
       /* @__PURE__ */ u4(
         "div",
         {
-          style: { height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0, transition: "background 0.15s" },
+          style: { height: "4px", cursor: "row-resize", background: "#313244", flexShrink: 0 },
           onMouseDown: onDragStart,
           onMouseEnter: (e4) => {
             e4.target.style.background = "#89b4fa";
@@ -1342,7 +1339,7 @@
           }
         }
       ),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto", padding: "8px 12px" }, className: "sidebar__content", children: [
+      /* @__PURE__ */ u4("div", { style: { flex: 1, minHeight: 0, overflow: "auto", padding: "8px 12px" }, className: "sidebar__content", children: [
         /* @__PURE__ */ u4("div", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }, children: "Preview" }),
         /* @__PURE__ */ u4("div", { style: { fontSize: "12px", color: "#6c7086" }, children: "Select a file to preview" })
       ] })
