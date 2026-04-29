@@ -1158,26 +1158,9 @@
   }
 
   // runtime/web/frontend/src/components/Sidebar.tsx
-  function Sidebar({ title, collapsed, onToggleCollapse, children }) {
+  function Sidebar({ title, children }) {
     return /* @__PURE__ */ u4("aside", { style: { height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#181825" }, children: [
-      /* @__PURE__ */ u4("header", { style: { height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }, children: [
-        /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600, flex: 1 }, children: title.toUpperCase() }),
-        onToggleCollapse && /* @__PURE__ */ u4(
-          "span",
-          {
-            onClick: onToggleCollapse,
-            title: collapsed ? "Expand sidebar" : "Collapse sidebar",
-            style: { cursor: "pointer", color: "#6c7086", fontSize: "16px", lineHeight: 1, padding: "2px 4px", borderRadius: "3px", background: "none", border: "none" },
-            onMouseEnter: (e4) => {
-              e4.target.style.color = "#cdd6f4";
-            },
-            onMouseLeave: (e4) => {
-              e4.target.style.color = "#6c7086";
-            },
-            children: "\u2039"
-          }
-        )
-      ] }),
+      /* @__PURE__ */ u4("header", { style: { height: "35px", display: "flex", alignItems: "center", padding: "0 12px", borderBottom: "1px solid #313244", flexShrink: 0 }, children: /* @__PURE__ */ u4("span", { style: { fontSize: "11px", color: "#89b4fa", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }, children: title.toUpperCase() }) }),
       /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto" }, children })
     ] });
   }
@@ -1312,60 +1295,6 @@
     ] }) });
   }
 
-  // runtime/web/frontend/src/components/SplitPane.tsx
-  function SplitPane({ direction, initialSize, minSize, maxSize, children, onResize }) {
-    const [size, setSize] = d2(initialSize);
-    const rootRef = A2(null);
-    const isH = direction === "horizontal";
-    const [first, second] = children;
-    const onMouseDown = q2((e4) => {
-      e4.preventDefault();
-      const startPos = isH ? e4.clientX : e4.clientY;
-      const startSize = size;
-      const onMove = (ev) => {
-        const pos = isH ? ev.clientX : ev.clientY;
-        const next = Math.max(minSize, Math.min(maxSize, startSize + (pos - startPos)));
-        setSize(next);
-        onResize?.(next);
-      };
-      const onUp = () => {
-        document.body.style.userSelect = "";
-        document.body.style.cursor = "";
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      };
-      document.body.style.userSelect = "none";
-      document.body.style.cursor = isH ? "col-resize" : "row-resize";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    }, [isH, size, minSize, maxSize, onResize]);
-    const firstStyle = isH ? { width: `${size}px`, flexShrink: 0, overflow: "hidden" } : { height: `${size}px`, flexShrink: 0, overflow: "hidden" };
-    return /* @__PURE__ */ u4("div", { ref: rootRef, style: { display: "flex", flexDirection: isH ? "row" : "column", width: "100%", height: "100%" }, children: [
-      /* @__PURE__ */ u4("div", { style: firstStyle, children: first }),
-      /* @__PURE__ */ u4(
-        "div",
-        {
-          onMouseDown,
-          style: {
-            flexShrink: 0,
-            background: "#313244",
-            cursor: isH ? "col-resize" : "row-resize",
-            width: isH ? "4px" : "100%",
-            height: isH ? "100%" : "4px",
-            transition: "background 0.15s"
-          },
-          onMouseEnter: (e4) => {
-            e4.target.style.background = "#89b4fa";
-          },
-          onMouseLeave: (e4) => {
-            e4.target.style.background = "#313244";
-          }
-        }
-      ),
-      /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "hidden", minWidth: 0, minHeight: 0 }, children: second })
-    ] });
-  }
-
   // runtime/web/frontend/src/panels/PanelRouter.tsx
   var PANEL_CONTENT = {
     explorer: {
@@ -1414,6 +1343,7 @@
     const terminalHeight = useSignal(200);
     const terminalMaximized = useSignal(false);
     const sidebarCollapsed = useSignal(false);
+    const sidebarWidth = useSignal(250);
     const websocket = T2(() => new WebSocketManager(), []);
     const termDragRef = A2(null);
     y2(() => {
@@ -1468,12 +1398,13 @@
       return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible, sidebarCollapsed]);
     const handlePanelChange = q2((id) => {
-      sidebarCollapsed.value = false;
-      activePanel.value = id;
+      if (id === activePanel.value) {
+        sidebarCollapsed.value = !sidebarCollapsed.value;
+      } else {
+        activePanel.value = id;
+        sidebarCollapsed.value = false;
+      }
     }, [activePanel, sidebarCollapsed]);
-    const toggleSidebar = q2(() => {
-      sidebarCollapsed.value = !sidebarCollapsed.value;
-    }, [sidebarCollapsed]);
     const connected = connectionStatus.value === "connected";
     const onTermDragStart = q2((e4) => {
       e4.preventDefault();
@@ -1481,8 +1412,7 @@
       terminalMaximized.value = false;
       const onMove = (ev) => {
         if (!termDragRef.current) return;
-        const next = Math.max(100, Math.min(window.innerHeight * 0.8, termDragRef.current.startH + (termDragRef.current.startY - ev.clientY)));
-        terminalHeight.value = next;
+        terminalHeight.value = Math.max(100, Math.min(window.innerHeight * 0.8, termDragRef.current.startH + (termDragRef.current.startY - ev.clientY)));
       };
       const onUp = () => {
         termDragRef.current = null;
@@ -1497,16 +1427,54 @@
       document.addEventListener("mouseup", onUp);
     }, [terminalHeight, terminalMaximized]);
     const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
+    const sbWidth = sidebarCollapsed.value ? 0 : sidebarWidth.value;
     return /* @__PURE__ */ u4("div", { style: { display: "flex", width: "100vw", height: "100vh", overflow: "hidden", background: "#1e1e2e", color: "#cdd6f4" }, children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
       /* @__PURE__ */ u4("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }, children: [
-        /* @__PURE__ */ u4("div", { style: { flex: "1 1 0", minHeight: 0, overflow: "hidden" }, children: sidebarCollapsed.value ? /* @__PURE__ */ u4("div", { style: { width: "100%", height: "100%" }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) }) : /* @__PURE__ */ u4(SplitPane, { direction: "horizontal", initialSize: 250, minSize: 150, maxSize: Math.round(window.innerWidth * 0.5), children: [
-          /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, collapsed: false, onToggleCollapse: toggleSidebar, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
+        /* @__PURE__ */ u4("div", { style: { flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }, children: [
+          /* @__PURE__ */ u4("div", { style: {
+            width: `${sbWidth}px`,
+            minWidth: sidebarCollapsed.value ? 0 : 150,
+            maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5),
+            overflow: "hidden",
+            transition: "width 0.15s ease",
+            flexShrink: 0
+          }, children: /* @__PURE__ */ u4(Sidebar, { title: activePanel.value, children: /* @__PURE__ */ u4("div", { style: { padding: "8px 12px", color: "#6c7086", fontSize: "12px" }, children: [
             activePanel.value,
             " content..."
-          ] }) }),
-          /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value })
-        ] }) }),
+          ] }) }) }),
+          !sidebarCollapsed.value && /* @__PURE__ */ u4(
+            "div",
+            {
+              style: { width: "4px", cursor: "col-resize", background: "#313244", flexShrink: 0, transition: "background 0.15s" },
+              onMouseEnter: (e4) => {
+                e4.target.style.background = "#89b4fa";
+              },
+              onMouseLeave: (e4) => {
+                e4.target.style.background = "#313244";
+              },
+              onMouseDown: (e4) => {
+                e4.preventDefault();
+                const startX = e4.clientX;
+                const startW = sidebarWidth.value;
+                const onMove = (ev) => {
+                  sidebarWidth.value = Math.max(150, Math.min(Math.round(window.innerWidth * 0.5), startW + (ev.clientX - startX)));
+                };
+                const onUp = () => {
+                  document.body.style.userSelect = "";
+                  document.body.style.cursor = "";
+                  document.removeEventListener("mousemove", onMove);
+                  document.removeEventListener("mouseup", onUp);
+                };
+                document.body.style.userSelect = "none";
+                document.body.style.cursor = "col-resize";
+                document.addEventListener("mousemove", onMove);
+                document.addEventListener("mouseup", onUp);
+              }
+            }
+          ),
+          /* @__PURE__ */ u4("div", { style: { flex: 1, overflow: "auto", minWidth: 0 }, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value }) })
+        ] }),
         terminalVisible.value && /* @__PURE__ */ u4("div", { style: { height: tH, flexShrink: 0, display: "flex", flexDirection: "column", background: "#11111b" }, children: [
           /* @__PURE__ */ u4(
             "div",
