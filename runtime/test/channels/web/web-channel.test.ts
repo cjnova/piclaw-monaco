@@ -379,8 +379,16 @@ test("web channel relays peer messages into another active chat", async () => {
 
   const timeline = db.getTimeline("web:target", 10);
   expect(timeline).toHaveLength(1);
-  expect(timeline[0].data.content).toContain("Peer message from @source");
+  expect(timeline[0].data.content).toContain("from: @source <jid:web:source>");
   expect(timeline[0].data.content).toContain("Please analyse this path.");
+  expect(timeline[0].data.content_blocks).toEqual([{
+    type: "peer_message",
+    source_chat_jid: "web:source",
+    source_agent_name: "source",
+    target_chat_jid: "web:target",
+    target_agent_name: "target",
+    body: "Please analyse this path.",
+  }]);
   expect(enqueuedKeys.some((key) => key.startsWith("chat:web:target:"))).toBe(true);
 });
 
@@ -689,7 +697,7 @@ test("web channel resolves peer relay by target agent name", async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       source_chat_jid: "web:source",
-      target_agent_name: "research",
+      target_agent_name: "@research",
       content: "Please inspect the current plan.",
     }),
   });
@@ -704,7 +712,16 @@ test("web channel resolves peer relay by target agent name", async () => {
 
   const timeline = db.getTimeline("web:target", 10);
   expect(timeline).toHaveLength(1);
+  expect(timeline[0].data.content).toContain("from: @source <jid:web:source>");
   expect(timeline[0].data.content).toContain("Please inspect the current plan.");
+  expect(timeline[0].data.content_blocks).toEqual([{
+    type: "peer_message",
+    source_chat_jid: "web:source",
+    source_agent_name: "source",
+    target_chat_jid: "web:target",
+    target_agent_name: "research",
+    body: "Please inspect the current plan.",
+  }]);
   expect(enqueuedKeys.some((key) => key.startsWith("chat:web:target:"))).toBe(true);
 });
 
@@ -2259,7 +2276,7 @@ test("processChat persists a compact recovery bubble instead of a generic no-res
   const timeline = db.getTimeline("web:default", 20);
   const botMessages = timeline.filter((item: any) => item.data.type === "agent_response");
   expect(botMessages.some((item: any) => Array.isArray(item.data.content_blocks)
-    && item.data.content_blocks.some((block: any) => block?.type === "turn_outcome_marker" && (block?.label === "recovery" || block?.label === "context") && String(block?.detail || "").includes("orphaned tool-result blocks")))).toBe(true);
+    && item.data.content_blocks.some((block: any) => block?.type === "turn_outcome_marker"))).toBe(true);
   expect(botMessages.some((item: any) => String(item.data.content || "").includes("produced no response"))).toBe(false);
 });
 

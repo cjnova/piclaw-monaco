@@ -3,6 +3,7 @@
  */
 
 import {
+  clearChatPreflight,
   clearInflightMarker,
   getAgentReplyStateAfter,
   getAllChatCursors,
@@ -11,11 +12,13 @@ import {
   getInflightRuns,
   getMessageThreadRootIdById,
   getMessagesSince,
+  getPreflightRuns,
   rollbackInflightRun,
   storeMessage,
   type AgentReplyState,
   type DeferredQueuedFollowupRecord,
   type InflightRun,
+  type PreflightRun,
 } from "../../../db.js";
 import { createUuid } from "../../../utils/ids.js";
 import { createLogger } from "../../../utils/logger.js";
@@ -106,9 +109,11 @@ export interface WebRecoveryContext {
 
 /** Persistence contract used by web recovery helpers. */
 export interface WebRecoveryStore {
+  getPreflightRuns?(): PreflightRun[];
   getInflightRuns(): InflightRun[];
   transaction(run: () => void): void;
   getAgentReplyStateAfter(chatJid: string, prevTs: string): AgentReplyState;
+  clearChatPreflight?(chatJid: string): void;
   clearInflightMarker(chatJid: string): void;
   rollbackInflightRun(chatJid: string, prevTs: string): void;
   getAllChatCursors(): Record<string, string>;
@@ -132,11 +137,13 @@ function getKnownChatJids(): string[] {
 }
 
 const defaultStore: WebRecoveryStore = {
+  getPreflightRuns,
   getInflightRuns,
   transaction: (run) => {
     getDb().transaction(run)();
   },
   getAgentReplyStateAfter,
+  clearChatPreflight,
   clearInflightMarker,
   rollbackInflightRun,
   getAllChatCursors,
@@ -245,6 +252,28 @@ export function recoverInflightRuns(
   ctx: WebRecoveryContext,
   store: WebRecoveryStore = defaultStore
 ): void {
+  const preflights = store.getPreflightRuns?.() ?? [];
+  if (preflights.length > 0) {
+    try {
+      store.transaction(() => {
+        for (const preflight of preflights) {
+          log.info("Preflight run never reached prompt execution; clearing marker", {
+            operation: "recover_preflight_runs.clear_pending",
+            chatJid: preflight.chatJid,
+            startedAt: preflight.startedAt,
+          });
+          store.clearChatPreflight?.(preflight.chatJid);
+        }
+      });
+    } catch (error) {
+      log.error("Failed to clear preflight run markers; will retry on next startup", {
+        operation: "recover_preflight_runs",
+        err: error,
+      });
+      return;
+    }
+  }
+
   const inflights = store.getInflightRuns();
   if (inflights.length === 0) return;
 

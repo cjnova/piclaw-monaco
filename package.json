@@ -1,6 +1,6 @@
 {
   "name": "piclaw",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Personal pi coding agent assistant. Lightweight nanoclaw-style orchestrator using Bun and pi.",
   "type": "module",
   "license": "MIT",
@@ -97,7 +97,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
     "@lezer/highlight": "1.2.3",
-    "@mariozechner/pi-coding-agent": "0.68.1",
+    "@mariozechner/pi-coding-agent": "0.70.6",
     "@preact/signals": "2.5.1",
     "@simplewebauthn/server": "13.3.0",
     "@vscode/codicons": "^0.0.45",
@@ -120,6 +120,7 @@
     "preact": "10.29.1",
     "qrcode-terminal": "0.12.0",
     "sharp": "^0.34.5",
+    "typebox": "^1.1.24",
     "web-push": "3.6.7",
     "xlsx": "^0.18.5"
   },

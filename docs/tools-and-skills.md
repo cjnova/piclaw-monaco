@@ -208,6 +208,16 @@ Example:
 5. use the tool
 ```
 
+Image-editing example:
+
+```text
+1. list_tools(intent="regenerate transparent favicons from a PNG icon")
+2. inspect the compact recommendations (image_process should rank highly)
+3. list_tools(query="favicon transparent png", include_parameters=true)
+4. if needed, activate_tools(names=["image_process"])
+5. use the tool
+```
+
 You can extend that baseline with `.piclaw/config.json`:
 
 ```json
@@ -251,7 +261,7 @@ You can extend that baseline with `.piclaw/config.json`:
 
   ![ECharts treemap widget example](echarts-treemap-widget.png)
 - `open_workspace_file` — ask the active web UI to open a workspace file in an editor tab or popout window; popout requests are blocked on small viewports so the agent does not force unusable layouts
-- `image_process` — comprehensive workspace image manipulation via sharp, including resize/crop/convert/optimise, colour and geometry transforms, text/SVG/composite operations, metadata/info inspection, frame extraction, and spritesheet-to-GIF assembly
+- `image_process` — comprehensive workspace image manipulation via sharp, including resize/crop/convert/optimise, colour and geometry transforms, text/SVG/composite operations, metadata/info inspection, frame extraction, and spritesheet-to-GIF assembly; especially useful for icons, favicons, transparent PNGs, screenshots, avatars, and GIF workflows
 - `exec_batch` — run multiple shell commands and return concise summaries for each
 - `powershell` — Windows-only replacement for the default shell tool; active instead of `bash` on Windows hosts
 - `bun_run` — run a workspace Bun script directly; kept in the default active baseline on Windows so there is still a first-party script runner alongside PowerShell

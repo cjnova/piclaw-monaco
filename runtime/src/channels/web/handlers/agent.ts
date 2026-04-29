@@ -13,6 +13,7 @@ import {
   getAgentRuntimeConfig,
   getIdentityConfig,
   getRoutingConfig,
+  setUiThemeConfig,
 } from "../../../core/config.js";
 import { parseControlCommand } from "../../../agent-control/index.js";
 import {
@@ -23,7 +24,9 @@ import {
 import { handleUiThemeCommand } from "../theming/ui-theme-commands.js";
 import { handleUiMetersCommand } from "../ui-meters-commands.js";
 import {
+  beginChatPreflight,
   beginChatRun,
+  clearChatPreflight,
   clearFailedRun,
   endChatRun,
   getChatCursor,
@@ -32,6 +35,7 @@ import {
   getMessageRowIdById,
   getMessagesSince,
   getDb,
+  promoteChatPreflightToInflight,
   rollbackChatRunWithError,
   rollbackInflightRun,
   setChatCursor,
@@ -49,10 +53,48 @@ import "../../../extensions/generic-tool-status-hints.js";
 import { createUuid } from "../../../utils/ids.js";
 import { createLogger } from "../../../utils/logger.js";
 import type { AttachmentInfo } from "../../../agent-pool/attachments.js";
+import { maybeAutoCompactSessionBeforePrompt } from "../../../agent-pool/compaction.js";
 import { checkPendingShutdown } from "../../../runtime/shutdown-registry.js";
 import { DEFAULT_BASE_RETRY_MS, getRetryAtIso } from "../../../queue/retry-policy.js";
+import {
+  beginTrackedPhase,
+  heartbeatTrackedPhase,
+  endTrackedPhase,
+} from "../../../runtime/progress-watchdog.js";
 
 const log = createLogger("web.handlers.agent");
+
+type BrowserObservabilityContext = {
+  userId?: string;
+  sessionId?: string;
+  clientId?: string;
+};
+
+function readTrimmedHeader(req: Request, name: string): string | null {
+  const value = req.headers.get(name);
+  return value && value.trim() ? value.trim() : null;
+}
+
+function getBrowserObservabilityContext(req: Request): BrowserObservabilityContext {
+  const userId = readTrimmedHeader(req, "x-piclaw-user-id");
+  const sessionId = readTrimmedHeader(req, "x-piclaw-session-id");
+  const clientId = readTrimmedHeader(req, "x-piclaw-client-id");
+  return {
+    ...(userId ? { userId } : {}),
+    ...(sessionId ? { sessionId } : {}),
+    ...(clientId ? { clientId } : {}),
+  };
+}
+
+function withObservabilityMetadata(details: Record<string, unknown>, turnId: string, browserContext?: BrowserObservabilityContext): Record<string, unknown> {
+  return {
+    ...details,
+    turnId,
+    ...(browserContext?.userId ? { userId: browserContext.userId } : {}),
+    ...(browserContext?.sessionId ? { sessionId: browserContext.sessionId } : {}),
+    ...(browserContext?.clientId ? { clientId: browserContext.clientId } : {}),
+  };
+}
 
 function isRateLimitError(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
@@ -77,6 +119,32 @@ function isSessionCorruptionError(errorText: string | null | undefined): boolean
 function isQuotaError(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
   return /quota|usage.*limit|out of.*usage|billing|insufficient.*funds|exceeded.*limit|credit/i.test(errorText);
+}
+
+function isNetworkError(errorText: string | null | undefined): boolean {
+  if (!errorText) return false;
+  return /\bENOTFOUND\b|\bECONNREFUSED\b|\bETIMEDOUT\b|\bECONNRESET\b|getaddrinfo|dns.*failed|network.*error|connection.*error|fetch failed|socket hang up|connection.*refused|connection.*lost/i.test(errorText);
+}
+
+function describeNetworkError(errorText: string): string {
+  if (/ENOTFOUND|getaddrinfo|dns/i.test(errorText)) {
+    const hostMatch = errorText.match(/ENOTFOUND\s+(\S+)|getaddrinfo.*?\s+(\S+?)(?:\s|$|:)/i);
+    const host = hostMatch?.[1] || hostMatch?.[2] || '';
+    return host ? `DNS lookup failed for ${host}` : 'DNS lookup failed — provider hostname not reachable';
+  }
+  if (/ECONNREFUSED|connection.*refused/i.test(errorText)) {
+    return 'Connection refused — provider API endpoint is down or blocked';
+  }
+  if (/ETIMEDOUT|timed? out|timeout/i.test(errorText)) {
+    return 'Connection timed out — provider API did not respond';
+  }
+  if (/ECONNRESET|connection.*reset|socket hang up/i.test(errorText)) {
+    return 'Connection reset — provider closed the connection unexpectedly';
+  }
+  if (/fetch failed/i.test(errorText)) {
+    return 'Network request failed — check provider URL and connectivity';
+  }
+  return 'Network error — check provider connectivity';
 }
 
 type TurnOutcomeSeverity = "warning" | "error" | "critical" | "info";
@@ -157,6 +225,19 @@ function buildErrorOutcomeMarker(
         : isQuotaError(errorText)
           ? "Provider quota exceeded"
           : "Model configuration error",
+      detail: errorText.slice(0, 500),
+      severity: options.severity ?? "error",
+      draftRecovered: options.draftRecovered,
+      attemptsUsed: options.attemptsUsed,
+      classifier: options.classifier,
+    });
+  }
+
+  if (isNetworkError(errorText)) {
+    return buildTurnOutcomeMarker({
+      kind: "network",
+      label: "network",
+      title: describeNetworkError(errorText),
       detail: errorText.slice(0, 500),
       severity: options.severity ?? "error",
       draftRecovered: options.draftRecovered,
@@ -428,6 +509,7 @@ export async function handleAgentMessage(
   defaultAgentId: string
 ): Promise<Response> {
   const agentId = pathname.split("/")[2] || defaultAgentId;
+  const browserObservability = getBrowserObservabilityContext(req);
   const parsed = await parseAgentMessageRequest(req);
   if (parsed.error || !parsed.payload) return channel.json({ error: parsed.error }, 400);
 
@@ -498,9 +580,13 @@ export async function handleAgentMessage(
       ? (channel.agentPool as { getAgentHandleForChat: (chatJid: string) => string }).getAgentHandleForChat(chatJid)
       : fallbackAgentHandle(chatJid);
     const forwardedContent = mention.remainder;
+    const forwardHeaders = new Headers({ "Content-Type": "application/json" });
+    if (browserObservability.userId) forwardHeaders.set("x-piclaw-user-id", browserObservability.userId);
+    if (browserObservability.sessionId) forwardHeaders.set("x-piclaw-session-id", browserObservability.sessionId);
+    if (browserObservability.clientId) forwardHeaders.set("x-piclaw-client-id", browserObservability.clientId);
     const forwardReq = new Request(`http://internal/agent/${agentId}/message?chat_jid=${encodeURIComponent(mentionTarget.chat_jid)}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: forwardHeaders,
       body: JSON.stringify({
         content: forwardedContent,
         media_ids: normalized.mediaIds,
@@ -598,7 +684,8 @@ export async function handleAgentMessage(
 
   if (themeCommand) {
     if (themeCommand.payload) {
-      channel.broadcastEvent("ui_theme", { chat_jid: chatJid, ...themeCommand.payload });
+      setUiThemeConfig({ theme: themeCommand.payload.theme, tint: themeCommand.payload.tint ?? null });
+      channel.broadcastEvent("ui_theme", { ...themeCommand.payload });
     }
 
     const formattedThemeMessage = formatOutbound(themeCommand.message, "web");
@@ -1087,7 +1174,7 @@ export async function handleAgentMessage(
   });
 
   channel.queue.enqueue(async () => {
-    await processChat(channel, chatJid, agentId, interaction.data?.thread_id ?? interaction.id);
+    await processChat(channel, chatJid, agentId, interaction.data?.thread_id ?? interaction.id, browserObservability);
   }, `chat:${chatJid}:${interaction.id}`, `chat:${chatJid}`);
 
   return channel.json({ user_message: interaction, thread_id: threadId }, 201);
@@ -1106,7 +1193,8 @@ export async function processChat(
   channel: WebChannelLike,
   chatJid: string,
   agentId: string,
-  threadRootId?: number
+  threadRootId?: number,
+  browserObservability?: BrowserObservabilityContext,
 ): Promise<void> {
   const MAX_MATERIALIZE_RETRIES = 5;
 
@@ -1240,17 +1328,7 @@ export async function processChat(
   const channelName = detectChannel(chatJid);
   const prompt = formatMessages([currentMessage], channelName);
   const lastMessage = currentMessage;
-
-  // Atomically advance the cursor AND write an inflight marker in one SQL
-  // statement. If the process is killed before endChatRun(), the next
-  // startup sees the inflight marker, rolls the cursor back to prevCursor,
-  // and retries this turn.
-  beginChatRun(chatJid, lastMessage.timestamp, {
-    prevTs: prevCursor,
-    messageId: lastMessage.id,
-    startedAt: new Date().toISOString(),
-  });
-
+  const runStartedAt = new Date().toISOString();
   const threadId = lastMessage.timestamp;
 
   const THOUGHT_PREVIEW_LINES = 8;
@@ -1283,13 +1361,21 @@ export async function processChat(
     },
   };
 
-  trackedEmitter.status({
-    thread_id: threadId,
-    agent_id: agentId,
-    type: "thinking",
-    title: "Thinking...",
-    turn_id: turnId,
-  });
+  const hasActiveClients = channel.sse.clients.size > 0;
+  const agentRuntimeConfig = getAgentRuntimeConfig();
+  const timeoutMs = hasActiveClients
+    ? agentRuntimeConfig.timeoutMs
+    : (agentRuntimeConfig.backgroundTimeoutMs > 0 ? agentRuntimeConfig.backgroundTimeoutMs : agentRuntimeConfig.timeoutMs);
+
+  let turnCount = 0;
+  let hadIntermediateOutput = false;
+  let persistedIntermediateOutput = false;
+  let intermediatePersistFailed = false;
+  let lastRecoveryMeta: { attemptsUsed?: number; recovered?: boolean; exhausted?: boolean; lastClassifier?: string | null } | null = null;
+  let sawCompactionEvent = false;
+  let sawRecoveryEvent = false;
+  let lastCompactionErrorMessage: string | null = null;
+  let lastRecoveryOutcome: string | null = null;
 
   const resolvedThreadRootId = resolveThreadRootId(
     channel,
@@ -1297,7 +1383,6 @@ export async function processChat(
     currentMessage.id ?? "",
     effectiveThreadRootId
   );
-
 
   const streamingHandler = createStreamingEventHandler({
     emitter: trackedEmitter,
@@ -1314,6 +1399,20 @@ export async function processChat(
   });
   const trackedStreamingHandler = (event: Record<string, unknown>) => {
     const type = typeof event?.type === "string" ? event.type : "";
+    if (type === "message_update") {
+      heartbeatTrackedPhase(chatJid, "streaming", { eventType: type });
+    } else if (type === "tool_execution_start" || type === "tool_execution_update" || type === "tool_execution_end") {
+      heartbeatTrackedPhase(chatJid, "tool_execution", {
+        eventType: type,
+        toolName: event.toolName,
+      });
+    } else if (type === "compaction_start") {
+      heartbeatTrackedPhase(chatJid, "preprompt_compaction", { eventType: type });
+    } else if (type === "compaction_end") {
+      heartbeatTrackedPhase(chatJid, "prompt", { eventType: type });
+    } else if (type === "recovery_start" || type === "recovery_end") {
+      heartbeatTrackedPhase(chatJid, "recovery", { eventType: type });
+    }
     if (type === "compaction_start" || type === "compaction_end") {
       sawCompactionEvent = true;
     }
@@ -1330,21 +1429,55 @@ export async function processChat(
     streamingHandler(event as any);
   };
 
-  const hasActiveClients = channel.sse.clients.size > 0;
-  const agentRuntimeConfig = getAgentRuntimeConfig();
-  const timeoutMs = hasActiveClients
-    ? agentRuntimeConfig.timeoutMs
-    : (agentRuntimeConfig.backgroundTimeoutMs > 0 ? agentRuntimeConfig.backgroundTimeoutMs : agentRuntimeConfig.timeoutMs);
+  trackedEmitter.status({
+    thread_id: threadId,
+    agent_id: agentId,
+    type: "thinking",
+    title: "Thinking...",
+    turn_id: turnId,
+  });
 
-  let turnCount = 0;
-  let hadIntermediateOutput = false;
-  let persistedIntermediateOutput = false;
-  let intermediatePersistFailed = false;
-  let lastRecoveryMeta: { attemptsUsed?: number; recovered?: boolean; exhausted?: boolean; lastClassifier?: string | null } | null = null;
-  let sawCompactionEvent = false;
-  let sawRecoveryEvent = false;
-  let lastCompactionErrorMessage: string | null = null;
-  let lastRecoveryOutcome: string | null = null;
+  if (typeof channel.agentPool.getSessionForIntrospection === "function") {
+    const session = await channel.agentPool.getSessionForIntrospection(chatJid);
+    beginTrackedPhase(chatJid, "preprompt_compaction", {
+      source: "web.process_chat.preflight",
+      messageId: lastMessage.id,
+    });
+    beginChatPreflight(chatJid, {
+      prevTs: prevCursor,
+      messageId: lastMessage.id,
+      startedAt: runStartedAt,
+    });
+    try {
+      await maybeAutoCompactSessionBeforePrompt(
+        session,
+        chatJid,
+        {
+          onInfo: (message, details) => log.info(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
+          onWarn: (message, details) => log.warn(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
+        },
+        trackedStreamingHandler,
+      );
+    } catch (error) {
+      clearChatPreflight(chatJid);
+      endTrackedPhase(chatJid);
+      throw error;
+    }
+
+    heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preflight_promoted" });
+    promoteChatPreflightToInflight(chatJid, lastMessage.timestamp, {
+      prevTs: prevCursor,
+      messageId: lastMessage.id,
+      startedAt: runStartedAt,
+    });
+  } else {
+    beginChatRun(chatJid, lastMessage.timestamp, {
+      prevTs: prevCursor,
+      messageId: lastMessage.id,
+      startedAt: runStartedAt,
+    });
+  }
+
   const getActiveRecoveryIntent = (): "compaction" | "recovery" | null => {
     const status = channel.getAgentStatus(chatJid);
     if (!status || typeof status !== "object") return null;
@@ -1503,6 +1636,11 @@ export async function processChat(
 
   const output = await channel.agentPool.runAgent(prompt, chatJid, {
     timeoutMs,
+    turnId,
+    ...(browserObservability?.userId ? { userId: browserObservability.userId } : {}),
+    ...(browserObservability?.sessionId ? { sessionId: browserObservability.sessionId } : {}),
+    ...(browserObservability?.clientId ? { clientId: browserObservability.clientId } : {}),
+    skipPrePromptCompaction: true,
     onEvent: trackedStreamingHandler,
     onTurnComplete: (turn: { text: string; attachments: unknown[] }) => {
       // Turn boundary: the first turn (index 0) is the original prompt's
@@ -1543,14 +1681,23 @@ export async function processChat(
   if (output.status === "tool_complete") {
     // Provider stopped cleanly after tool use with no closing text reply.
     // This is not an error — emit a muted "done" pill and finalise normally.
+    // If there is a draft buffer (partial streamed text), surface it so the user
+    // sees the work that was done even though the model didn't emit a final reply.
+    const toolCompleteDraft = channel.getBuffer(turnId, "draft");
+    const toolCompleteDraftText = typeof toolCompleteDraft?.text === "string" ? toolCompleteDraft.text.trim() : "";
     const marker = buildTurnOutcomeMarker({
       kind: "tool_complete",
       label: "done",
       title: "Completed via tools",
-      detail: "Turn finished after tool use — no closing reply was emitted.",
+      detail: toolCompleteDraftText
+        ? "Turn finished after tool use — showing recovered draft."
+        : "Turn finished after tool use — no closing reply was emitted.",
       severity: "info",
+      draftRecovered: Boolean(toolCompleteDraftText),
     });
-    const persisted = persistVisibleFailureOutcome(marker);
+    const persisted = toolCompleteDraftText
+      ? persistTerminalOutcome(toolCompleteDraftText, marker)
+      : persistVisibleFailureOutcome(marker);
     if (persisted) {
       await finalizeSuccessfulRun();
     } else {
@@ -1597,6 +1744,8 @@ export async function processChat(
     const errorText = output.error || "Agent error";
     const aborted = isAbortError(errorText);
     const rateLimited = isRateLimitError(errorText);
+    const networkFailed = isNetworkError(errorText);
+    const networkDetail = networkFailed ? describeNetworkError(errorText) : null;
     const fallbackPublished = errorText.toLowerCase().includes("timed out")
       ? publishDraftFallback("timeout", errorText)
       : rateLimited
@@ -1637,8 +1786,8 @@ export async function processChat(
       thread_id: threadId,
       agent_id: agentId,
       type: "error",
-      title: rateLimited ? "AI provider rate limit" : errorText,
-      detail: rateLimited ? errorText : undefined,
+      title: rateLimited ? "AI provider rate limit" : networkFailed ? networkDetail! : errorText,
+      detail: rateLimited ? errorText : networkFailed ? errorText : undefined,
       turn_id: turnId,
     });
     return;
@@ -1652,6 +1801,8 @@ export async function processChat(
   // actually persisted (either the final output itself or a draft fallback).
   const finalAttachments = output.attachments ?? [];
   const hasOutput = !!(output.result || finalAttachments.length > 0);
+  const finalDraft = channel.getBuffer(turnId, "draft");
+  const hasDraftFallback = typeof finalDraft?.text === "string" && finalDraft.text.trim().length > 0;
   const finalized = hasOutput
     ? storeAgentTurn(channel, emitter, {
         chatJid,
@@ -1663,7 +1814,11 @@ export async function processChat(
         isTerminalAgentReply: true,
         extraContentBlocks: buildRecoveryMarkerBlocks(output.recovery),
       })
-    : publishDraftFallback("empty-final", undefined, { requireDraft: true });
+    : hasDraftFallback
+      ? publishDraftFallback("empty-final")
+      : persistedIntermediateOutput
+        ? true
+        : publishDraftFallback("empty-final");
 
   if (!finalized && hasOutput) {
     // The agent produced output but terminal persistence failed.
@@ -1856,4 +2011,5 @@ export async function processChat(
   }
 
   await finalizeSuccessfulRun();
+  endTrackedPhase(chatJid);
 }

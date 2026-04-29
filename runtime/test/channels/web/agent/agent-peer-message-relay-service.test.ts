@@ -102,7 +102,15 @@ describe("WebAgentPeerMessageRelayService", () => {
       chatJid: "web:branch",
       agentId: "default",
       payload: {
-        content: "Peer message from @source-handle:\n\nPlease inspect the plan.",
+        content: "from: @source-handle <jid:web:source>\n\nPlease inspect the plan.",
+        content_blocks: [{
+          type: "peer_message",
+          source_chat_jid: "web:source",
+          source_agent_name: "source-handle",
+          target_chat_jid: "web:branch",
+          target_agent_name: "research",
+          body: "Please inspect the plan.",
+        }],
         mode: "queue",
       },
     });
@@ -135,7 +143,15 @@ describe("WebAgentPeerMessageRelayService", () => {
       },
       forwardAgentMessageRequest: async (req) => {
         expect(await req.json()).toEqual({
-          content: "Peer message from @manual-source:\n\nHello there",
+          content: "from: @manual-source <jid:web:source>\n\nHello there",
+          content_blocks: [{
+            type: "peer_message",
+            source_chat_jid: "web:source",
+            source_agent_name: "manual-source",
+            target_chat_jid: "web:target",
+            target_agent_name: "research",
+            body: "Hello there",
+          }],
           mode: "auto",
         });
         return jsonResponse({ created: true }, 202);
@@ -148,7 +164,7 @@ describe("WebAgentPeerMessageRelayService", () => {
       body: JSON.stringify({
         source_chat_jid: "web:source",
         source_agent_name: "manual-source",
-        target_agent_name: "research",
+        target_agent_name: "@research",
         content: "Hello there",
         mode: "invalid",
       }),

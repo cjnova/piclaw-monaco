@@ -13,11 +13,12 @@
  * lose the agent's response.
  */
 
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { markPendingShutdown } from "../runtime/shutdown-registry.js";
 import { createLogger } from "../utils/logger.js";
 import { killTrackedProcesses } from "../utils/process-tracker.js";
+import { getActiveSessionCount } from "./session-status.js";
 
 const log = createLogger("extensions.exit-process");
 
@@ -50,7 +51,13 @@ export const exitProcess: ExtensionFactory = (pi: ExtensionAPI) => {
     async execute(_toolCallId, params: ExitProcessParams) {
       const reason = params.reason?.trim() || "Agent-initiated restart";
 
-      log.info("Killing tracked subprocesses and marking pending shutdown", { reason });
+      // Warn if other sessions are actively working
+      const otherActive = getActiveSessionCount();
+      const activeWarning = otherActive > 0
+        ? ` \u26a0\ufe0f ${otherActive} other session(s) currently active — their work will be interrupted.`
+        : "";
+
+      log.info("Killing tracked subprocesses and marking pending shutdown", { reason, otherActiveSessions: otherActive });
       const killed = killTrackedProcesses();
 
       // Mark the shutdown as pending. The actual exit happens after
@@ -59,13 +66,15 @@ export const exitProcess: ExtensionFactory = (pi: ExtensionAPI) => {
       markPendingShutdown(reason);
 
       return {
-        content: [{ type: "text", text: `Graceful shutdown scheduled. ${killed} subprocess${killed === 1 ? "" : 'es'} killed. Supervisor will restart piclaw. Reason: ${reason}` }],
+        content: [{ type: "text", text: `Graceful shutdown scheduled.${activeWarning} ${killed} subprocess${killed === 1 ? "" : 'es'} killed. Supervisor will restart piclaw. Reason: ${reason}` }],
         details: {
           tool: "exit_process",
           scheduled: true,
           killed_subprocesses: killed,
+          other_active_sessions: otherActive,
           reason,
         },
+        terminate: true,
       } satisfies AgentToolResult<Record<string, unknown>>;
     },
   });

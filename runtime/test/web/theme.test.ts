@@ -157,6 +157,27 @@ test('named themes still expose a distinct warning token instead of falling back
   expect(runtime.styleValues.get('--warning-color')).not.toBe(runtime.styleValues.get('--accent-color'));
 });
 
+test('applyThemeFromEvent without chat affinity updates global localStorage keys', async () => {
+  const runtime = createThemeRuntime();
+  (globalThis as any).window = runtime.window;
+  (globalThis as any).document = runtime.document;
+  (globalThis as any).CustomEvent = class CustomEventStub {
+    type: string;
+    detail: unknown;
+    constructor(type: string, init?: { detail?: unknown }) {
+      this.type = type;
+      this.detail = init?.detail;
+    }
+  };
+
+  const theme = await importFresh<typeof import('../../web/src/ui/theme.js')>('../web/src/ui/theme.ts');
+  theme.applyThemeFromEvent({ theme: 'gotham', tint: null });
+
+  expect(runtime.window.localStorage.getItem('piclaw_theme')).toBe('gotham');
+  expect(runtime.window.localStorage.getItem('piclaw_tint')).toBe('');
+  expect(runtime.document.documentElement.dataset.colorTheme).toBe('gotham');
+});
+
 test('theme parser falls back to inline css color when computed-style resolution fails', async () => {
   const runtime = createThemeRuntime();
   runtime.document.body.appendChild = () => {

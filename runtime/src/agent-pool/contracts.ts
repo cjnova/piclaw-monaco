@@ -79,10 +79,27 @@ export interface RunAgentOptions {
   onEvent?: (event: AgentSessionEvent) => void;
   /** Called when a turn completes (text_start → next text_start or end). */
   onTurnComplete?: (turn: TurnOutput) => void;
+  /** Stable runtime turn identifier for observability/correlation. */
+  turnId?: string;
+  /** Optional browser/user correlation identifier supplied by the caller. */
+  userId?: string;
+  /** Optional browser session correlation identifier supplied by the caller. */
+  sessionId?: string;
+  /** Optional browser tab/client correlation identifier supplied by the caller. */
+  clientId?: string;
+  /** Optional runtime session/fork leaf identity for observability correlation. */
+  sessionLeafId?: string;
   /** Override the default timeout (ms). Use 0 or a negative value to disable. */
   timeoutMs?: number;
   /** Abort after this many tool calls complete. Undefined means no cap. */
   maxToolCalls?: number;
+  /**
+   * Skip Piclaw-managed pre-prompt compaction for this run.
+   *
+   * Used by callers that perform preflight compaction themselves before
+   * promoting a pending message into normal inflight run state.
+   */
+  skipPrePromptCompaction?: boolean;
   /**
    * If set, the active tool set is clamped to names passing this predicate for
    * the entire run. The predicate is also enforced against any

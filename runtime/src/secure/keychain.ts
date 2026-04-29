@@ -24,6 +24,8 @@
 
 import { readFileSync } from "fs";
 import { getDb } from "../db/connection.js";
+// External provider fallback — see docs/keychain.md#external-keychain-providers
+import { getFromExternalProviders, listFromExternalProviders } from "./keychain-providers.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -195,7 +197,15 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
   );
 }
 
-/** Retrieve and decrypt a keychain entry by name. Throws if not found. */
+/**
+ * Retrieve and decrypt a keychain entry by name.
+ *
+ * Lookup order:
+ *   1. Internal encrypted SQLite keychain
+ *   2. Registered external keychain providers (see keychain-providers.ts)
+ *
+ * Throws if the entry is not found in any source.
+ */
 export async function getKeychainEntry(name: string): Promise<KeychainEntry> {
   const db = getDb();
   const row = db
@@ -205,17 +215,22 @@ export async function getKeychainEntry(name: string): Promise<KeychainEntry> {
        WHERE name = ?`
     )
     .get(name) as KeychainRow | undefined;
-  if (!row) {
-    throw new Error(`Keychain entry not found: ${name}`);
+  if (row) {
+    if (row.kdf !== KDF_ALGO) {
+      throw new Error(`Unsupported keychain KDF: ${row.kdf}`);
+    }
+    const payload = await decryptPayload(row.name, row);
+    return { name: row.name, type: row.type, secret: payload.secret, username: payload.username };
   }
-  if (row.kdf !== KDF_ALGO) {
-    throw new Error(`Unsupported keychain KDF: ${row.kdf}`);
+  // Fallback to registered external keychain providers
+  const external = await getFromExternalProviders(name);
+  if (external) {
+    return external;
   }
-  const payload = await decryptPayload(row.name, row);
-  return { name: row.name, type: row.type, secret: payload.secret, username: payload.username };
+  throw new Error(`Keychain entry not found: ${name}`);
 }
 
-/** List all keychain entry names and types (no secrets). */
+/** List all keychain entry names and types (no secrets). Internal entries only (sync). */
 export function listKeychainEntries(): KeychainEntryMetadata[] {
   const db = getDb();
   const rows = db
@@ -226,6 +241,27 @@ export function listKeychainEntries(): KeychainEntryMetadata[] {
     )
     .all() as KeychainEntryMetadata[];
   return rows;
+}
+
+/**
+ * List all entries from both internal keychain and registered external providers.
+ *
+ * Internal entries take precedence — if both internal and external have the
+ * same name, only the internal entry appears. External-only entries are
+ * appended with null timestamps.
+ */
+export async function listAllKeychainEntries(): Promise<KeychainEntryMetadata[]> {
+  const internal = listKeychainEntries();
+  const internalNames = new Set(internal.map((e) => e.name));
+  const external = await listFromExternalProviders();
+  // Merge: internal entries take precedence, external entries fill in gaps
+  const merged = [...internal];
+  for (const ext of external) {
+    if (!internalNames.has(ext.name)) {
+      merged.push({ name: ext.name, type: ext.type, createdAt: null as any, updatedAt: null as any });
+    }
+  }
+  return merged;
 }
 
 /** Delete a keychain entry by name. Returns true if the entry existed. */

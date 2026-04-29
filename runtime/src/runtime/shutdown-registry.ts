@@ -21,9 +21,12 @@ import { createLogger } from "../utils/logger.js";
 const log = createLogger("runtime.shutdown-registry");
 
 type ShutdownFn = (signal: string) => Promise<void>;
+type PreShutdownHook = () => void | Promise<void>;
 
 let registeredShutdown: ShutdownFn | null = null;
 let pendingShutdownReason: string | null = null;
+const preShutdownHooks = new Set<PreShutdownHook>();
+let preShutdownHooksRan = false;
 
 /**
  * Register the graceful shutdown handler.
@@ -31,6 +34,30 @@ let pendingShutdownReason: string | null = null;
  */
 export function registerShutdownHandler(handler: ShutdownFn): void {
   registeredShutdown = handler;
+}
+
+/**
+ * Register a best-effort hook that runs immediately before graceful shutdown
+ * begins. Used for cheap persistence cleanup such as clearing transient UI
+ * state that should not survive a clean restart.
+ */
+export function registerPreShutdownHook(hook: PreShutdownHook): void {
+  preShutdownHooks.add(hook);
+}
+
+export async function runPreShutdownHooksOnce(): Promise<void> {
+  if (preShutdownHooksRan) return;
+  preShutdownHooksRan = true;
+  for (const hook of preShutdownHooks) {
+    try {
+      await hook();
+    } catch (error) {
+      log.warn("Pre-shutdown hook failed", {
+        operation: "pre_shutdown_hook",
+        err: error,
+      });
+    }
+  }
 }
 
 /**
@@ -46,18 +73,20 @@ export function requestGracefulShutdown(reason: string, delayMs = 800): void {
     return;
   }
 
-  if (registeredShutdown) {
-    log.info("Graceful shutdown requested", { operation: "request", reason });
-    void registeredShutdown(`exit_process: ${reason}`);
-    return;
-  }
+  void runPreShutdownHooksOnce().finally(() => {
+    if (registeredShutdown) {
+      log.info("Graceful shutdown requested", { operation: "request", reason });
+      void registeredShutdown(`exit_process: ${reason}`);
+      return;
+    }
 
-  log.info("No runtime handler registered; scheduling process exit", {
-    operation: "request_fallback",
-    reason,
-    delayMs,
+    log.info("No runtime handler registered; scheduling process exit", {
+      operation: "request_fallback",
+      reason,
+      delayMs,
+    });
+    setTimeout(() => process.exit(0), delayMs);
   });
-  setTimeout(() => process.exit(0), delayMs);
 }
 
 /**
@@ -79,13 +108,19 @@ export function isPendingShutdown(): boolean {
 }
 
 /**
- * Check if a pending shutdown was requested. If so, execute it immediately.
- * Called from finalizeSuccessfulRun() after the response is committed to the DB
- * and broadcast to connected clients.
+ * Check if a pending shutdown was requested. If so, execute it after a brief
+ * delay. Called from finalizeSuccessfulRun() after the response is committed
+ * to the DB and broadcast to connected clients.
+ *
+ * The delay gives the SSE transport time to flush the final "done" status and
+ * stored message events to connected web clients before the server tears down.
+ * Without it the client may miss the agent's final reply even though it is
+ * already persisted in the DB.
  */
 export function checkPendingShutdown(): void {
   if (!pendingShutdownReason) return;
   const reason = pendingShutdownReason;
   pendingShutdownReason = null;
-  requestGracefulShutdown(reason);
+  log.info("Pending shutdown: delaying 1.5s for SSE flush", { operation: "check_pending.delay", reason });
+  setTimeout(() => requestGracefulShutdown(reason), 1500);
 }

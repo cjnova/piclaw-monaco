@@ -6,7 +6,7 @@
  * Large captured outputs are stored as searchable tool-output logs.
  */
 
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 
 import { registerToolStatusHintProvider } from "../tool-status-hints.js";

@@ -1,0 +1,68 @@
+{
+  "version": "Notebook/1.0",
+  "fallbackResourceIds": [
+    "Azure Monitor"
+  ],
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# PiClaw agent observability\n\nAgent-centric workbook template for App Insights.\n\nPrimary identity:\n- actor = chatJid\n- transaction = turnId\n- runtime leaf = sessionLeafId"
+      },
+      "name": "text - intro"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "union withsource=table dependencies, customEvents\n| where timestamp > ago(24h)\n| extend chat_jid = coalesce(tostring(customDimensions['piclaw.chat_jid']), user_AuthenticatedId, tostring(customDimensions['piclaw.actor.id']))\n| where isnotempty(chat_jid)\n| summarize events = count() by chat_jid\n| top 20 by events desc",
+        "size": 0,
+        "title": "Busiest chat JIDs",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "query - busiest-jids"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where timestamp > ago(24h)\n| where name == 'tool.call'\n| extend chat_jid = tostring(customDimensions['piclaw.chat_jid'])\n| extend tool_name = tostring(customDimensions['piclaw.tool.name'])\n| extend duration_ms = todouble(duration / 1ms)\n| where isnotempty(chat_jid)\n| summarize calls = count(), p95_ms = percentile(duration_ms, 95), max_ms = max(duration_ms) by chat_jid, tool_name\n| top 20 by p95_ms desc",
+        "size": 0,
+        "title": "Slowest tools by JID",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "query - slowest-tools"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where timestamp > ago(24h)\n| where name == 'model.call'\n| extend chat_jid = tostring(customDimensions['piclaw.chat_jid'])\n| extend model = tostring(customDimensions['piclaw.model'])\n| extend duration_ms = todouble(duration / 1ms)\n| where isnotempty(chat_jid)\n| summarize calls = count(), p95_ms = percentile(duration_ms, 95), max_ms = max(duration_ms) by chat_jid, model\n| top 20 by p95_ms desc",
+        "size": 0,
+        "title": "Slowest models by JID",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "query - slowest-models"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "union withsource=table dependencies, traces, exceptions\n| where timestamp > ago(24h)\n| extend chat_jid = tostring(customDimensions['piclaw.chat_jid'])\n| extend classifier = tostring(customDimensions['piclaw.error.classifier'])\n| extend item_name = coalesce(name, operation_Name, message, outerMessage)\n| where item_name in ('provider.error', 'log.warn', 'log.error') or isnotempty(classifier)\n| where isnotempty(chat_jid)\n| summarize events = count() by chat_jid, classifier, item_name\n| top 20 by events desc",
+        "size": 0,
+        "title": "Recovery hotspots",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "query - recovery-hotspots"
+    }
+  ],
+  "isLocked": false
+}

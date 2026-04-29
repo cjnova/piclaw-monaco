@@ -5,6 +5,7 @@ import {
   buildTimelineQuickActionItems,
   normalizeTimelineQuickActionsSettingsData,
 } from '../../web/src/ui/timeline-quick-actions.js';
+import { shouldOpenTimelineQuickActionsFromKeyEvent } from '../../web/src/components/timeline-quick-actions.ts';
 
 test('normalizeTimelineQuickActionsSettingsData dedupes configured ids and command names', () => {
   expect(normalizeTimelineQuickActionsSettingsData({
@@ -51,6 +52,38 @@ test('buildTimelineQuickActionItems filters slash commands by name and descripti
 
   expect(items).toHaveLength(1);
   expect(items[0]?.commandName).toBe('/model');
+});
+
+test('shouldOpenTimelineQuickActionsFromKeyEvent defers to single-key keyboard shortcuts before opening typeahead', () => {
+  const originalWindow = (globalThis as any).window;
+  (globalThis as any).window = {
+    localStorage: {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    },
+  } as any;
+
+  try {
+    const timelineTarget = {
+      tagName: 'DIV',
+      closest: (selector: string) => selector.split(',').map((part) => part.trim()).includes('.timeline') ? ({} as Element) : null,
+    };
+
+    expect(shouldOpenTimelineQuickActionsFromKeyEvent({
+      key: '?',
+      shiftKey: true,
+      target: timelineTarget,
+    })).toBe(false);
+
+    expect(shouldOpenTimelineQuickActionsFromKeyEvent({
+      key: 'g',
+      shiftKey: false,
+      target: timelineTarget,
+    })).toBe(true);
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
 });
 
 test('buildTimelineQuickActionItems excludes archived agents and disabled commands', () => {

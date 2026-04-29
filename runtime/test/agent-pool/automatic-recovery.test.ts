@@ -118,6 +118,26 @@ test("allows compaction recovery despite tool activity when error is context-pre
   expect(decision.strategy).toBe("compact_then_retry");
 });
 
+test("treats tool-use budget exhaustion as compact-then-retry tool-history pressure", () => {
+  const decision = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "Tool-use budget exceeded before finalization (65/64 tool steps).",
+    recoveryAttemptsUsed: 0,
+    elapsedMs: 1000,
+    snapshot: {
+      hadToolActivity: true,
+      hadPartialOutput: false,
+      toolUseBudgetExceeded: true,
+      assistantToolUseMessageCount: 65,
+      toolExecutionCount: 64,
+    },
+  });
+
+  expect(decision.recover).toBe(true);
+  expect(decision.classifier).toBe("tool_history_pressure");
+  expect(decision.strategy).toBe("compact_then_retry");
+});
+
 test("stops recovery after the configured attempt budget", () => {
   const decision = decideAutomaticRecovery({
     config: { ...DEFAULT_AUTOMATIC_RECOVERY_CONFIG, maxAttempts: 2, totalBudgetMs: 30_000, enabled: true },
@@ -150,4 +170,60 @@ test("treats partial-output interruptions as transient retry candidates", () => 
   expect(decision.recover).toBe(true);
   expect(decision.classifier).toBe("transient");
   expect(decision.strategy).toBe("retry");
+});
+
+test("retries a thinking-only stop once before escalating", () => {
+  const first = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "Prompt completed without emitting an assistant reply before finalization (provider stopped after emitting thinking without a final assistant reply, last stop reason: stop, session delta: 2 appended entries).",
+    recoveryAttemptsUsed: 0,
+    elapsedMs: 1000,
+    snapshot: {
+      hadToolActivity: false,
+      hadPartialOutput: false,
+      hadCompletedTurnOutput: false,
+      sawThinkingOnlyStop: true,
+    },
+  });
+
+  expect(first.recover).toBe(true);
+  expect(first.classifier).toBe("thinking_only_stop");
+  expect(first.strategy).toBe("retry");
+
+  const second = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "Prompt completed without emitting an assistant reply before finalization (provider stopped after emitting thinking without a final assistant reply, last stop reason: stop, session delta: 2 appended entries).",
+    recoveryAttemptsUsed: 1,
+    elapsedMs: 3000,
+    snapshot: {
+      hadToolActivity: false,
+      hadPartialOutput: false,
+      hadCompletedTurnOutput: false,
+      sawThinkingOnlyStop: true,
+    },
+  });
+
+  expect(second.recover).toBe(false);
+  expect(second.classifier).toBe("thinking_only_stop");
+  expect(second.strategy).toBeNull();
+});
+
+test("escalates repeated thinking-only stop to compact-then-retry when context pressure is flagged", () => {
+  const decision = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "Prompt completed without emitting an assistant reply before finalization (provider stopped after emitting thinking without a final assistant reply, last stop reason: stop, session delta: 2 appended entries).",
+    recoveryAttemptsUsed: 1,
+    elapsedMs: 3000,
+    snapshot: {
+      hadToolActivity: false,
+      hadPartialOutput: false,
+      hadCompletedTurnOutput: false,
+      sawThinkingOnlyStop: true,
+      sawCompactionIntent: true,
+    },
+  });
+
+  expect(decision.recover).toBe(true);
+  expect(decision.classifier).toBe("context_pressure");
+  expect(decision.strategy).toBe("compact_then_retry");
 });

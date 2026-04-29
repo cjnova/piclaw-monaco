@@ -18,6 +18,7 @@
  *   - dreamMaintenance: /dream memory-consolidation slash command.
  *   - sendAdaptiveCard: send_adaptive_card for agent-owned Adaptive Card posting.
  *   - sendDashboardWidget: send_dashboard_widget for posting the built-in live dashboard widget.
+ *   - chatTool: chat for cross-session agent-to-agent messaging.
  *   - openWorkspaceFile: open_workspace_file for browser-side editor tab/popout launches.
  *   - envTools: env for persistent workspace-scoped environment variables.
  *
@@ -45,12 +46,14 @@ import { uiThemeExtension } from "./ui-theme.js";
 import { smartCompaction } from "./smart-compaction.js";
 import { sendAdaptiveCard } from "./send-adaptive-card.js";
 import { sendDashboardWidget } from "./send-dashboard-widget.js";
+import { chatTool } from "./chat-tool.js";
 import { openWorkspaceFile } from "./open-workspace-file.js";
 import { envTools } from "./env-tools.js";
 import { exitProcess } from "./exit-process.js";
-import { autoresearchSupervisor } from "./autoresearch-supervisor.js";
 import { imageProcessing } from "./image-processing.js";
 import { remotePair } from "./remote-pair.js";
+import { sessionStatus } from "./session-status.js";
+import { providerResponseDiagnostics } from "./provider-response-diagnostics.js";
 
 /** Build the built-in extension factory list used for session creation. */
 export function createBuiltinExtensionFactories(options?: {
@@ -72,12 +75,14 @@ export function createBuiltinExtensionFactories(options?: {
     smartCompaction,
     sendAdaptiveCard,
     sendDashboardWidget,
+    chatTool,
     openWorkspaceFile,
     envTools,
     exitProcess,
-    autoresearchSupervisor,
     imageProcessing,
     remotePair,
+    sessionStatus,
+    providerResponseDiagnostics,
   ];
 }
 

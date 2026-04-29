@@ -199,7 +199,7 @@ test('pruneCurrentBranch blocks archiving a root session while child branches st
   ]);
 });
 
-test('purgeArchivedBranch requires archived state and uses irreversible confirmation copy', async () => {
+test('purgeArchivedBranch supports archived root sessions and uses irreversible confirmation copy', async () => {
   const toasts: Array<[string, string, string, number]> = [];
   const confirmations: string[] = [];
 
@@ -224,7 +224,7 @@ test('purgeArchivedBranch requires archived state and uses irreversible confirma
   const deleted = await purgeArchivedBranch({
     targetChatJid: 'web:archived',
     purgeChatBranch: async () => ({ branch: { chat_jid: 'web:archived' } }),
-    currentChatBranches: [{ chat_jid: 'web:archived', agent_name: 'feature', archived_at: '2026-03-29T00:00:00Z' }],
+    currentChatBranches: [{ chat_jid: 'web:archived', root_chat_jid: 'web:root', agent_name: 'feature', archived_at: '2026-03-29T00:00:00Z' }],
     refreshActiveChatAgents: async () => {},
     refreshCurrentChatBranches: async () => {},
     showIntentToast: (title: string, message: string, kind: string, timeout: number) => {
@@ -240,6 +240,27 @@ test('purgeArchivedBranch requires archived state and uses irreversible confirma
   expect(confirmations[0]).toContain('Permanently delete @feature?');
   expect(confirmations[0]).toContain('It cannot be undone.');
   expect(toasts[0]).toEqual(['Archived branch deleted', '@feature was permanently deleted.', 'info', 4000]);
+
+  toasts.length = 0;
+  confirmations.length = 0;
+  const deletedRoot = await purgeArchivedBranch({
+    targetChatJid: 'web:archived-root',
+    purgeChatBranch: async () => ({ branch: { chat_jid: 'web:archived-root' } }),
+    currentChatBranches: [{ chat_jid: 'web:archived-root', root_chat_jid: 'web:archived-root', agent_name: 'session-root', archived_at: '2026-03-29T00:00:00Z' }],
+    refreshActiveChatAgents: async () => {},
+    refreshCurrentChatBranches: async () => {},
+    showIntentToast: (title: string, message: string, kind: string, timeout: number) => {
+      toasts.push([title, message, kind, timeout]);
+    },
+    confirm: (message: string) => {
+      confirmations.push(message);
+      return true;
+    },
+  });
+
+  expect(deletedRoot).toBe(true);
+  expect(confirmations[0]).toContain('for this session');
+  expect(toasts[0]).toEqual(['Archived session deleted', '@session-root was permanently deleted.', 'info', 4000]);
 });
 
 test('restoreBranch shows collision-aware messaging and navigates to restored branch', async () => {

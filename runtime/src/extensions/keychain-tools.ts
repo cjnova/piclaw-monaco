@@ -1,16 +1,17 @@
 /**
  * keychain-tools – registers a keychain tool for listing and retrieving entries.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 
 import { registerToolStatusHintProvider } from "../tool-status-hints.js";
 import {
   deleteKeychainEntry,
   getKeychainEntry,
+  listAllKeychainEntries,   // async — includes external provider entries
   listInjectableKeychainEntries,
   listInjectableKeychainEnvNames,
-  listKeychainEntries,
+  listKeychainEntries,      // sync — internal only (used for prompt hints)
   setKeychainEntry,
 } from "../secure/keychain.js";
 
@@ -152,7 +153,7 @@ export const keychainTools: ExtensionFactory = (pi: ExtensionAPI) => {
     async execute(_toolCallId, params): Promise<AgentToolResult<KeychainToolDetails>> {
       if (params.action === "list") {
         const limit = clampLimit(params.limit, 100);
-        const entries = listKeychainEntries().slice(0, limit);
+        const entries = (await listAllKeychainEntries()).slice(0, limit);
         if (entries.length === 0) {
           return {
             content: [{ type: "text", text: "No keychain entries found." }],

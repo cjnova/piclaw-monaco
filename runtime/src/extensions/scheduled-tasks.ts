@@ -2,7 +2,7 @@
  * scheduled-tasks – registers /tasks and /scheduled commands plus the unified
  * scheduled_tasks tool surface for create/list/get/pause/resume/delete.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { createTask, deleteTask, getTaskById, updateTask } from "../db.js";
 import {

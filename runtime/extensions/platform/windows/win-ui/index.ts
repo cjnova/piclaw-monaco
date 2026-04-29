@@ -150,7 +150,7 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { writeFileSync } from "fs";
 import { registerToolStatusHintProvider } from "../../../../src/tool-status-hints.js";
 import { createLogger, debugSuppressedError } from "../../../../src/utils/logger.js";

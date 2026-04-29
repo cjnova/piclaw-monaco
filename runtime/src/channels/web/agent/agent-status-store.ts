@@ -2,6 +2,8 @@
  * channels/web/agent-status-store.ts – in-memory + persisted web agent status state.
  */
 
+import { getInflightRuns, getPreflightRuns, type InflightRun, type PreflightRun } from "../../../db.js";
+
 interface AgentStatusStateStore {
   load(): void;
   save(): void;
@@ -9,38 +11,72 @@ interface AgentStatusStateStore {
   getAgentStatuses(): Record<string, Record<string, unknown>>;
 }
 
-function isRestartRestorableStatus(status: Record<string, unknown> | null | undefined): boolean {
+interface AgentStatusInflightStore {
+  getPreflightRuns?: () => Array<Pick<PreflightRun, "chatJid" | "startedAt">>;
+  getInflightRuns(): Array<Pick<InflightRun, "chatJid" | "startedAt">>;
+}
+
+const STATUS_RUNTIME_GENERATION = [
+  String(process.pid || "0"),
+  Date.now().toString(36),
+  Math.random().toString(36).slice(2, 10),
+].join(":");
+
+const STATUS_RUNTIME_GENERATION_KEY = "runtime_generation";
+
+function withRuntimeGeneration(status: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...status,
+    [STATUS_RUNTIME_GENERATION_KEY]: STATUS_RUNTIME_GENERATION,
+  };
+}
+
+function hasCurrentRuntimeGeneration(status: Record<string, unknown> | null | undefined): boolean {
   if (!status || typeof status !== "object") return false;
-  const intentKey = status.intent_key ?? status.intentKey;
-  const startedAt = status.started_at ?? status.startedAt;
-  return status.type === "intent"
-    && (intentKey === "compaction" || intentKey === "recovery")
-    && typeof startedAt === "string"
-    && startedAt.length > 0;
+  return status[STATUS_RUNTIME_GENERATION_KEY] === STATUS_RUNTIME_GENERATION;
+}
+
+function buildRestartRecoveryStatus(
+  pending: Pick<InflightRun, "startedAt"> | Pick<PreflightRun, "startedAt">,
+  phase: "preflight" | "inflight",
+): Record<string, unknown> {
+  return {
+    type: "intent",
+    kind: "info",
+    intent_key: "recovery",
+    source: "startup_recovery",
+    title: phase === "preflight" ? "Recovering interrupted pre-prompt work" : "Recovering interrupted response",
+    detail: phase === "preflight"
+      ? "Clearing a persisted preflight marker before the prompt started."
+      : "Reconstructing runtime state from the persisted inflight marker.",
+    blocking: true,
+    started_at: pending.startedAt,
+    [STATUS_RUNTIME_GENERATION_KEY]: STATUS_RUNTIME_GENERATION,
+  };
 }
 
 /** In-memory + persisted lifecycle store for active web agent statuses. */
 export class AgentStatusStore {
   private activeAgentStatuses = new Map<string, Record<string, unknown>>();
 
-  constructor(private readonly state: AgentStatusStateStore) {}
+  constructor(
+    private readonly state: AgentStatusStateStore,
+    private readonly inflightStore: AgentStatusInflightStore = { getPreflightRuns, getInflightRuns },
+  ) {}
 
   load(): void {
     this.state.load();
 
-    // Most persisted statuses are cleared on every startup because the new
-    // process may not actually still be running that exact tool/plan phase.
-    //
-    // Compaction intents are the exception: restart recovery can legitimately
-    // land back in the middle of a long compaction/replay window, and keeping
-    // the last compaction status (with its original started_at) gives the UI a
-    // stable indicator + elapsed timer across reconnects and process restarts.
+    // Persisted agentStatuses are only trustworthy when they were written by
+    // the current process generation. After a restart, the durable truth comes
+    // from chat_cursors inflight markers, and get() synthesizes a fresh
+    // recovery status from that durable state when needed.
     const restored = this.state.getAgentStatuses();
     const nextStatuses = new Map<string, Record<string, unknown>>();
     let mutated = false;
 
     for (const [jid, status] of Object.entries(restored)) {
-      if (isRestartRestorableStatus(status)) {
+      if (hasCurrentRuntimeGeneration(status)) {
         nextStatuses.set(jid, status);
         continue;
       }
@@ -58,20 +94,37 @@ export class AgentStatusStore {
   update(chatJid: string, status: Record<string, unknown>): void {
     const type = status?.type;
     if (type === "done" || type === "error") {
-      const removed = this.activeAgentStatuses.delete(chatJid);
-      if (removed) {
-        this.state.setAgentStatus(chatJid, null);
-        this.state.save();
-      }
+      this.activeAgentStatuses.delete(chatJid);
       return;
     }
 
-    this.activeAgentStatuses.set(chatJid, status);
-    this.state.setAgentStatus(chatJid, status);
-    this.state.save();
+    const stamped = withRuntimeGeneration(status);
+    this.activeAgentStatuses.set(chatJid, stamped);
   }
 
   get(chatJid: string): Record<string, unknown> | null {
-    return this.activeAgentStatuses.get(chatJid) ?? null;
+    const active = this.activeAgentStatuses.get(chatJid);
+    if (active) return active;
+
+    const inflight = this.inflightStore.getInflightRuns().find((entry) => entry.chatJid === chatJid);
+    if (inflight) return buildRestartRecoveryStatus(inflight, "inflight");
+
+    const preflight = this.inflightStore.getPreflightRuns?.().find((entry) => entry.chatJid === chatJid);
+    if (!preflight) return null;
+    return buildRestartRecoveryStatus(preflight, "preflight");
+  }
+
+  clearPersistedStatuses(): void {
+    // Migration cleanup: removes any agentStatuses that were written to
+    // router_state by older code. update() no longer persists active statuses,
+    // so after one full restart cycle this becomes a no-op.
+    const persisted = this.state.getAgentStatuses();
+    const chatJids = Object.keys(persisted);
+    this.activeAgentStatuses.clear();
+    if (chatJids.length === 0) return;
+    for (const chatJid of chatJids) {
+      this.state.setAgentStatus(chatJid, null);
+    }
+    this.state.save();
   }
 }

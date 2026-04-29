@@ -155,6 +155,102 @@ describe("deferred queued follow-ups", () => {
 });
 
 // ---------------------------------------------------------------------------
+// compaction backoff state
+// ---------------------------------------------------------------------------
+
+describe("chat compaction backoff", () => {
+  test("round-trips persisted compaction backoff state", () => {
+    const chatJid = jid("compaction-backoff-basic");
+    db.setChatCompactionBackoff(chatJid, {
+      failureCount: 2,
+      lastFailedAt: "2024-03-15T00:00:00.000Z",
+      backoffUntil: "2024-03-15T00:30:00.000Z",
+      lastErrorMessage: "Compaction timed out",
+    });
+
+    expect(db.getChatCompactionBackoff(chatJid)).toEqual({
+      chatJid,
+      failureCount: 2,
+      lastFailedAt: "2024-03-15T00:00:00.000Z",
+      backoffUntil: "2024-03-15T00:30:00.000Z",
+      lastErrorMessage: "Compaction timed out",
+    });
+  });
+
+  test("clearChatCompactionBackoff removes persisted suppression state", () => {
+    const chatJid = jid("compaction-backoff-clear");
+    db.setChatCompactionBackoff(chatJid, {
+      failureCount: 1,
+      lastFailedAt: "2024-03-16T00:00:00.000Z",
+      backoffUntil: "2024-03-16T00:15:00.000Z",
+      lastErrorMessage: "Compaction failed",
+    });
+
+    db.clearChatCompactionBackoff(chatJid);
+    expect(db.getChatCompactionBackoff(chatJid)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// beginChatPreflight / promoteChatPreflightToInflight
+// ---------------------------------------------------------------------------
+
+describe("chat preflight lifecycle", () => {
+  test("records preflight without advancing the cursor", () => {
+    const chatJid = jid("preflight-basic");
+    db.setChatCursor(chatJid, "2024-03-20T00:00:00.000Z");
+
+    db.beginChatPreflight(chatJid, {
+      prevTs: "2024-03-20T00:00:00.000Z",
+      messageId: "msg-preflight-1",
+      startedAt: "2024-03-20T00:00:00.001Z",
+    });
+
+    expect(db.getChatCursor(chatJid)).toBe("2024-03-20T00:00:00.000Z");
+    expect(db.getInflightRuns().filter((r) => r.chatJid === chatJid)).toHaveLength(0);
+    expect(db.getPreflightRuns().filter((r) => r.chatJid === chatJid)).toEqual([
+      {
+        chatJid,
+        prevTs: "2024-03-20T00:00:00.000Z",
+        messageId: "msg-preflight-1",
+        startedAt: "2024-03-20T00:00:00.001Z",
+      },
+    ]);
+
+    db.clearChatPreflight(chatJid);
+  });
+
+  test("promotes preflight into inflight state in one step", () => {
+    const chatJid = jid("preflight-promote");
+    db.setChatCursor(chatJid, "2024-03-21T00:00:00.000Z");
+
+    db.beginChatPreflight(chatJid, {
+      prevTs: "2024-03-21T00:00:00.000Z",
+      messageId: "msg-preflight-2",
+      startedAt: "2024-03-21T00:00:00.001Z",
+    });
+    db.promoteChatPreflightToInflight(chatJid, "2024-03-21T00:01:00.000Z", {
+      prevTs: "2024-03-21T00:00:00.000Z",
+      messageId: "msg-preflight-2",
+      startedAt: "2024-03-21T00:00:00.001Z",
+    });
+
+    expect(db.getPreflightRuns().filter((r) => r.chatJid === chatJid)).toHaveLength(0);
+    expect(db.getChatCursor(chatJid)).toBe("2024-03-21T00:01:00.000Z");
+    expect(db.getInflightRuns().filter((r) => r.chatJid === chatJid)).toEqual([
+      {
+        chatJid,
+        prevTs: "2024-03-21T00:00:00.000Z",
+        messageId: "msg-preflight-2",
+        startedAt: "2024-03-21T00:00:00.001Z",
+      },
+    ]);
+
+    db.endChatRun(chatJid);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // beginChatRun
 // ---------------------------------------------------------------------------
 

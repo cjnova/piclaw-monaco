@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 import { getChatJid } from "../core/chat-context.js";
 import { registerToolStatusHintProvider } from "../tool-status-hints.js";
@@ -10,7 +10,7 @@ import type {
   SshConfigSetResult,
 } from "../types.js";
 
-type SessionSshConfigInput = Omit<SshConfig, "chat_jid" | "created_at" | "updated_at">;
+type SessionSshConfigInput = Omit<SshConfig, "chat_jid" | "created_at" | "updated_at" | "last_used_at">;
 type SshToolResult = { content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> };
 
 export interface SshToolHandlers {

@@ -5,6 +5,12 @@
 import { type AgentSession, type AgentSessionEvent, type AgentSessionRuntime } from "@mariozechner/pi-coding-agent";
 
 import type { AttachmentInfo } from "./attachments.js";
+import {
+  trackToolStart as trackToolStartActivity,
+  trackToolEnd as trackToolEndActivity,
+  updateSessionStreaming,
+  updateSessionModel,
+} from "../extensions/session-status.js";
 
 import {
   decideAutomaticRecovery,
@@ -27,6 +33,15 @@ import {
   waitForSessionIdle,
 } from "./prompt-utils.js";
 import {
+  DEFAULT_FALLBACK_CONTEXT_WINDOW,
+  clearCompactionFailureBackoff,
+  estimateContextTokensFromSession,
+  getModelContextWindow,
+  maybeAutoCompactSessionBeforePrompt,
+  noteCompactionFailure,
+  runCompactionWithTimeout,
+} from "./compaction.js";
+import {
   inspectBlankTurnSessionDelta,
   isBlankTurnSessionDelta,
   snapshotSessionEntryCount,
@@ -34,6 +49,11 @@ import {
 import type { AgentTurnCoordinator } from "./turn-coordinator.js";
 import type { AgentOutput, AgentRecoveryDiagnosticEntry, AgentRecoveryMetadata, RetrySettingsProvider, RunAgentOptions } from "./contracts.js";
 import { isPendingShutdown } from "../runtime/shutdown-registry.js";
+import {
+  beginTrackedPhase,
+  heartbeatTrackedPhase,
+  endTrackedPhase,
+} from "../runtime/progress-watchdog.js";
 
 const log = createLogger("agent-pool.run-orchestrator");
 
@@ -122,241 +142,11 @@ async function maybeAutoRotateSession(
   return session;
 }
 
-function estimateMessageTokens(message: any): number {
-  if (!message || typeof message !== "object") return 0;
-
-  const countText = (value: unknown): number => {
-    if (typeof value === "string") return value.length;
-    if (!Array.isArray(value)) return 0;
-    let chars = 0;
-    for (const block of value) {
-      if (!block || typeof block !== "object") continue;
-      if (block.type === "text" && typeof block.text === "string") chars += block.text.length;
-      if (block.type === "thinking" && typeof block.thinking === "string") chars += block.thinking.length;
-      if (block.type === "toolCall") {
-        chars += typeof block.name === "string" ? block.name.length : 0;
-        if (block.arguments !== undefined) chars += JSON.stringify(block.arguments).length;
-      }
-      if (block.type === "image") chars += 4800;
-    }
-    return chars;
-  };
-
-  switch (message.role) {
-    case "assistant":
-    case "custom":
-    case "toolResult":
-      return Math.ceil(countText(message.content) / 4);
-    case "user":
-      return Math.ceil(countText(message.content) / 4);
-    case "bashExecution": {
-      const chars = (typeof message.command === "string" ? message.command.length : 0)
-        + (typeof message.output === "string" ? message.output.length : 0);
-      return Math.ceil(chars / 4);
-    }
-    case "branchSummary":
-    case "compactionSummary":
-      return Math.ceil(((typeof message.summary === "string" ? message.summary.length : 0)) / 4);
-    default:
-      return 0;
-  }
-}
-
-function estimateContextTokensFromSession(session: AgentSession): number {
-  const usage = session.getContextUsage?.();
-  if (typeof usage?.tokens === "number") return usage.tokens;
-
-  const context = session.sessionManager.buildSessionContext();
-  return context.messages.reduce((total: number, message: any) => total + estimateMessageTokens(message), 0);
-}
-
-/** Fallback context window when the model does not report one.
- *  Conservative enough to trigger compaction before most models overflow. */
-const DEFAULT_FALLBACK_CONTEXT_WINDOW = 128_000;
-
-function getModelContextWindow(session: AgentSession): number | null {
-  const model = session.model as (AgentSession["model"] & { contextLength?: number }) | undefined;
-  const contextWindow = typeof model?.contextWindow === "number"
-    ? model.contextWindow
-    : typeof model?.contextLength === "number"
-      ? model.contextLength
-      : null;
-  if (typeof contextWindow !== "number" || !Number.isFinite(contextWindow) || contextWindow <= 0) {
-    return null;
-  }
-  return contextWindow;
-}
-
 function getSessionStateErrorMessage(session: AgentSession): string | null {
   const errorMessage = (session as AgentSession & {
     agent?: { state?: { errorMessage?: unknown } };
   }).agent?.state?.errorMessage;
   return typeof errorMessage === "string" && errorMessage.trim() ? errorMessage.trim() : null;
-}
-
-const DEFAULT_COMPACTION_TIMEOUT_MS = 180_000;
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(String(value || "").trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function getCompactionTimeoutMs(): number {
-  return parsePositiveInt(process.env.PICLAW_COMPACTION_TIMEOUT_MS, DEFAULT_COMPACTION_TIMEOUT_MS);
-}
-
-async function abortCompactionBestEffort(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<RunAgentOrchestratorOptions, "onWarn">,
-): Promise<void> {
-  try {
-    const compactingSession = session as AgentSession & {
-      abortCompaction?: () => void;
-      abort?: () => Promise<void>;
-    };
-    if (typeof compactingSession.abortCompaction === "function" && session.isCompacting) {
-      compactingSession.abortCompaction();
-      return;
-    }
-    if (typeof compactingSession.abort === "function") {
-      await compactingSession.abort();
-    }
-  } catch (error) {
-    options.onWarn?.("Failed to abort stuck compaction", {
-      operation: "run_agent.abort_stuck_compaction",
-      chatJid,
-      err: error,
-    });
-  }
-}
-
-async function runCompactionWithTimeout(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<RunAgentOrchestratorOptions, "onWarn">,
-  runCompact: () => Promise<unknown>,
-): Promise<{ ok: true } | { ok: false; errorMessage: string }> {
-  const timeoutMs = getCompactionTimeoutMs();
-  if (timeoutMs <= 0) {
-    try {
-      await runCompact();
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, errorMessage: error instanceof Error ? error.message : String(error) };
-    }
-  }
-
-  const compactionOutcome = new Promise<{ ok: true } | { ok: false; errorMessage: string }>((resolve) => {
-    void Promise.resolve()
-      .then(() => runCompact())
-      .then(() => resolve({ ok: true }))
-      .catch((error) => resolve({
-        ok: false,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      }));
-  });
-
-  const timedOut = Symbol("compaction-timeout");
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const timeoutOutcome = new Promise<typeof timedOut>((resolve) => {
-    timeoutId = setTimeout(() => resolve(timedOut), timeoutMs);
-  });
-
-  const outcome = await Promise.race([compactionOutcome, timeoutOutcome]);
-  if (timeoutId) clearTimeout(timeoutId);
-  if (outcome !== timedOut) {
-    return outcome;
-  }
-
-  await abortCompactionBestEffort(session, chatJid, options);
-  return {
-    ok: false,
-    errorMessage: `Compaction timed out after ${formatTimeoutDuration(timeoutMs)}`,
-  };
-}
-
-async function maybeAutoCompactSessionBeforePrompt(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<RunAgentOrchestratorOptions, "onInfo" | "onWarn">,
-  onEvent?: (event: AgentSessionEvent) => void,
-): Promise<void> {
-  if (session.isStreaming || session.isCompacting || session.isRetrying) return;
-  const reportedContextWindow = getModelContextWindow(session);
-  const contextWindow = reportedContextWindow ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
-  if (!reportedContextWindow) {
-    options.onWarn?.("Model does not report contextWindow; using fallback for pre-prompt compaction", {
-      operation: "maybe_auto_compact_session_before_prompt.fallback_context_window",
-      chatJid,
-      fallbackContextWindow: DEFAULT_FALLBACK_CONTEXT_WINDOW,
-      modelId: (session.model as any)?.id ?? null,
-      provider: (session.model as any)?.provider ?? null,
-    });
-  }
-
-  const settingsManager = (session as AgentSession & {
-    settingsManager?: { getCompactionSettings?: () => { enabled?: boolean; reserveTokens?: number } };
-  }).settingsManager;
-  const settings = typeof settingsManager?.getCompactionSettings === "function"
-    ? settingsManager.getCompactionSettings()
-    : null;
-  // Piclaw manages compaction at safe pre-prompt boundaries regardless of
-  // upstream auto-compaction being disabled.  Only bail when there is no
-  // settings object at all (no model / no session).
-  if (!settings) return;
-
-  try {
-    const contextTokens = estimateContextTokensFromSession(session);
-    // Inline threshold check — bypasses upstream settings.enabled flag since
-    // piclaw disables upstream auto-compaction and owns the compaction schedule.
-    const reserveTokens = settings.reserveTokens ?? 16384;
-    if (contextTokens <= contextWindow - reserveTokens) return;
-
-    options.onInfo?.("Auto-compacting session before prompt", {
-      operation: "maybe_auto_compact_session_before_prompt",
-      chatJid,
-      contextTokens,
-      contextWindow,
-      reserveTokens: settings.reserveTokens ?? null,
-    });
-
-    // Upstream 0.67.6 removed compaction_start/end events from the manual
-    // compact() path. Emit them locally so the web UI still shows the
-    // "Compacting context" status pill during what can be a 30-60s operation.
-    onEvent?.({ type: "compaction_start", reason: "threshold" } as AgentSessionEvent);
-    const compactionResult = await runCompactionWithTimeout(
-      session,
-      chatJid,
-      options,
-      async () => await session.compact(),
-    );
-    if (!compactionResult.ok) {
-      const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
-      onEvent?.({
-        type: "compaction_end",
-        reason: "threshold",
-        result: undefined,
-        aborted,
-        willRetry: false,
-        errorMessage: aborted ? undefined : `Pre-prompt compaction failed: ${compactionResult.errorMessage}`,
-      } as AgentSessionEvent);
-      throw new Error(compactionResult.errorMessage);
-    }
-    onEvent?.({
-      type: "compaction_end",
-      reason: "threshold",
-      result: undefined,
-      aborted: false,
-      willRetry: false,
-    } as AgentSessionEvent);
-  } catch (error) {
-    options.onWarn?.("Pre-prompt auto-compaction skipped", {
-      operation: "maybe_auto_compact_session_before_prompt",
-      chatJid,
-      error,
-    });
-  }
 }
 
 interface PromptAttemptResult {
@@ -414,6 +204,20 @@ function emitAgentSessionEvent(onEvent: RunAgentOptions["onEvent"], event: Recor
   onEvent?.(event as AgentSessionEvent);
 }
 
+function getRunObservabilityDetails(
+  runOptions: RunAgentOptions,
+  extras: { sessionLeafId?: string | null } = {},
+): Record<string, unknown> {
+  const sessionLeafId = extras.sessionLeafId ?? runOptions.sessionLeafId ?? null;
+  return {
+    ...(runOptions.turnId ? { turnId: runOptions.turnId } : {}),
+    ...(runOptions.userId ? { userId: runOptions.userId } : {}),
+    ...(runOptions.sessionId ? { sessionId: runOptions.sessionId } : {}),
+    ...(runOptions.clientId ? { clientId: runOptions.clientId } : {}),
+    ...(sessionLeafId ? { sessionLeafId } : {}),
+  };
+}
+
 async function runRecoveryCompaction(
   session: AgentSession,
   chatJid: string,
@@ -432,6 +236,7 @@ async function runRecoveryCompaction(
     async () => await session.compact(),
   );
   if (!compactionResult.ok) {
+    noteCompactionFailure(chatJid, compactionResult.errorMessage);
     const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
     emitAgentSessionEvent(runOptions.onEvent, {
       type: "compaction_end",
@@ -443,6 +248,7 @@ async function runRecoveryCompaction(
     });
     return { ok: false, errorMessage: compactionResult.errorMessage };
   }
+  clearCompactionFailureBackoff(chatJid);
   emitAgentSessionEvent(runOptions.onEvent, {
     type: "compaction_end",
     reason: "overflow",
@@ -461,6 +267,7 @@ async function runPromptAttempt(
   runOptions: RunAgentOptions,
   options: RunAgentOrchestratorOptions,
   totalRunStartedAt: number,
+  modelLabel: string | null,
 ): Promise<PromptAttemptResult> {
   let hadToolActivity = false;
   let hadPartialOutput = false;
@@ -472,9 +279,15 @@ async function runPromptAttempt(
   let hadToolFailure = false;
   let failedToolName: string | null = null;
   let assistantToolUseMessageCount = 0;
+  let toolExecutionCount = 0;
   let toolUseBudgetExceeded = false;
+  let modelResponseSequence = 0;
+  let activeModelResponse: { sequence: number; startedAt: number } | null = null;
   const sessionEntryBaseline = snapshotSessionEntryCount(session);
   const toolUseMessageBudget = getToolUseMessageBudget();
+  runOptions.sessionLeafId = typeof session.sessionManager?.getLeafId === "function"
+    ? session.sessionManager.getLeafId() ?? undefined
+    : runOptions.sessionLeafId;
 
   const originalOnTurnComplete = runOptions.onTurnComplete;
   const onTurnComplete = originalOnTurnComplete
@@ -495,7 +308,78 @@ async function runPromptAttempt(
   ].includes(toolName);
   const wrappedOnEvent = (event: AgentSessionEvent) => {
     if (event.type === "message_update") {
+      heartbeatTrackedPhase(chatJid, "streaming", { eventType: event.type });
+    } else if (
+      event.type === "tool_execution_start"
+      || event.type === "tool_execution_update"
+      || event.type === "tool_execution_end"
+    ) {
+      heartbeatTrackedPhase(chatJid, "tool_execution", {
+        eventType: event.type,
+        toolName: (event as { toolName?: unknown }).toolName,
+      });
+    } else if (event.type === "compaction_start" || event.type === "compaction_end") {
+      heartbeatTrackedPhase(chatJid, event.type === "compaction_start" ? "preprompt_compaction" : "prompt", {
+        eventType: event.type,
+      });
+    }
+
+    // Track session activity for cross-session visibility
+    if (event.type === "tool_execution_start") {
+      const e = event as { toolCallId?: string; toolName?: string; args?: unknown };
+      if (e.toolCallId && e.toolName) {
+        trackToolStartActivity(chatJid, e.toolCallId, e.toolName, e.args);
+        options.onInfo?.("Tool execution started", {
+          operation: "tool.call.start",
+          chatJid,
+          toolName: e.toolName,
+          toolCallId: e.toolCallId,
+          ...getRunObservabilityDetails(runOptions),
+        });
+      }
+    }
+    if (event.type === "tool_execution_end") {
+      const e = event as { toolCallId?: string; toolName?: string; isError?: boolean; durationMs?: number };
+      if (e.toolCallId) trackToolEndActivity(chatJid, e.toolCallId);
+      options.onInfo?.("Tool execution ended", {
+        operation: "tool.call.end",
+        chatJid,
+        toolName: e.toolName ?? null,
+        toolCallId: e.toolCallId ?? null,
+        isError: Boolean(e.isError),
+        durationMs: typeof e.durationMs === "number" ? e.durationMs : null,
+        ...getRunObservabilityDetails(runOptions),
+      });
+    }
+
+    if (event.type === "message_start") {
+      const message = (event as { message?: { role?: unknown } }).message;
+      if (message?.role === "assistant" && !activeModelResponse) {
+        modelResponseSequence += 1;
+        activeModelResponse = { sequence: modelResponseSequence, startedAt: Date.now() };
+        options.onInfo?.("Assistant model response started", {
+          operation: "model.response.start",
+          chatJid,
+          model: modelLabel,
+          sequence: modelResponseSequence,
+          ...getRunObservabilityDetails(runOptions),
+        });
+      }
+    }
+    if (event.type === "message_update") {
       const messageEvent = (event as { assistantMessageEvent?: { type?: string; delta?: string } }).assistantMessageEvent;
+      if ((messageEvent?.type === "text_start" || messageEvent?.type === "thinking_start") && !activeModelResponse) {
+        modelResponseSequence += 1;
+        activeModelResponse = { sequence: modelResponseSequence, startedAt: Date.now() };
+        options.onInfo?.("Assistant model response started", {
+          operation: "model.response.start",
+          chatJid,
+          model: modelLabel,
+          sequence: modelResponseSequence,
+          phase: messageEvent.type,
+          ...getRunObservabilityDetails(runOptions),
+        });
+      }
       if (messageEvent?.type === "text_delta" && typeof messageEvent.delta === "string" && messageEvent.delta.length > 0) {
         hadPartialOutput = true;
       }
@@ -506,6 +390,9 @@ async function runPromptAttempt(
       || event.type === "tool_execution_end"
     ) {
       hadToolActivity = true;
+      if (event.type === "tool_execution_end") {
+        toolExecutionCount += 1;
+      }
       const toolName = (event as { toolName?: unknown }).toolName;
       if (!isRetrySafeToolName(toolName)) {
         onlyReadOnlyToolActivity = false;
@@ -517,26 +404,46 @@ async function runPromptAttempt(
           failedToolName = toolName;
         }
       }
-      // If exit_process was called, abort the session immediately so no more
-      // tools execute. The turn output gathered so far will be committed by
-      // finalizeSuccessfulRun, which then calls checkPendingShutdown.
-      if (event.type === "tool_execution_end" && isPendingShutdown()) {
-        void session.abort().catch((err) => {
-          options.onWarn?.("Failed to abort session after exit_process", {
-            operation: "run_agent.pending_shutdown_abort",
-            chatJid,
-            err,
-          });
-        });
-      }
+      // If exit_process was called, do NOT abort immediately — let the LLM
+      // finish its current text response so the agent's reply is captured and
+      // persisted to the DB. The abort happens below in the message_end handler
+      // when the LLM tries to issue further tool calls (stopReason === "toolUse").
     }
     if (event.type === "message_end") {
-      const message = (event as { message?: { role?: unknown; content?: unknown; stopReason?: unknown } }).message;
+      const message = (event as { message?: { role?: unknown; content?: unknown; stopReason?: unknown; errorMessage?: unknown; usage?: Record<string, unknown> } }).message;
+      if (message?.role === "assistant") {
+        const durationMs = activeModelResponse ? Math.max(0, Date.now() - activeModelResponse.startedAt) : null;
+        options.onInfo?.("Assistant model response completed", {
+          operation: "model.response.end",
+          chatJid,
+          model: modelLabel,
+          sequence: activeModelResponse?.sequence ?? null,
+          durationMs,
+          stopReason: typeof message.stopReason === "string" ? message.stopReason : null,
+          errorMessage: typeof message.errorMessage === "string" ? message.errorMessage : null,
+          usage: message.usage ?? null,
+          ...getRunObservabilityDetails(runOptions),
+        });
+        activeModelResponse = null;
+      }
       if (message?.role === "assistant" && Array.isArray(message.content)) {
         const hasToolCall = message.content.some((block) => block && typeof block === "object" && (block as { type?: unknown }).type === "toolCall");
         sawAssistantToolCallMessage = sawAssistantToolCallMessage || hasToolCall;
         if (hasToolCall && message.stopReason === "toolUse") {
           assistantToolUseMessageCount += 1;
+          // If exit_process was called earlier in this turn, abort now before
+          // any further tool calls execute. The LLM's text reply has already
+          // been streamed and captured by onTurnComplete, so the agent's
+          // response will be persisted to the DB by finalizeSuccessfulRun.
+          if (isPendingShutdown()) {
+            void session.abort().catch((err) => {
+              options.onWarn?.("Failed to abort session after exit_process (deferred to message_end)", {
+                operation: "run_agent.pending_shutdown_abort",
+                chatJid,
+                err,
+              });
+            });
+          }
           if (!toolUseBudgetExceeded && assistantToolUseMessageCount > toolUseMessageBudget) {
             toolUseBudgetExceeded = true;
             void session.abort().catch((err) => {
@@ -573,8 +480,10 @@ async function runPromptAttempt(
 
   let promptThrownError: string | null = null;
   try {
+    heartbeatTrackedPhase(chatJid, "prompt", { eventType: "prompt_start" });
     await session.prompt(prompt);
     finishPromptTimeout();
+    heartbeatTrackedPhase(chatJid, "prompt", { eventType: "prompt_resolved" });
     options.onInfo?.("session.prompt() resolved", {
       operation: "run_agent.prompt_resolved",
       chatJid,
@@ -582,6 +491,7 @@ async function runPromptAttempt(
       sessionIsStreaming: Boolean(session.isStreaming),
       sessionIsCompacting: Boolean(session.isCompacting),
       sessionIsRetrying: Boolean(session.isRetrying),
+      ...getRunObservabilityDetails(runOptions),
     });
     const idleMaxWaitMs = resolveSessionIdleMaxWaitMs(session);
     await waitForSessionIdle(session, 10, (result) => {
@@ -604,12 +514,19 @@ async function runPromptAttempt(
   const finalAttachments = options.takeAttachments(chatJid);
   const timedOut = timedOutRef.value;
   const lastAssistantState = tracker.getLastAssistantState();
+  const sawThinkingOnlyStop = Boolean(
+    lastAssistantState?.stopReason === "stop"
+      && lastAssistantState?.hadThinkingContent
+      && !lastAssistantState?.hadTextContent
+      && !lastAssistantState?.hadToolCallContent
+  );
   const latentStateError = !finalText ? getSessionStateErrorMessage(session) : null;
 
   let output: AgentOutput;
   if (timedOut) {
     output = { status: "error", result: null, error: `Timed out after ${formatTimeoutDuration(timeoutMs)}` };
   } else if (toolUseBudgetExceeded && !finalText && finalAttachments.length === 0) {
+    sawCompactionIntent = true;
     output = {
       status: "error",
       result: null,
@@ -648,6 +565,7 @@ async function runPromptAttempt(
             && lastAssistantState?.stopReason === "stop"
             && !lastAssistantState?.hadTextContent;
           detail = [
+            sawThinkingOnlyStop ? "provider stopped after emitting thinking without a final assistant reply" : null,
             providerStoppedAfterToolUse ? "provider stopped after tool use without a final assistant reply" : null,
             hadPartialOutput ? "partial output seen" : null,
             hadToolActivity ? "tool activity seen" : null,
@@ -662,13 +580,14 @@ async function runPromptAttempt(
             hadToolActivity,
             hadCompletedTurnOutput,
             blankTurnDelta,
+            ...getRunObservabilityDetails(runOptions),
           });
         }
         // When the provider stopped cleanly after tool use with no other failure
         // signal, this is a tool-only completion — not an error worth alarming about.
         const isToolOnlyCompletion = hadToolActivity
           && !hadPartialOutput
-          && !blankTurnDelta
+          && !isBlankTurnSessionDelta(blankTurnDelta)
           && detail.includes("provider stopped after tool use");
         output = isToolOnlyCompletion
           ? {
@@ -711,7 +630,11 @@ async function runPromptAttempt(
       compactionErrorMessage,
       sawCompactionIntent,
       sawAssistantToolCall: sawAssistantToolCallMessage,
+      sawThinkingOnlyStop,
       onlyReadOnlyToolActivity,
+      toolUseBudgetExceeded,
+      assistantToolUseMessageCount,
+      toolExecutionCount,
     },
   };
 }
@@ -725,6 +648,8 @@ export async function runAgentPrompt(
 ): Promise<AgentOutput> {
   const startTime = Date.now();
   options.clearAttachments(chatJid);
+  updateSessionStreaming(chatJid, true);
+  let modelLabel: string | null = null;
 
   // Tool-cap and tool-ceiling state – declared outside try so cleanup
   // can run in finally regardless of how the try exits.
@@ -742,16 +667,35 @@ export async function runAgentPrompt(
     const runtime = await options.getOrCreateRuntime(chatJid);
     let session = runtime.session;
     session = await maybeAutoRotateSession(session, runtime, chatJid, options);
-    await maybeAutoCompactSessionBeforePrompt(session, chatJid, options, runOptions.onEvent);
+    modelLabel = session.model ? `${session.model.provider}/${session.model.id}` : null;
+    updateSessionModel(chatJid, modelLabel, session.thinkingLevel ?? null);
+    beginTrackedPhase(chatJid, runOptions.skipPrePromptCompaction ? "prompt" : "preprompt_compaction", {
+      source: "run_agent",
+    });
+    if (!runOptions.skipPrePromptCompaction) {
+      await maybeAutoCompactSessionBeforePrompt(session, chatJid, options, (event) => {
+        if (event.type === "compaction_start") {
+          heartbeatTrackedPhase(chatJid, "preprompt_compaction", { eventType: event.type });
+        } else if (event.type === "compaction_end") {
+          heartbeatTrackedPhase(chatJid, "prompt", { eventType: event.type });
+        }
+        runOptions.onEvent?.(event);
+      });
+    } else {
+      heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preprompt_compaction_skipped" });
+    }
     pruneOrphanToolResults(session, chatJid);
     const forkBaseLeafId = typeof session.sessionManager?.getLeafId === "function"
       ? session.sessionManager.getLeafId()
       : null;
     options.setActiveForkBaseLeaf(chatJid, forkBaseLeafId ?? null);
+    runOptions.sessionLeafId = forkBaseLeafId ?? undefined;
     options.onInfo?.("Prompting session", {
       operation: "run_agent.prompt",
       chatJid,
+      model: modelLabel,
       promptLength: prompt.length,
+      ...getRunObservabilityDetails(runOptions),
     });
 
     const timeoutMs = typeof runOptions.timeoutMs === "number" ? runOptions.timeoutMs : getAgentRuntimeConfig().timeoutMs;
@@ -827,6 +771,7 @@ export async function runAgentPrompt(
           runOptions,
           options,
           startTime,
+          modelLabel,
         );
 
         // If the tool-call cap was hit, abort immediately without recovery.
@@ -846,10 +791,12 @@ export async function runAgentPrompt(
           options.onInfo?.("Agent run completed", {
             operation: "run_agent.complete",
             chatJid,
+            model: modelLabel,
             durationMs: duration,
             outputChars: finalText?.length ?? 0,
             recoveryAttemptsUsed,
             recovered: recoveryAttemptsUsed > 0,
+            ...getRunObservabilityDetails(runOptions),
           });
           if (recoveryAttemptsUsed > 0) {
             emitAgentSessionEvent(runOptions.onEvent, {
@@ -889,6 +836,7 @@ export async function runAgentPrompt(
           recoveryAttemptsUsed,
           recoveryStrategy: decision.strategy,
           reason: decision.reason,
+          ...getRunObservabilityDetails(runOptions),
         });
 
         recoveryDiagnostics.push(buildRecoveryDiagnosticEntry(
@@ -938,6 +886,10 @@ export async function runAgentPrompt(
         const retryDelayMs = decision.strategy === "retry"
           ? getAutomaticRecoveryDelayMs(recoveryConfig, recoveryAttemptsUsed)
           : 0;
+        heartbeatTrackedPhase(chatJid, "recovery", {
+          eventType: "recovery_start",
+          attempt: recoveryAttemptsUsed,
+        });
         emitAgentSessionEvent(runOptions.onEvent, {
           type: "recovery_start",
           classifier: decision.classifier,
@@ -953,11 +905,19 @@ export async function runAgentPrompt(
         });
 
         if (retryDelayMs > 0) {
+          heartbeatTrackedPhase(chatJid, "recovery", {
+            eventType: "recovery_delay",
+            delayMs: retryDelayMs,
+          });
           await sleep(retryDelayMs);
         }
 
         if (decision.strategy === "compact_then_retry") {
           const compactionResult = await runRecoveryCompaction(session, chatJid, runOptions, options);
+          heartbeatTrackedPhase(chatJid, "preprompt_compaction", {
+            eventType: "recovery_compaction",
+            attempt: recoveryAttemptsUsed,
+          });
           if (!compactionResult.ok) {
             const compactDecision = decideAutomaticRecovery({
               config: recoveryConfig,
@@ -970,6 +930,9 @@ export async function runAgentPrompt(
                 hadCompletedTurnOutput: attempt.snapshot.hadCompletedTurnOutput,
                 compactionErrorMessage: compactionResult.errorMessage,
                 sawCompactionIntent: true,
+                toolUseBudgetExceeded: attempt.snapshot.toolUseBudgetExceeded,
+                assistantToolUseMessageCount: attempt.snapshot.assistantToolUseMessageCount,
+                toolExecutionCount: attempt.snapshot.toolExecutionCount,
               },
             });
             lastClassifier = compactDecision.classifier;
@@ -988,6 +951,9 @@ export async function runAgentPrompt(
                   hadCompletedTurnOutput: attempt.snapshot.hadCompletedTurnOutput,
                   compactionErrorMessage: compactionResult.errorMessage,
                   sawCompactionIntent: true,
+                  toolUseBudgetExceeded: attempt.snapshot.toolUseBudgetExceeded,
+                  assistantToolUseMessageCount: attempt.snapshot.assistantToolUseMessageCount,
+                  toolExecutionCount: attempt.snapshot.toolExecutionCount,
                 },
               ));
               const duration = Date.now() - startTime;
@@ -1026,6 +992,10 @@ export async function runAgentPrompt(
           }
         }
 
+        heartbeatTrackedPhase(chatJid, "prompt", {
+          eventType: "recovery_retry_ready",
+          attempt: recoveryAttemptsUsed,
+        });
         options.clearAttachments(chatJid);
       }
     });
@@ -1037,12 +1007,15 @@ export async function runAgentPrompt(
     options.onError?.("Agent run failed", {
       operation: "run_agent",
       chatJid,
+      model: modelLabel,
       durationMs: duration,
       errorMessage: errorMsg,
       err,
     });
     return { status: "error", result: null, error: errorMsg };
   } finally {
+    endTrackedPhase(chatJid);
+    updateSessionStreaming(chatJid, false);
     toolCallUnsub?.();
     if (sessionCtrl && savedToolNames !== null && originalSetActiveToolsByName) {
       sessionCtrl.setActiveToolsByName = originalSetActiveToolsByName;

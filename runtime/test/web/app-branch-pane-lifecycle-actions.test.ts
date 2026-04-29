@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import {
   applyStoredPaneLayoutAction,
   handleBranchPickerChangeAction,
+  renameCurrentBranchAction,
   runBranchLoaderModeEffect,
   toggleWorkspaceVisibility,
   watchPaneOpenEventBridge,
@@ -37,6 +38,46 @@ test('handleBranchPickerChangeAction delegates branch navigation with chat-only 
 
   expect(calls).toHaveLength(1);
   expect(calls[0]).toContain('chat_jid=web%3Achild');
+});
+
+test('renameCurrentBranchAction falls back to window.location.href when baseHref is blank', async () => {
+  const originalWindow = (globalThis as any).window;
+  (globalThis as any).window = { location: { href: 'https://example.test/?chat_jid=web%3Abranch' } };
+
+  const navigateCalls: string[] = [];
+  const toasts: Array<[string, string, string, number]> = [];
+  const renameBranchInFlightRef = { current: false };
+  const renameBranchLockUntilRef = { current: 0 };
+  const formLock = { inFlight: false, cooldownUntil: 0 };
+
+  try {
+    await renameCurrentBranchAction({
+      hasWindow: true,
+      currentBranchRecord: { chat_jid: 'web:branch', agent_name: 'feature' } as any,
+      nextName: 'next',
+      openRenameForm: () => undefined,
+      renameBranchInFlightRef: renameBranchInFlightRef as any,
+      renameBranchLockUntilRef: renameBranchLockUntilRef as any,
+      getFormLock: () => formLock as any,
+      setIsRenamingBranch: () => undefined,
+      renameChatBranch: async () => ({ branch: { chat_jid: 'web:next', agent_name: 'next' } }),
+      refreshActiveChatAgents: () => undefined,
+      refreshCurrentChatBranches: () => undefined,
+      navigate: (url) => navigateCalls.push(String(url)),
+      baseHref: '',
+      chatOnlyMode: true,
+      showIntentToast: (title, detail, kind, durationMs) => {
+        toasts.push([title, String(detail || ''), String(kind || ''), Number(durationMs || 0)]);
+      },
+      closeRenameForm: () => undefined,
+    });
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
+
+  expect(navigateCalls).toHaveLength(1);
+  expect(navigateCalls[0]).toBe('https://example.test/?chat_jid=web%3Anext&chat_only=1');
+  expect(toasts).toContainEqual(['Branch renamed', '@next', 'info', 3500]);
 });
 
 test('runBranchLoaderModeEffect launches loader and cancellation flag flips on cleanup', () => {

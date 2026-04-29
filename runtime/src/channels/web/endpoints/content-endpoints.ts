@@ -64,10 +64,11 @@ export function handleSearchRequest(
   chatJid: string | undefined,
   searchScope: "current" | "root" | "all" | undefined,
   rootChatJid: string | undefined,
-  ctx: ContentEndpointsContext
+  ctx: ContentEndpointsContext,
+  filters?: { images?: boolean; attachments?: boolean } | null,
 ): Response {
   const normalizedScope = searchScope === "root" || searchScope === "all" ? searchScope : "current";
-  const { result, durationMs } = measureSync(() => getSearchResponse(chatJid || ctx.defaultChatJid, query, limit, offset, normalizedScope, rootChatJid || null));
+  const { result, durationMs } = measureSync(() => getSearchResponse(chatJid || ctx.defaultChatJid, query, limit, offset, normalizedScope, rootChatJid || null, filters));
   return appendServerTiming(ctx.json(result.body, result.status), {
     name: "search",
     durationMs,

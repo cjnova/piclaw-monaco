@@ -290,7 +290,7 @@ export interface PermanentDeleteArchivedBranchResult {
   };
 }
 
-function requireArchivedNonRootBranch(chatJid: string): ChatBranchRecord {
+function requireArchivedPurgeTarget(chatJid: string): ChatBranchRecord {
   const normalizedChatJid = String(chatJid || "").trim();
   if (!normalizedChatJid) throw new Error("chat_jid is required");
 
@@ -300,7 +300,17 @@ function requireArchivedNonRootBranch(chatJid: string): ChatBranchRecord {
     throw new Error(`Cannot permanently delete a branch that is not archived: ${normalizedChatJid}`);
   }
   if (branch.chat_jid === branch.root_chat_jid) {
-    throw new Error(`Cannot permanently delete a root chat session: ${normalizedChatJid}`);
+    const childCount = countRows(
+      `SELECT COUNT(*) AS count
+         FROM chat_branches
+        WHERE root_chat_jid = ?
+          AND chat_jid != ?`,
+      branch.chat_jid,
+      branch.chat_jid,
+    );
+    if (childCount > 0) {
+      throw new Error(`Cannot permanently delete an archived root chat session while child branch sessions still exist: ${normalizedChatJid}`);
+    }
   }
 
   return branch;
@@ -336,7 +346,7 @@ function countRows(sql: string, ...params: Array<string | number>): number {
 }
 
 export function previewPermanentDeleteArchivedBranch(chatJid: string): ArchivedBranchPurgePreview {
-  const branch = requireArchivedNonRootBranch(chatJid);
+  const branch = requireArchivedPurgeTarget(chatJid);
   const taskIds = getArchivedBranchTaskIds(branch.chat_jid);
   const mediaIds = getArchivedBranchMediaIds(branch.chat_jid);
   const taskPlaceholders = taskIds.map(() => "?").join(",");

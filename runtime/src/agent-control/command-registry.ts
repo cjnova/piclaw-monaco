@@ -19,7 +19,7 @@ export interface ControlCommandDefinition {
 
 /** Metadata for all control commands: name, description, aliases. */
 export const CONTROL_COMMAND_DEFINITIONS: ControlCommandDefinition[] = [
-  { name: "/model", description: "Select model or list available models (alias /models)", aliases: ["/models"] },
+  { name: "/model", description: "Select model or list available models" },
   { name: "/cycle-model", description: "Cycle to the next available model" },
   { name: "/thinking", description: "Show or set thinking/effort level (alias /effort)", aliases: ["/effort"] },
   { name: "/cycle-thinking", description: "Cycle thinking level" },
@@ -33,7 +33,7 @@ export const CONTROL_COMMAND_DEFINITIONS: ControlCommandDefinition[] = [
   { name: "/abort", description: "Abort the current response" },
   { name: "/abort-retry", description: "Abort retry backoff" },
   { name: "/abort-bash", description: "Abort running bash command" },
-  { name: "/shell", description: "Run a shell command and return output" },
+  { name: "/shell", description: "Run a shell command and return output", aliases: ["!"] },
   { name: "/bash", description: "Run a shell command and add output to context" },
   { name: "/queue", description: "Queue a follow-up message (one-at-a-time)" },
   { name: "/queue-all", description: "Queue a follow-up message (batch all)" },

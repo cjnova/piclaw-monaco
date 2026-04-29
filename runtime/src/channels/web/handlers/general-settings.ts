@@ -3,20 +3,30 @@
  */
 
 import {
+  getSessionIsolationLevel,
+  setSessionIsolationLevel,
+  type SessionIsolationLevel,
+} from "../../../extensions/session-status.js";
+import {
   getIdentityConfig,
   getSessionStorageConfig,
   getToolUseMessageBudget,
   getWebRuntimeConfig,
+  getSearchMatchMode,
+  getUiThemeConfig,
   setAssistantAvatar,
   setAssistantName,
   setSessionStorageConfig,
   setToolUseMessageBudget,
+  setSearchMatchMode,
+  setUiThemeConfig,
   setUserAvatar,
   setUserAvatarBackground,
   setUserName,
   setWebComposeUploadLimitMb,
   setWebTerminalEnabled,
   setWebWorkspaceUploadLimitMb,
+  type SearchMatchMode,
 } from "../../../core/config.js";
 import { updateAssistantConfig, updateUserConfig } from "../../../agent-control/agent-control-helpers.js";
 import { generateTotpQr } from "../../../utils/totp-qr.js";
@@ -41,6 +51,10 @@ export interface GeneralSettingsData {
     otpauth: string;
     qrSvg: string;
   };
+  sessionIsolation: "none" | "summary" | "full";
+  searchMatchMode: "or" | "and";
+  uiTheme: string;
+  uiTint: string | null;
 }
 
 export interface GeneralSettingsInput {
@@ -54,6 +68,10 @@ export interface GeneralSettingsInput {
   composeUploadLimitMb?: unknown;
   workspaceUploadLimitMb?: unknown;
   toolUseBudget?: unknown;
+  sessionIsolation?: unknown;
+  searchMatchMode?: unknown;
+  uiTheme?: unknown;
+  uiTint?: unknown;
 }
 
 function normalizeOptionalString(value: unknown): string | null | undefined {
@@ -119,6 +137,10 @@ export function getGeneralSettingsData(): GeneralSettingsData {
     workspaceUploadLimitMb: web.workspaceUploadLimitMb,
     toolUseBudget: getToolUseMessageBudget(),
     instanceTotp: buildTotpSettingsData(),
+    sessionIsolation: getSessionIsolationLevel(),
+    searchMatchMode: getSearchMatchMode(),
+    uiTheme: getUiThemeConfig().theme,
+    uiTint: getUiThemeConfig().tint,
   };
 }
 
@@ -176,7 +198,7 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
     setWebComposeUploadLimitMb(nextComposeUploadLimitMb);
   }
 
-  const nextWorkspaceUploadLimitMb = normalizeOptionalInt(input.workspaceUploadLimitMb, 1, 512);
+  const nextWorkspaceUploadLimitMb = normalizeOptionalInt(input.workspaceUploadLimitMb, 1, 1024);
   if (nextWorkspaceUploadLimitMb !== undefined) {
     setWebWorkspaceUploadLimitMb(nextWorkspaceUploadLimitMb);
   }
@@ -184,6 +206,29 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
   const nextToolUseBudget = normalizeOptionalInt(input.toolUseBudget, 8, 512);
   if (nextToolUseBudget !== undefined) {
     setToolUseMessageBudget(nextToolUseBudget);
+  }
+
+  const nextSessionIsolation = typeof input.sessionIsolation === "string" ? input.sessionIsolation.trim().toLowerCase() : undefined;
+  if (nextSessionIsolation === "none" || nextSessionIsolation === "summary" || nextSessionIsolation === "full") {
+    setSessionIsolationLevel(nextSessionIsolation as SessionIsolationLevel);
+  }
+
+  const nextSearchMatchMode = typeof input.searchMatchMode === "string" ? input.searchMatchMode.trim().toLowerCase() : undefined;
+  if (nextSearchMatchMode === "or" || nextSearchMatchMode === "and") {
+    setSearchMatchMode(nextSearchMatchMode as SearchMatchMode);
+  }
+
+  const nextUiTheme = typeof input.uiTheme === "string" ? input.uiTheme.trim().toLowerCase() : undefined;
+  const nextUiTint = input.uiTint === undefined
+    ? undefined
+    : (typeof input.uiTint === "string" && input.uiTint.trim())
+      ? input.uiTint.trim()
+      : null;
+  if (nextUiTheme !== undefined || nextUiTint !== undefined) {
+    setUiThemeConfig({
+      ...(nextUiTheme !== undefined ? { theme: nextUiTheme || "default" } : {}),
+      ...(nextUiTint !== undefined ? { tint: nextUiTint } : {}),
+    });
   }
 
   return getGeneralSettingsData();

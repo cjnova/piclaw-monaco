@@ -37,9 +37,11 @@ import { SESSIONS_DIR, WORKSPACE_DIR } from "../core/config.js";
 import { buildChannelSystemPromptAppendix } from "../channels/formatting.js";
 import { detectChannel } from "../router.js";
 import { builtinExtensionFactories } from "../extensions/index.js";
+import { freezeExtensionRoutes } from "../channels/web/http/extension-routes.js";
 import { bindImmediateToolActivation } from "./tool-activation-live-update.js";
 import { ensureExtensionNodeModulesLink } from "./session-node-modules-link.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
+import { installAddonRuntimeApi } from "../addons/runtime-contributions.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const AGENT_DIR = getAgentDir();
@@ -60,6 +62,7 @@ const SESSION_TOOL_RESULT_PREVIEW_CHARS = parsePositiveInt(
 const CHANNEL_SYSTEM_PROMPT_APPENDIX_CACHE = new Map<string, string>();
 const APPEND_SYSTEM_PROMPT_OVERRIDE_CACHE = new Map<string, (base: string[]) => string[]>();
 let cachedExtensionNodeModulesDir: string | null | undefined;
+installAddonRuntimeApi();
 let ensuredExtensionNodeModulesLinkTarget: string | null | undefined;
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -535,6 +538,7 @@ export async function createSessionInDir(
       ...(appendSystemPromptOverride ? { appendSystemPromptOverride } : {}),
     });
     await resourceLoader.reload();
+    freezeExtensionRoutes();
 
     const services: AgentSessionServices = {
       cwd,

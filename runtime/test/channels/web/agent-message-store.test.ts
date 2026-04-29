@@ -1,6 +1,22 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, test } from "bun:test";
 
 import { storeAgentTurn } from "../../../src/channels/web/messaging/agent-message-store.js";
+import { addLogSink, removeLogSink, type LogRecord } from "../../../src/utils/logger.js";
+
+const sinkRecords: LogRecord[] = [];
+const sink = (record: LogRecord) => {
+  sinkRecords.push(record);
+};
+
+addLogSink(sink);
+
+afterEach(() => {
+  sinkRecords.length = 0;
+});
+
+afterAll(() => {
+  removeLogSink(sink);
+});
 
 describe("agent message store", () => {
   test("dispatches Web Push for terminal persisted replies", async () => {
@@ -75,5 +91,28 @@ describe("agent message store", () => {
     expect(ok).toBe(true);
     await Promise.resolve();
     expect(pushCalls).toEqual([]);
+  });
+
+  test("warns when a plain web reply contains SVG source markup without an attachment or widget", () => {
+    const ok = storeAgentTurn({
+      consumeQueuedFollowupPlaceholder: () => null,
+      replaceQueuedFollowupPlaceholder: () => null,
+      broadcastEvent: () => {},
+      storeMessage: () => ({ id: 103, chat_jid: "web:default", timestamp: "2026-04-29T10:00:00.000Z", data: {} }),
+    } as any, {
+      response: () => {},
+    } as any, {
+      chatJid: "web:default",
+      text: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" /></svg>',
+      attachments: [],
+      channelName: "web" as any,
+      isTerminalAgentReply: true,
+    });
+
+    expect(ok).toBe(true);
+    const warning = sinkRecords.find((record) => record.operation === "web.agent_message_store.svg_source_guardrail");
+    expect(warning).toBeTruthy();
+    expect(warning?.level).toBe("warn");
+    expect(String(warning?.textPreview || "")).toContain("<svg");
   });
 });

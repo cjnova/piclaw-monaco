@@ -417,7 +417,8 @@ export function installWebChannelPrototype(
         chatJid?: string,
         searchScope?: "current" | "root" | "all",
         rootChatJid?: string,
-      ) => service.handleSearch(query, limit, offset, chatJid, searchScope, rootChatJid)),
+        filters?: { images?: boolean; attachments?: boolean } | null,
+      ) => service.handleSearch(query, limit, offset, chatJid, searchScope, rootChatJid, filters)),
     },
     handleThread: {
       configurable: true,

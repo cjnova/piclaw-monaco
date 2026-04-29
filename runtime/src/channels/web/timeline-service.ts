@@ -11,6 +11,7 @@ import {
   deleteMessageByRowId,
   deleteThreadByRowId,
   getChatBranchByChatJid,
+  getDb,
   getMessageByRowId,
   getMessagesByHashtag,
   getTimeline,
@@ -111,6 +112,8 @@ function resolveSearchRootChatJid(chatJid: string, requestedRootChatJid?: string
   return registryRoot || requestedRoot || chatJid;
 }
 
+export type SearchFilter = "images" | "attachments" | null;
+
 /** Build timeline data filtered by search query. */
 export function getSearchResponse(
   chatJid: string,
@@ -119,6 +122,7 @@ export function getSearchResponse(
   offset: number,
   scope: SearchScope = "current",
   rootChatJid?: string | null,
+  filters?: { images?: boolean; attachments?: boolean } | null,
 ): { status: number; body: unknown } {
   if (!query) return { status: 400, body: { error: "Missing 'q' parameter" } };
 
@@ -135,6 +139,24 @@ export function getSearchResponse(
     results = searchMessagesAcrossChats(scopedChatJids, query, limit, offset);
   } else {
     results = searchMessages(chatJid, query, limit, offset);
+  }
+
+  // Post-filter by media presence if requested
+  if (filters?.images || filters?.attachments) {
+    const db = getDb();
+    results = results.filter((row) => {
+      const mediaIds = Array.isArray(row.data?.media_ids) ? row.data.media_ids : [];
+      if (mediaIds.length === 0) return false;
+      if (filters.attachments && !filters.images) return true;
+      if (filters.images) {
+        const placeholders = mediaIds.map(() => "?").join(",");
+        const imageCount = db
+          .prepare(`SELECT COUNT(*) as cnt FROM media WHERE id IN (${placeholders}) AND content_type LIKE 'image/%'`)
+          .get(...mediaIds) as { cnt: number } | undefined;
+        return (imageCount?.cnt ?? 0) > 0;
+      }
+      return true;
+    });
   }
 
   return {

@@ -40,7 +40,10 @@ export async function handleContentPrimaryRoutes(
     const chatJid = url.searchParams.get("chat_jid")?.trim() || undefined;
     const searchScope = url.searchParams.get("scope")?.trim() as "current" | "root" | "all" | undefined;
     const rootChatJid = url.searchParams.get("root_chat_jid")?.trim() || undefined;
-    return channel.handleSearch(query, limit, offset, chatJid, searchScope, rootChatJid);
+    const filterImages = url.searchParams.get("images") === "1" || url.searchParams.get("images") === "true";
+    const filterAttachments = url.searchParams.get("attachments") === "1" || url.searchParams.get("attachments") === "true";
+    const filters = (filterImages || filterAttachments) ? { images: filterImages, attachments: filterAttachments } : null;
+    return channel.handleSearch(query, limit, offset, chatJid, searchScope, rootChatJid, filters);
   }
 
   if (req.method === "POST" && pathname === "/post") {

@@ -23,10 +23,10 @@ describe("built-in extension hook determinism", () => {
       "workspaceMemoryBootstrap",
       "sendAdaptiveCard",
       "sendDashboardWidget",
+      "chatTool",
       "openWorkspaceFile",
       "envTools",
       "exitProcess",
-      "autoresearchSupervisor",
       "imageProcessing",
     ]);
     expect(audit.context_hook_order).toEqual(["fileAttachments"]);

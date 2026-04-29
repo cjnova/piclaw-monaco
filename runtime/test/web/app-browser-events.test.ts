@@ -1,8 +1,11 @@
 import { expect, test } from 'bun:test';
 
 import {
+  watchChatSwitchShortcuts,
   watchDockToggleShortcut,
+  watchKeyboardHelpShortcut,
   watchPaneOpenEvents,
+  watchSettingsShortcut,
   watchZenModeShortcuts,
 } from '../../web/src/ui/app-browser-events.js';
 
@@ -104,4 +107,95 @@ test('watchZenModeShortcuts toggles on Ctrl+Shift+Z and exits on Escape when act
 
   dispose();
   expect(doc.count('keydown')).toBe(0);
+});
+
+test('watchChatSwitchShortcuts uses bare [ and ] outside editable targets', () => {
+  const doc = createEventTarget();
+  const events: string[] = [];
+  const dispose = watchChatSwitchShortcuts({
+    previousChat: () => events.push('prev'),
+    nextChat: () => events.push('next'),
+  }, { document: doc as any });
+
+  const prevEvent = doc.dispatch('keydown', { key: '[' });
+  const nextEvent = doc.dispatch('keydown', { key: ']' });
+  const editableEvent = doc.dispatch('keydown', {
+    key: '[',
+    target: { closest: (selector: string) => selector.includes('textarea') ? ({} as Element) : null },
+  });
+
+  expect(prevEvent.prevented).toBe(true);
+  expect(nextEvent.prevented).toBe(true);
+  expect(editableEvent.prevented).toBeUndefined();
+  expect(events).toEqual(['prev', 'next']);
+
+  dispose();
+  expect(doc.count('keydown')).toBe(0);
+});
+
+test('watchSettingsShortcut accepts default bindings and ignores editable targets', () => {
+  const doc = createEventTarget();
+  const events: Array<{ type: string; detail?: any }> = [];
+  const originalWindow = (globalThis as any).window;
+  const customWindow = {
+    dispatchEvent(event: { type?: string; detail?: any }) {
+      events.push({ type: String(event?.type || ''), detail: event?.detail });
+      return true;
+    },
+  } as any;
+  (globalThis as any).window = customWindow;
+
+  const dispose = watchSettingsShortcut({ document: doc as any });
+
+  const primaryEvent = doc.dispatch('keydown', { ctrlKey: true, key: ',' });
+  const altEvent = doc.dispatch('keydown', { altKey: true, key: ',' });
+  const editableEvent = doc.dispatch('keydown', {
+    altKey: true,
+    key: ',',
+    target: { closest: (selector: string) => selector.includes('input') ? ({} as Element) : null },
+  });
+
+  expect(primaryEvent.prevented).toBe(true);
+  expect(altEvent.prevented).toBe(true);
+  expect(editableEvent.prevented).toBeUndefined();
+  expect(events.map((entry) => entry.type)).toEqual(['piclaw:open-settings', 'piclaw:open-settings']);
+
+  dispose();
+  expect(doc.count('keydown')).toBe(0);
+  (globalThis as any).window = originalWindow;
+});
+
+test('watchKeyboardHelpShortcut opens the keyboard section on quote and question mark outside editable targets', () => {
+  const doc = createEventTarget();
+  const events: Array<{ type: string; detail?: any }> = [];
+  const originalWindow = (globalThis as any).window;
+  const customWindow = {
+    dispatchEvent(event: { type?: string; detail?: any }) {
+      events.push({ type: String(event?.type || ''), detail: event?.detail });
+      return true;
+    },
+  } as any;
+  (globalThis as any).window = customWindow;
+
+  const dispose = watchKeyboardHelpShortcut({ document: doc as any });
+
+  const acceptedQuote = doc.dispatch('keydown', { shiftKey: true, key: '"' });
+  const acceptedQuestion = doc.dispatch('keydown', { shiftKey: true, key: '?' });
+  const editable = doc.dispatch('keydown', {
+    shiftKey: true,
+    key: '?',
+    target: { closest: (selector: string) => selector.includes('textarea') ? ({} as Element) : null },
+  });
+
+  expect(acceptedQuote.prevented).toBe(true);
+  expect(acceptedQuestion.prevented).toBe(true);
+  expect(editable.prevented).toBeUndefined();
+  expect(events).toEqual([
+    { type: 'piclaw:open-settings', detail: { section: 'keyboard' } },
+    { type: 'piclaw:open-settings', detail: { section: 'keyboard' } },
+  ]);
+
+  dispose();
+  expect(doc.count('keydown')).toBe(0);
+  (globalThis as any).window = originalWindow;
 });

@@ -137,6 +137,22 @@ describe("parseControlCommand", () => {
     expect(cmd).toEqual({ type: "shell", command: undefined, raw: "/shell" });
   });
 
+  test("! aliases /shell when used as the first character of a submission", () => {
+    const cmd = parseControlCommand("!ls -la");
+    expect(cmd).toEqual({ type: "shell", command: "ls -la", raw: "!ls -la" });
+  });
+
+  test("! also aliases /shell when followed by whitespace", () => {
+    const cmd = parseControlCommand("! pwd");
+    expect(cmd).toEqual({ type: "shell", command: "pwd", raw: "! pwd" });
+  });
+
+  test("! alias works after stripping a trigger prefix", () => {
+    const trigger = /(?:^|\s)@PiClaw\b/i;
+    const cmd = parseControlCommand("@PiClaw !echo hi", trigger);
+    expect(cmd).toEqual({ type: "shell", command: "echo hi", raw: "!echo hi" });
+  });
+
   test("/shell strips appended Files footer from the raw command body", () => {
     const raw = `/shell ls
 

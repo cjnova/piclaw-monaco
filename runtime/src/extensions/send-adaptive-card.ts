@@ -1,7 +1,7 @@
 /**
  * send-adaptive-card – dedicated internal tool for posting web Adaptive Cards as agent messages.
  */
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { getChatJid } from "../core/chat-context.js";
 import { postMessagesToolMessage } from "./messages-crud.js";
@@ -119,6 +119,7 @@ export const sendAdaptiveCard: ExtensionFactory = (pi: ExtensionAPI) => {
 
       return {
         ...result,
+        terminate: true,
         details: {
           ...(isRecord(result.details) ? result.details : {}),
           tool: "send_adaptive_card",

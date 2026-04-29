@@ -12,10 +12,16 @@ import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import type { AgentControlCommand, AgentControlResult } from "../agent-control-types.js";
 import { formatCompactNumber } from "../agent-control-helpers.js";
 import { createMedia } from "../../db.js";
+import { getChatJid } from "../../core/chat-context.js";
 import { requestGracefulShutdown } from "../../runtime/shutdown-registry.js";
 import { createLogger, debugSuppressedError } from "../../utils/logger.js";
 import { killTrackedProcesses } from "../../utils/process-tracker.js";
 import { pruneOrphanToolResults } from "../../agent-pool/orphan-tool-results.js";
+import {
+  clearCompactionFailureBackoff,
+  noteCompactionFailure,
+  runCompactionWithTimeout,
+} from "../../agent-pool/compaction.js";
 
 const log = createLogger("agent-control.control");
 
@@ -148,20 +154,42 @@ export async function handleExit(session: AgentSession, _command: ExitCommand): 
 /** Handle /compact: manually trigger conversation compaction. */
 export async function handleCompact(session: AgentSession, command: CompactCommand): Promise<AgentControlResult> {
   try {
-    const prunedToolResults = pruneOrphanToolResults(session, "control:/compact");
-    const result = await session.compact(command.instructions?.trim() || undefined);
+    const chatJid = getChatJid("control:/compact");
+    const prunedToolResults = pruneOrphanToolResults(session, chatJid);
+    const compactionResult = await runCompactionWithTimeout(
+      session,
+      chatJid,
+      {
+        onWarn: (message, details) => {
+          log.warn(message, details);
+        },
+      },
+      async () => await session.compact(command.instructions?.trim() || undefined),
+    );
+    if (!compactionResult.ok) {
+      noteCompactionFailure(chatJid, compactionResult.errorMessage);
+      const timedOut = /timed out/i.test(compactionResult.errorMessage);
+      return {
+        status: "error",
+        message: timedOut
+          ? `${compactionResult.errorMessage}. Compaction was aborted and the session was not rewritten.`
+          : formatCompactFailureMessage(compactionResult.errorMessage),
+      };
+    }
+
+    clearCompactionFailureBackoff(chatJid);
     const generatedAt = new Date().toISOString();
     const attachmentId = createCompactReportAttachment(
-      result.summary,
-      result.tokensBefore,
-      result.firstKeptEntryId,
+      compactionResult.result.summary,
+      compactionResult.result.tokensBefore,
+      compactionResult.result.firstKeptEntryId,
       generatedAt
     );
     const lines = [
       "Compaction complete.",
       prunedToolResults > 0 ? `Removed ${prunedToolResults} orphaned tool-result block${prunedToolResults === 1 ? "" : "s"} before rewriting the session.` : null,
-      `Tokens before: ${formatCompactNumber(result.tokensBefore)}`,
-      `First kept entry: ${result.firstKeptEntryId}`,
+      `Tokens before: ${formatCompactNumber(compactionResult.result.tokensBefore)}`,
+      `First kept entry: ${compactionResult.result.firstKeptEntryId}`,
       attachmentId ? "Attached: full compaction report (.md)." : "Full compaction report attachment unavailable.",
     ].filter(Boolean) as string[];
     return {

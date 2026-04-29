@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { Agent } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry, SettingsManager, getAgentDir, type ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { fauxAssistantMessage, fauxToolCall, registerFauxProvider } from "@mariozechner/pi-ai";

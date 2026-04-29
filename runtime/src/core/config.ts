@@ -94,6 +94,8 @@ const envConfig = readEnvFile([
   "PICLAW_SESSION_MAX_SIZE_MB",
   "PICLAW_SESSION_AUTO_ROTATE",
   "PICLAW_TURN_MAX_TOOL_USE_MESSAGES",
+  "PICLAW_PROGRESS_WATCHDOG_ENABLED",
+  "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
   "PICLAW_WORKSPACE_SEARCH_ROOTS",
   "PICLAW_INTERNAL_SECRET",
   "PICLAW_REMOTE_INTEROP_ENABLED",
@@ -135,7 +137,11 @@ export function getRuntimeTimingConfig(): Readonly<RuntimeTimingConfig> {
 // ---------------------------------------------------------------------------
 
 /** Root of the persistent workspace (bind-mounted volume). */
-export const WORKSPACE_DIR = resolve(CLI_WORKSPACE || process.env.PICLAW_WORKSPACE || "/workspace");
+export function getWorkspaceDir(): string {
+  return resolve(CLI_WORKSPACE || process.env.PICLAW_WORKSPACE || "/workspace");
+}
+
+export const WORKSPACE_DIR = getWorkspaceDir();
 /** Directory for the SQLite database and related state. */
 export const STORE_DIR = resolve(
   CLI_WORKSPACE ? `${WORKSPACE_DIR}/.piclaw/store` : (process.env.PICLAW_STORE || `${WORKSPACE_DIR}/.piclaw/store`)
@@ -190,6 +196,20 @@ const toolsConfig =
   piclawConfig.tools && typeof piclawConfig.tools === "object"
     ? (piclawConfig.tools as Record<string, unknown>)
     : piclawConfig;
+const compactionConfig =
+  piclawConfig.compaction && typeof piclawConfig.compaction === "object"
+    ? (piclawConfig.compaction as Record<string, unknown>)
+    : piclawConfig;
+
+function hasDefinedConfigValue(source: Record<string, unknown>, keys: string[]): boolean {
+  return keys.some((key) => {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) return false;
+    const value = source[key];
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    return true;
+  });
+}
 
 // Extract individual settings from the JSON config, trying multiple key aliases.
 const configAppToken = pickString(pushoverConfig, ["appToken", "app_token", "PUSHOVER_APP_TOKEN"]);
@@ -514,10 +534,16 @@ export function isDefaultWebVncDirectEnabled(platform = process.platform): boole
   return platform === "linux" || platform === "darwin" || platform === "win32";
 }
 
-function clampWebUploadLimitMb(value: unknown, fallback: number): number {
+function clampComposeUploadLimitMb(value: unknown, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(512, Math.max(1, Math.round(parsed)));
+}
+
+function clampWorkspaceUploadLimitMb(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(1024, Math.max(1, Math.round(parsed)));
 }
 
 const nestedWebTerminalEnabled = pickBoolean(webConfig, ["terminalEnabled", "webTerminalEnabled", "PICLAW_WEB_TERMINAL_ENABLED"]);
@@ -573,13 +599,13 @@ export const WEB_RUNTIME_CONFIG: WebRuntimeConfig = Object.seal({
     "totp-fallback"
   ).toLowerCase(),
   terminalEnabled: envWebTerminalEnabled ?? nestedWebTerminalEnabled ?? legacyWebTerminalEnabled ?? isDefaultWebTerminalEnabled(),
-  composeUploadLimitMb: clampWebUploadLimitMb(
+  composeUploadLimitMb: clampComposeUploadLimitMb(
     envWebComposeUploadLimitMb ?? configWebComposeUploadLimitMb ?? legacyWebComposeUploadLimitMb,
     32,
   ),
-  workspaceUploadLimitMb: clampWebUploadLimitMb(
+  workspaceUploadLimitMb: clampWorkspaceUploadLimitMb(
     envWebWorkspaceUploadLimitMb ?? configWebWorkspaceUploadLimitMb ?? legacyWebWorkspaceUploadLimitMb,
-    512,
+    256,
   ),
   notificationDebugLabels: envWebNotificationDebugLabels ?? nestedWebNotificationDebugLabels ?? legacyWebNotificationDebugLabels ?? false,
   vncAllowDirect: envWebVncAllowDirect ?? nestedWebVncAllowDirect ?? legacyWebVncAllowDirect ?? isDefaultWebVncDirectEnabled(),
@@ -622,13 +648,37 @@ export function setWebTerminalEnabled(enabled: boolean): boolean {
   return WEB_RUNTIME_CONFIG.terminalEnabled;
 }
 
+export function setWebVncAllowDirect(enabled: boolean): boolean {
+  const nextEnabled = Boolean(enabled);
+  const config = readJsonConfig(getConfigPath());
+  const web =
+    config.web && typeof config.web === "object"
+      ? { ...(config.web as Record<string, unknown>) }
+      : {};
+  const webKeys = ["vncAllowDirect", "vnc_allow_direct", "webVncAllowDirect", "PICLAW_WEB_VNC_ALLOW_DIRECT", "PICLAW_VNC_ALLOW_DIRECT"];
+  for (const key of webKeys) {
+    delete web[key];
+    delete config[key];
+  }
+  web.vncAllowDirect = nextEnabled;
+  config.web = web;
+  delete config.webVncAllowDirect;
+  writeJsonConfig(getConfigPath(), config);
+
+  process.env.PICLAW_WEB_VNC_ALLOW_DIRECT = nextEnabled ? "1" : "0";
+  process.env.PICLAW_VNC_ALLOW_DIRECT = nextEnabled ? "1" : "0";
+  WEB_RUNTIME_CONFIG.vncAllowDirect = nextEnabled;
+  return WEB_RUNTIME_CONFIG.vncAllowDirect;
+}
+
 function persistWebNumberSetting(options: {
   keys: string[];
   value: number;
   envKey: string;
   runtimeKey: "composeUploadLimitMb" | "workspaceUploadLimitMb";
+  clamp: (value: unknown, fallback: number) => number;
 }): number {
-  const nextValue = clampWebUploadLimitMb(options.value, WEB_RUNTIME_CONFIG[options.runtimeKey]);
+  const nextValue = options.clamp(options.value, WEB_RUNTIME_CONFIG[options.runtimeKey]);
   const config = readJsonConfig(getConfigPath());
   const web =
     config.web && typeof config.web === "object"
@@ -655,6 +705,7 @@ export function setWebComposeUploadLimitMb(limitMb: number): number {
     value: limitMb,
     envKey: "PICLAW_WEB_COMPOSE_UPLOAD_LIMIT_MB",
     runtimeKey: "composeUploadLimitMb",
+    clamp: clampComposeUploadLimitMb,
   });
 }
 
@@ -664,6 +715,7 @@ export function setWebWorkspaceUploadLimitMb(limitMb: number): number {
     value: limitMb,
     envKey: "PICLAW_WEB_WORKSPACE_UPLOAD_LIMIT_MB",
     runtimeKey: "workspaceUploadLimitMb",
+    clamp: clampWorkspaceUploadLimitMb,
   });
 }
 
@@ -739,6 +791,48 @@ const configTurnMaxToolUseMessages = pickNumber(piclawConfig, [
   "tool_use_budget",
   "PICLAW_TURN_MAX_TOOL_USE_MESSAGES",
 ]);
+const configCompactionTimeoutMs = pickNumber(compactionConfig, [
+  "timeoutMs",
+  "timeout_ms",
+  "compactionTimeoutMs",
+  "PICLAW_COMPACTION_TIMEOUT_MS",
+]);
+const configCompactionBackoffBaseMs = pickNumber(compactionConfig, [
+  "backoffBaseMs",
+  "backoff_base_ms",
+  "compactionBackoffBaseMs",
+  "PICLAW_COMPACTION_BACKOFF_BASE_MS",
+]);
+const configCompactionBackoffMaxMs = pickNumber(compactionConfig, [
+  "backoffMaxMs",
+  "backoff_max_ms",
+  "compactionBackoffMaxMs",
+  "PICLAW_COMPACTION_BACKOFF_MAX_MS",
+]);
+const PROGRESS_WATCHDOG_ENABLED_CONFIG_KEYS = [
+  "progressWatchdogEnabled",
+  "progress_watchdog_enabled",
+  "watchdogEnabled",
+  "PICLAW_PROGRESS_WATCHDOG_ENABLED",
+];
+const PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS = [
+  "progressWatchdogTimeoutMs",
+  "progress_watchdog_timeout_ms",
+  "watchdogTimeoutMs",
+  "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
+];
+const configProgressWatchdogEnabled = pickBoolean(compactionConfig, PROGRESS_WATCHDOG_ENABLED_CONFIG_KEYS);
+const configProgressWatchdogTimeoutMs = pickNumber(compactionConfig, PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS);
+const hasExplicitConfigProgressWatchdogTimeout = hasDefinedConfigValue(compactionConfig, PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS);
+const envProgressWatchdogEnabled = pickBoolean({
+  PICLAW_PROGRESS_WATCHDOG_ENABLED: process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED ?? envConfig.PICLAW_PROGRESS_WATCHDOG_ENABLED,
+}, ["PICLAW_PROGRESS_WATCHDOG_ENABLED"]);
+const envProgressWatchdogTimeoutMs = pickNumber({
+  PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS ?? envConfig.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
+}, ["PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS"]);
+const hasExplicitEnvProgressWatchdogTimeout = hasDefinedConfigValue({
+  PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS ?? envConfig.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
+}, ["PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS"]);
 const configAdditionalDefaultTools = pickStringArray(toolsConfig, [
   "additionalDefaultTools",
   "additional_default_tools",
@@ -754,6 +848,11 @@ const configWorkspaceSearchExtensions = pickStringArray(toolsConfig, [
   "workspace_search_extensions",
   "PICLAW_WORKSPACE_SEARCH_EXTENSIONS",
 ]);
+const configSearchMatchMode = pickString(toolsConfig, [
+  "searchMatchMode",
+  "search_match_mode",
+  "PICLAW_SEARCH_MATCH_MODE",
+]);
 
 /** Typed session-file safeguards grouped for runtime/session wiring. */
 export interface SessionStorageConfig {
@@ -761,6 +860,14 @@ export interface SessionStorageConfig {
   maxSizeBytes: number;
   maxLines: number;
   autoRotate: boolean;
+}
+
+export interface CompactionRuntimeConfig {
+  timeoutMs: number;
+  backoffBaseMs: number;
+  backoffMaxMs: number;
+  progressWatchdogEnabled: boolean;
+  progressWatchdogTimeoutMs: number;
 }
 
 const sessionMaxSizeMb =
@@ -862,6 +969,147 @@ export function setToolUseMessageBudget(budget: number): number {
   return TOOL_USE_MESSAGE_BUDGET;
 }
 
+const DEFAULT_COMPACTION_TIMEOUT_MS = 180_000;
+const DEFAULT_COMPACTION_BACKOFF_BASE_MS = 15 * 60_000;
+const DEFAULT_COMPACTION_BACKOFF_MAX_MS = 6 * 60 * 60_000;
+const DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS = 120_000;
+
+function resolveDefaultProgressWatchdogEnabled(): boolean {
+  if (envProgressWatchdogEnabled !== undefined) return envProgressWatchdogEnabled;
+  if (configProgressWatchdogEnabled !== undefined) return configProgressWatchdogEnabled;
+  if (hasExplicitEnvProgressWatchdogTimeout) return Number(envProgressWatchdogTimeoutMs ?? 0) > 0;
+  if (hasExplicitConfigProgressWatchdogTimeout) return Number(configProgressWatchdogTimeoutMs ?? 0) > 0;
+  return false;
+}
+
+let COMPACTION_RUNTIME_CONFIG: CompactionRuntimeConfig = Object.seal({
+  timeoutMs: Number.isFinite(configCompactionTimeoutMs) && (configCompactionTimeoutMs ?? 0) > 0
+    ? Math.round(Number(configCompactionTimeoutMs))
+    : DEFAULT_COMPACTION_TIMEOUT_MS,
+  backoffBaseMs: Number.isFinite(configCompactionBackoffBaseMs) && (configCompactionBackoffBaseMs ?? 0) > 0
+    ? Math.round(Number(configCompactionBackoffBaseMs))
+    : DEFAULT_COMPACTION_BACKOFF_BASE_MS,
+  backoffMaxMs: Number.isFinite(configCompactionBackoffMaxMs) && (configCompactionBackoffMaxMs ?? 0) > 0
+    ? Math.round(Number(configCompactionBackoffMaxMs))
+    : DEFAULT_COMPACTION_BACKOFF_MAX_MS,
+  progressWatchdogEnabled: resolveDefaultProgressWatchdogEnabled(),
+  progressWatchdogTimeoutMs: Number.isFinite(configProgressWatchdogTimeoutMs)
+    ? Math.max(0, Math.round(Number(configProgressWatchdogTimeoutMs)))
+    : DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS,
+});
+
+function parseOptionalBooleanFlag(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  return fallback;
+}
+
+function parsePositiveDurationMs(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.round(parsed));
+}
+
+function parseOptionalNonNegativeDurationMs(value: unknown, fallback: number): number {
+  const trimmed = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (trimmed && ["0", "off", "false", "disabled", "no"].includes(trimmed)) return 0;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.round(parsed));
+}
+
+export function getCompactionRuntimeConfig(): Readonly<CompactionRuntimeConfig> {
+  return Object.freeze({
+    timeoutMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_TIMEOUT_MS, COMPACTION_RUNTIME_CONFIG.timeoutMs),
+    backoffBaseMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS, COMPACTION_RUNTIME_CONFIG.backoffBaseMs),
+    backoffMaxMs: parsePositiveDurationMs(process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS, COMPACTION_RUNTIME_CONFIG.backoffMaxMs),
+    progressWatchdogEnabled: parseOptionalBooleanFlag(
+      process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED,
+      COMPACTION_RUNTIME_CONFIG.progressWatchdogEnabled,
+    ),
+    progressWatchdogTimeoutMs: parseOptionalNonNegativeDurationMs(
+      process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
+      COMPACTION_RUNTIME_CONFIG.progressWatchdogTimeoutMs,
+    ),
+  });
+}
+
+export function setCompactionRuntimeConfig(patch: {
+  timeoutMs?: number;
+  backoffBaseMs?: number;
+  backoffMaxMs?: number;
+  progressWatchdogEnabled?: boolean;
+  progressWatchdogTimeoutMs?: number;
+}): Readonly<CompactionRuntimeConfig> {
+  const current = getCompactionRuntimeConfig();
+  const next: CompactionRuntimeConfig = {
+    timeoutMs: patch.timeoutMs === undefined ? current.timeoutMs : parsePositiveDurationMs(patch.timeoutMs, current.timeoutMs),
+    backoffBaseMs: patch.backoffBaseMs === undefined ? current.backoffBaseMs : parsePositiveDurationMs(patch.backoffBaseMs, current.backoffBaseMs),
+    backoffMaxMs: patch.backoffMaxMs === undefined ? current.backoffMaxMs : parsePositiveDurationMs(patch.backoffMaxMs, current.backoffMaxMs),
+    progressWatchdogEnabled: typeof patch.progressWatchdogEnabled === "boolean"
+      ? patch.progressWatchdogEnabled
+      : current.progressWatchdogEnabled,
+    progressWatchdogTimeoutMs: patch.progressWatchdogTimeoutMs === undefined
+      ? current.progressWatchdogTimeoutMs
+      : parseOptionalNonNegativeDurationMs(patch.progressWatchdogTimeoutMs, current.progressWatchdogTimeoutMs),
+  };
+
+  if (next.backoffMaxMs < next.backoffBaseMs) {
+    next.backoffMaxMs = next.backoffBaseMs;
+  }
+
+  const config = readJsonConfig(getConfigPath());
+  const compaction =
+    config.compaction && typeof config.compaction === "object"
+      ? { ...(config.compaction as Record<string, unknown>) }
+      : {};
+  const clearKeys = [
+    "timeoutMs",
+    "timeout_ms",
+    "compactionTimeoutMs",
+    "backoffBaseMs",
+    "backoff_base_ms",
+    "compactionBackoffBaseMs",
+    "backoffMaxMs",
+    "backoff_max_ms",
+    "compactionBackoffMaxMs",
+    "progressWatchdogEnabled",
+    "progress_watchdog_enabled",
+    "watchdogEnabled",
+    "progressWatchdogTimeoutMs",
+    "progress_watchdog_timeout_ms",
+    "watchdogTimeoutMs",
+    "PICLAW_COMPACTION_TIMEOUT_MS",
+    "PICLAW_COMPACTION_BACKOFF_BASE_MS",
+    "PICLAW_COMPACTION_BACKOFF_MAX_MS",
+    "PICLAW_PROGRESS_WATCHDOG_ENABLED",
+    "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
+  ];
+  for (const key of clearKeys) {
+    delete compaction[key];
+    delete config[key];
+  }
+  compaction.timeoutMs = next.timeoutMs;
+  compaction.backoffBaseMs = next.backoffBaseMs;
+  compaction.backoffMaxMs = next.backoffMaxMs;
+  compaction.progressWatchdogEnabled = next.progressWatchdogEnabled;
+  compaction.progressWatchdogTimeoutMs = next.progressWatchdogTimeoutMs;
+  config.compaction = compaction;
+  writeJsonConfig(getConfigPath(), config);
+
+  process.env.PICLAW_COMPACTION_TIMEOUT_MS = String(next.timeoutMs);
+  process.env.PICLAW_COMPACTION_BACKOFF_BASE_MS = String(next.backoffBaseMs);
+  process.env.PICLAW_COMPACTION_BACKOFF_MAX_MS = String(next.backoffMaxMs);
+  process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED = next.progressWatchdogEnabled ? "1" : "0";
+  process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS = String(next.progressWatchdogTimeoutMs);
+
+  COMPACTION_RUNTIME_CONFIG = Object.seal(next);
+  return getCompactionRuntimeConfig();
+}
+
 // ---------------------------------------------------------------------------
 // Tool activation defaults – used by lazy tool activation.
 // ---------------------------------------------------------------------------
@@ -875,6 +1123,9 @@ export interface ToolActivationConfig {
 export const TOOL_ACTIVATION_CONFIG = Object.freeze<ToolActivationConfig>({
   additionalDefaultTools: configAdditionalDefaultTools ?? [],
 });
+
+/** FTS match mode for multi-word queries: "or" = any keyword, "and" = all keywords. */
+export type SearchMatchMode = "or" | "and";
 
 /** Typed workspace-search config grouped for FTS root and extension selection. */
 export interface WorkspaceSearchConfig {
@@ -902,6 +1153,88 @@ export const WORKSPACE_SEARCH_CONFIG = Object.freeze<WorkspaceSearchConfig>({
 /** Return grouped workspace-search config for runtime wiring and tests. */
 export function getWorkspaceSearchConfig(): Readonly<WorkspaceSearchConfig> {
   return WORKSPACE_SEARCH_CONFIG;
+}
+
+// ---------------------------------------------------------------------------
+// Search match mode – controls whether multi-word FTS queries use OR or AND.
+// ---------------------------------------------------------------------------
+
+function parseSearchMatchMode(raw: string | null | undefined): SearchMatchMode {
+  const lower = (raw ?? "").trim().toLowerCase();
+  return lower === "and" ? "and" : "or";
+}
+
+let SEARCH_MATCH_MODE: SearchMatchMode = parseSearchMatchMode(
+  process.env.PICLAW_SEARCH_MATCH_MODE ?? configSearchMatchMode,
+);
+
+/** Return the current FTS match mode ("or" = any keyword, "and" = all keywords). */
+export function getSearchMatchMode(): SearchMatchMode {
+  // Read dynamically so test env overrides take effect.
+  const envOverride = process.env.PICLAW_SEARCH_MATCH_MODE?.trim().toLowerCase();
+  if (envOverride === "and" || envOverride === "or") return envOverride;
+  return SEARCH_MATCH_MODE;
+}
+
+/** Persist and apply the search match mode. */
+export function setSearchMatchMode(mode: SearchMatchMode): SearchMatchMode {
+  const nextMode: SearchMatchMode = mode === "and" ? "and" : "or";
+  const config = readJsonConfig(getConfigPath());
+  const tools =
+    config.tools && typeof config.tools === "object"
+      ? { ...(config.tools as Record<string, unknown>) }
+      : {};
+  const clearKeys = ["searchMatchMode", "search_match_mode", "PICLAW_SEARCH_MATCH_MODE"];
+  for (const key of clearKeys) {
+    delete tools[key];
+  }
+  tools.searchMatchMode = nextMode;
+  config.tools = tools;
+  writeJsonConfig(getConfigPath(), config);
+
+  process.env.PICLAW_SEARCH_MATCH_MODE = nextMode;
+  SEARCH_MATCH_MODE = nextMode;
+  return SEARCH_MATCH_MODE;
+}
+
+// ---------------------------------------------------------------------------
+// UI theme – persisted instance-wide theme + tint.
+// ---------------------------------------------------------------------------
+
+export interface UiThemeConfig {
+  theme: string;
+  tint: string | null;
+}
+
+const uiSection =
+  piclawConfig.ui && typeof piclawConfig.ui === "object"
+    ? (piclawConfig.ui as Record<string, unknown>)
+    : {};
+
+let UI_THEME: string = typeof uiSection.theme === "string" ? uiSection.theme.trim() : "default";
+let UI_TINT: string | null = typeof uiSection.tint === "string" && uiSection.tint.trim() ? uiSection.tint.trim() : null;
+
+export function getUiThemeConfig(): UiThemeConfig {
+  return { theme: UI_THEME, tint: UI_TINT };
+}
+
+export function setUiThemeConfig(patch: { theme?: string; tint?: string | null }): UiThemeConfig {
+  const config = readJsonConfig(getConfigPath());
+  const ui =
+    config.ui && typeof config.ui === "object"
+      ? { ...(config.ui as Record<string, unknown>) }
+      : {};
+  if (typeof patch.theme === "string") {
+    ui.theme = patch.theme.trim() || "default";
+    UI_THEME = ui.theme as string;
+  }
+  if (patch.tint !== undefined) {
+    ui.tint = typeof patch.tint === "string" && patch.tint.trim() ? patch.tint.trim() : null;
+    UI_TINT = ui.tint as string | null;
+  }
+  config.ui = ui;
+  writeJsonConfig(getConfigPath(), config);
+  return { theme: UI_THEME, tint: UI_TINT };
 }
 
 /** Return grouped tool-activation config for runtime wiring and tests. */

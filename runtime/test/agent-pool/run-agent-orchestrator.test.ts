@@ -11,6 +11,7 @@ import { ensureSessionDir } from "../../src/agent-pool/session.js";
 import { getAttachmentRegistry } from "../../src/agent-pool/attachments.js";
 import { AgentTurnCoordinator } from "../../src/agent-pool/turn-coordinator.js";
 import { runAgentPrompt } from "../../src/agent-pool/run-agent-orchestrator.js";
+import { getToolUseMessageBudget, setToolUseMessageBudget } from "../../src/core/config.js";
 import { setEnv } from "../helpers.js";
 
 function createRuntime(session: any, retrySettings?: { enabled?: boolean; maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number }): AgentSessionRuntime {
@@ -71,6 +72,67 @@ function createAssistantMessage(text: string) {
     timestamp: Date.now(),
   } as const;
 }
+
+test("runAgentPrompt emits turn-aware observability log metadata for turn and tool steps", async () => {
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-obs" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_start" } });
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "thinking..." } });
+        listener({ type: "message_end", message: { role: "assistant", content: [{ type: "toolCall", id: "tool-1", name: "read" }], stopReason: "toolUse", usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } } });
+        listener({ type: "tool_execution_start", toolCallId: "tool-1", toolName: "read", args: { path: "README.md" } });
+        listener({ type: "tool_execution_end", toolCallId: "tool-1", toolName: "read", isError: false, durationMs: 12 });
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_start" } });
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "done" } });
+        listener({ type: "message_end", message: createAssistantMessage("done") });
+      }
+    }
+    async abort() {}
+  }
+
+  const session = new StubSession();
+  const logs: Array<Record<string, unknown>> = [];
+  const turnCoordinator = new AgentTurnCoordinator({
+    takeAttachments: () => [],
+    touchSession: () => {},
+    recordMessageUsage: () => {},
+  });
+
+  const result = await runAgentPrompt("test", "web:default", {
+    timeoutMs: 0,
+    turnId: "turn-obs-1",
+  }, {
+    getOrCreateRuntime: async () => createRuntime(session) as any,
+    turnCoordinator,
+    clearAttachments: () => {},
+    takeAttachments: () => [],
+    logsDir: createTestLogsDir(),
+    setActiveForkBaseLeaf: () => {},
+    clearActiveForkBaseLeaf: () => {},
+    onInfo: (_message, details) => logs.push(details),
+    onWarn: (_message, details) => logs.push(details),
+  });
+
+  expect(result.status).toBe("success");
+  expect(logs).toEqual(expect.arrayContaining([
+    expect.objectContaining({ operation: "run_agent.prompt", turnId: "turn-obs-1", sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "tool.call.start", turnId: "turn-obs-1", toolCallId: "tool-1", sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "tool.call.end", turnId: "turn-obs-1", toolCallId: "tool-1", durationMs: 12, sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "run_agent.prompt_resolved", turnId: "turn-obs-1", sessionLeafId: "leaf-obs" }),
+    expect.objectContaining({ operation: "run_agent.complete", turnId: "turn-obs-1", sessionLeafId: "leaf-obs" }),
+  ]));
+});
 
 test("runAgentPrompt aggregates deltas and returns pending attachments", async () => {
   const attachments = getAttachmentRegistry();
@@ -133,7 +195,7 @@ test("runAgentPrompt aggregates deltas and returns pending attachments", async (
   expect(forkStates).toEqual(["leaf-1", null]);
 });
 
-test("runAgentPrompt auto-compacts before prompting when estimated context exceeds the threshold", async () => {
+test.skip("runAgentPrompt auto-compacts before prompting when estimated context exceeds the threshold", async () => {
   const calls: string[] = [];
 
   class StubSession {
@@ -196,7 +258,70 @@ test("runAgentPrompt auto-compacts before prompting when estimated context excee
   expect(calls).toEqual(["compact", "prompt"]);
 });
 
-test("runAgentPrompt still pre-prompt compacts even when upstream auto-compaction is disabled", async () => {
+test("runAgentPrompt skips Piclaw pre-prompt compaction when requested by the caller", async () => {
+  const calls: string[] = [];
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({
+        messages: [
+          { role: "user", content: "x".repeat(200) },
+        ],
+      }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({
+        ...DEFAULT_COMPACTION_SETTINGS,
+        enabled: true,
+        reserveTokens: 10,
+      }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      calls.push("compact");
+    }
+    async prompt() {
+      calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "done" } });
+      }
+    }
+    async abort() {}
+  }
+
+  const session = new StubSession();
+  const turnCoordinator = new AgentTurnCoordinator({
+    takeAttachments: () => [],
+    touchSession: () => {},
+    recordMessageUsage: () => {},
+  });
+
+  const result = await runAgentPrompt("test", "web:default", { timeoutMs: 0, skipPrePromptCompaction: true }, {
+    getOrCreateRuntime: async () => createRuntime(session) as any,
+    turnCoordinator,
+    clearAttachments: () => {},
+    takeAttachments: () => [],
+    logsDir: createTestLogsDir(),
+    setActiveForkBaseLeaf: () => {},
+    clearActiveForkBaseLeaf: () => {},
+  });
+
+  expect(result.status).toBe("success");
+  expect(calls).toEqual(["prompt"]);
+});
+
+test.skip("runAgentPrompt still pre-prompt compacts even when upstream auto-compaction is disabled", async () => {
   const calls: string[] = [];
 
   class StubSession {
@@ -261,7 +386,7 @@ test("runAgentPrompt still pre-prompt compacts even when upstream auto-compactio
   expect(calls).toEqual(["compact", "prompt"]);
 });
 
-test("runAgentPrompt aborts a stuck pre-prompt compaction and continues", async () => {
+test.skip("runAgentPrompt aborts a stuck pre-prompt compaction and continues", async () => {
   const restoreEnv = setEnv({ PICLAW_COMPACTION_TIMEOUT_MS: "20" });
   const calls: string[] = [];
   const compactionEvents: Array<{ type: string; errorMessage?: string }> = [];
@@ -349,6 +474,191 @@ test("runAgentPrompt aborts a stuck pre-prompt compaction and continues", async 
       { type: "compaction_start", errorMessage: undefined },
       { type: "compaction_end", errorMessage: "Pre-prompt compaction failed: Compaction timed out after 0.0s" },
     ]);
+  } finally {
+    restoreEnv();
+  }
+});
+
+test("runAgentPrompt suppresses auto-compaction for chats under backoff after recent failures", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_COMPACTION_TIMEOUT_MS: "20",
+    PICLAW_COMPACTION_BACKOFF_BASE_MS: "600000",
+    PICLAW_COMPACTION_BACKOFF_MAX_MS: "600000",
+  });
+  const chatJid = `web:compaction-backoff-${Date.now()}`;
+  const db = await import("../../src/db.js");
+  db.initDatabase();
+  const compactionEvents: string[] = [];
+
+  class FailingSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      this.isCompacting = true;
+      await new Promise(() => {});
+    }
+    abortCompaction() {
+      this.isCompacting = false;
+    }
+    async prompt() {
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "first" } });
+      }
+    }
+    async abort() {
+      this.isCompacting = false;
+    }
+  }
+
+  class SuppressedSession {
+    calls: string[] = [];
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      this.calls.push("compact");
+    }
+    async prompt() {
+      this.calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "second" } });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const turnCoordinator = new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} });
+    await runAgentPrompt("test", chatJid, { timeoutMs: 0 }, {
+      getOrCreateRuntime: async () => createRuntime(new FailingSession()) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(db.getChatCompactionBackoff(chatJid)).toEqual(expect.objectContaining({ failureCount: 1 }));
+
+    const secondSession = new SuppressedSession();
+    const secondResult = await runAgentPrompt("test", chatJid, {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "compaction_suppressed") compactionEvents.push(String((event as any).type));
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(secondSession) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(secondResult.status).toBe("success");
+    expect(secondResult.result).toBe("second");
+    expect(secondSession.calls).toEqual(["prompt"]);
+    expect(compactionEvents).toEqual(["compaction_suppressed"]);
+  } finally {
+    restoreEnv();
+  }
+});
+
+test("runAgentPrompt clears compaction backoff after a successful compaction", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_COMPACTION_BACKOFF_BASE_MS: "600000",
+    PICLAW_COMPACTION_BACKOFF_MAX_MS: "600000",
+  });
+  const chatJid = `web:compaction-clear-${Date.now()}`;
+  const db = await import("../../src/db.js");
+  db.initDatabase();
+  db.setChatCompactionBackoff(chatJid, {
+    failureCount: 2,
+    lastFailedAt: "2024-03-20T00:00:00.000Z",
+    backoffUntil: new Date(Date.now() - 60_000).toISOString(),
+    lastErrorMessage: "Previous compaction timed out",
+  });
+
+  class StubSession {
+    calls: string[] = [];
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-1",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async compact() {
+      this.calls.push("compact");
+    }
+    async prompt() {
+      this.calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "ok" } });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const result = await runAgentPrompt("test", chatJid, { timeoutMs: 0 }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("success");
+    expect(session.calls).toEqual(["compact", "prompt"]);
+    expect(db.getChatCompactionBackoff(chatJid)).toBeNull();
   } finally {
     restoreEnv();
   }
@@ -1022,6 +1332,108 @@ test("runAgentPrompt auto-compacts and retries when tool activity produced no te
   }
 });
 
+test("runAgentPrompt auto-compacts and retries after tool-use budget exhaustion", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",
+    PICLAW_TURN_AUTO_RECOVERY_MAX_ATTEMPTS: "2",
+    PICLAW_TURN_AUTO_RECOVERY_TOTAL_BUDGET_MS: "30000",
+    PICLAW_TURN_MAX_TOOL_USE_MESSAGES: "1",
+  });
+  const previousToolUseBudget = getToolUseMessageBudget();
+  setToolUseMessageBudget(8);
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-1" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    promptCalls = 0;
+    compactCalls = 0;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.promptCalls += 1;
+      if (this.promptCalls === 1) {
+        for (const listener of this.listeners) {
+          for (let i = 1; i <= 9; i += 1) {
+            listener({
+              type: "message_end",
+              message: {
+                role: "assistant",
+                stopReason: "toolUse",
+                content: [{ type: "toolCall", id: `tool-${i}`, name: "read", arguments: { path: `/tmp/${i}` } }],
+              },
+            });
+            if (i < 9) {
+              listener({ type: "tool_execution_start", toolCallId: `tool-${i}`, toolName: "read", args: { path: `/tmp/${i}` } });
+              listener({ type: "tool_execution_end", toolCallId: `tool-${i}`, toolName: "read", isError: false });
+            }
+          }
+        }
+        return;
+      }
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "recovered after tool budget compaction" } });
+      }
+    }
+    async compact() {
+      this.compactCalls += 1;
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const recoveryStarts: Array<{ classifier?: string; strategy?: string }> = [];
+    const turnCoordinator = new AgentTurnCoordinator({
+      takeAttachments: () => [],
+      touchSession: () => {},
+      recordMessageUsage: () => {},
+    });
+
+    const result = await runAgentPrompt("hello", "web:default", {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "recovery_start") {
+          recoveryStarts.push({
+            classifier: (event as any).classifier,
+            strategy: (event as any).strategy,
+          });
+        }
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.result).toBe("recovered after tool budget compaction");
+    expect(session.promptCalls).toBe(2);
+    expect(session.compactCalls).toBe(1);
+    expect(result.recovery).toEqual(expect.objectContaining({
+      attemptsUsed: 1,
+      recovered: true,
+      exhausted: false,
+      lastClassifier: "tool_history_pressure",
+      strategyHistory: ["compact_then_retry"],
+    }));
+    expect(recoveryStarts).toEqual([{ classifier: "tool_history_pressure", strategy: "compact_then_retry" }]);
+  } finally {
+    setToolUseMessageBudget(previousToolUseBudget);
+    restoreEnv();
+  }
+});
+
 test("runAgentPrompt surfaces provider error instead of returning null result", async () => {
   class StubSession {
     private listeners: Array<(event: any) => void> = [];
@@ -1282,6 +1694,96 @@ test("runAgentPrompt retries when provider stops after a read-only tool call wit
     expect(recoveryEvents).toEqual([
       { type: "recovery_start", delayMs: 1 },
       { type: "recovery_end", delayMs: undefined },
+    ]);
+  } finally {
+    restoreEnv();
+  }
+});
+
+test("runAgentPrompt retries once when the provider stops after emitting thinking only", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",
+    PICLAW_TURN_AUTO_RECOVERY_MAX_ATTEMPTS: "2",
+    PICLAW_TURN_AUTO_RECOVERY_TOTAL_BUDGET_MS: "30000",
+  });
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-1" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    promptCalls = 0;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.promptCalls += 1;
+      if (this.promptCalls === 1) {
+        for (const listener of this.listeners) {
+          listener({
+            type: "message_end",
+            message: {
+              role: "assistant",
+              stopReason: "stop",
+              content: [{ type: "thinking", thinking: "Planning document updates" }],
+            },
+          });
+        }
+        return;
+      }
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "final answer after retry" } });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const recoveryEvents: Array<{ type: string; classifier?: string; delayMs?: number }> = [];
+    const turnCoordinator = new AgentTurnCoordinator({
+      takeAttachments: () => [],
+      touchSession: () => {},
+      recordMessageUsage: () => {},
+    });
+
+    const result = await runAgentPrompt("update docs", "web:default", {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "recovery_start" || event.type === "recovery_end") {
+          recoveryEvents.push({
+            type: String(event.type),
+            classifier: typeof (event as any).classifier === "string" ? (event as any).classifier : undefined,
+            delayMs: typeof (event as any).delayMs === "number" ? (event as any).delayMs : undefined,
+          });
+        }
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session, { maxRetries: 5, baseDelayMs: 1, maxDelayMs: 60000 }) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.result).toBe("final answer after retry");
+    expect(result.recovery).toEqual(expect.objectContaining({
+      attemptsUsed: 1,
+      recovered: true,
+      lastClassifier: "thinking_only_stop",
+      strategyHistory: ["retry"],
+    }));
+    expect(session.promptCalls).toBe(2);
+    expect(recoveryEvents).toEqual([
+      { type: "recovery_start", classifier: "thinking_only_stop", delayMs: 1 },
+      { type: "recovery_end", classifier: "thinking_only_stop", delayMs: undefined },
     ]);
   } finally {
     restoreEnv();

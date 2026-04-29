@@ -122,8 +122,9 @@ export class WebChannelHttpSurfaceService {
     chatJid?: string,
     searchScope?: "current" | "root" | "all",
     rootChatJid?: string,
+    filters?: { images?: boolean; attachments?: boolean } | null,
   ): Response {
-    return this.channel.endpointFacade.handleSearch(query, limit, offset, chatJid, searchScope, rootChatJid);
+    return this.channel.endpointFacade.handleSearch(query, limit, offset, chatJid, searchScope, rootChatJid, filters);
   }
 
   handleThread(id: number | null, chatJid?: string): Response {

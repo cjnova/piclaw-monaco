@@ -8,7 +8,7 @@ import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-age
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { supportsXhigh } from "@mariozechner/pi-ai";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { findModel, parseModelInput } from "../utils/model-utils.js";
 
 // ---------------------------------------------------------------------------

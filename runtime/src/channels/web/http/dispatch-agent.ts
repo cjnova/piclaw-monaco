@@ -12,14 +12,26 @@ import { TOOLSETS } from "../../../extensions/tool-activation.js";
 import { getToolCapability } from "../../../extensions/tool-capabilities.js";
 import {
   handleAddonAssetRequest,
+  handleAddonConfigApiRequest,
   handleGetAddons,
   handleGetAddonWebEntries,
   handleInstallAddon,
   handleRestartAddonRuntime,
   handleUninstallAddon,
 } from "../handlers/addons.js";
+import { getCompactionSettingsData, resetCompactionBackoff, saveCompactionSettings } from "../handlers/compaction-settings.js";
 import { getGeneralSettingsData, saveGeneralSettings } from "../handlers/general-settings.js";
 import { getQuickActionsSettingsData, saveQuickActionsSettings } from "../handlers/quick-actions-settings.js";
+import { getWorkspaceSettingsData, saveWorkspaceSettings } from "../handlers/workspace-settings.js";
+import { PROVIDER_DEFS } from "../../../agent-control/provider-defs.js";
+import {
+  listKeychainEntries,
+  getKeychainEntry,
+  setKeychainEntry,
+  deleteKeychainEntry,
+  listInjectableKeychainEntries,
+  type KeychainEntryMetadata,
+} from "../../../secure/keychain.js";
 import {
   handleWebPushPresence,
   handleWebPushSubscriptionDelete,
@@ -256,62 +268,37 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
       const assistantSection = typeof rawConfig.assistant === "object" && rawConfig.assistant ? rawConfig.assistant as Record<string, unknown> : rawConfig;
       const userSection = typeof rawConfig.user === "object" && rawConfig.user ? rawConfig.user as Record<string, unknown> : rawConfig;
 
-      // Read auth state
+      // Read auth + custom provider state
       const piAgentDir = process.env.PICLAW_PI_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
       let authProviders: Record<string, unknown> = {};
       try {
         const authPath = join(piAgentDir, "auth.json");
         if (existsSync(authPath)) authProviders = JSON.parse(readFileSync(authPath, "utf-8"));
       } catch (e) { /* context usage non-critical — best effort */ void e; }
+      let modelProviders: Record<string, unknown> = {};
+      try {
+        const modelsPath = join(piAgentDir, "models.json");
+        if (existsSync(modelsPath)) {
+          const parsed = JSON.parse(readFileSync(modelsPath, "utf-8")) as { providers?: Record<string, unknown> };
+          modelProviders = parsed.providers || {};
+        }
+      } catch (e) { /* context usage non-critical — best effort */ void e; }
 
-      const providerDefs = [
-        { id: "anthropic", name: "Anthropic", hasOAuth: true, hasApiKey: true, apiKeyHint: "sk-ant-..." },
-        { id: "github-copilot", name: "GitHub Copilot", hasOAuth: true, hasApiKey: false },
-        { id: "google-gemini-cli", name: "Google Gemini CLI", hasOAuth: true, hasApiKey: true, apiKeyHint: "AIza..." },
-        { id: "antigravity", name: "Antigravity (Google Cloud)", hasOAuth: true, hasApiKey: false },
-        { id: "openai-codex", name: "OpenAI Codex", hasOAuth: true, hasApiKey: false },
-        { id: "openai", name: "OpenAI", hasOAuth: false, hasApiKey: true, apiKeyHint: "sk-proj-..." },
-        { id: "opencode", name: "OpenCode", hasOAuth: false, hasApiKey: true, apiKeyHint: "OPENCODE_API_KEY" },
-        {
-          id: "azure-openai", name: "Azure OpenAI", hasOAuth: false, hasApiKey: false, isCustom: true,
-          customFields: [
-            { key: "baseUrl", label: "Base URL", placeholder: "https://myresource.openai.azure.com/openai/v1", required: true },
-            { key: "apiKey", label: "API Key (or empty for managed identity)", placeholder: "Bearer ...", required: false },
-            { key: "modelId", label: "Model ID", placeholder: "gpt-4o", required: true },
-            { key: "modelIds", label: "Additional model IDs (comma-separated)", placeholder: "gpt-4o,o3-mini", required: false },
-          ],
-        },
-        {
-          id: "ollama", name: "Ollama", hasOAuth: false, hasApiKey: false, isCustom: true,
-          customFields: [
-            { key: "baseUrl", label: "Base URL", placeholder: "http://192.168.1.100:11434/v1", required: true },
-            { key: "modelId", label: "Model ID", placeholder: "llama3:latest", required: true },
-            { key: "modelIds", label: "Additional model IDs (comma-separated)", placeholder: "qwen3:latest", required: false },
-            { key: "contextWindow", label: "Context window", placeholder: "128000", required: false },
-          ],
-        },
-        {
-          id: "openai-compatible", name: "OpenAI-compatible", hasOAuth: false, hasApiKey: false, isCustom: true,
-          customFields: [
-            { key: "baseUrl", label: "Base URL", placeholder: "https://api.example.com/v1", required: true },
-            { key: "apiKey", label: "API Key", placeholder: "sk-...", required: true },
-            { key: "modelId", label: "Model ID", placeholder: "gpt-4o", required: true },
-            { key: "modelIds", label: "Additional model IDs (comma-separated)", placeholder: "model-a,model-b", required: false },
-            { key: "contextWindow", label: "Context window", placeholder: "128000", required: false },
-          ],
-        },
-      ];
-
-      const providers = providerDefs.map((p) => {
-        const auth = authProviders[p.id];
-        const configured = Boolean(auth);
-        const authType = typeof (auth as Record<string, unknown>)?.type === "string" ? (auth as Record<string, unknown>).type : null;
+      const providers = PROVIDER_DEFS.map((p) => {
+        const auth = authProviders[p.id] as Record<string, unknown> | undefined;
+        const authTypeFromAuth = typeof auth?.type === "string" ? auth.type : null;
+        const hasCustomConfig = Boolean(p.isCustom && modelProviders[p.id]);
+        const configured = Boolean(authTypeFromAuth) || hasCustomConfig;
+        const authType = authTypeFromAuth || (hasCustomConfig ? "custom" : null);
         return { ...p, configured, authType };
       });
 
       return channel.json({
         ...getGeneralSettingsData(),
+        ...getCompactionSettingsData(),
         quickActions: getQuickActionsSettingsData(),
+        workspaceSettings: getWorkspaceSettingsData(),
+        runtimePlatform: process.platform,
         providers,
         themes,
         colorKeys: [...THEME_LIST_COLOR_KEYS],
@@ -358,10 +345,191 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
       try {
         const body = await req.json().catch(() => ({}));
         const saved = await saveGeneralSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
+        channel.broadcastEvent("ui_theme", { theme: saved.uiTheme, tint: saved.uiTint });
         return channel.json({ ok: true, settings: saved });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return channel.json({ error: message || "Failed to save general settings." }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/settings/workspace",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({}));
+        const saved = saveWorkspaceSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
+        return channel.json({ ok: true, settings: saved });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message || "Failed to save workspace settings." }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/settings/compaction",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({}));
+        const saved = await saveCompactionSettings((body && typeof body === "object") ? body as Record<string, unknown> : {});
+        return channel.json({ ok: true, settings: saved });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message || "Failed to save compaction settings." }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/settings/compaction/reset-backoff",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const chatJid = typeof body.chatJid === "string" ? body.chatJid.trim() : "";
+        if (!chatJid) {
+          return channel.json({ error: "Provide chatJid." }, 400);
+        }
+        return channel.json({ ok: true, settings: resetCompactionBackoff(chatJid) });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message || "Failed to reset compaction backoff." }, 400);
+      }
+    },
+  },
+  // ── Keychain management ──────────────────────────────────────────────
+  {
+    method: "GET",
+    path: "/agent/keychain",
+    handle: (channel) => {
+      try {
+        const entries = listKeychainEntries();
+        const injectable = listInjectableKeychainEntries();
+        const envMap: Record<string, string> = {};
+        for (const { keychainName, envName } of injectable) {
+          envMap[keychainName] = envName;
+        }
+        const result = entries.map((e: KeychainEntryMetadata) => ({
+          ...e,
+          envVar: envMap[e.name] || null,
+        }));
+        return channel.json({ ok: true, entries: result });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message }, 500);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/keychain",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        const secret = typeof body.secret === "string" ? body.secret : "";
+        if (!name || !secret) {
+          return channel.json({ error: "Provide name and secret." }, 400);
+        }
+        const type = (["token", "password", "basic", "secret"] as const).includes(body.type as any)
+          ? (body.type as "token" | "password" | "basic" | "secret")
+          : "secret";
+        const username = typeof body.username === "string" && body.username.trim() ? body.username.trim() : undefined;
+        await setKeychainEntry({ name, type, secret, username });
+        return channel.json({ ok: true, name, type });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message }, 400);
+      }
+    },
+  },
+    {
+    method: "DELETE",
+    path: "/agent/keychain",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        if (!name) {
+          return channel.json({ error: "Provide name." }, 400);
+        }
+        const removed = deleteKeychainEntry(name);
+        return channel.json({ ok: true, removed });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/keychain/reveal",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        if (!name) {
+          return channel.json({ error: "Provide name." }, 400);
+        }
+        // Gate: TOTP if configured, otherwise master password
+        const { getWebRuntimeConfig } = await import("../../../core/config.js");
+        const { verifyTotp } = await import("../auth/auth.js");
+        const webConfig = getWebRuntimeConfig();
+        const totpSecret = (webConfig.totpSecret || "").trim();
+        if (totpSecret) {
+          // TOTP is configured — use it as the gate
+          const code = typeof body.totp_code === "string" ? body.totp_code.trim() : "";
+          if (!code) {
+            return channel.json({ error: "TOTP code required.", needs_totp: true }, 401);
+          }
+          if (!verifyTotp(totpSecret, code, webConfig.totpWindow)) {
+            return channel.json({ error: "Invalid TOTP code.", needs_totp: true }, 401);
+          }
+        } else {
+          // No TOTP — fall back to master password
+          const masterPassword = typeof body.master_password === "string" ? body.master_password : "";
+          if (!masterPassword) {
+            return channel.json({ error: "Master password required.", needs_master_password: true }, 401);
+          }
+          const configuredKey = process.env.PICLAW_KEYCHAIN_KEY || "";
+          const keyFile = process.env.PICLAW_KEYCHAIN_KEY_FILE;
+          let expectedKey = configuredKey;
+          if (!expectedKey && keyFile) {
+            try {
+              const { readFileSync } = await import("node:fs");
+              expectedKey = readFileSync(keyFile, "utf8").trim();
+            } catch (e) { void e; }
+          }
+          if (!expectedKey) {
+            return channel.json({ error: "Keychain master key not configured on server." }, 500);
+          }
+          if (masterPassword !== expectedKey) {
+            return channel.json({ error: "Invalid master password.", needs_master_password: true }, 401);
+          }
+        }
+        const entry = await getKeychainEntry(name);
+        return channel.json({ ok: true, name: entry.name, secret: entry.secret, username: entry.username ?? null });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/client-perf",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const label = typeof body.label === "string" ? body.label : "unknown";
+        const lines = Array.isArray(body.lines) ? body.lines.filter((l: unknown) => typeof l === "string") : [];
+        const { createLogger } = await import("../../../utils/logger.js");
+        const log = createLogger("web.client-perf");
+        log.info(`Client perf: ${label}`, { label, lines });
+        return channel.json({ ok: true });
+      } catch {
+        return channel.json({ ok: true });
       }
     },
   },
@@ -387,6 +555,11 @@ export async function handleAgentRoutes(
 
   if ((req.method === "GET" || req.method === "HEAD") && pathname.startsWith("/agent/addons/assets/")) {
     return await handleAddonAssetRequest(req, pathname);
+  }
+
+  if ((req.method === 'GET' || req.method === 'POST') && pathname.startsWith('/agent/addons/api/')) {
+    const chatJid = url.searchParams.get('chat_jid')?.trim() || 'web:default';
+    return await handleAddonConfigApiRequest(req, pathname, (body, status) => channel.json(body, status), channel.agentPool, chatJid);
   }
 
   const route = EXACT_AGENT_ROUTES.find((candidate) => candidate.method === req.method && candidate.path === pathname);

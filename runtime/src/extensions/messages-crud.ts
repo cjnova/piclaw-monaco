@@ -1,7 +1,7 @@
 /**
  * messages-crud – unified message CRUD tool for internal agent operations.
  */
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
 
 import {
@@ -15,6 +15,7 @@ import { getChatJid } from "../core/chat-context.js";
 import { stripInternalTags } from "../router.js";
 import { createUuid } from "../utils/ids.js";
 import { prepareFtsQuery } from "../utils/fts-query.js";
+import { getSearchMatchMode } from "../core/config.js";
 
 const MessagesSchema = Type.Object({
   action: Type.Optional(
@@ -568,7 +569,7 @@ function runSearch(
   try {
     const conditions: string[] = ["messages_fts MATCH ?"];
     const params: (string | number)[] = [];
-    const ftsQuery = prepareFtsQuery(trimmed) ?? trimmed;
+    const ftsQuery = prepareFtsQuery(trimmed, getSearchMatchMode()) ?? trimmed;
     params.push(ftsQuery);
 
     if (chatJid) {

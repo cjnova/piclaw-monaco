@@ -8,6 +8,7 @@
  */
 
 import { createLogger } from "../../../utils/logger.js";
+import { getUiThemeConfig } from "../../../core/config.js";
 import { getAppAssetVersion } from "../http/static.js";
 
 const log = createLogger("web.sse");
@@ -36,6 +37,7 @@ const CHAT_SCOPED_EVENT_TYPES = new Set([
   "extension_ui_status",
   "extension_ui_working",
   "extension_ui_working_indicator",
+  "extension_ui_working_visible",
   "extension_ui_widget",
   "extension_ui_title",
   "extension_ui_editor_text",
@@ -99,7 +101,7 @@ export function handleSse(channel: SseClientContainer, req?: Request): Response 
       }, 30000);
       clientRef = { controller, heartbeat, chatJid };
       channel.clients.add(clientRef);
-      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ app_asset_version: getAppAssetVersion(), ...(chatJid ? { chat_jid: chatJid } : {}) })}\n\n`));
+      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ app_asset_version: getAppAssetVersion(), ui_theme: getUiThemeConfig(), ...(chatJid ? { chat_jid: chatJid } : {}) })}\n\n`));
     },
     cancel: () => {
       if (clientRef) {

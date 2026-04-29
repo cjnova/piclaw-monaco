@@ -8,8 +8,14 @@
  *   cursor_ts      – ISO timestamp of the last fully-processed message.
  *                    `getMessagesSince()` uses this as the lower-bound filter.
  *
- *   inflight_*     – Set atomically with the cursor advance just before
- *                    `runAgent()` starts (beginChatRun). If the process is
+ *   preflight_*    – Set while pre-prompt work is running before the current
+ *                    message is consumed into normal inflight run state.
+ *                    Startup recovery clears these markers without cursor
+ *                    rollback because the message is still pending.
+ *
+ *   inflight_*     – Set atomically with the cursor advance immediately
+ *                    before prompt execution begins (beginChatRun or
+ *                    promoteChatPreflightToInflight). If the process is
  *                    killed mid-run these survive; the next startup rolls
  *                    the cursor back to inflight_prev_ts and retries.
  *
@@ -35,8 +41,8 @@
 
 import { getDb } from "./connection.js";
 
-/** Shape returned by getInflightRuns(). */
-export interface InflightRun {
+/** Shared shape for persisted preflight / inflight run markers. */
+interface PendingRunState {
   chatJid: string;
   /** Cursor value that was current *before* this run started. */
   prevTs: string;
@@ -44,6 +50,20 @@ export interface InflightRun {
   messageId: string;
   /** ISO timestamp when the run was started. */
   startedAt: string;
+}
+
+/** Shape returned by getPreflightRuns(). */
+export interface PreflightRun extends PendingRunState {}
+
+/** Shape returned by getInflightRuns(). */
+export interface InflightRun extends PendingRunState {}
+
+export interface ChatCompactionBackoffState {
+  chatJid: string;
+  failureCount: number;
+  lastFailedAt: string;
+  backoffUntil: string;
+  lastErrorMessage: string | null;
 }
 
 /** Possible persisted assistant-output states seen after an inflight start. */
@@ -164,6 +184,116 @@ export function setDeferredQueuedFollowups(chatJid: string, items: DeferredQueue
   `).run(chatJid, payload);
 }
 
+function readCompactionBackoffStateRow(
+  chatJid: string,
+  row:
+    | {
+        compaction_failure_count: number | null;
+        compaction_last_failed_at: string | null;
+        compaction_backoff_until: string | null;
+        compaction_last_error: string | null;
+      }
+    | null
+    | undefined,
+): ChatCompactionBackoffState | null {
+  if (!row?.compaction_failure_count || !row.compaction_last_failed_at || !row.compaction_backoff_until) return null;
+  return {
+    chatJid,
+    failureCount: Number(row.compaction_failure_count),
+    lastFailedAt: row.compaction_last_failed_at,
+    backoffUntil: row.compaction_backoff_until,
+    lastErrorMessage: row.compaction_last_error ?? null,
+  };
+}
+
+export function getChatCompactionBackoff(chatJid: string): ChatCompactionBackoffState | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      compaction_failure_count,
+      compaction_last_failed_at,
+      compaction_backoff_until,
+      compaction_last_error
+    FROM chat_cursors
+    WHERE chat_jid = ?
+  `).get(chatJid) as {
+    compaction_failure_count: number | null;
+    compaction_last_failed_at: string | null;
+    compaction_backoff_until: string | null;
+    compaction_last_error: string | null;
+  } | undefined;
+  return readCompactionBackoffStateRow(chatJid, row);
+}
+
+export function getAllChatCompactionBackoffs(): ChatCompactionBackoffState[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      chat_jid,
+      compaction_failure_count,
+      compaction_last_failed_at,
+      compaction_backoff_until,
+      compaction_last_error
+    FROM chat_cursors
+    WHERE compaction_backoff_until IS NOT NULL
+  `).all() as Array<{
+    chat_jid: string;
+    compaction_failure_count: number | null;
+    compaction_last_failed_at: string | null;
+    compaction_backoff_until: string | null;
+    compaction_last_error: string | null;
+  }>;
+  return rows
+    .map((row) => readCompactionBackoffStateRow(row.chat_jid, row))
+    .filter((row): row is ChatCompactionBackoffState => Boolean(row));
+}
+
+export function setChatCompactionBackoff(
+  chatJid: string,
+  backoff: {
+    failureCount: number;
+    lastFailedAt: string;
+    backoffUntil: string;
+    lastErrorMessage?: string | null;
+  },
+): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO chat_cursors (
+      chat_jid,
+      cursor_ts,
+      compaction_failure_count,
+      compaction_last_failed_at,
+      compaction_backoff_until,
+      compaction_last_error
+    )
+    VALUES (?, '', ?, ?, ?, ?)
+    ON CONFLICT(chat_jid) DO UPDATE SET
+      compaction_failure_count  = excluded.compaction_failure_count,
+      compaction_last_failed_at = excluded.compaction_last_failed_at,
+      compaction_backoff_until  = excluded.compaction_backoff_until,
+      compaction_last_error     = excluded.compaction_last_error
+  `).run(
+    chatJid,
+    backoff.failureCount,
+    backoff.lastFailedAt,
+    backoff.backoffUntil,
+    backoff.lastErrorMessage ?? null,
+  );
+}
+
+export function clearChatCompactionBackoff(chatJid: string): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE chat_cursors
+    SET compaction_failure_count  = NULL,
+        compaction_last_failed_at = NULL,
+        compaction_backoff_until  = NULL,
+        compaction_last_error     = NULL
+    WHERE chat_jid = ?
+  `).run(chatJid);
+}
+
 // ---------------------------------------------------------------------------
 // Cursor writes
 // ---------------------------------------------------------------------------
@@ -186,12 +316,85 @@ export function setChatCursor(chatJid: string, ts: string): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Record that a chat has entered preflight work before the prompt starts.
+ *
+ * The cursor remains at prevTs, so if the process dies in this phase the
+ * pending user message is still visible to getMessagesSince(). Startup
+ * recovery only needs to clear the preflight marker.
+ */
+export function beginChatPreflight(
+  chatJid: string,
+  preflight: { prevTs: string; messageId: string; startedAt: string }
+): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO chat_cursors
+      (chat_jid, cursor_ts, preflight_prev_ts, preflight_message_id, preflight_started_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(chat_jid) DO UPDATE SET
+      preflight_prev_ts    = excluded.preflight_prev_ts,
+      preflight_message_id = excluded.preflight_message_id,
+      preflight_started_at = excluded.preflight_started_at
+  `).run(chatJid, preflight.prevTs, preflight.prevTs, preflight.messageId, preflight.startedAt);
+}
+
+/**
+ * Clear the preflight marker without consuming or rolling back the cursor.
+ */
+export function clearChatPreflight(chatJid: string): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE chat_cursors
+    SET preflight_prev_ts    = NULL,
+        preflight_message_id = NULL,
+        preflight_started_at = NULL
+    WHERE chat_jid = ?
+  `).run(chatJid);
+}
+
+/**
+ * Promote a chat from preflight into normal inflight run state.
+ *
+ * Single UPDATE that consumes the user message into cursor_ts, clears the
+ * preflight marker, and records the inflight marker together.
+ */
+export function promoteChatPreflightToInflight(
+  chatJid: string,
+  newCursorTs: string,
+  inflight: { prevTs: string; messageId: string; startedAt: string }
+): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO chat_cursors (
+      chat_jid,
+      cursor_ts,
+      preflight_prev_ts,
+      preflight_message_id,
+      preflight_started_at,
+      inflight_prev_ts,
+      inflight_message_id,
+      inflight_started_at
+    )
+    VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?)
+    ON CONFLICT(chat_jid) DO UPDATE SET
+      cursor_ts            = excluded.cursor_ts,
+      preflight_prev_ts    = NULL,
+      preflight_message_id = NULL,
+      preflight_started_at = NULL,
+      inflight_prev_ts     = excluded.inflight_prev_ts,
+      inflight_message_id  = excluded.inflight_message_id,
+      inflight_started_at  = excluded.inflight_started_at
+  `).run(chatJid, newCursorTs, inflight.prevTs, inflight.messageId, inflight.startedAt);
+}
+
+/**
  * Atomically advance the cursor AND record the inflight marker.
  *
- * Called immediately before runAgent(). Because this is one INSERT OR REPLACE,
- * both the new cursor_ts and the inflight_* fields land together. If the
- * process is killed before endChatRun() / endChatRunWithError(), the next
- * startup finds the inflight marker and rolls the cursor back to prevTs.
+ * Called immediately before prompt execution when no separate preflight phase
+ * was recorded. Because this is one INSERT OR REPLACE, both the new cursor_ts
+ * and the inflight_* fields land together. If the process is killed before
+ * endChatRun() / endChatRunWithError(), the next startup finds the inflight
+ * marker and rolls the cursor back to prevTs.
  */
 export function beginChatRun(
   chatJid: string,
@@ -222,10 +425,13 @@ export function endChatRun(chatJid: string): void {
   const db = getDb();
   db.prepare(`
     UPDATE chat_cursors
-    SET inflight_prev_ts    = NULL,
-        inflight_message_id = NULL,
-        inflight_started_at = NULL,
-        failed_prev_ts      = NULL,
+    SET preflight_prev_ts    = NULL,
+        preflight_message_id = NULL,
+        preflight_started_at = NULL,
+        inflight_prev_ts     = NULL,
+        inflight_message_id  = NULL,
+        inflight_started_at  = NULL,
+        failed_prev_ts       = NULL,
         failed_ts           = NULL,
         failed_message_id   = NULL,
         failed_thread_root  = NULL,
@@ -245,10 +451,13 @@ export function endChatRunWithError(chatJid: string, failed: FailedRunRecord): v
   const db = getDb();
   db.prepare(`
     UPDATE chat_cursors
-    SET inflight_prev_ts    = NULL,
-        inflight_message_id = NULL,
-        inflight_started_at = NULL,
-        failed_prev_ts      = ?,
+    SET preflight_prev_ts    = NULL,
+        preflight_message_id = NULL,
+        preflight_started_at = NULL,
+        inflight_prev_ts     = NULL,
+        inflight_message_id  = NULL,
+        inflight_started_at  = NULL,
+        failed_prev_ts       = ?,
         failed_ts           = ?,
         failed_message_id   = ?,
         failed_thread_root  = ?,
@@ -295,11 +504,14 @@ export function rollbackChatRunWithError(chatJid: string, failed: FailedRunRecor
 
     db.prepare(`
       UPDATE chat_cursors
-      SET cursor_ts           = ?,
-          inflight_prev_ts    = NULL,
-          inflight_message_id = NULL,
-          inflight_started_at = NULL,
-          failed_prev_ts      = ?,
+      SET cursor_ts            = ?,
+          preflight_prev_ts    = NULL,
+          preflight_message_id = NULL,
+          preflight_started_at = NULL,
+          inflight_prev_ts     = NULL,
+          inflight_message_id  = NULL,
+          inflight_started_at  = NULL,
+          failed_prev_ts       = ?,
           failed_ts           = ?,
           failed_message_id   = ?,
           failed_thread_root  = ?,
@@ -371,6 +583,29 @@ export function clearFailedRun(chatJid: string): void {
 // Crash recovery
 // ---------------------------------------------------------------------------
 
+/** Return every chat that has an active preflight marker. */
+export function getPreflightRuns(): PreflightRun[] {
+  const db = getDb();
+  const rows = db
+    .prepare(`
+      SELECT chat_jid, preflight_prev_ts, preflight_message_id, preflight_started_at
+      FROM chat_cursors
+      WHERE preflight_prev_ts IS NOT NULL
+    `)
+    .all() as Array<{
+      chat_jid: string;
+      preflight_prev_ts: string;
+      preflight_message_id: string;
+      preflight_started_at: string;
+    }>;
+  return rows.map((r) => ({
+    chatJid: r.chat_jid,
+    prevTs: r.preflight_prev_ts,
+    messageId: r.preflight_message_id,
+    startedAt: r.preflight_started_at,
+  }));
+}
+
 /** Return every chat that has an active inflight marker. */
 export function getInflightRuns(): InflightRun[] {
   const db = getDb();
@@ -426,10 +661,13 @@ export function rollbackInflightRun(chatJid: string, prevTs: string): void {
 
   db.prepare(`
     UPDATE chat_cursors
-    SET cursor_ts           = ?,
-        inflight_prev_ts    = NULL,
-        inflight_message_id = NULL,
-        inflight_started_at = NULL
+    SET cursor_ts            = ?,
+        preflight_prev_ts    = NULL,
+        preflight_message_id = NULL,
+        preflight_started_at = NULL,
+        inflight_prev_ts     = NULL,
+        inflight_message_id  = NULL,
+        inflight_started_at  = NULL
     WHERE chat_jid = ?
   `).run(prevTs, chatJid);
 }
@@ -443,9 +681,12 @@ export function clearInflightMarker(chatJid: string): void {
   const db = getDb();
   db.prepare(`
     UPDATE chat_cursors
-    SET inflight_prev_ts    = NULL,
-        inflight_message_id = NULL,
-        inflight_started_at = NULL
+    SET preflight_prev_ts    = NULL,
+        preflight_message_id = NULL,
+        preflight_started_at = NULL,
+        inflight_prev_ts     = NULL,
+        inflight_message_id  = NULL,
+        inflight_started_at  = NULL
     WHERE chat_jid = ?
   `).run(chatJid);
 }

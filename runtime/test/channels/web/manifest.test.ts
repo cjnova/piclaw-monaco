@@ -34,7 +34,7 @@ describe("web manifest helper", () => {
     expect(res.headers.get("Content-Length")).toBeTruthy();
   });
 
-  test("prepends cached agent avatar icon when available", async () => {
+  test("uses explicit avatar-sized manifest icons when a cached agent avatar is available", async () => {
     const req = new Request("https://example.com/manifest.json", { method: "GET" });
     const res = await handleManifestRequest(req, {
       assistantName: "Pi",
@@ -46,7 +46,19 @@ describe("web manifest helper", () => {
     });
 
     const manifest = await res.json();
-    expect(manifest.icons[0].src).toContain("/avatar/agent?v=2026-03-09T00%3A00%3A00.000Z");
-    expect(manifest.icons[0].type).toBe("image/webp");
+    expect(manifest.icons).toEqual([
+      {
+        src: "/avatar/agent?format=png&size=192&v=2026-03-09T00%3A00%3A00.000Z",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any maskable",
+      },
+      {
+        src: "/avatar/agent?format=png&size=512&v=2026-03-09T00%3A00%3A00.000Z",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any maskable",
+      },
+    ]);
   });
 });

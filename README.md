@@ -2,7 +2,7 @@
 
 ![PiClaw](docs/icon-256.png)
 
-PiClaw packages the [Pi Coding Agent](https://github.com/badlogic/pi-mono) into a self-hosted workspace with a streaming web UI, persistent state, multi-provider LLM support, and a practical built-in toolset.
+PiClaw packages the [Pi Coding Agent](https://github.com/badlogic/pi-mono) into a self-hosted workspace with a streaming web UI, persistent state, multi-provider LLM support, and a practical built-in toolset that includes [many add-ons](https://rcarmo.github.io/piclaw-addons/).
 
 It is for people who want one stateful agent workspace they can run locally or in a container without stitching together half a dozen separate services.
 
@@ -118,7 +118,7 @@ See [docs/development.md](docs/development.md).
 |---|---|
 | Getting started | [Configuration](docs/configuration.md), [Web UI](docs/web-ui.md), [Install from repo](docs/install-from-repo.md) |
 | Operations | [Azure VM deployment](docs/azure/README.md), [Reverse proxy](docs/reverse-proxy.md), [Release process](docs/release.md) |
-| Runtime internals | [Architecture](docs/architecture.md), [Runtime flows](docs/runtime-flows.md), [Storage model](docs/storage.md) |
+| Runtime internals | [Architecture](docs/architecture.md), [Runtime flows](docs/runtime-flows.md), [Storage model](docs/storage.md), [Observability](docs/observability.md) |
 | UI extension model | [Web pane extensions](docs/web-pane-extensions.md), [Extension UI contract](docs/extension-ui-contract.md), [Vendored widget libraries](docs/vendored-widget-libraries.md) |
 | Agent capabilities | [Tools and skills](docs/tools-and-skills.md), [Visual artifact generator](docs/visual-artifact-generator.md), [MCP via pi-mcp-adapter](docs/mcp.md), [Keychain](docs/keychain.md) |
 | Other references | [Dream memory system](docs/dream-memory.md), [Web notification delivery policy](docs/web-notification-delivery-policy.md), [iOS PWA reference](docs/PWA.md), [WhatsApp](docs/whatsapp.md), [Cross-instance interop](docs/cross-instance-ipc.md), [Experimental M365 extension](docs/m365-experimental-extension.md), [Development](docs/development.md) |
@@ -136,11 +136,15 @@ See [WORKITEMS.md](WORKITEMS.md) for board lane definitions and label taxonomy.
 
 ## Credits
 
+- [pi.dev](http://pi.dev) for a stupendously flexible and extensible core
 - [rcarmo/agentbox](https://github.com/rcarmo/agentbox)
 - [qwibitai/nanoclaw](https://github.com/qwibitai/nanoclaw)
 - [badlogic/pi-mono](https://github.com/badlogic/pi-mono)
-- [davebcn87/pi-autoresearch](https://github.com/davebcn87/pi-autoresearch) — autonomous experiment loop by Tobi Lutke and David Cortés (vendored under `runtime/vendor/autoresearch/`)
+- [davebcn87/pi-autoresearch](https://github.com/davebcn87/pi-autoresearch) — autonomous experiment loop by Tobi Lutke and David Cortés (now carried by the autoresearch add-on in `rcarmo/piclaw-addons`)
 - [nicobailon/visual-explainer](https://github.com/nicobailon/visual-explainer) — visual artifact generation skill philosophy, prompt workflow, and template patterns by Nico Bailon (adapted, not vendored)
+
+> [!NOTE]
+> piclaw is **not** directly affiliated with [pi.dev](https://pi.dev). It is a derivative work that leverages all of its core Pi functionality and builds additional runtime, tooling, and UI layers around it.
 
 ## Licence
 

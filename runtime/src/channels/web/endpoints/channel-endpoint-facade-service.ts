@@ -101,6 +101,7 @@ export class WebChannelEndpointFacadeService {
     chatJid?: string,
     searchScope?: "current" | "root" | "all",
     rootChatJid?: string,
+    filters?: { images?: boolean; attachments?: boolean } | null,
   ): Response {
     return handleSearchRequest(
       query,
@@ -110,6 +111,7 @@ export class WebChannelEndpointFacadeService {
       searchScope,
       rootChatJid,
       this.options.endpointContexts.content(),
+      filters,
     );
   }
 

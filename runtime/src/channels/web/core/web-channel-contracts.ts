@@ -145,7 +145,7 @@ export interface WebChannelLike
   handleWorkspaceVisibility(req: Request): Promise<Response>;
   handleTimeline(limit: number, before?: number, chatJid?: string): Response;
   handleHashtag(tag: string, limit: number, offset: number, chatJid?: string): Response;
-  handleSearch(query: string, limit: number, offset: number, chatJid?: string, searchScope?: "current" | "root" | "all", rootChatJid?: string): Response;
+  handleSearch(query: string, limit: number, offset: number, chatJid?: string, searchScope?: "current" | "root" | "all", rootChatJid?: string, filters?: { images?: boolean; attachments?: boolean } | null): Response;
   handleThread(id: number | null, chatJid?: string): Response;
   handleThought(panel: string | null, turnId: string | null): Response;
   handleThoughtVisibility(req: Request): Promise<Response>;

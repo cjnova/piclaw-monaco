@@ -8,7 +8,7 @@
  * Reads the current chat JID from AsyncLocalStorage/env at execution time.
  */
 import { basename, resolve, relative } from "path";
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type {
   AgentToolResult,
   ExtensionAPI,

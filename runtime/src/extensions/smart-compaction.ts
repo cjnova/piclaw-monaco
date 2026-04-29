@@ -51,7 +51,13 @@ const MAX_PROMPT_CHARS = 60_000;
 const TOOL_RESULT_MAX_CHARS = 1_500;
 
 /** How many recent messages to always include verbatim. */
-const TAIL_MESSAGES = 20;
+const TAIL_MESSAGES = 30;
+
+/** Char budget for the backwards-walk recent context. */
+const RECENT_CONTEXT_BUDGET_CHARS = 25_000;
+
+/** Char budget for kept-message context (what survives compaction). */
+const KEPT_CONTEXT_BUDGET_CHARS = 8_000;
 
 /** How many earliest user turns to include for goal context. */
 const HEAD_USER_TURNS = 3;
@@ -61,7 +67,7 @@ const TOPIC_SHIFT_CONTEXT_BEFORE = 2;
 const TOPIC_SHIFT_CONTEXT_AFTER = 6;
 
 /** Context messages to pin after the latest user request (separate from shift). */
-const LATEST_REQUEST_CONTEXT_AFTER = 4;
+const LATEST_REQUEST_CONTEXT_AFTER = 12;
 
 /** Preview length for embedded user-topic snippets. */
 const USER_PREVIEW_MAX_CHARS = 300;
@@ -73,14 +79,38 @@ const MIN_SUMMARY_CHARS = 100;
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalize a file path: strip the workspace prefix so all paths are
+ * workspace-relative. Tool calls record paths inconsistently — some
+ * absolute (`/workspace/foo`), some relative (`foo`). Without this,
+ * `compressFilePaths` can't find a common prefix and the output bloats.
+ */
+const CWD_PREFIX = process.cwd().endsWith("/") ? process.cwd() : process.cwd() + "/";
+function normalizePath(p: string): string {
+  if (p.startsWith(CWD_PREFIX)) return p.slice(CWD_PREFIX.length);
+  // Also handle bare /workspace/ when cwd is /workspace
+  if (p.startsWith("/") && !p.startsWith(CWD_PREFIX) && p.startsWith(process.cwd())) {
+    return p.slice(process.cwd().length + 1);
+  }
+  return p;
+}
+
+function normalizePathSet(paths: Iterable<string>): string[] {
+  const seen = new Set<string>();
+  for (const p of paths) {
+    seen.add(normalizePath(p));
+  }
+  return [...seen];
+}
+
 /** Compute final read-only / modified file lists from FileOperations. */
 function fileListsFromOps(fileOps: FileOperations): {
   readFiles: string[];
   modifiedFiles: string[];
 } {
-  const modified = new Set([...fileOps.written, ...fileOps.edited]);
-  const readOnly = [...fileOps.read].filter((f) => !modified.has(f));
-  return { readFiles: filterJunkPaths(readOnly), modifiedFiles: [...modified] };
+  const modified = new Set(filterJunkPaths(normalizePathSet([...fileOps.written, ...fileOps.edited])));
+  const readOnly = filterJunkPaths(normalizePathSet([...fileOps.read]).filter((f) => !modified.has(f)));
+  return { readFiles: readOnly, modifiedFiles: [...modified] };
 }
 
 /**
@@ -90,24 +120,130 @@ function fileListsFromOps(fileOps: FileOperations): {
  */
 const JUNK_PATH_PATTERNS: RegExp[] = [
   /^\/dev\//,                          // device nodes (/dev/stdin, /dev/null)
-  /^\/tmp\//,                          // temp files
-  /^\/var\/log\//,                     // log files
+  /^\/var\/log\//,                     // host log files
   /^\/proc\//,                         // proc filesystem
   /^\/sys\//,                          // sys filesystem
-  /\/\.cache\//,                       // cache dirs
-  /\/node_modules\//,                  // node_modules
-  /\.jsonl$/,                          // session log files
-  /\/\.pi\/agent\/sessions\//,         // pi session files
-  /\/\.pi\/agent\/models\.json$/,      // pi model config
-  /\/\.pi\/agent\/settings\.json$/,    // pi settings
-  /\/bun\.lock$/,                      // lockfiles
-  /\/package-lock\.json$/,
+  /^(?:\/tmp|tmp)\//,                  // host temp files or workspace tmp/
+  /(?:^|\/)\.piclaw\/tmp\//,          // piclaw temp files
+  /(?:^|\/)\.cache\//,                // cache dirs
+  /(?:^|\/)node_modules\//,           // dependency trees
+  /(?:^|\/)\.pi\/agent\/sessions\//,  // pi session files
+  /(?:^|\/)\.pi\/agent\/models\.json$/, // pi model config
+  /(?:^|\/)\.pi\/agent\/settings\.json$/, // pi settings
+  /(?:^|\/)bun\.lock$/,               // lockfiles
+  /(?:^|\/)package-lock\.json$/,
+  /\.jsonl$/,                          // session/log jsonl files
   /\.wasm$/,                           // binary blobs
   /\.map$/,                            // source maps
   /\.min\.js$/,                        // minified bundles
   /\.bundle\.(js|css)$/,               // bundles
   /\.meta\.json$/,                     // meta files
 ];
+
+/**
+ * Find the longest common directory prefix for a set of paths.
+ * Returns a prefix ending in `/`, or an empty string when no shared
+ * directory prefix exists.
+ */
+function findCommonDirectoryPrefix(paths: string[]): string {
+  if (paths.length === 0) return "";
+  let prefix = paths[0];
+  for (let i = 1; i < paths.length; i++) {
+    while (!paths[i].startsWith(prefix)) {
+      const slash = prefix.lastIndexOf("/", prefix.length - 2);
+      if (slash < 0) return "";
+      prefix = prefix.slice(0, slash + 1);
+    }
+  }
+  return prefix;
+}
+
+/**
+ * Group paths by their top-level root so unrelated outliers (`tmp/...`)
+ * do not destroy compression for the main cluster (`piclaw/...`).
+ */
+function topLevelPathKey(path: string): string {
+  if (!path.includes("/")) return "";
+  if (path.startsWith("/")) {
+    const trimmed = path.slice(1);
+    const slash = trimmed.indexOf("/");
+    return slash >= 0 ? `/${trimmed.slice(0, slash + 1)}` : path;
+  }
+  const slash = path.indexOf("/");
+  return slash >= 0 ? path.slice(0, slash + 1) : "";
+}
+
+/** Render a single compressed path cluster. */
+function renderCompressedPathCluster(paths: string[]): string {
+  if (paths.length === 0) return "(none)";
+  const sorted = [...paths].sort();
+  const prefix = findCommonDirectoryPrefix(sorted);
+
+  const groups = new Map<string, string[]>();
+  for (const p of sorted) {
+    const rel = prefix ? p.slice(prefix.length) : p;
+    const lastSlash = rel.lastIndexOf("/");
+    const dir = lastSlash >= 0 ? rel.slice(0, lastSlash + 1) : "";
+    const file = lastSlash >= 0 ? rel.slice(lastSlash + 1) : rel;
+    if (!groups.has(dir)) groups.set(dir, []);
+    groups.get(dir)!.push(file);
+  }
+
+  const lines: string[] = [];
+  if (prefix) lines.push(`base: ${prefix}`);
+  for (const [dir, files] of [...groups.entries()].sort()) {
+    if (files.length === 1) {
+      lines.push(`${dir}${files[0]}`);
+    } else {
+      lines.push(`${dir || "./"}: ${files.join(", ")}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Compress a list of file paths by factoring out common prefixes and,
+ * when needed, compressing multiple top-level clusters independently.
+ *
+ * Example:
+ *   piclaw/runtime/web/src/ui/app.ts
+ *   piclaw/runtime/web/src/ui/theme.ts
+ *   piclaw/runtime/test/web/app.test.ts
+ *   tmp/report.patch
+ * →
+ *   base: piclaw/runtime/
+ *   web/src/ui/: app.ts, theme.ts
+ *   test/web/: app.test.ts
+ *   tmp/report.patch
+ */
+function compressFilePaths(paths: string[]): string {
+  if (paths.length === 0) return "(none)";
+  const uniqueSorted = [...new Set(paths)].sort();
+  if (uniqueSorted.length <= 3) return uniqueSorted.join("\n");
+
+  const globalPrefix = findCommonDirectoryPrefix(uniqueSorted);
+  if (globalPrefix) return renderCompressedPathCluster(uniqueSorted);
+
+  const clusters = new Map<string, string[]>();
+  for (const path of uniqueSorted) {
+    const key = topLevelPathKey(path);
+    if (!clusters.has(key)) clusters.set(key, []);
+    clusters.get(key)!.push(path);
+  }
+
+  if (clusters.size <= 1) return renderCompressedPathCluster(uniqueSorted);
+
+  const lines: string[] = [];
+  for (const key of [...clusters.keys()].sort()) {
+    const cluster = clusters.get(key)!;
+    if (cluster.length === 1) {
+      lines.push(cluster[0]);
+      continue;
+    }
+    lines.push(renderCompressedPathCluster(cluster));
+  }
+  return lines.join("\n");
+}
 
 function filterJunkPaths(paths: string[]): string[] {
   return paths.filter((p) => !JUNK_PATH_PATTERNS.some((re) => re.test(p)));
@@ -123,15 +259,87 @@ function extractText(content: unknown): string {
     .trim();
 }
 
+// ---------------------------------------------------------------------------
+// Synthetic message detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Prefixes used by pi upstream's convertToLlm to wrap compaction/branch
+ * summaries as user-role messages. We must skip these in every function
+ * that looks for real user turns.
+ */
+const SYNTHETIC_USER_PREFIXES = [
+  "The conversation history before this point was compacted into the following summary:",
+  "The following is a summary of a branch that this conversation came back from:",
+];
+
+/** True when a user-role LLM message is actually a synthetic summary wrapper. */
+function isSyntheticUserMessage(msg: Message): boolean {
+  if (msg.role !== "user") return false;
+  const text = extractText(msg.content);
+  return SYNTHETIC_USER_PREFIXES.some((prefix) => text.startsWith(prefix));
+}
+
+/** True when an LLM user-role message came from a real human user turn. */
+function isRealUserMessage(msg: Message, idx: number, humanUserIndexes?: Set<number>): boolean {
+  if (msg.role !== "user") return false;
+  if (isSyntheticUserMessage(msg)) return false;
+  const text = extractText(msg.content).trim();
+  if (!text || text.startsWith("/")) return false;
+  return humanUserIndexes ? humanUserIndexes.has(idx) : true;
+}
+
+type SourceMessage = {
+  role: string;
+  content?: unknown;
+  excludeFromContext?: boolean;
+};
+
+function isRealUserSourceMessage(msg: SourceMessage): boolean {
+  if (msg.role !== "user") return false;
+  const text = extractText(msg.content).trim();
+  return !!text && !text.startsWith("/");
+}
+
+function convertMessagesWithMetadata(sourceMessages: SourceMessage[]): {
+  llmMessages: Message[];
+  humanUserIndexes: Set<number>;
+} {
+  const llmMessages: Message[] = [];
+  const humanUserIndexes = new Set<number>();
+
+  for (const source of sourceMessages) {
+    const converted = convertToLlm([source as any]);
+    if (converted.length === 0) continue;
+    const start = llmMessages.length;
+    llmMessages.push(...converted);
+    if (isRealUserSourceMessage(source)) {
+      for (let i = 0; i < converted.length; i++) {
+        humanUserIndexes.add(start + i);
+      }
+    }
+  }
+
+  return { llmMessages, humanUserIndexes };
+}
+
 function buildPreview(text: string, maxChars = USER_PREVIEW_MAX_CHARS): string {
   return text.length > maxChars ? text.slice(0, maxChars) + "..." : text;
 }
 
 /** Serialize one LLM message to a compact readable line. */
-function serializeMessage(msg: Message, idx: number): string {
+function serializeMessage(msg: Message, idx: number, humanUserIndexes?: Set<number>): string {
   if (msg.role === "user") {
+    if (isSyntheticUserMessage(msg)) {
+      // Don't dump the full compaction/branch summary into excerpts.
+      // A brief marker is enough — the previous summary is already in the prompt.
+      return `[${idx}|CompactionSummary]: (previous compaction summary — see Previous Summary section)`;
+    }
     const text = extractText(msg.content);
-    return text ? `[${idx}|User]: ${text}` : "";
+    if (!text) return "";
+    return humanUserIndexes?.has(idx)
+      ? `[${idx}|User]: ${text}`
+      : `[${idx}|Context]: ${text}`;
   }
   if (msg.role === "assistant") {
     const parts: string[] = [];
@@ -162,6 +370,123 @@ function serializeMessage(msg: Message, idx: number): string {
   return "";
 }
 
+/**
+ * Compress a tool call + result pair into a single compact outcome line.
+ * Keeps tool name and key arg, plus a brief outcome summary.
+ */
+function serializeToolCompact(assistantMsg: Message, resultMsg: Message | null, idx: number): string {
+  const calls: string[] = [];
+  for (const block of (assistantMsg.content as any[])) {
+    if (block.type === "toolCall") {
+      const args = block.arguments ?? {};
+      const keyArg = args.path ?? args.command ?? args.pattern ?? args.query ?? null;
+      const argStr = typeof keyArg === "string"
+        ? (keyArg.length > 80 ? keyArg.slice(0, 77) + "..." : keyArg)
+        : "";
+      calls.push(`${block.name}(${argStr})`);
+    }
+    if (block.type === "text" && block.text?.trim()) {
+      const t = block.text.trim();
+      calls.push(t.length > 150 ? t.slice(0, 147) + "..." : t);
+    }
+  }
+  if (calls.length === 0) return "";
+
+  let outcome = "";
+  if (resultMsg) {
+    const text = extractText(resultMsg.content).trim();
+    if (text) {
+      // Extract just the first meaningful line or error indicator
+      const firstLine = text.split("\n").find(l => l.trim().length > 0) || "";
+      outcome = firstLine.length > 120 ? firstLine.slice(0, 117) + "..." : firstLine;
+    }
+  }
+
+  return outcome
+    ? `[${idx}|Tool]: ${calls.join("; ")} → ${outcome}`
+    : `[${idx}|Tool]: ${calls.join("; ")}`;
+}
+
+/**
+ * Walk backwards from the end of the message array, capturing user intent
+ * with full fidelity while aggressively compressing tool call/result pairs.
+ *
+ * Returns a set of message indices to include, plus pre-rendered compact
+ * versions for tool pairs (overrides the normal serializeMessage output).
+ */
+function selectRecentContextBackwards(
+  messages: Message[],
+  humanUserIndexes?: Set<number>,
+): { included: Set<number>; compactOverrides: Map<number, string> } {
+  const included = new Set<number>();
+  const compactOverrides = new Map<number, string>();
+  let budget = RECENT_CONTEXT_BUDGET_CHARS;
+
+  let i = messages.length - 1;
+  while (i >= 0 && budget > 0) {
+    const msg = messages[i];
+
+    if (msg.role === "user") {
+      if (isSyntheticUserMessage(msg)) {
+        // Compaction/branch summaries are synthetic — skip, don't eat budget
+        i--;
+        continue;
+      }
+      // Keep user-role context, but only real human turns are labeled as User.
+      const line = serializeMessage(msg, i, humanUserIndexes);
+      included.add(i);
+      budget -= line.length;
+      i--;
+      continue;
+    }
+
+    if (msg.role === "assistant") {
+      const hasToolCalls = Array.isArray(msg.content) &&
+        (msg.content as any[]).some((b: any) => b.type === "toolCall");
+      const hasText = Array.isArray(msg.content) &&
+        (msg.content as any[]).some((b: any) => b.type === "text" && b.text?.trim());
+
+      if (hasToolCalls) {
+        // Find the corresponding tool result ahead
+        const resultIdx = i + 1 < messages.length && messages[i + 1].role === "toolResult" ? i + 1 : null;
+        const compact = serializeToolCompact(msg, resultIdx !== null ? messages[resultIdx] : null, i);
+        if (compact) {
+          included.add(i);
+          compactOverrides.set(i, compact);
+          if (resultIdx !== null) {
+            included.add(resultIdx); // mark result as consumed
+            compactOverrides.set(resultIdx, ""); // skip separate rendering
+          }
+          budget -= compact.length;
+        }
+        i--;
+        continue;
+      }
+
+      if (hasText) {
+        // Assistant explanatory text — keep full
+        const line = serializeMessage(msg, i, humanUserIndexes);
+        included.add(i);
+        budget -= line.length;
+        i--;
+        continue;
+      }
+    }
+
+    if (msg.role === "toolResult") {
+      // Orphaned tool result not yet consumed by assistant handler above.
+      // Skip — it will be captured when the backwards walk reaches the
+      // assistant message that issued the call.
+      i--;
+      continue;
+    }
+
+    i--;
+  }
+
+  return { included, compactOverrides };
+}
+
 // ---------------------------------------------------------------------------
 // Fragment selection
 // ---------------------------------------------------------------------------
@@ -169,6 +494,7 @@ function serializeMessage(msg: Message, idx: number): string {
 /** Detect session type from tool-call patterns and user messages. */
 function detectSessionType(
   messages: Message[],
+  humanUserIndexes?: Set<number>,
 ): "implementation" | "exploration" | "discussion" | "debugging" {
   let hasWrite = false;
   let hasEdit = false;
@@ -176,7 +502,8 @@ function detectSessionType(
   let hasBash = false;
   let errorMentions = 0;
 
-  for (const msg of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
     if (msg.role === "assistant") {
       for (const block of msg.content as any[]) {
         if (block.type !== "toolCall") continue;
@@ -186,7 +513,7 @@ function detectSessionType(
         else if (name === "read") hasRead = true;
         else if (name === "bash" || name === "exec_batch") hasBash = true;
       }
-    } else if (msg.role === "user") {
+    } else if (isRealUserMessage(msg, i, humanUserIndexes)) {
       const text = extractText(msg.content).toLowerCase();
       if (
         /\b(error|bug|broken|doesn't work|still wrong|fix|issue)\b/.test(
@@ -205,10 +532,10 @@ function detectSessionType(
 }
 
 /** Indices of user messages that look like complaints. */
-function findUserComplaints(messages: Message[]): number[] {
+function findUserComplaints(messages: Message[], humanUserIndexes?: Set<number>): number[] {
   const out: number[] = [];
   for (let i = 0; i < messages.length; i++) {
-    if (messages[i].role !== "user") continue;
+    if (!isRealUserMessage(messages[i], i, humanUserIndexes)) continue;
     const text = extractText(messages[i].content).toLowerCase();
     if (
       /\b(doesn't work|still broken|still wrong|not working|bug|issue|error|failed|broken|fix)\b/.test(
@@ -221,30 +548,45 @@ function findUserComplaints(messages: Message[]): number[] {
   return out;
 }
 
-/** First non-slash-command user message. */
+/** First non-slash-command, non-synthetic user message. */
 function findFirstUserRequest(
   messages: Message[],
+  humanUserIndexes?: Set<number>,
 ): { index: number; text: string } | null {
   for (let i = 0; i < messages.length; i++) {
-    if (messages[i].role !== "user") continue;
+    if (!isRealUserMessage(messages[i], i, humanUserIndexes)) continue;
     const text = extractText(messages[i].content).trim();
-    if (!text || text.startsWith("/")) continue;
     return { index: i, text };
   }
   return null;
 }
 
-/** Latest non-slash-command user message. */
+/** Latest non-slash-command, non-synthetic user message. */
 function findLatestUserRequest(
   messages: Message[],
+  humanUserIndexes?: Set<number>,
 ): { index: number; text: string } | null {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role !== "user") continue;
+    if (!isRealUserMessage(messages[i], i, humanUserIndexes)) continue;
     const text = extractText(messages[i].content).trim();
-    if (!text || text.startsWith("/")) continue;
     return { index: i, text };
   }
   return null;
+}
+
+/** Collect the last N non-slash-command, non-synthetic user turns (newest first). */
+function findRecentUserTurns(
+  messages: Message[],
+  maxTurns = 5,
+  humanUserIndexes?: Set<number>,
+): { index: number; text: string }[] {
+  const turns: { index: number; text: string }[] = [];
+  for (let i = messages.length - 1; i >= 0 && turns.length < maxTurns; i--) {
+    if (!isRealUserMessage(messages[i], i, humanUserIndexes)) continue;
+    const text = extractText(messages[i].content).trim();
+    turns.push({ index: i, text });
+  }
+  return turns;
 }
 
 // A1 requirement: pre-prompt compaction must stop biasing the next turn toward
@@ -307,10 +649,10 @@ function tokenizeTopicText(text: string): Set<string> {
   );
 }
 
-function findUserTurns(messages: Message[]): UserTurn[] {
+function findUserTurns(messages: Message[], humanUserIndexes?: Set<number>): UserTurn[] {
   const turns: UserTurn[] = [];
   for (let i = 0; i < messages.length; i++) {
-    if (messages[i].role !== "user") continue;
+    if (!isRealUserMessage(messages[i], i, humanUserIndexes)) continue;
     const text = extractText(messages[i].content).trim();
     if (!text || text.startsWith("/")) continue;
     turns.push({ index: i, text, tokens: tokenizeTopicText(text) });
@@ -328,8 +670,8 @@ function computeTokenOverlap(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : intersection / union;
 }
 
-function detectRecentTopicShift(messages: Message[]): TopicShiftSignal | null {
-  const userTurns = findUserTurns(messages);
+function detectRecentTopicShift(messages: Message[], humanUserIndexes?: Set<number>): TopicShiftSignal | null {
+  const userTurns = findUserTurns(messages, humanUserIndexes);
   for (let i = userTurns.length - 1; i >= 1; i--) {
     const current = userTurns[i];
     const previous = userTurns[i - 1];
@@ -450,6 +792,10 @@ interface SelectivePromptInput {
   tokensBefore: number;
   previousSummary?: string;
   fileOps: FileOperations;
+  /** Compact summary of the kept (surviving) messages. */
+  keptMessagesSummary?: string;
+  /** Compact excerpt of the dropped prefix of a split current turn, if any. */
+  turnPrefixSummary?: string;
 }
 
 function buildSelectivePrompt(
@@ -457,47 +803,33 @@ function buildSelectivePrompt(
   input: SelectivePromptInput,
   customInstructions?: string,
   topicShift?: TopicShiftSignal | null,
+  humanUserIndexes?: Set<number>,
 ): string {
   const total = allMessages.length;
-  const sessionType = detectSessionType(allMessages);
-  const firstRequest = findFirstUserRequest(allMessages);
-  const latestRequest = findLatestUserRequest(allMessages);
+  const sessionType = detectSessionType(allMessages, humanUserIndexes);
+  const firstRequest = findFirstUserRequest(allMessages, humanUserIndexes);
+  const latestRequest = findLatestUserRequest(allMessages, humanUserIndexes);
+  const recentUserTurns = findRecentUserTurns(allMessages, 5, humanUserIndexes);
   // topicShift is pre-computed by the caller to avoid a redundant full scan.
   const shift = topicShift ?? null;
-  const complaints = findUserComplaints(allMessages);
+  const complaints = findUserComplaints(allMessages, humanUserIndexes);
   const { readFiles, modifiedFiles } = fileListsFromOps(input.fileOps);
 
   // A1 requirement: always preserve enough context to distinguish the newest
-  // active topic from older background material. The core stale-summary failure
-  // happens when compaction keeps the old goal but under-represents the pivot.
-  // We therefore pin four classes of excerpts:
-  //   1. head          → original goal / session setup,
-  //   2. tail          → newest state,
-  //   3. complaints    → user corrections that invalidate "done" claims,
-  //   4. topic shifts  → the transition boundary between old and new topics.
-  const included = new Set<number>();
+  // active topic from older background material.
+  //
+  // Strategy: walk BACKWARDS from the end with a char budget, compressing
+  // tool call/result pairs into compact outcome lines. This captures far more
+  // user turns (intent) than a fixed tail window that wastes budget on verbose
+  // tool output. Then pin head, complaints, and topic-shift boundaries.
+  const { included: recentIncluded, compactOverrides } = selectRecentContextBackwards(allMessages, humanUserIndexes);
+  const included = new Set<number>(recentIncluded);
 
   // 1. Head — first few user turns for goal context
   const headEnd = Math.min(HEAD_USER_TURNS * 3, total);
   for (let i = 0; i < headEnd; i++) included.add(i);
 
-  // 2. Tail — most recent messages for current state
-  const tailStart = Math.max(0, total - TAIL_MESSAGES);
-  for (let i = tailStart; i < total; i++) included.add(i);
-
-  // 3. Latest request — pin the newest user instruction even if a long tool run
-  // pushed it outside the fixed tail window.
-  if (latestRequest) {
-    for (
-      let j = Math.max(0, latestRequest.index - 1);
-      j <= Math.min(total - 1, latestRequest.index + LATEST_REQUEST_CONTEXT_AFTER);
-      j++
-    ) {
-      included.add(j);
-    }
-  }
-
-  // 4. User complaints + surrounding context
+  // 2. User complaints + surrounding context
   for (const idx of complaints) {
     for (
       let j = Math.max(0, idx - 1);
@@ -508,8 +840,7 @@ function buildSelectivePrompt(
     }
   }
 
-  // 5. Topic-shift boundary — if we think A1 is in play, pin the turns on both
-  // sides of the pivot so the summarizer can explicitly demote the stale topic.
+  // 3. Topic-shift boundary — pin turns on both sides of the pivot
   if (shift) {
     for (
       let j = Math.max(0, shift.previous.index - TOPIC_SHIFT_CONTEXT_BEFORE);
@@ -520,13 +851,13 @@ function buildSelectivePrompt(
     }
   }
 
-  // 6. Key decision messages from the middle
+  // 4. Key decision messages from the middle
   const decisions = findKeyDecisionMessages(allMessages, included);
   for (const idx of decisions) {
     included.add(idx);
     for (let j = idx - 1; j >= Math.max(0, idx - 2); j--) {
       included.add(j);
-      if (allMessages[j].role === "user") break;
+      if (isRealUserMessage(allMessages[j], j, humanUserIndexes)) break;
     }
   }
 
@@ -549,14 +880,36 @@ function buildSelectivePrompt(
   // A1 requirement: the prompt must tell the compaction model which topic is
   // active *before* it sees the previous summary. Otherwise the older summary
   // can dominate the merge and resurrect stale work as if it were current.
-  // We use a distinct heading ("Detected Active Topic") to avoid name collision
-  // with the output format's "## Current Active Topic" section that may appear
-  // in iterative previous-summary payloads.
   sec.push(`\n## Detected Active Topic (from latest messages)`);
-  if (latestRequest) {
+  if (recentUserTurns.length > 0) {
+    sec.push(`Recent user instructions (newest first):`);
+    for (const turn of recentUserTurns) {
+      sec.push(`- [msg ${turn.index}]: "${buildPreview(turn.text)}"`);
+    }
+    if (latestRequest) {
+      sec.push(`- Treat message ${latestRequest.index} as the current active instruction.`);
+    }
+  } else if (latestRequest) {
     sec.push(`- Treat message ${latestRequest.index} as the newest active user instruction: "${buildPreview(latestRequest.text)}"`);
   } else {
     sec.push(`- (none)`);
+  }
+
+  // Show what the user is working on in the KEPT messages (the ones that
+  // survive compaction and will follow the summary in context). This is
+  // critical: messagesToSummarize only contains what's being discarded,
+  // so without this section the LLM has no visibility into the most recent work.
+  if (input.keptMessagesSummary) {
+    sec.push(`\n## Kept Messages (survive compaction — these represent the CURRENT work)`);
+    sec.push(`The following excerpts are in the kept window and will remain in context after compaction. They represent what the user is CURRENTLY working on now, including surviving user turns, assistant/tool progress, and other retained context:`);
+    sec.push(input.keptMessagesSummary);
+    sec.push(`\nIMPORTANT: The summary you produce must reflect this current work as the active topic, not older topics from the messages being discarded.`);
+  }
+
+  if (input.turnPrefixSummary) {
+    sec.push(`\n## Split Turn Prefix (discarded prefix of the CURRENT turn)`);
+    sec.push(`The compacted window cut through an in-progress turn. The following excerpt is the dropped prefix of that current turn and is needed to understand the kept suffix:`);
+    sec.push(input.turnPrefixSummary);
   }
 
   sec.push(`\n## Historical / Background Context Handling`);
@@ -567,21 +920,20 @@ function buildSelectivePrompt(
     sec.push(`- Shift signals: ${shift.reasons.join("; ")}.`);
     sec.push(`- Treat earlier summary content as background unless it is reaffirmed after message ${shift.current.index}.`);
   } else {
-    sec.push(`- No strong recent topic shift detected. Merge prior summary normally.`);
+    sec.push(`- No explicit topic shift cue detected. Determine the active topic from the Detected Active Topic and Kept Messages sections above.`);
+    sec.push(`- If the kept messages show different work than the previous summary's active topic, update accordingly.`);
   }
 
   sec.push(`\n## Files Modified (verified from tool results)`);
   if (modifiedFiles.length > 0) {
-    for (const f of modifiedFiles) sec.push(`- ${f}`);
+    sec.push(compressFilePaths(modifiedFiles));
   } else {
     sec.push(`- (none)`);
   }
 
   sec.push(`\n## Files Read (not modified)`);
   if (readFiles.length > 0) {
-    const shown = readFiles.slice(0, 20);
-    for (const f of shown) sec.push(`- ${f}`);
-    if (readFiles.length > 20) sec.push(`- … and ${readFiles.length - 20} more`);
+    sec.push(compressFilePaths(readFiles));
   } else {
     sec.push(`- (none)`);
   }
@@ -600,9 +952,9 @@ function buildSelectivePrompt(
 
   sec.push(`\n## Conversation Excerpts`);
   sec.push(
-    shift
-      ? `(Selected fragments from ${total} messages — head, tail, complaints, key decisions, and the latest topic-shift boundary)\n`
-      : `(Selected fragments from ${total} messages — head, tail, complaints, and key decisions)\n`,
+    `(Selected fragments from ${total} messages \u2014 backwards walk with compressed tool calls, head, complaints${
+      shift ? ", topic-shift boundary" : ""
+    }, and key decisions)\n`,
   );
 
   const sorted = [...included].sort((a, b) => a - b);
@@ -611,13 +963,15 @@ function buildSelectivePrompt(
 
   for (const idx of sorted) {
     if (chars > MAX_PROMPT_CHARS) {
-      sec.push(`\n… (prompt limit reached, ${sorted.length - sorted.indexOf(idx)} more selected messages omitted)`);
+      sec.push(`\n\u2026 (prompt limit reached, ${sorted.length - sorted.indexOf(idx)} more selected messages omitted)`);
       break;
     }
     if (lastIdx >= 0 && idx > lastIdx + 1) {
       sec.push(`\n--- [${idx - lastIdx - 1} messages omitted] ---\n`);
     }
-    const line = serializeMessage(allMessages[idx], idx);
+    // Use compact override if available (compressed tool pairs)
+    const override = compactOverrides.get(idx);
+    const line = override !== undefined ? override : serializeMessage(allMessages[idx], idx, humanUserIndexes);
     if (line) {
       sec.push(line);
       chars += line.length;
@@ -665,10 +1019,16 @@ function tryNoOpCompaction(
   preparation: {
     previousSummary?: string;
     fileOps: FileOperations;
+    isSplitTurn?: boolean;
   },
   firstKeptEntryId: string,
   tokensBefore: number,
   topicShift: TopicShiftSignal | null,
+  humanUserIndexes: Set<number>,
+  currentWorkHints: {
+    hasKeptUserContext: boolean;
+    hasTurnPrefixHumanUser: boolean;
+  },
   ctx: { ui: { notify: (msg: string, level?: "info" | "warning" | "error") => void } },
 ): { compaction: CompactionResult } | null {
   const { previousSummary, fileOps } = preparation;
@@ -678,16 +1038,15 @@ function tryNoOpCompaction(
     return null;
   }
 
-  // Count user messages (non-slash-command)
+  // Count real user messages (non-slash-command, non-synthetic)
   let userMessageCount = 0;
   let userTotalChars = 0;
-  for (const msg of llmMessages) {
-    if (msg.role === "user") {
+  for (let i = 0; i < llmMessages.length; i++) {
+    const msg = llmMessages[i];
+    if (isRealUserMessage(msg, i, humanUserIndexes)) {
       const text = extractText(msg.content);
-      if (text && !text.trim().startsWith("/")) {
-        userMessageCount++;
-        userTotalChars += text.length;
-      }
+      userMessageCount++;
+      userTotalChars += text.length;
     }
   }
 
@@ -696,8 +1055,9 @@ function tryNoOpCompaction(
   // topicShift is pre-computed by the caller.
 
   // ── Pattern 1: Split-turn continuation ────────────────────────────
-  // Zero user messages → the goal/context hasn't changed, just more tool work.
-  if (userMessageCount === 0) {
+  // Zero user messages in the discarded window can still be unsafe if the
+  // dropped prefix of the current turn contains a fresh user instruction.
+  if (preparation.isSplitTurn && userMessageCount === 0 && !currentWorkHints.hasTurnPrefixHumanUser) {
     const delta = buildMechanicalDelta(llmMessages, modifiedFiles, readFiles);
     const summary = appendDeltaToSummary(previousSummary, delta, fileOps);
 
@@ -715,7 +1075,13 @@ function tryNoOpCompaction(
   // Tiny user input, no modifications → usually nothing new to capture.
   // But if that tiny input is a pivot cue, we must force the LLM path so the
   // summary can demote the stale topic and promote the new one.
-  if (userTotalChars < 100 && !hasModifications && !topicShift) {
+  if (
+    userTotalChars < 100 &&
+    !hasModifications &&
+    !topicShift &&
+    !currentWorkHints.hasKeptUserContext &&
+    !currentWorkHints.hasTurnPrefixHumanUser
+  ) {
     const summary = updateFileLists(previousSummary, fileOps);
 
     ctx.ui.notify(
@@ -825,15 +1191,143 @@ function appendFileLists(base: string, fileOps: FileOperations): string {
   const parts: string[] = [base];
 
   if (readFiles.length > 0) {
-    parts.push(`\n<read-files>\n${readFiles.join("\n")}\n</read-files>`);
+    parts.push(`\n<read-files>\n${compressFilePaths(readFiles)}\n</read-files>`);
   }
   if (modifiedFiles.length > 0) {
     parts.push(
-      `\n<modified-files>\n${modifiedFiles.join("\n")}\n</modified-files>`,
+      `\n<modified-files>\n${compressFilePaths(modifiedFiles)}\n</modified-files>`,
     );
   }
 
   return parts.join("\n");
+}
+
+function normalizeSerializedLine(line: string): string {
+  return line.replace(/^\[\d+\|([^\]]+)\]:\s*/, "[$1]: ");
+}
+
+function compactInlineText(text: string, maxChars = 240): string {
+  return buildPreview(text.replace(/\s+/g, " ").trim(), maxChars);
+}
+
+function serializeKeptEntryMessage(message: SourceMessage, nextMessage?: SourceMessage): string[] {
+  const lines: string[] = [];
+
+  if (message.role === "assistant") {
+    const assistantCtx = convertMessagesWithMetadata([message]);
+    const assistantLlm = assistantCtx.llmMessages[0];
+    const hasToolCalls = Array.isArray((assistantLlm as any)?.content) &&
+      ((assistantLlm as any).content as any[]).some((b: any) => b.type === "toolCall");
+
+    if (assistantLlm && hasToolCalls) {
+      let resultLlm: Message | null = null;
+      if (nextMessage?.role === "toolResult") {
+        resultLlm = convertMessagesWithMetadata([nextMessage]).llmMessages[0] ?? null;
+      }
+      const compact = serializeToolCompact(assistantLlm, resultLlm, 0);
+      if (compact) return [normalizeSerializedLine(compact)];
+    }
+  }
+
+  const ctx = convertMessagesWithMetadata([message]);
+  for (let i = 0; i < ctx.llmMessages.length; i++) {
+    const line = serializeMessage(ctx.llmMessages[i], i, ctx.humanUserIndexes);
+    if (line) lines.push(normalizeSerializedLine(line));
+  }
+
+  return lines;
+}
+
+/**
+ * Extract a compact summary of the kept window (the entries that survive
+ * compaction) from the full session entries. This tells the LLM what current
+ * work will remain in context after the new summary, including user turns,
+ * assistant/tool progress, branch summaries, and extension custom messages.
+ */
+function extractKeptMessagesSummary(
+  branchEntries: any[],
+  firstKeptEntryId: string,
+): { summary: string; hasHumanUser: boolean } {
+  let foundKept = false;
+  const lines: string[] = [];
+  let hasHumanUser = false;
+
+  for (let i = 0; i < branchEntries.length; i++) {
+    const entry = branchEntries[i];
+    if (entry.id === firstKeptEntryId) foundKept = true;
+    if (!foundKept) continue;
+    if (entry.type === "compaction") continue;
+
+    if (entry.type === "message" && entry.message) {
+      const message = entry.message as SourceMessage;
+      if (isRealUserSourceMessage(message)) hasHumanUser = true;
+
+      const nextMessage =
+        entry.message?.role === "assistant" &&
+        branchEntries[i + 1]?.type === "message" &&
+        branchEntries[i + 1]?.message?.role === "toolResult"
+          ? (branchEntries[i + 1].message as SourceMessage)
+          : undefined;
+
+      const serialized = serializeKeptEntryMessage(message, nextMessage);
+      if (serialized.length > 0) lines.push(...serialized);
+      if (nextMessage) i++;
+      continue;
+    }
+
+    if (entry.type === "custom_message") {
+      const text = extractText(entry.content).trim();
+      if (!text) continue;
+      lines.push(`[Context:${entry.customType ?? "custom"}]: ${compactInlineText(text, 400)}`);
+      continue;
+    }
+
+    if (entry.type === "branch_summary") {
+      const summary = typeof entry.summary === "string" ? entry.summary.trim() : "";
+      if (!summary) continue;
+      lines.push(`[BranchSummary]: ${compactInlineText(summary, 400)}`);
+    }
+  }
+
+  if (lines.length === 0) return { summary: "", hasHumanUser };
+
+  const selected: string[] = [];
+  let chars = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line) continue;
+    if (selected.length > 0 && chars + line.length > KEPT_CONTEXT_BUDGET_CHARS) break;
+    selected.push(line);
+    chars += line.length;
+  }
+
+  selected.reverse();
+  return { summary: selected.join("\n"), hasHumanUser };
+}
+
+function buildTurnPrefixSummary(
+  turnPrefixMessages: Message[],
+  humanUserIndexes: Set<number>,
+): string {
+  if (turnPrefixMessages.length === 0) return "";
+
+  const { included, compactOverrides } = selectRecentContextBackwards(
+    turnPrefixMessages,
+    humanUserIndexes,
+  );
+  const sorted = [...included].sort((a, b) => a - b);
+  const lines: string[] = [];
+  let chars = 0;
+
+  for (const idx of sorted) {
+    const line = compactOverrides.get(idx) ?? serializeMessage(turnPrefixMessages[idx], idx, humanUserIndexes);
+    if (!line) continue;
+    lines.push(line);
+    chars += line.length;
+    if (chars >= 4_000) break;
+  }
+
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -852,7 +1346,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
   }
 
   pi.on("session_before_compact", async (event, ctx) => {
-    const { preparation, signal, customInstructions } = event;
+    const { preparation, signal, customInstructions, branchEntries } = event;
     const {
       messagesToSummarize,
       tokensBefore,
@@ -878,13 +1372,17 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
       // ── Compute topic-shift signal once for all downstream paths ──────
       // Both tryNoOpCompaction (to gate the minimal-content fast path) and
       // buildSelectivePrompt (to annotate the compaction prompt) need this.
-      // Computing it once avoids a redundant full scan of the message array.
-      const llmMessages = convertToLlm(messagesToSummarize);
+      // We preserve source-message provenance so synthetic upstream user-role
+      // wrappers (branch/compaction summaries, custom messages, bashExecution)
+      // don't get mistaken for real human user turns.
+      const { llmMessages, humanUserIndexes } = convertMessagesWithMetadata(
+        messagesToSummarize as SourceMessage[],
+      );
 
       // Check abort early — a concurrent compact() may have already cancelled us.
       if (abortSignal.aborted) return { cancel: true };
 
-      const topicShift = detectRecentTopicShift(llmMessages);
+      const topicShift = detectRecentTopicShift(llmMessages, humanUserIndexes);
 
       log.debug("Pivot detection result", {
         detected: !!topicShift,
@@ -892,6 +1390,22 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         overlap: topicShift?.overlap ?? null,
         messageCount: llmMessages.length,
       });
+
+      // Extract kept-messages context from branchEntries so the LLM knows
+      // what the user is currently working on (kept messages survive compaction).
+      const keptContext = branchEntries
+        ? extractKeptMessagesSummary(branchEntries, firstKeptEntryId)
+        : { summary: "", hasHumanUser: false };
+      const keptMessagesSummary = keptContext.summary;
+      const turnPrefixContext = preparation.isSplitTurn && preparation.turnPrefixMessages.length > 0
+        ? convertMessagesWithMetadata(preparation.turnPrefixMessages as SourceMessage[])
+        : null;
+      const turnPrefixSummary = turnPrefixContext
+        ? buildTurnPrefixSummary(
+            turnPrefixContext.llmMessages,
+            turnPrefixContext.humanUserIndexes,
+          )
+        : "";
 
       // ── No-op detection ──────────────────────────────────────────────
       // Skip the LLM call entirely when we can produce a good summary
@@ -902,6 +1416,11 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         firstKeptEntryId,
         tokensBefore,
         topicShift,
+        humanUserIndexes,
+        {
+          hasKeptUserContext: keptContext.hasHumanUser,
+          hasTurnPrefixHumanUser: !!turnPrefixContext && turnPrefixContext.humanUserIndexes.size > 0,
+        },
         ctx,
       );
       if (noOpResult) return noOpResult;
@@ -917,9 +1436,10 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
 
       const promptText = buildSelectivePrompt(
         llmMessages,
-        { tokensBefore, previousSummary, fileOps: preparation.fileOps },
+        { tokensBefore, previousSummary, fileOps: preparation.fileOps, keptMessagesSummary, turnPrefixSummary },
         customInstructions,
         topicShift,
+        humanUserIndexes,
       );
 
       ctx.ui.notify(
@@ -995,11 +1515,11 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         ) {
           const parts: string[] = [];
           if (readFiles.length > 0) {
-            parts.push(`\n<read-files>\n${readFiles.join("\n")}\n</read-files>`);
+            parts.push(`\n<read-files>\n${compressFilePaths(readFiles)}\n</read-files>`);
           }
           if (modifiedFiles.length > 0) {
             parts.push(
-              `\n<modified-files>\n${modifiedFiles.join("\n")}\n</modified-files>`,
+              `\n<modified-files>\n${compressFilePaths(modifiedFiles)}\n</modified-files>`,
             );
           }
           if (parts.length) fullSummary += "\n" + parts.join("\n");

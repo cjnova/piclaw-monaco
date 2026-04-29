@@ -275,6 +275,7 @@ const groupDefinitions: GroupDefinition[] = [
         "extension-routes.test.ts",
         "oobe-instance-state.test.ts",
         "post-handler-resume.test.ts",
+        "dispatch-agent-provider-settings.test.ts",
         "manifest.test.ts",
         "server-lifecycle-gateway-service.test.ts",
         "sse-hub.test.ts",
@@ -344,7 +345,7 @@ const groupDefinitions: GroupDefinition[] = [
     id: "extensions",
     label: "extensions",
     notes: "Built-in tools, skills, adaptive cards, workspace search, and compaction helpers.",
-    match: (relativePath) => relativePath.startsWith("extensions/"),
+    match: (relativePath) => relativePath.startsWith("extensions/") || relativePath.startsWith("addons/"),
   },
   {
     id: "runtime",
@@ -393,6 +394,9 @@ const groupDefinitions: GroupDefinition[] = [
           "oobe-state.test.ts",
           "timeline-quick-actions.test.ts",
           "upload-limit-settings.test.ts",
+          "compaction-settings-handler.test.ts",
+          "compose-speech.test.ts",
+          "post-speech.test.ts",
           "use-splitters.test.ts",
           "optional-api.test.ts",
           "popup-typeahead.test.ts",
@@ -447,6 +451,7 @@ const groupDefinitions: GroupDefinition[] = [
           "post-copy-markdown.test.ts",
           "post-recovery-chip.test.ts",
           "post-runtime-safety.test.ts",
+          "post-peer-message.test.ts",
           "addons-handler.test.ts",
           "addon-web-extensions.test.ts",
           "general-settings-handler.test.ts",
@@ -477,7 +482,7 @@ const groupDefinitions: GroupDefinition[] = [
   {
     id: "web-ui-remote-and-workspace",
     label: "web ui remote and workspace",
-    notes: "Workspace preview/scale flows plus client-side remote display and VNC behavior.",
+    notes: "Workspace preview/settings/cache flows plus client-side remote display and VNC behavior.",
     match: (relativePath) =>
       relativePath.startsWith("web/") && (
         basenameIsOneOf(relativePath, [
@@ -490,6 +495,8 @@ const groupDefinitions: GroupDefinition[] = [
           "workspace-explorer.test.ts",
           "workspace-preview-pane.test.ts",
           "workspace-scale.test.ts",
+          "workspace-settings-handler.test.ts",
+          "workspace-tree-cache-settings.test.ts",
           "workspace-visibility.test.ts",
           "remote-display-gc.test.ts",
           "remote-display-socket.test.ts",

@@ -49,7 +49,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "SAMEORIGIN",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
   // Cross-origin isolation headers (COOP/COEP) are NOT set globally.
   // COEP require-corp blocks cross-origin iframes that don't send CORP
   // headers (e.g., draw.io embed, external widgets). Extensions needing

@@ -19,6 +19,31 @@ type PeerRelayTargetChat = {
   agent_name: string;
 };
 
+function fallbackPeerAgentHandle(chatJid: string): string {
+  return (chatJid.split(/[:/]/).filter(Boolean).pop() || chatJid).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "agent";
+}
+
+function buildPeerRelayContent(sourceChatJid: string, sourceAgentName: string, content: string): string {
+  return `from: @${sourceAgentName} <jid:${sourceChatJid}>\n\n${content}`;
+}
+
+function buildPeerRelayBlock(input: {
+  source_chat_jid: string;
+  source_agent_name: string;
+  target_chat_jid: string;
+  target_agent_name: string;
+  body: string;
+}): Record<string, unknown> {
+  return {
+    type: "peer_message",
+    source_chat_jid: input.source_chat_jid,
+    source_agent_name: input.source_agent_name,
+    target_chat_jid: input.target_chat_jid,
+    target_agent_name: input.target_agent_name,
+    body: input.body,
+  };
+}
+
 type PeerRelayAgentPool = Pick<AgentPool, "listActiveChats" | "findActiveChatByAgentName" | "getAgentHandleForChat"> & {
   findChatByAgentName?: (name: string) => PeerRelayTargetChat | null;
 };
@@ -69,7 +94,9 @@ export class WebAgentPeerMessageRelayService {
     const sourceChatJid = typeof payload.source_chat_jid === "string" ? payload.source_chat_jid.trim() : "";
     const sourceAgentName = typeof payload.source_agent_name === "string" ? payload.source_agent_name.trim() : "";
     const requestedTargetChatJid = typeof payload.target_chat_jid === "string" ? payload.target_chat_jid.trim() : "";
-    const requestedTargetAgentName = typeof payload.target_agent_name === "string" ? payload.target_agent_name.trim() : "";
+    const requestedTargetAgentName = typeof payload.target_agent_name === "string"
+      ? payload.target_agent_name.trim().replace(/^@+/, "").trim()
+      : "";
     const content = typeof payload.content === "string" ? payload.content.trim() : "";
     const mode = payload.mode === "queue" || payload.mode === "steer" || payload.mode === "auto"
       ? payload.mode
@@ -93,8 +120,18 @@ export class WebAgentPeerMessageRelayService {
       return this.options.json({ error: "source_chat_jid and target chat must differ" }, 400);
     }
 
-    const effectiveSourceAgentName = sourceAgentName || this.options.agentPool.getAgentHandleForChat(sourceChatJid);
-    const forwardedContent = `Peer message from @${effectiveSourceAgentName}:\n\n${content}`;
+    const resolvedSourceAgentName = this.options.agentPool.getAgentHandleForChat(sourceChatJid);
+    const effectiveSourceAgentName = sourceAgentName.trim()
+      || (typeof resolvedSourceAgentName === "string" ? resolvedSourceAgentName.trim() : "")
+      || fallbackPeerAgentHandle(sourceChatJid);
+    const forwardedContent = buildPeerRelayContent(sourceChatJid, effectiveSourceAgentName, content);
+    const forwardedBlock = buildPeerRelayBlock({
+      source_chat_jid: sourceChatJid,
+      source_agent_name: effectiveSourceAgentName,
+      target_chat_jid: targetChat.chat_jid,
+      target_agent_name: targetChat.agent_name,
+      body: content,
+    });
     const pathname = `/agent/${this.options.defaultAgentId}/message`;
     const forwardReq = new Request(
       `http://internal${pathname}?chat_jid=${encodeURIComponent(targetChat.chat_jid)}`,
@@ -103,6 +140,7 @@ export class WebAgentPeerMessageRelayService {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: forwardedContent,
+          content_blocks: [forwardedBlock],
           mode,
         }),
       },

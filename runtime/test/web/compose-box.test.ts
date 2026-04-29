@@ -11,10 +11,14 @@ import {
   resolveComposeModelPickerState,
   buildReturnedQueuedDraft,
   parseQueuedContent,
+  returnQueuedFollowupToEditor,
   resolveComposePrefillRequest,
   resolveComposeSubmitButtonState,
   resolveComposeAbortButtonState,
   isComposeSubmitAbortMode,
+  resolveSessionPopupChats,
+  isSessionPopupChatEmphasized,
+  resolveSessionPopupInitialIndex,
   resolveUiOnlyCommandNotice,
 } from '../../web/src/components/compose-box.ts';
 import { CONTROL_COMMAND_DEFINITIONS } from '../../src/agent-control/command-registry.ts';
@@ -94,6 +98,46 @@ test('slash autocomplete exposes the local /meters HUD command with a descriptio
   expect(meters?.description).toContain('CPU/RAM HUD');
 });
 
+test('slash autocomplete exposes the local /help keyboard shortcut pane command', () => {
+  const help = SLASH_COMMANDS.find((item) => item.name === '/help');
+  expect(help).toBeTruthy();
+  expect(help?.description).toContain('keyboard shortcuts');
+});
+
+test('resolveSessionPopupChats keeps the current session in alphabetical order with archived rows last', () => {
+  expect(resolveSessionPopupChats([
+    { chat_jid: 'web:zeta', agent_name: 'Zeta', is_active: false },
+    { chat_jid: 'web:alpha', agent_name: 'Alpha', is_active: true },
+    { chat_jid: 'web:beta', agent_name: 'beta', is_active: false },
+    { chat_jid: 'web:archived', agent_name: 'Archived', archived_at: '2026-04-29T00:00:00Z', is_active: false },
+    { chat_jid: 'web:alpha', agent_name: 'Alpha', is_active: true },
+  ], 'web:alpha').map((chat) => chat.chat_jid)).toEqual([
+    'web:alpha',
+    'web:beta',
+    'web:zeta',
+    'web:archived',
+  ]);
+});
+
+test('isSessionPopupChatEmphasized only highlights active non-archived sessions', () => {
+  expect(isSessionPopupChatEmphasized({ is_active: true, archived_at: null })).toBe(true);
+  expect(isSessionPopupChatEmphasized({ is_active: true, archived_at: '2026-04-29T00:00:00Z' })).toBe(false);
+  expect(isSessionPopupChatEmphasized({ is_active: false, archived_at: null })).toBe(false);
+});
+
+test('resolveSessionPopupInitialIndex prefers the current session over the first alphabetical row', () => {
+  expect(resolveSessionPopupInitialIndex([
+    { type: 'session', chat: { chat_jid: 'web:alpha' }, disabled: false },
+    { type: 'session', chat: { chat_jid: 'web:current' }, disabled: false },
+    { type: 'action', key: 'action:new', disabled: false },
+  ], 'web:current')).toBe(1);
+  expect(resolveSessionPopupInitialIndex([
+    { type: 'session', chat: { chat_jid: 'web:alpha' }, disabled: false },
+    { type: 'session', chat: { chat_jid: 'web:current' }, disabled: true },
+    { type: 'action', key: 'action:new', disabled: false },
+  ], 'web:current')).toBe(0);
+});
+
 test('resolveComposePrefillRequest applies new non-search prefill tokens exactly once', () => {
   expect(resolveComposePrefillRequest({ token: 'tok-1', text: '/login' }, '', false)).toEqual({
     shouldApply: true,
@@ -139,6 +183,25 @@ test('parseQueuedContent extracts file, message, and attachment refs from transc
   ]);
 });
 
+test('parseQueuedContent normalizes backtick-wrapped file refs from Files blocks', () => {
+  const parsed = parseQueuedContent([
+    'Channel: web',
+    '',
+    'Rui Carmo @ 2026-04-26T18:11:58.022Z:',
+    '  Fixed it.',
+    '  ',
+    '  Files:',
+    '  - `piclaw/runtime/extensions/viewers/editor/markdown/code-block.ts`',
+    '  - `piclaw/runtime/web/static/dist/editor.bundle.js`',
+  ].join('\n'));
+
+  expect(parsed.text).toBe('Fixed it.');
+  expect(parsed.fileRefs).toEqual([
+    'piclaw/runtime/extensions/viewers/editor/markdown/code-block.ts',
+    'piclaw/runtime/web/static/dist/editor.bundle.js',
+  ]);
+});
+
 test('buildReturnedQueuedDraft restores refs and preserves attachment markers in compose text', () => {
   const restored = buildReturnedQueuedDraft([
     'Channel: web',
@@ -164,6 +227,65 @@ test('buildReturnedQueuedDraft restores refs and preserves attachment markers in
       { id: '784', label: 'image.png', raw: 'attachment:784 (image.png)' },
     ],
   });
+});
+
+test('returnQueuedFollowupToEditor restores compose state before removing the queue item', () => {
+  const calls: string[] = [];
+  const textarea = {
+    value: '',
+    selectionStart: 0,
+    selectionEnd: 0,
+    focus: () => { calls.push('focus'); },
+  };
+  const timeoutCallbacks: Array<() => void> = [];
+
+  const result = returnQueuedFollowupToEditor({
+    queuedItem: {
+      row_id: 7,
+      content: [
+        'Channel: web',
+        '',
+        'Rui Carmo @ 2026-04-13T08:40:35.008Z:',
+        '  Please check this later.',
+        '  ',
+        '  Files:',
+        '  - notes/todo.md',
+      ].join('\n'),
+    },
+    setSubmitError: (value: string | null) => { calls.push(`error:${String(value)}`); },
+    setSubmitNotice: (value: string | null) => { calls.push(`notice:${String(value)}`); },
+    setMediaFiles: (value: unknown[]) => { calls.push(`media:${Array.isArray(value) ? value.length : 'x'}`); },
+    onSetFileRefs: (value: string[]) => { calls.push(`files:${value.join(',')}`); },
+    onSetMessageRefs: (value: string[]) => { calls.push(`messages:${value.join(',')}`); },
+    setContent: (value: string) => { calls.push(`content:${value}`); },
+    textareaRef: { current: textarea },
+    resizeTextarea: () => { calls.push('resize'); },
+    scheduleRaf: (callback: () => void) => { calls.push('raf'); callback(); },
+    scheduleTimeout: (callback: () => void) => { calls.push('timeout'); timeoutCallbacks.push(callback); return 0 as any; },
+    onRemoveQueuedFollowup: () => { calls.push('remove'); },
+    logger: { info: () => undefined, warn: () => undefined },
+  });
+
+  expect(result).toBe(true);
+  expect(calls).toEqual([
+    'error:null',
+    'notice:null',
+    'media:0',
+    'files:notes/todo.md',
+    'messages:',
+    'content:Please check this later.',
+    'raf',
+    'resize',
+    'focus',
+    'timeout',
+  ]);
+  expect(textarea.value).toBe('Please check this later.');
+  expect(textarea.selectionStart).toBe('Please check this later.'.length);
+  expect(textarea.selectionEnd).toBe('Please check this later.'.length);
+
+  timeoutCallbacks[0]?.();
+  expect(calls).toContain('remove');
+  expect(calls.indexOf('content:Please check this later.')).toBeLessThan(calls.indexOf('remove'));
 });
 
 test('model picker helpers expose searchable names and formatted context windows', () => {
