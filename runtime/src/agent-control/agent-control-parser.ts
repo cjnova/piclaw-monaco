@@ -21,13 +21,13 @@ import { COMMAND_PARSERS } from "./command-parsers.js";
 export function parseControlCommand(text: string, triggerPattern?: RegExp): AgentControlCommand | null {
   if (!text) return null;
   const cleaned = stripTrigger(text, triggerPattern);
-  if (!cleaned.startsWith("/")) return null;
+  if (!cleaned.startsWith("/") && !cleaned.startsWith("!")) return null;
 
-  const commandMatch = cleaned.match(/^\S+/);
-  const command = commandMatch?.[0];
+  const shellBangAlias = cleaned.startsWith("!");
+  const command = shellBangAlias ? "!" : cleaned.match(/^\S+/)?.[0];
   if (!command) return null;
 
-  const rawArgs = cleaned.slice(command.length).replace(/^\s+/, "");
+  const rawArgs = (shellBangAlias ? cleaned.slice(1) : cleaned.slice(command.length)).replace(/^\s+/, "");
   const normalizedArgs = rawArgs.split(/\s+/).filter(Boolean).join(" ").trim();
   const commandLower = normalizeControlCommandName(command.toLowerCase());
 

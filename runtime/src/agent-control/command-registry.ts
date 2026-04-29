@@ -33,7 +33,7 @@ export const CONTROL_COMMAND_DEFINITIONS: ControlCommandDefinition[] = [
   { name: "/abort", description: "Abort the current response" },
   { name: "/abort-retry", description: "Abort retry backoff" },
   { name: "/abort-bash", description: "Abort running bash command" },
-  { name: "/shell", description: "Run a shell command and return output" },
+  { name: "/shell", description: "Run a shell command and return output", aliases: ["!"] },
   { name: "/bash", description: "Run a shell command and add output to context" },
   { name: "/queue", description: "Queue a follow-up message (one-at-a-time)" },
   { name: "/queue-all", description: "Queue a follow-up message (batch all)" },
