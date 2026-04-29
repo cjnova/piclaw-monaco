@@ -542,6 +542,15 @@ export function handleAppSseEvent(
   }
 
   if (isExtensionUiEventType(eventType)) {
+    // Session/branch name changes should refresh lists for ALL clients,
+    // not just the one viewing that specific chat.
+    if (eventType === 'extension_ui_title') {
+      void refreshActiveChatAgents();
+      void refreshCurrentChatBranches();
+      dispatchExtensionUiBrowserEvent(eventType, data);
+      return;
+    }
+
     if (!isCurrentChatEvent) return;
 
     setExtensionWorkingState((previous) => {
