@@ -9836,9 +9836,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   // runtime/web/frontend/src/panels/SettingsPanel.tsx
   var CATEGORIES = [
     { id: "general", label: "General", icon: "codicon-gear" },
-    { id: "providers", label: "Providers", icon: "codicon-cloud" },
-    { id: "models", label: "Models", icon: "codicon-hubot" },
-    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" }
+    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
+    { id: "compaction", label: "Compaction", icon: "codicon-archive" },
+    { id: "providers", label: "Providers", icon: "codicon-cloud" }
   ];
   function SettingsPanel() {
     const activeCategory = useSignal("general");
@@ -9846,6 +9846,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const loading = useSignal(true);
     const error = useSignal(null);
     const saveStatus = useSignal(null);
+    let saveTimer = null;
     y2(() => {
       fetch("/agent/settings-data", { credentials: "same-origin" }).then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -9854,26 +9855,52 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         settings.value = data;
         loading.value = false;
       }).catch((err) => {
-        error.value = `Failed to load settings: ${err.message}`;
+        error.value = `Failed to load settings: ${err instanceof Error ? err.message : String(err)}`;
         settings.value = {};
         loading.value = false;
       });
     }, []);
+    function showSaved(msg = "Saved \u2713") {
+      saveStatus.value = msg;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveStatus.value = null, 2e3);
+    }
+    function showError(msg = "Save failed") {
+      saveStatus.value = msg;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveStatus.value = null, 3e3);
+    }
     function saveGeneral(field, value) {
-      const updated = { ...settings.value?.general ?? {}, [field]: value };
       fetch("/agent/settings/general", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated)
+        body: JSON.stringify({ [field]: value })
       }).then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        saveStatus.value = "Saved";
-        setTimeout(() => saveStatus.value = null, 2e3);
-      }).catch(() => {
-        saveStatus.value = "Save failed";
-        setTimeout(() => saveStatus.value = null, 3e3);
-      });
+        return res.json();
+      }).then((body) => {
+        if (body.settings) {
+          settings.value = { ...settings.value ?? {}, ...body.settings };
+        }
+        showSaved();
+      }).catch(() => showError());
+    }
+    function saveCompaction(field, value) {
+      fetch("/agent/settings/compaction", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value })
+      }).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      }).then((body) => {
+        if (body.settings) {
+          settings.value = { ...settings.value ?? {}, ...body.settings };
+        }
+        showSaved();
+      }).catch(() => showError());
     }
     if (loading.value) {
       return /* @__PURE__ */ u4("div", { className: "settings-panel", children: /* @__PURE__ */ u4("div", { className: "settings-panel__loading", children: "Loading settings\u2026" }) });
@@ -9895,21 +9922,37 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("div", { className: "settings-panel__content", children: [
         error.value && /* @__PURE__ */ u4("div", { className: "settings-panel__error", children: error.value }),
         saveStatus.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status", children: saveStatus.value }),
-        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4.general ?? {}, onSave: saveGeneral }),
-        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] }),
-        activeCategory.value === "models" && /* @__PURE__ */ u4(ModelsSection, { models: s4.models ?? {} }),
-        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { appearance: s4.appearance ?? {} })
+        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4, onSaveGeneral: saveGeneral }),
+        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
+        activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
+        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] })
       ] })
     ] });
   }
   function GeneralSection({
     data,
-    onSave
+    onSaveGeneral
   }) {
+    const assistantName = useSignal(data.assistantName ?? "");
     const userName = useSignal(data.userName ?? "");
-    const agentName = useSignal(data.agentName ?? "");
+    const sessionMaxSizeMb = useSignal(data.sessionMaxSizeMb ?? 0);
+    const toolUseBudget = useSignal(data.toolUseBudget ?? 0);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "General" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Agent name" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input",
+            type: "text",
+            value: assistantName.value,
+            onInput: (e5) => assistantName.value = e5.target.value,
+            onBlur: () => onSaveGeneral("assistantName", assistantName.value),
+            placeholder: "Agent display name"
+          }
+        )
+      ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "User name" }),
         /* @__PURE__ */ u4(
@@ -9919,107 +9962,244 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             type: "text",
             value: userName.value,
             onInput: (e5) => userName.value = e5.target.value,
-            onBlur: () => onSave("userName", userName.value),
+            onBlur: () => onSaveGeneral("userName", userName.value),
             placeholder: "Your name"
           }
         )
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Agent name" }),
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max session size (MB)" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__input--number",
+            type: "number",
+            min: 1,
+            max: 500,
+            value: sessionMaxSizeMb.value,
+            onInput: (e5) => sessionMaxSizeMb.value = Number(e5.target.value),
+            onBlur: () => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tool use budget" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__input--number",
+            type: "number",
+            min: 0,
+            max: 200,
+            value: toolUseBudget.value,
+            onInput: (e5) => toolUseBudget.value = Number(e5.target.value),
+            onBlur: () => onSaveGeneral("toolUseBudget", toolUseBudget.value)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "sessionAutoRotate",
+            type: "checkbox",
+            checked: data.sessionAutoRotate ?? false,
+            onChange: (e5) => onSaveGeneral("sessionAutoRotate", e5.target.checked)
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "sessionAutoRotate", className: "settings-panel__label", children: "Auto-rotate sessions" })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "webTerminalEnabled",
+            type: "checkbox",
+            checked: data.webTerminalEnabled ?? false,
+            onChange: (e5) => onSaveGeneral("webTerminalEnabled", e5.target.checked)
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "webTerminalEnabled", className: "settings-panel__label", children: "Web terminal enabled" })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Session isolation" }),
+        /* @__PURE__ */ u4(
+          "select",
+          {
+            className: "settings-panel__select",
+            value: data.sessionIsolation ?? "none",
+            onChange: (e5) => onSaveGeneral("sessionIsolation", e5.target.value),
+            children: [
+              /* @__PURE__ */ u4("option", { value: "none", children: "None" }),
+              /* @__PURE__ */ u4("option", { value: "summary", children: "Summary" }),
+              /* @__PURE__ */ u4("option", { value: "full", children: "Full" })
+            ]
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Search match mode" }),
+        /* @__PURE__ */ u4(
+          "select",
+          {
+            className: "settings-panel__select",
+            value: data.searchMatchMode ?? "or",
+            onChange: (e5) => onSaveGeneral("searchMatchMode", e5.target.value),
+            children: [
+              /* @__PURE__ */ u4("option", { value: "or", children: "OR (any term)" }),
+              /* @__PURE__ */ u4("option", { value: "and", children: "AND (all terms)" })
+            ]
+          }
+        )
+      ] })
+    ] });
+  }
+  function AppearanceSection({
+    data,
+    onSaveGeneral
+  }) {
+    const uiTint = useSignal(data.uiTint ?? "");
+    const themes = data.themes ?? [];
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Appearance" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Theme" }),
+        /* @__PURE__ */ u4(
+          "select",
+          {
+            className: "settings-panel__select",
+            value: data.uiTheme ?? "",
+            onChange: (e5) => onSaveGeneral("uiTheme", e5.target.value),
+            children: [
+              themes.length === 0 && /* @__PURE__ */ u4("option", { value: data.uiTheme ?? "", children: data.uiTheme ?? "Default" }),
+              themes.map((t4) => /* @__PURE__ */ u4("option", { value: t4.name, children: [
+                t4.label,
+                " (",
+                t4.mode,
+                ")"
+              ] }, t4.name))
+            ]
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tint color" }),
         /* @__PURE__ */ u4(
           "input",
           {
             className: "settings-panel__input",
             type: "text",
-            value: agentName.value,
-            onInput: (e5) => agentName.value = e5.target.value,
-            onBlur: () => onSave("agentName", agentName.value),
-            placeholder: "Agent name"
+            value: uiTint.value,
+            placeholder: "e.g. #3a86ff or empty",
+            onInput: (e5) => uiTint.value = e5.target.value,
+            onBlur: () => onSaveGeneral("uiTint", uiTint.value.trim() || null)
           }
         )
-      ] }),
-      data.sessionTimeout !== void 0 && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Session timeout (min)" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: data.sessionTimeout })
-      ] }),
-      data.sessionMaxMessages !== void 0 && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max messages" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: data.sessionMaxMessages })
       ] })
     ] });
   }
-  function ProvidersSection({
-    providers
+  function CompactionSection({
+    data,
+    onSaveCompaction
   }) {
+    const timeoutSec = useSignal(data.compactionTimeoutSec ?? 0);
+    const backoffBase = useSignal(data.compactionBackoffBaseMin ?? 0);
+    const backoffMax = useSignal(data.compactionBackoffMaxMin ?? 0);
+    const watchdogTimeout = useSignal(data.progressWatchdogTimeoutSec ?? 0);
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Compaction" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Timeout (sec)" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__input--number",
+            type: "number",
+            min: 1,
+            max: 3600,
+            value: timeoutSec.value,
+            onInput: (e5) => timeoutSec.value = Number(e5.target.value),
+            onBlur: () => onSaveCompaction("compactionTimeoutSec", timeoutSec.value)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff base (min)" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__input--number",
+            type: "number",
+            min: 1,
+            max: 1440,
+            value: backoffBase.value,
+            onInput: (e5) => backoffBase.value = Number(e5.target.value),
+            onBlur: () => onSaveCompaction("compactionBackoffBaseMin", backoffBase.value)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff max (min)" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__input--number",
+            type: "number",
+            min: 1,
+            max: 10080,
+            value: backoffMax.value,
+            onInput: (e5) => backoffMax.value = Number(e5.target.value),
+            onBlur: () => onSaveCompaction("compactionBackoffMaxMin", backoffMax.value)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "progressWatchdogEnabled",
+            type: "checkbox",
+            checked: data.progressWatchdogEnabled ?? false,
+            onChange: (e5) => onSaveCompaction(
+              "progressWatchdogEnabled",
+              e5.target.checked
+            )
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "progressWatchdogEnabled", className: "settings-panel__label", children: "Progress watchdog enabled" })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__input--number",
+            type: "number",
+            min: 0,
+            max: 3600,
+            value: watchdogTimeout.value,
+            onInput: (e5) => watchdogTimeout.value = Number(e5.target.value),
+            onBlur: () => onSaveCompaction("progressWatchdogTimeoutSec", watchdogTimeout.value)
+          }
+        )
+      ] })
+    ] });
+  }
+  function ProvidersSection({ providers }) {
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Providers" }),
-      providers.length === 0 && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No providers configured." }),
-      providers.map((p6) => /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: [
-          p6.name,
-          p6.type ? /* @__PURE__ */ u4("span", { className: "settings-panel__meta", children: [
-            " (",
-            p6.type,
-            ")"
-          ] }) : null
-        ] }),
+      providers.length === 0 && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No providers found." }),
+      providers.map((p6) => /* @__PURE__ */ u4("div", { className: "settings-panel__provider-row", children: [
+        /* @__PURE__ */ u4("span", { className: "settings-panel__label", children: p6.name }),
         /* @__PURE__ */ u4(
           "span",
           {
-            className: `settings-panel__status settings-panel__status--${p6.status.toLowerCase()}`,
-            children: p6.status
+            className: `settings-panel__status settings-panel__status--${p6.configured ? "ok" : "unknown"}`,
+            children: p6.configured ? "Configured" : "Not configured"
           }
-        )
+        ),
+        p6.authType && /* @__PURE__ */ u4("span", { className: "settings-panel__meta", children: p6.authType })
       ] }, p6.id))
-    ] });
-  }
-  function ModelsSection({ models }) {
-    const available = models.available ?? [];
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
-      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
-      models.current && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Current model" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__value settings-panel__value--accent", children: models.current })
-      ] }),
-      available.length > 0 && /* @__PURE__ */ u4(S, { children: [
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Available models" }) }),
-        /* @__PURE__ */ u4("ul", { className: "settings-panel__list", children: available.map((m6) => /* @__PURE__ */ u4(
-          "li",
-          {
-            className: `settings-panel__list-item${m6.id === models.current ? " settings-panel__list-item--active" : ""}`,
-            children: [
-              /* @__PURE__ */ u4("span", { children: m6.name }),
-              m6.provider && /* @__PURE__ */ u4("span", { className: "settings-panel__meta", children: m6.provider })
-            ]
-          },
-          m6.id
-        )) })
-      ] }),
-      available.length === 0 && !models.current && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No model data available." })
-    ] });
-  }
-  function AppearanceSection({
-    appearance
-  }) {
-    const presets = appearance.presets ?? [];
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
-      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Appearance" }),
-      appearance.theme && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Current theme" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__value settings-panel__value--accent", children: appearance.theme })
-      ] }),
-      presets.length > 0 && /* @__PURE__ */ u4(S, { children: [
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Theme presets" }) }),
-        /* @__PURE__ */ u4("ul", { className: "settings-panel__list", children: presets.map((preset) => /* @__PURE__ */ u4(
-          "li",
-          {
-            className: `settings-panel__list-item${preset === appearance.theme ? " settings-panel__list-item--active" : ""}`,
-            children: preset
-          },
-          preset
-        )) })
-      ] }),
-      presets.length === 0 && !appearance.theme && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No appearance data available." })
     ] });
   }
 
