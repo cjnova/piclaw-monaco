@@ -323,6 +323,20 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
     navigator.clipboard.writeText(node.path).catch(() => {});
   }, [node.path]);
 
+  const handleOpenFile = useCallback(() => {
+    const ext = node.path.split('.').pop()?.toLowerCase() ?? '';
+    const encoded = encodeURIComponent(node.path);
+    let viewerUrl: string;
+    if (ext === 'csv') viewerUrl = `/csv-viewer?path=${encoded}`;
+    else if (['html', 'htm'].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
+    else if (ext === 'pdf') viewerUrl = `/pdf-viewer?path=${encoded}`;
+    else if (['docx', 'xlsx', 'pptx'].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
+    else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
+    else if (['mp4', 'webm', 'mov'].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
+    else viewerUrl = `/editor-vendor?path=${encoded}`;
+    window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { url: viewerUrl, name: node.path.split('/').pop() } }));
+  }, [node.path]);
+
   const handleDelete = useCallback(async () => {
     if (isDeleting) return;
     const confirmed = window.confirm(`Delete ${node.name}? This cannot be undone.`);
@@ -377,6 +391,14 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
           <span className="codicon codicon-cloud-download" />
           Download
         </a>
+        <button
+          className="workspace__preview-action-btn"
+          onClick={handleOpenFile}
+          title="Open in central pane"
+        >
+          <span className="codicon codicon-open-preview" />
+          Open
+        </button>
         <button
           className="workspace__preview-action-btn workspace__preview-action-btn--danger"
           disabled={isDeleting}
