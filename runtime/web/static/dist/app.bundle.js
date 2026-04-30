@@ -5332,15 +5332,18 @@ For tests, pass a Ghostty instance directly:
         document.removeEventListener("click", handleClickOutside);
       };
     }, [showPicker.value, showThinkingPicker.value]);
-    const handleCompact = (e5) => {
+    const handleCompact = async (e5) => {
       e5.stopPropagation();
-      fetch(getMessageUrl(), {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "/compact" })
-      }).catch(() => {
-      });
+      try {
+        await fetch(getMessageUrl(), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: "/compact" })
+        });
+        setTimeout(() => fetchContext(), 2e3);
+      } catch {
+      }
     };
     const handleBadgeClick = async (e5) => {
       e5.stopPropagation();

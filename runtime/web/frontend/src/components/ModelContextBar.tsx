@@ -155,14 +155,18 @@ export function ModelContextBar() {
     };
   }, [showPicker.value, showThinkingPicker.value]);
 
-  const handleCompact = (e: MouseEvent) => {
+  const handleCompact = async (e: MouseEvent) => {
     e.stopPropagation();
-    fetch(getMessageUrl(), {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "/compact" }),
-    }).catch(() => {});
+    try {
+      await fetch(getMessageUrl(), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "/compact" }),
+      });
+      // Immediately refresh context after compact instead of waiting for next poll
+      setTimeout(() => fetchContext(), 2000);
+    } catch {}
   };
 
   const handleBadgeClick = async (e: MouseEvent) => {
