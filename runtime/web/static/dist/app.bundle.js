@@ -5262,46 +5262,54 @@ For tests, pass a Ghostty instance directly:
     const models = useSignal([]);
     const thinkingLevels = useSignal([]);
     const currentModel = useSignal(null);
-    y2(() => {
-      const fetchStatus = async () => {
-        try {
-          const res = await fetch("/agent/status");
-          if (res.ok) {
-            agentStatus.value = await res.json();
-            error.value = false;
-            lastSuccessAt.value = Date.now();
-          } else {
-            error.value = true;
-          }
-          const modelsRes = await fetch("/agent/models");
-          if (modelsRes.ok) {
-            const info = await modelsRes.json();
-            if (info.current) currentModel.value = info.current;
-          }
-        } catch (err) {
-          console.warn("[ModelContextBar] status fetch failed:", err);
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/agent/status");
+        if (res.ok) {
+          agentStatus.value = await res.json();
+          error.value = false;
+          lastSuccessAt.value = Date.now();
+        } else {
           error.value = true;
         }
-      };
+        const modelsRes = await fetch("/agent/models");
+        if (modelsRes.ok) {
+          const info = await modelsRes.json();
+          if (info.current) currentModel.value = info.current;
+        }
+      } catch (err) {
+        console.warn("[ModelContextBar] status fetch failed:", err);
+        error.value = true;
+      }
+    };
+    const fetchContext = async () => {
+      try {
+        const res = await fetch("/agent/context");
+        if (res.ok) {
+          agentContext.value = await res.json();
+        }
+      } catch (err) {
+        console.warn("[ModelContextBar] context fetch failed:", err);
+      }
+    };
+    y2(() => {
       fetchStatus();
       const interval = setInterval(fetchStatus, 5e3);
       return () => clearInterval(interval);
     }, [agentStatus, error]);
     y2(() => {
-      const fetchContext = async () => {
-        try {
-          const res = await fetch("/agent/context");
-          if (res.ok) {
-            agentContext.value = await res.json();
-          }
-        } catch (err) {
-          console.warn("[ModelContextBar] context fetch failed:", err);
-        }
-      };
       fetchContext();
       const interval = setInterval(fetchContext, 1e4);
       return () => clearInterval(interval);
     }, [agentContext]);
+    y2(() => {
+      const onConnect = () => {
+        fetchStatus();
+        fetchContext();
+      };
+      window.addEventListener("piclaw:sse-connected", onConnect);
+      return () => window.removeEventListener("piclaw:sse-connected", onConnect);
+    }, []);
     y2(() => {
       if (!showPicker.value && !showThinkingPicker.value) return;
       const handleKeyDown = (e5) => {
@@ -5545,6 +5553,35 @@ For tests, pass a Ghostty instance directly:
   var commandRegistry = new CommandRegistry();
 
   // runtime/web/frontend/src/components/CommandPalette.tsx
+  var COMMAND_PARAMS = {
+    "/model": { type: "autocomplete", fetch: "/agent/models", extractField: "models" },
+    "/thinking": { type: "autocomplete", fetch: "/agent/models", extractField: "available_thinking_levels" },
+    "/compact": { type: "bare" },
+    "/stats": { type: "bare" },
+    "/state": { type: "bare" },
+    "/context": { type: "bare" },
+    "/abort": { type: "bare" },
+    "/last": { type: "bare" },
+    "/restart": { type: "bare" },
+    "/tree": { type: "bare" },
+    "/forks": { type: "bare" },
+    "/auto-compact": { type: "bare" },
+    "/auto-retry": { type: "bare" },
+    "/cycle-model": { type: "bare" },
+    "/cycle-thinking": { type: "bare" },
+    "/shell": { type: "text", placeholder: "Shell command" },
+    "/bash": { type: "text", placeholder: "Bash command" },
+    "/user-github": { type: "text", placeholder: "GitHub username or URL" },
+    "/session-name": { type: "text", placeholder: "Session name" },
+    "/agent-name": { type: "text", placeholder: "Agent display name" },
+    "/agent-avatar": { type: "text", placeholder: "Avatar URL" },
+    "/user-name": { type: "text", placeholder: "Your display name" },
+    "/user-avatar": { type: "text", placeholder: "Avatar URL" },
+    "/new-session": { type: "bare" },
+    "/fork": { type: "bare" },
+    "/clone": { type: "bare" },
+    "/session-rotate": { type: "bare" }
+  };
   var CATEGORY_BADGE_COLORS = {
     navigation: "#89b4fa",
     terminal: "#a6e3a1",
@@ -5556,36 +5593,57 @@ For tests, pass a Ghostty instance directly:
     skill: "#a6e3a1",
     template: "#89dceb"
   };
+  function sendCommand(command) {
+    fetch(getMessageUrl(), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: command })
+    }).catch((err) => console.warn("[CommandPalette] send failed:", err));
+  }
   function CommandPalette({ visible, onClose, onCommand }) {
     const [query, setQuery] = d2("");
     const [selectedIndex, setSelectedIndex] = d2(0);
     const [backendCommands, setBackendCommands] = d2([]);
     const [copiedLabel, setCopiedLabel] = d2(null);
+    const [step, setStep] = d2("command");
+    const [selectedCommand, setSelectedCommand] = d2("");
+    const [autoCompleteOptions, setAutoCompleteOptions] = d2([]);
+    const [paramPlaceholder, setParamPlaceholder] = d2("");
     const inputRef = A2(null);
     const listRef = A2(null);
     const copiedTimerRef = A2(null);
     y2(() => {
-      if (!visible) return;
-      setQuery("");
-      setSelectedIndex(0);
-      const timer = window.setTimeout(() => {
-        inputRef.current?.focus();
-      }, 0);
-      const controller = new AbortController();
-      fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal }).then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      }).then((data) => {
-        setBackendCommands(data.commands ?? []);
-      }).catch((err) => {
-        if (err.name === "AbortError") return;
-        console.warn("[CommandPalette] Failed to fetch backend commands:", err);
-        setBackendCommands([]);
-      });
-      return () => {
-        window.clearTimeout(timer);
-        controller.abort();
-      };
+      if (visible) {
+        setQuery("");
+        setSelectedIndex(0);
+        setStep("command");
+        setSelectedCommand("");
+        setAutoCompleteOptions([]);
+        setParamPlaceholder("");
+        const timer = window.setTimeout(() => {
+          inputRef.current?.focus();
+        }, 0);
+        const controller = new AbortController();
+        fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal }).then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        }).then((data) => {
+          setBackendCommands(data.commands ?? []);
+        }).catch((err) => {
+          if (err.name === "AbortError") return;
+          console.warn("[CommandPalette] Failed to fetch backend commands:", err);
+          setBackendCommands([]);
+        });
+        return () => {
+          window.clearTimeout(timer);
+          controller.abort();
+        };
+      } else {
+        setStep("command");
+        setSelectedCommand("");
+        setAutoCompleteOptions([]);
+      }
     }, [visible]);
     const allCommands = T2(() => {
       const localCmds = commandRegistry.getAll().map((cmd) => ({
@@ -5606,12 +5664,20 @@ For tests, pass a Ghostty instance directly:
       return [...localCmds, ...backendCmds];
     }, [backendCommands, visible]);
     const results = T2(() => {
+      if (step === "parameter" && autoCompleteOptions.length > 0) {
+        const q6 = query.trim().toLowerCase();
+        if (!q6) return autoCompleteOptions;
+        return autoCompleteOptions.filter((opt) => opt.toLowerCase().includes(q6));
+      }
+      if (step === "parameter") {
+        return [];
+      }
       const q5 = query.trim().toLowerCase();
       if (!q5) return allCommands;
       return allCommands.filter(
         (cmd) => cmd.label.toLowerCase().includes(q5) || (cmd.description?.toLowerCase().includes(q5) ?? false)
       );
-    }, [query, allCommands]);
+    }, [query, allCommands, step, autoCompleteOptions]);
     y2(() => {
       setSelectedIndex((current) => {
         if (results.length === 0) return 0;
@@ -5621,23 +5687,72 @@ For tests, pass a Ghostty instance directly:
     if (!visible) {
       return null;
     }
-    const executeBackendCommand = (label) => {
-      navigator.clipboard.writeText(label).catch(() => {
-      });
-      if (onCommand) onCommand(label);
-      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-      setCopiedLabel(label);
-      copiedTimerRef.current = setTimeout(() => setCopiedLabel(null), 1500);
+    const executeBackendCommand = async (command) => {
+      const name = command.label;
+      const param = COMMAND_PARAMS[name];
+      if (!param || param.type === "bare") {
+        sendCommand(name);
+        if (onCommand) onCommand(name);
+        onClose();
+        return;
+      }
+      if (param.type === "autocomplete" && param.fetch) {
+        try {
+          const res = await fetch(param.fetch, { credentials: "same-origin" });
+          const data = await res.json();
+          const options = param.extractField ? data[param.extractField] ?? [] : [];
+          setAutoCompleteOptions(Array.isArray(options) ? options : []);
+        } catch (err) {
+          console.warn("[CommandPalette] Failed to fetch autocomplete options:", err);
+          setAutoCompleteOptions([]);
+        }
+        setSelectedCommand(name);
+        setStep("parameter");
+        setSelectedIndex(0);
+        setQuery("");
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
+      if (param.type === "text") {
+        setSelectedCommand(name);
+        setParamPlaceholder(param.placeholder ?? "Enter value");
+        setStep("parameter");
+        setQuery("");
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
     };
     const executeSelected = () => {
+      if (step === "parameter") {
+        if (autoCompleteOptions.length > 0) {
+          const selectedOption = results[selectedIndex];
+          if (selectedOption != null) {
+            const fullCommand = `${selectedCommand} ${selectedOption}`;
+            sendCommand(fullCommand);
+            if (onCommand) onCommand(fullCommand);
+            onClose();
+          }
+        } else {
+          const trimmed = query.trim();
+          if (trimmed) {
+            const fullCommand = `${selectedCommand} ${trimmed}`;
+            sendCommand(fullCommand);
+            if (onCommand) onCommand(fullCommand);
+            onClose();
+          }
+        }
+        return;
+      }
       const command = results[selectedIndex];
       if (!command) return;
       if (command.handler) {
         command.handler();
+        onClose();
       } else if (command.isBackend) {
-        executeBackendCommand(command.label);
+        executeBackendCommand(command);
+      } else {
+        onClose();
       }
-      onClose();
     };
     const scrollActiveIntoView = (index) => {
       requestAnimationFrame(() => {
@@ -5655,7 +5770,15 @@ For tests, pass a Ghostty instance directly:
       }
       if (event.key === "Backspace" && query === "") {
         event.preventDefault();
-        onClose();
+        if (step === "parameter") {
+          setStep("command");
+          setSelectedCommand("");
+          setAutoCompleteOptions([]);
+          setQuery("");
+          setSelectedIndex(0);
+        } else {
+          onClose();
+        }
         return;
       }
       if (event.key === "ArrowDown") {
@@ -5716,18 +5839,27 @@ For tests, pass a Ghostty instance directly:
         executeSelected();
       }
     };
+    const isParameterStep = step === "parameter";
+    const isAutocompleteStep = isParameterStep && autoCompleteOptions.length > 0;
+    const isTextStep = isParameterStep && autoCompleteOptions.length === 0;
+    const inputPlaceholder = isAutocompleteStep ? `${selectedCommand} > Select option...` : isTextStep ? `${selectedCommand} > ${paramPlaceholder}` : "Type a command...";
     return /* @__PURE__ */ u4("div", { className: "command-palette-backdrop", onClick: onClose, children: /* @__PURE__ */ u4(
       "div",
       {
         className: "command-palette",
         onClick: (event) => event.stopPropagation(),
         children: [
+          isParameterStep && /* @__PURE__ */ u4("div", { className: "command-palette__step-indicator", children: [
+            /* @__PURE__ */ u4("span", { className: "command-palette__step-command", children: selectedCommand }),
+            /* @__PURE__ */ u4("span", { className: "command-palette__step-arrow", children: "\u203A" }),
+            /* @__PURE__ */ u4("span", { className: "command-palette__step-hint", children: isAutocompleteStep ? "Select option" : paramPlaceholder || "Enter value" })
+          ] }),
           /* @__PURE__ */ u4(
             "input",
             {
               ref: inputRef,
               className: "command-palette__input",
-              placeholder: "Type a command...",
+              placeholder: inputPlaceholder,
               value: query,
               onInput: (event) => setQuery(event.target.value),
               onKeyDown: handleKeyDown
@@ -5737,8 +5869,28 @@ For tests, pass a Ghostty instance directly:
             "Copied to clipboard: ",
             /* @__PURE__ */ u4("strong", { children: copiedLabel })
           ] }),
-          /* @__PURE__ */ u4("ul", { ref: listRef, className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
-            results.map((command, index) => {
+          isTextStep ? /* @__PURE__ */ u4("div", { className: "command-palette__text-hint", children: [
+            "Press ",
+            /* @__PURE__ */ u4("kbd", { children: "Enter" }),
+            " to send",
+            query.trim() ? `: ${selectedCommand} ${query.trim()}` : ""
+          ] }) : /* @__PURE__ */ u4("ul", { ref: listRef, className: "command-palette__results", role: "listbox", "aria-label": "Commands", children: [
+            isAutocompleteStep ? results.map((option, index) => /* @__PURE__ */ u4(
+              "li",
+              {
+                className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
+                style: { background: index === selectedIndex ? "var(--border)" : "transparent" },
+                onMouseDown: (event) => event.preventDefault(),
+                onClick: () => {
+                  const fullCommand = `${selectedCommand} ${option}`;
+                  sendCommand(fullCommand);
+                  if (onCommand) onCommand(fullCommand);
+                  onClose();
+                },
+                children: /* @__PURE__ */ u4("span", { className: "command-palette__row-content", children: /* @__PURE__ */ u4("span", { className: "command-palette__label", children: option }) })
+              },
+              option
+            )) : results.map((command, index) => {
               const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
               return /* @__PURE__ */ u4(
                 "li",
@@ -5749,10 +5901,12 @@ For tests, pass a Ghostty instance directly:
                   onClick: () => {
                     if (command.handler) {
                       command.handler();
+                      onClose();
                     } else if (command.isBackend) {
-                      executeBackendCommand(command.label);
+                      executeBackendCommand(command);
+                    } else {
+                      onClose();
                     }
-                    onClose();
                   },
                   children: [
                     /* @__PURE__ */ u4("span", { className: "command-palette__row-content", children: [
@@ -5779,7 +5933,7 @@ For tests, pass a Ghostty instance directly:
                 command.id
               );
             }),
-            results.length === 0 && /* @__PURE__ */ u4("li", { className: "command-palette__empty", children: "No matching commands" })
+            results.length === 0 && !isTextStep && /* @__PURE__ */ u4("li", { className: "command-palette__empty", children: "No matching commands" })
           ] })
         ]
       }
