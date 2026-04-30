@@ -257,11 +257,7 @@ export function TerminalComponent() {
     return () => {
       mountedRef.current = false;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        // Send clear command so terminal is clean on next open
-        ws.send(JSON.stringify({ type: "input", data: "clear\n" }));
-        ws.close();
-      } else if (ws) {
+      if (ws) {
         ws.close();
       }
       if (terminal) {

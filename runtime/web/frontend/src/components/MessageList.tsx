@@ -313,8 +313,29 @@ export function MessageList() {
       scrollToBottom(true);
     });
 
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
+    es.onopen = () => {
+      setConnected(true);
+      window.dispatchEvent(new Event("piclaw:sse-connected"));
+      // Re-fetch timeline on reconnect (server may have restarted)
+      fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          const raw = data.posts ?? data.interactions ?? [];
+          const parsed = raw.map((p: Record<string, unknown>) => ({
+            id: p.id as number,
+            type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
+            content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
+            content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
+            created_at: (p.created_at ?? p.timestamp ?? "") as string,
+            data: p.data as Record<string, unknown> | undefined,
+          }));
+          setMessages(parsed);
+          scrollToBottom(true);
+        })
+        .catch(() => {});
+    };
+    es.onerror = () => { setConnected(false); window.dispatchEvent(new Event("piclaw:sse-disconnected")); };
 
     return () => {
       es.close();

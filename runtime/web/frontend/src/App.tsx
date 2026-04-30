@@ -1,3 +1,4 @@
+import { getChatJid } from "./api/chat-jid";
 import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
@@ -23,7 +24,6 @@ function AppContent() {
   const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
@@ -39,14 +39,15 @@ function AppContent() {
     localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value));
   }, [terminalHeight.value]);
 
+  // Connection status — derive from MessageList's SSE (via custom event)
   useEffect(() => {
-    const es = new EventSource("/sse/stream");
-    sseRef.current = es;
-    es.onopen = () => { connectionStatus.value = "connected"; };
-    es.onerror = () => { connectionStatus.value = "disconnected"; };
+    const onConnected = () => { connectionStatus.value = "connected"; };
+    const onDisconnected = () => { connectionStatus.value = "disconnected"; };
+    window.addEventListener("piclaw:sse-connected", onConnected);
+    window.addEventListener("piclaw:sse-disconnected", onDisconnected);
     return () => {
-      es.close();
-      sseRef.current = null;
+      window.removeEventListener("piclaw:sse-connected", onConnected);
+      window.removeEventListener("piclaw:sse-disconnected", onDisconnected);
     };
   }, [connectionStatus]);
 
@@ -124,7 +125,7 @@ function AppContent() {
       { id: "theme.dark", label: "Switch to Dark Theme", category: "theme" as const, handler: () => { themeControl.setMode("dark"); } },
       { id: "theme.light", label: "Switch to Light Theme", category: "theme" as const, handler: () => { themeControl.setMode("light"); } },
       // Session
-      { id: "session.reconnect", label: "Reconnect", category: "session" as const, handler: () => { if (sseRef.current) sseRef.current.close(); const es = new EventSource("/sse/stream"); sseRef.current = es; es.onopen = () => { connectionStatus.value = "connected"; }; es.onerror = () => { connectionStatus.value = "disconnected"; }; } },
+      { id: "session.reconnect", label: "Reconnect", category: "session" as const, handler: () => { window.dispatchEvent(new Event("piclaw:sse-reconnect")); } },
       // General
       { id: "general.commandPalette", label: "Open Command Palette", category: "general" as const, keybinding: "Ctrl+Shift+P", handler: () => { paletteVisible.value = !paletteVisible.value; } },
       { id: "general.clearLocalStorage", label: "Clear Layout State", category: "general" as const, handler: () => { ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k) => localStorage.removeItem(k)); } },

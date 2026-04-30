@@ -5083,10 +5083,7 @@ For tests, pass a Ghostty instance directly:
       return () => {
         mountedRef.current = false;
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "input", data: "clear\n" }));
-          ws.close();
-        } else if (ws) {
+        if (ws) {
           ws.close();
         }
         if (terminal) {
@@ -8483,8 +8480,29 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         setDraft("");
         scrollToBottom(true);
       });
-      es.onopen = () => setConnected(true);
-      es.onerror = () => setConnected(false);
+      es.onopen = () => {
+        setConnected(true);
+        window.dispatchEvent(new Event("piclaw:sse-connected"));
+        fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, { credentials: "include" }).then((r4) => r4.ok ? r4.json() : null).then((data) => {
+          if (!data) return;
+          const raw = data.posts ?? data.interactions ?? [];
+          const parsed = raw.map((p6) => ({
+            id: p6.id,
+            type: p6.type ?? (p6.data?.type === "user_message" ? "user" : "agent"),
+            content: p6.content ?? p6.data?.content ?? "",
+            content_blocks: p6.content_blocks ?? p6.data?.content_blocks,
+            created_at: p6.created_at ?? p6.timestamp ?? "",
+            data: p6.data
+          }));
+          setMessages(parsed);
+          scrollToBottom(true);
+        }).catch(() => {
+        });
+      };
+      es.onerror = () => {
+        setConnected(false);
+        window.dispatchEvent(new Event("piclaw:sse-disconnected"));
+      };
       return () => {
         es.close();
         sseRef.current = null;
@@ -8801,7 +8819,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
     const extensionPageUrl = useSignal(null);
     const extensionPageName = useSignal(null);
-    const sseRef = A2(null);
     const termDragRef = A2(null);
     y2(() => {
       localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
@@ -8816,17 +8833,17 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value));
     }, [terminalHeight.value]);
     y2(() => {
-      const es = new EventSource("/sse/stream");
-      sseRef.current = es;
-      es.onopen = () => {
+      const onConnected = () => {
         connectionStatus.value = "connected";
       };
-      es.onerror = () => {
+      const onDisconnected = () => {
         connectionStatus.value = "disconnected";
       };
+      window.addEventListener("piclaw:sse-connected", onConnected);
+      window.addEventListener("piclaw:sse-disconnected", onDisconnected);
       return () => {
-        es.close();
-        sseRef.current = null;
+        window.removeEventListener("piclaw:sse-connected", onConnected);
+        window.removeEventListener("piclaw:sse-disconnected", onDisconnected);
       };
     }, [connectionStatus]);
     y2(() => {
@@ -8940,15 +8957,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         } },
         // Session
         { id: "session.reconnect", label: "Reconnect", category: "session", handler: () => {
-          if (sseRef.current) sseRef.current.close();
-          const es = new EventSource("/sse/stream");
-          sseRef.current = es;
-          es.onopen = () => {
-            connectionStatus.value = "connected";
-          };
-          es.onerror = () => {
-            connectionStatus.value = "disconnected";
-          };
+          window.dispatchEvent(new Event("piclaw:sse-reconnect"));
         } },
         // General
         { id: "general.commandPalette", label: "Open Command Palette", category: "general", keybinding: "Ctrl+Shift+P", handler: () => {
