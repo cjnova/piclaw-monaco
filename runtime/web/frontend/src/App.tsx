@@ -159,11 +159,15 @@ function AppContent() {
 
   useEffect(() => {
     const onOpenPage = (e: Event) => {
-      const detail = (e as CustomEvent<{ url?: string; name: string; html?: string; mode?: string }>).detail;
+      const detail = (e as CustomEvent<{ url?: string; name: string; html?: string; mode?: string; sourceUrl?: string }>).detail;
       if (detail.mode === 'markdown' && detail.html && detail.name) {
         extensionPageUrl.value = null;
         extensionPageName.value = detail.name;
         extensionPageHtml.value = detail.html;
+      } else if (detail.mode === 'pdf' && detail.sourceUrl && detail.name) {
+        extensionPageUrl.value = detail.sourceUrl;
+        extensionPageName.value = detail.name;
+        extensionPageHtml.value = '__pdf__';
       } else if (detail.url && detail.name) {
         handlePageSelect(detail.url, detail.name);
       }
@@ -254,7 +258,19 @@ function AppContent() {
                   </button>
                   <span className="extension-frame__title">{extensionPageName.value}</span>
                 </div>
-                {extensionPageHtml.value ? (
+                {extensionPageHtml.value === '__pdf__' ? (
+                  <object
+                    data={extensionPageUrl.value!}
+                    type="application/pdf"
+                    style={{ width: '100%', flex: 1, border: 'none' }}
+                    aria-label={extensionPageName.value ?? 'PDF'}
+                  >
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <p>PDF cannot be displayed.</p>
+                      <a href={extensionPageUrl.value!} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>Open PDF in new tab</a>
+                    </div>
+                  </object>
+                ) : extensionPageHtml.value ? (
                   <div
                     className="workspace__preview-markdown extension-frame__markdown"
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()

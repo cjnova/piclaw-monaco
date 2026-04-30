@@ -345,7 +345,10 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
     let viewerUrl: string;
     if (ext === 'csv') viewerUrl = `/csv-viewer?path=${encoded}`;
     else if (['html', 'htm'].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
-    else if (ext === 'pdf') viewerUrl = `/pdf-viewer?path=${encoded}`;
+    else if (ext === 'pdf') {
+      window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { name, mode: 'pdf', sourceUrl: `/workspace/raw?path=${encoded}` } }));
+      return;
+    }
     else if (['docx', 'xlsx', 'pptx'].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
     else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
     else if (['mp4', 'webm', 'mov'].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
