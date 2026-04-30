@@ -9939,64 +9939,79 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const toolUseBudget = useSignal(data.toolUseBudget ?? 0);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "General" }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Identity" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Agent name" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input",
-            type: "text",
-            value: assistantName.value,
-            onInput: (e5) => assistantName.value = e5.target.value,
-            onBlur: () => onSaveGeneral("assistantName", assistantName.value),
-            placeholder: "Agent display name"
-          }
-        )
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input",
+              type: "text",
+              value: assistantName.value,
+              onInput: (e5) => assistantName.value = e5.target.value,
+              onBlur: () => onSaveGeneral("assistantName", assistantName.value),
+              placeholder: "Agent display name"
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Display name for the AI agent" })
+        ] })
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "User name" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input",
-            type: "text",
-            value: userName.value,
-            onInput: (e5) => userName.value = e5.target.value,
-            onBlur: () => onSaveGeneral("userName", userName.value),
-            placeholder: "Your name"
-          }
-        )
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input",
+              type: "text",
+              value: userName.value,
+              onInput: (e5) => userName.value = e5.target.value,
+              onBlur: () => onSaveGeneral("userName", userName.value),
+              placeholder: "Your name"
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Your display name in chat" })
+        ] })
       ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Instance Configuration" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max session size (MB)" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input settings-panel__input--number",
-            type: "number",
-            min: 1,
-            max: 500,
-            value: sessionMaxSizeMb.value,
-            onInput: (e5) => sessionMaxSizeMb.value = Number(e5.target.value),
-            onBlur: () => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)
-          }
-        )
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input settings-panel__input--number",
+              type: "number",
+              min: 1,
+              max: 500,
+              value: sessionMaxSizeMb.value,
+              onInput: (e5) => sessionMaxSizeMb.value = Number(e5.target.value),
+              onBlur: () => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum session context size before auto-compaction" })
+        ] })
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tool use budget" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input settings-panel__input--number",
-            type: "number",
-            min: 0,
-            max: 200,
-            value: toolUseBudget.value,
-            onInput: (e5) => toolUseBudget.value = Number(e5.target.value),
-            onBlur: () => onSaveGeneral("toolUseBudget", toolUseBudget.value)
-          }
-        )
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input settings-panel__input--number",
+              type: "number",
+              min: 0,
+              max: 200,
+              value: toolUseBudget.value,
+              onInput: (e5) => toolUseBudget.value = Number(e5.target.value),
+              onBlur: () => onSaveGeneral("toolUseBudget", toolUseBudget.value)
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Max tool calls per agent turn" })
+        ] })
       ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Behavior" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
         /* @__PURE__ */ u4(
           "input",
@@ -10007,7 +10022,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             onChange: (e5) => onSaveGeneral("sessionAutoRotate", e5.target.checked)
           }
         ),
-        /* @__PURE__ */ u4("label", { htmlFor: "sessionAutoRotate", className: "settings-panel__label", children: "Auto-rotate sessions" })
+        /* @__PURE__ */ u4("label", { htmlFor: "sessionAutoRotate", className: "settings-panel__label", children: "Auto-rotate sessions" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Automatically start new session when context is full" })
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
         /* @__PURE__ */ u4(
@@ -10019,38 +10035,46 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             onChange: (e5) => onSaveGeneral("webTerminalEnabled", e5.target.checked)
           }
         ),
-        /* @__PURE__ */ u4("label", { htmlFor: "webTerminalEnabled", className: "settings-panel__label", children: "Web terminal enabled" })
+        /* @__PURE__ */ u4("label", { htmlFor: "webTerminalEnabled", className: "settings-panel__label", children: "Web terminal enabled" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Enable terminal access in the web UI" })
       ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Session" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Session isolation" }),
-        /* @__PURE__ */ u4(
-          "select",
-          {
-            className: "settings-panel__select",
-            value: data.sessionIsolation ?? "none",
-            onChange: (e5) => onSaveGeneral("sessionIsolation", e5.target.value),
-            children: [
-              /* @__PURE__ */ u4("option", { value: "none", children: "None" }),
-              /* @__PURE__ */ u4("option", { value: "summary", children: "Summary" }),
-              /* @__PURE__ */ u4("option", { value: "full", children: "Full" })
-            ]
-          }
-        )
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "select",
+            {
+              className: "settings-panel__select",
+              value: data.sessionIsolation ?? "none",
+              onChange: (e5) => onSaveGeneral("sessionIsolation", e5.target.value),
+              children: [
+                /* @__PURE__ */ u4("option", { value: "none", children: "None" }),
+                /* @__PURE__ */ u4("option", { value: "summary", children: "Summary" }),
+                /* @__PURE__ */ u4("option", { value: "full", children: "Full" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "none = shared context, branch = isolated branches" })
+        ] })
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Search match mode" }),
-        /* @__PURE__ */ u4(
-          "select",
-          {
-            className: "settings-panel__select",
-            value: data.searchMatchMode ?? "or",
-            onChange: (e5) => onSaveGeneral("searchMatchMode", e5.target.value),
-            children: [
-              /* @__PURE__ */ u4("option", { value: "or", children: "OR (any term)" }),
-              /* @__PURE__ */ u4("option", { value: "and", children: "AND (all terms)" })
-            ]
-          }
-        )
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "select",
+            {
+              className: "settings-panel__select",
+              value: data.searchMatchMode ?? "or",
+              onChange: (e5) => onSaveGeneral("searchMatchMode", e5.target.value),
+              children: [
+                /* @__PURE__ */ u4("option", { value: "or", children: "OR (any term)" }),
+                /* @__PURE__ */ u4("option", { value: "and", children: "AND (all terms)" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "How multiple search terms are combined" })
+        ] })
       ] })
     ] });
   }
@@ -10108,80 +10132,83 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const watchdogTimeout = useSignal(data.progressWatchdogTimeoutSec ?? 0);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Compaction" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Timeout (sec)" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input settings-panel__input--number",
-            type: "number",
-            min: 1,
-            max: 3600,
-            value: timeoutSec.value,
-            onInput: (e5) => timeoutSec.value = Number(e5.target.value),
-            onBlur: () => onSaveCompaction("compactionTimeoutSec", timeoutSec.value)
-          }
-        )
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff base (min)" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input settings-panel__input--number",
-            type: "number",
-            min: 1,
-            max: 1440,
-            value: backoffBase.value,
-            onInput: (e5) => backoffBase.value = Number(e5.target.value),
-            onBlur: () => onSaveCompaction("compactionBackoffBaseMin", backoffBase.value)
-          }
-        )
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff max (min)" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input settings-panel__input--number",
-            type: "number",
-            min: 1,
-            max: 10080,
-            value: backoffMax.value,
-            onInput: (e5) => backoffMax.value = Number(e5.target.value),
-            onBlur: () => onSaveCompaction("compactionBackoffMaxMin", backoffMax.value)
-          }
-        )
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            id: "progressWatchdogEnabled",
-            type: "checkbox",
-            checked: data.progressWatchdogEnabled ?? false,
-            onChange: (e5) => onSaveCompaction(
-              "progressWatchdogEnabled",
-              e5.target.checked
-            )
-          }
-        ),
-        /* @__PURE__ */ u4("label", { htmlFor: "progressWatchdogEnabled", className: "settings-panel__label", children: "Progress watchdog enabled" })
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            className: "settings-panel__input settings-panel__input--number",
-            type: "number",
-            min: 0,
-            max: 3600,
-            value: watchdogTimeout.value,
-            onInput: (e5) => watchdogTimeout.value = Number(e5.target.value),
-            onBlur: () => onSaveCompaction("progressWatchdogTimeoutSec", watchdogTimeout.value)
-          }
-        )
+      /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: [
+        /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Compaction Timeouts" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Timeout (sec)" }),
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input settings-panel__input--number",
+              type: "number",
+              min: 1,
+              max: 3600,
+              value: timeoutSec.value,
+              onInput: (e5) => timeoutSec.value = Number(e5.target.value),
+              onBlur: () => onSaveCompaction("compactionTimeoutSec", timeoutSec.value)
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff base (min)" }),
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input settings-panel__input--number",
+              type: "number",
+              min: 1,
+              max: 1440,
+              value: backoffBase.value,
+              onInput: (e5) => backoffBase.value = Number(e5.target.value),
+              onBlur: () => onSaveCompaction("compactionBackoffBaseMin", backoffBase.value)
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff max (min)" }),
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input settings-panel__input--number",
+              type: "number",
+              min: 1,
+              max: 10080,
+              value: backoffMax.value,
+              onInput: (e5) => backoffMax.value = Number(e5.target.value),
+              onBlur: () => onSaveCompaction("compactionBackoffMaxMin", backoffMax.value)
+            }
+          )
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              id: "progressWatchdogEnabled",
+              type: "checkbox",
+              checked: data.progressWatchdogEnabled ?? false,
+              onChange: (e5) => onSaveCompaction(
+                "progressWatchdogEnabled",
+                e5.target.checked
+              )
+            }
+          ),
+          /* @__PURE__ */ u4("label", { htmlFor: "progressWatchdogEnabled", className: "settings-panel__label", children: "Progress watchdog enabled" })
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input settings-panel__input--number",
+              type: "number",
+              min: 0,
+              max: 3600,
+              value: watchdogTimeout.value,
+              onInput: (e5) => watchdogTimeout.value = Number(e5.target.value),
+              onBlur: () => onSaveCompaction("progressWatchdogTimeoutSec", watchdogTimeout.value)
+            }
+          )
+        ] })
       ] })
     ] });
   }

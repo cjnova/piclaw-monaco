@@ -195,55 +195,73 @@ function GeneralSection({
     <section className="settings-panel__section">
       <h2 className="settings-panel__section-title">General</h2>
 
+      <h3 className="settings-panel__subsection-title">Identity</h3>
+
       <div className="settings-panel__field">
         <label className="settings-panel__label">Agent name</label>
-        <input
-          className="settings-panel__input"
-          type="text"
-          value={assistantName.value}
-          onInput={(e) => (assistantName.value = (e.target as HTMLInputElement).value)}
-          onBlur={() => onSaveGeneral("assistantName", assistantName.value)}
-          placeholder="Agent display name"
-        />
+        <div className="settings-panel__field-content">
+          <input
+            className="settings-panel__input"
+            type="text"
+            value={assistantName.value}
+            onInput={(e) => (assistantName.value = (e.target as HTMLInputElement).value)}
+            onBlur={() => onSaveGeneral("assistantName", assistantName.value)}
+            placeholder="Agent display name"
+          />
+          <span className="settings-panel__description">Display name for the AI agent</span>
+        </div>
       </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">User name</label>
-        <input
-          className="settings-panel__input"
-          type="text"
-          value={userName.value}
-          onInput={(e) => (userName.value = (e.target as HTMLInputElement).value)}
-          onBlur={() => onSaveGeneral("userName", userName.value)}
-          placeholder="Your name"
-        />
+        <div className="settings-panel__field-content">
+          <input
+            className="settings-panel__input"
+            type="text"
+            value={userName.value}
+            onInput={(e) => (userName.value = (e.target as HTMLInputElement).value)}
+            onBlur={() => onSaveGeneral("userName", userName.value)}
+            placeholder="Your name"
+          />
+          <span className="settings-panel__description">Your display name in chat</span>
+        </div>
       </div>
+
+      <h3 className="settings-panel__subsection-title">Instance Configuration</h3>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Max session size (MB)</label>
-        <input
-          className="settings-panel__input settings-panel__input--number"
-          type="number"
-          min={1}
-          max={500}
-          value={sessionMaxSizeMb.value}
-          onInput={(e) => (sessionMaxSizeMb.value = Number((e.target as HTMLInputElement).value))}
-          onBlur={() => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)}
-        />
+        <div className="settings-panel__field-content">
+          <input
+            className="settings-panel__input settings-panel__input--number"
+            type="number"
+            min={1}
+            max={500}
+            value={sessionMaxSizeMb.value}
+            onInput={(e) => (sessionMaxSizeMb.value = Number((e.target as HTMLInputElement).value))}
+            onBlur={() => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)}
+          />
+          <span className="settings-panel__description">Maximum session context size before auto-compaction</span>
+        </div>
       </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Tool use budget</label>
-        <input
-          className="settings-panel__input settings-panel__input--number"
-          type="number"
-          min={0}
-          max={200}
-          value={toolUseBudget.value}
-          onInput={(e) => (toolUseBudget.value = Number((e.target as HTMLInputElement).value))}
-          onBlur={() => onSaveGeneral("toolUseBudget", toolUseBudget.value)}
-        />
+        <div className="settings-panel__field-content">
+          <input
+            className="settings-panel__input settings-panel__input--number"
+            type="number"
+            min={0}
+            max={200}
+            value={toolUseBudget.value}
+            onInput={(e) => (toolUseBudget.value = Number((e.target as HTMLInputElement).value))}
+            onBlur={() => onSaveGeneral("toolUseBudget", toolUseBudget.value)}
+          />
+          <span className="settings-panel__description">Max tool calls per agent turn</span>
+        </div>
       </div>
+
+      <h3 className="settings-panel__subsection-title">Behavior</h3>
 
       <div className="settings-panel__field settings-panel__checkbox-row">
         <input
@@ -257,6 +275,7 @@ function GeneralSection({
         <label htmlFor="sessionAutoRotate" className="settings-panel__label">
           Auto-rotate sessions
         </label>
+        <span className="settings-panel__description">Automatically start new session when context is full</span>
       </div>
 
       <div className="settings-panel__field settings-panel__checkbox-row">
@@ -271,35 +290,44 @@ function GeneralSection({
         <label htmlFor="webTerminalEnabled" className="settings-panel__label">
           Web terminal enabled
         </label>
+        <span className="settings-panel__description">Enable terminal access in the web UI</span>
       </div>
+
+      <h3 className="settings-panel__subsection-title">Session</h3>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Session isolation</label>
-        <select
-          className="settings-panel__select"
-          value={data.sessionIsolation ?? "none"}
-          onChange={(e) =>
-            onSaveGeneral("sessionIsolation", (e.target as HTMLSelectElement).value)
-          }
-        >
-          <option value="none">None</option>
-          <option value="summary">Summary</option>
-          <option value="full">Full</option>
-        </select>
+        <div className="settings-panel__field-content">
+          <select
+            className="settings-panel__select"
+            value={data.sessionIsolation ?? "none"}
+            onChange={(e) =>
+              onSaveGeneral("sessionIsolation", (e.target as HTMLSelectElement).value)
+            }
+          >
+            <option value="none">None</option>
+            <option value="summary">Summary</option>
+            <option value="full">Full</option>
+          </select>
+          <span className="settings-panel__description">none = shared context, branch = isolated branches</span>
+        </div>
       </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Search match mode</label>
-        <select
-          className="settings-panel__select"
-          value={data.searchMatchMode ?? "or"}
-          onChange={(e) =>
-            onSaveGeneral("searchMatchMode", (e.target as HTMLSelectElement).value)
-          }
-        >
-          <option value="or">OR (any term)</option>
-          <option value="and">AND (all terms)</option>
-        </select>
+        <div className="settings-panel__field-content">
+          <select
+            className="settings-panel__select"
+            value={data.searchMatchMode ?? "or"}
+            onChange={(e) =>
+              onSaveGeneral("searchMatchMode", (e.target as HTMLSelectElement).value)
+            }
+          >
+            <option value="or">OR (any term)</option>
+            <option value="and">AND (all terms)</option>
+          </select>
+          <span className="settings-panel__description">How multiple search terms are combined</span>
+        </div>
       </div>
     </section>
   );
@@ -374,6 +402,9 @@ function CompactionSection({
     <section className="settings-panel__section">
       <h2 className="settings-panel__section-title">Compaction</h2>
 
+      <div className="settings-panel__card">
+      <h3 className="settings-panel__subsection-title">Compaction Timeouts</h3>
+
       <div className="settings-panel__field">
         <label className="settings-panel__label">Timeout (sec)</label>
         <input
@@ -443,6 +474,7 @@ function CompactionSection({
             onSaveCompaction("progressWatchdogTimeoutSec", watchdogTimeout.value)
           }
         />
+      </div>
       </div>
     </section>
   );
