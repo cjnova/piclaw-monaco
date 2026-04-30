@@ -145,6 +145,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ⏳ |
 | wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ⏳ |
 | leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ⏳ |
+| open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ⏳ |
+| browser-voice-integration | Speech-to-text input + text-to-speech output (browser APIs) | ⏳ |
 
 ### Wave 11 — Full Functionality
 
