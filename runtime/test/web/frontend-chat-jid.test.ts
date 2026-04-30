@@ -1,12 +1,12 @@
 /**
  * test/web/frontend-chat-jid.test.ts – Tests for api/chat-jid.ts utility functions.
  *
- * Covers ensureChatJidInUrl(), getChatJid(), and getMessageUrl().
+ * Covers getChatJid() and getMessageUrl().
  */
 
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { ensureChatJidInUrl, getChatJid, getMessageUrl } from "../../web/frontend/src/api/chat-jid.ts";
+import { getChatJid, getMessageUrl } from "../../web/frontend/src/api/chat-jid.ts";
 
 const originalWindow = (globalThis as any).window;
 
@@ -38,57 +38,6 @@ describe("getChatJid", () => {
   test("returns 'web:default' when chat_jid param is empty string", () => {
     (globalThis as any).window = { location: { search: "?chat_jid=" } };
     expect(getChatJid()).toBe("web:default");
-  });
-});
-
-describe("ensureChatJidInUrl", () => {
-  test("does nothing when window is undefined", () => {
-    (globalThis as any).window = undefined;
-    expect(() => ensureChatJidInUrl()).not.toThrow();
-  });
-
-  test("sets chat_jid=web:default when param is absent", () => {
-    let replacedUrl: string | null = null;
-    (globalThis as any).window = {
-      location: { search: "", pathname: "/app" },
-      history: {
-        replaceState: (_state: unknown, _title: string, url: string) => {
-          replacedUrl = url;
-        },
-      },
-    };
-    ensureChatJidInUrl();
-    expect(replacedUrl).not.toBeNull();
-    expect(replacedUrl).toContain("chat_jid=web%3Adefault");
-  });
-
-  test("does not replace URL when chat_jid is already present", () => {
-    let replaceStateCalled = false;
-    (globalThis as any).window = {
-      location: { search: "?chat_jid=web%3Adefault", pathname: "/app" },
-      history: {
-        replaceState: () => {
-          replaceStateCalled = true;
-        },
-      },
-    };
-    ensureChatJidInUrl();
-    expect(replaceStateCalled).toBe(false);
-  });
-
-  test("preserves existing query params when adding chat_jid", () => {
-    let replacedUrl: string | null = null;
-    (globalThis as any).window = {
-      location: { search: "?foo=bar", pathname: "/app" },
-      history: {
-        replaceState: (_state: unknown, _title: string, url: string) => {
-          replacedUrl = url;
-        },
-      },
-    };
-    ensureChatJidInUrl();
-    expect(replacedUrl).toContain("foo=bar");
-    expect(replacedUrl).toContain("chat_jid=web%3Adefault");
   });
 });
 
