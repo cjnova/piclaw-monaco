@@ -33,8 +33,8 @@ function TasksTab() {
   return (
     <div className="tasks-panel__list">
       <div className="tasks-panel__empty">
-        No scheduled tasks.{" "}
-        <span className="tasks-panel__hint">Use <code>/schedule</code> in chat to create one.</span>
+        <i className="codicon codicon-tasklist" />
+        <span>No scheduled tasks</span>
       </div>
     </div>
   );
