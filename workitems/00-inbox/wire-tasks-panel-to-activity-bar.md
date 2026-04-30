@@ -18,7 +18,7 @@ owner:
 
 ## Summary
 
-Add a **Tasks** Activity Bar icon (codicon: `tasklist`) that opens a three-tab sidebar panel for managing scheduled tasks, active chat channels, and conversation branches. The panel follows the same composition pattern as AddonsPanel: fetch-on-mount, card list, action controls. The Tasks tab requires a **new** `GET /agent/scheduled-tasks` HTTP endpoint backed by the existing `listScheduledTasks()` query service; Channels and Branches tabs use existing HTTP endpoints already present in `dispatch-agent.ts`.
+Add a **Tasks** Activity Bar icon (codicon: `tasklist`) that opens a three-tab sidebar panel for managing scheduled tasks and unified sessions. The panel follows the same composition pattern as AddonsPanel: fetch-on-mount, card list, action controls. The Tasks tab requires a **new** `GET /agent/scheduled-tasks` HTTP endpoint backed by the existing `listScheduledTasks()` query service; the Sessions tab uses existing HTTP endpoints already present in `dispatch-agent.ts`.
 
 ## Backend APIs
 
@@ -89,11 +89,10 @@ Add a new icon (codicon `tasklist`) between Dashboards and Settings in the Activ
 
 The Tasks panel uses the same `.chat-tabs` horizontal tab pattern as Dashboards. Three tabs:
 
-| # | Tab label | Data source | Refresh trigger |
-|---|---|---|---|
-| 1 | **Tasks** | `GET /agent/scheduled-tasks` | On mount + after each mutation |
-| 2 | **Channels** | `GET /agent/active-chats` | On tab focus |
-| 3 | **Branches** | `GET /agent/branches` | On tab focus |
+| Tab | Description | Backend API |
+|---|---|---|
+| **Tasks** | Scheduled tasks (cron/interval/once) — create, pause, resume, delete | `scheduled_tasks` system |
+| **Sessions** | Manage sessions & agents — unified view of all chat sessions and branches | `GET /agent/active-chats`, `GET /agent/branches`, `POST /agent/rename-jid`, `POST /agent/branch-fork`, `POST /agent/branch-rename`, `POST /agent/branch-prune`, `POST /agent/branch-restore` |
 
 Tab switching is instant; previously loaded data is cached in component state.
 
@@ -112,19 +111,33 @@ Tab switching is instant; previously loaded data is cached in component state.
 - **Empty state**: "No scheduled tasks. Use `/schedule` in chat to create one."
 - **Create** button in panel header → sends `/schedule help` to current chat tab or opens inline wizard (deferred)
 
-### Tab 2 — Channels
+### Sessions Tab — "Manage sessions & agents"
 
-- List of active chat sessions from `GET /agent/active-chats`
-- Each row: channel name / JID, message count, last activity
-- Actions: **Switch** (navigate to that chat), **Rename** (`POST /agent/rename-jid`)
-- Empty state: "No active channels"
+Shows a unified list combining active sessions and archived branches (same as piclaw's native session popup). Each entry shows:
 
-### Tab 3 — Branches
+**Format per row**: `@name — jid • status`
 
-- List of conversation branches from `GET /agent/branches`
-- Each row: branch name, parent JID, creation date, message count
-- Actions: **Fork** · **Rename** · **Prune** · **Restore** · **Purge** (destructive, confirmation required)
-- Empty state: "No branches"
+**Entry types:**
+- **Active session** (bright text): `@myownclaw — web:myownclaw • current branch`
+- **Active session** (normal): `@fleet — web:fleet`
+- **Archived branch** (muted/gray): `@290d4ad2c6fa — web:default:branch:290d4ad2c6fa • archived`
+
+**Interactions:**
+- Click an active session → switch to it (update URL `?chat_jid=`, reload chat panel)
+- Current session highlighted (accent color/border)
+- Scrollable list (may have many branches)
+
+**Actions (bottom bar):**
+- [New] — create new session (`POST /agent/branch-fork` or new chat)
+- [Rename current...] — rename active session (`POST /agent/branch-rename` or `POST /agent/rename-jid`)
+- [Delete current...] — delete/archive with confirmation (`POST /agent/branch-prune`)
+
+**Terminology mapping:**
+- "Session" = a named chat context with its own conversation history
+- "JID" (Jabber ID) = unique identifier like `web:default`, `web:myownclaw`
+- "Branch" = a forked/archived version of a session (created by branching or auto-archive)
+- "@name" = display name / alias for the session
+- "current branch" = the active conversation you're chatting in
 
 ### Style constraints
 
@@ -190,19 +203,14 @@ Add three new endpoints in `dispatch-agent.ts` backed by direct IPC calls:
 - [ ] Error banner shown when `/agent/scheduled-tasks` returns non-2xx
 - [ ] `401` response shows auth-specific message
 
-### Channels Tab
-- [ ] Sessions fetched from `GET /agent/active-chats` on tab focus
-- [ ] Each session row shows channel name / JID, message count, last activity
-- [ ] Switch action navigates to that chat
-- [ ] Rename action calls `POST /agent/rename-jid` and refreshes list
-- [ ] Empty state shown when no active channels
-
-### Branches Tab
-- [ ] Branches fetched from `GET /agent/branches` on tab focus
-- [ ] Each branch row shows name, parent, creation date, message count
-- [ ] Fork / Rename / Prune / Restore / Purge actions work and refresh list
-- [ ] Destructive actions (Purge) require confirmation
-- [ ] Empty state shown when no branches exist
+### Sessions Tab
+- [ ] Sessions tab shows unified list of active sessions + archived branches
+- [ ] Active sessions show @name, JID, and "current branch" indicator
+- [ ] Archived branches shown in muted style with "archived" label
+- [ ] Click session to switch (updates URL ?chat_jid=, reloads chat)
+- [ ] [New] button creates a new session
+- [ ] [Rename current...] renames the active session
+- [ ] [Delete current...] prunes/archives with confirmation
 
 ### Cross-cutting
 - [ ] All CSS in BEM classes; no inline styles
@@ -265,7 +273,7 @@ Add three new endpoints in `dispatch-agent.ts` backed by direct IPC calls:
 - IPC mutations (`pause_task`, `resume_task`, `cancel_task`) are synchronous and do not need polling; a single refetch after the action is sufficient.
 - `include_latest_run_log=true` adds one extra DB query per task — use only on the task detail view (future ticket), not on the list endpoint by default.
 - Task `chat_jid` links the task to a specific channel; the UI should make this navigable (click badge → switch to that channel).
-- For the Channels tab, "Switch" should update the active chat context without closing the panel.
+- The Sessions tab should mirror piclaw's native session popup behavior for switching, naming, and archiving.
 - Branch "Purge" is irreversible — modal confirmation must clearly state this.
 - Internal tasks (e.g. `dream`) should be displayed but mutation controls should be disabled or hidden to avoid breaking background maintenance.
 
