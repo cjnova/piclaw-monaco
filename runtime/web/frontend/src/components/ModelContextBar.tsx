@@ -179,10 +179,16 @@ export function ModelContextBar() {
   useEffect(() => {
     const onStatus = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?.type === "done" || detail?.status === "idle") {
+      // Detect compaction started (from /compact command or auto-compaction)
+      if (detail?.intent_key === "compaction" && !isCompacting.value) {
+        isCompacting.value = true;
+        compactStartTime.value = Date.now();
+        compactElapsed.value = 0;
+      }
+      // Detect compaction/turn done
+      if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {
         if (isCompacting.value) {
           isCompacting.value = false;
-          // Refresh context after compaction
           setTimeout(() => fetchContext(), 1000);
         }
       }
@@ -225,13 +231,21 @@ export function ModelContextBar() {
     compactStartTime.value = Date.now();
     compactElapsed.value = 0;
     try {
-      await fetch(getMessageUrl(), {
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: "/compact" }),
       });
-    } catch {}
+      const data = await res.json().catch(() => null);
+      // Command responded immediately ("Already compacted" or similar) — no agent turn
+      if (data?.command) {
+        isCompacting.value = false;
+        setTimeout(() => fetchContext(), 1000);
+      }
+    } catch {
+      isCompacting.value = false;
+    }
   };
 
   const handleBadgeClick = async (e: MouseEvent) => {

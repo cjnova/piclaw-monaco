@@ -330,10 +330,20 @@ export function MessageList() {
         });
         setDraft("");
         scrollToBottom(true);
+        // Signal that agent turn is complete (clears compaction badge, etc.)
+        window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
       } catch {
         setDraft("");
         scrollToBottom(true);
+        window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
       }
+    });
+
+    es.addEventListener("agent_status", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: data }));
+      } catch { /* ignore */ }
     });
 
     es.onopen = () => {
