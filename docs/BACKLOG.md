@@ -129,10 +129,12 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
-| merge-upstream-v2-1-0 | Merge upstream v2.1.0 tag, resolve conflicts, rebuild | ⏳ |
-| adopt-security-freeze-extension-routes | Verify extension route freeze works with our frontend | ⏳ |
-| configure-dev-provider | Configure model provider on dev instance for testing | ⏳ |
-| verify-all-panels-post-merge | Smoke test all panels after merge | ⏳ |
+| merge-upstream-v2-1-0 | Merge upstream v2.1.0 tag, resolve conflicts, rebuild | ✅ |
+| adopt-security-freeze-extension-routes | Verify extension route freeze works with our frontend | ✅ (workaround: defer freeze to session init) |
+| configure-dev-provider | Configure model provider on dev instance for testing | ✅ |
+| verify-all-panels-post-merge | Smoke test all panels after merge | ✅ |
+
+> Wave 10b complete. SSE reconnection, chat_jid URL params, single SSE connection (like upstream), agent responses visible in real-time. Upstream bug reported: rcarmo/piclaw#512.
 
 ### Wave 10c — Settings Panel
 
