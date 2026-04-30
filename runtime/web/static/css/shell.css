@@ -2500,3 +2500,26 @@ body {
   border: none;
   display: block;
 }
+
+.compaction-badge {
+  background: var(--error);
+  color: #ffffff;
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-weight: 500;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: compaction-pulse 1.5s infinite;
+}
+
+@keyframes compaction-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.usage-badge {
+  opacity: 0.8;
+  font-size: 11px;
+}

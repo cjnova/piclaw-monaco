@@ -5229,10 +5229,10 @@ For tests, pass a Ghostty instance directly:
     { id: "github-copilot/gemini-2.5-pro", context_window: 1048576 }
   ];
   var FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
+  var fmtTokens = (n4) => n4 >= 1e6 ? `${(n4 / 1e6).toFixed(1)}M` : `${(n4 / 1e3).toFixed(0)}k`;
   function ContextRing({ percent, tokens, contextWindow, onClick }) {
     const p6 = percent;
     const color = p6 > 95 ? "#f38ba8" : p6 > 80 ? "#f9e2af" : "#a6e3a1";
-    const fmtTokens = (n4) => n4 >= 1e6 ? `${(n4 / 1e6).toFixed(1)}M` : `${(n4 / 1e3).toFixed(0)}k`;
     const tokensK = fmtTokens(tokens);
     const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
     return /* @__PURE__ */ u4(
@@ -5262,6 +5262,12 @@ For tests, pass a Ghostty instance directly:
     const models = useSignal([]);
     const thinkingLevels = useSignal([]);
     const currentModel = useSignal(null);
+    const modelContextWindow = useSignal(0);
+    const isCompacting = useSignal(false);
+    const compactStartTime = useSignal(0);
+    const compactElapsed = useSignal(0);
+    const sessionTokens = useSignal(0);
+    const providerUsage = useSignal(null);
     const fetchStatus = async () => {
       try {
         const res = await fetch("/agent/status");
@@ -5276,7 +5282,17 @@ For tests, pass a Ghostty instance directly:
         if (modelsRes.ok) {
           const info = await modelsRes.json();
           if (info.current) currentModel.value = info.current;
-          if (info.provider_usage) providerUsage.value = info.provider_usage;
+          const currentOpt = info.model_options?.find((m6) => m6.id === info.current);
+          if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window;
+          if (info.provider_usage) {
+            providerUsage.value = info.provider_usage;
+            const pu = info.provider_usage;
+            const total = Object.values(pu).reduce((sum, p6) => {
+              if (typeof p6 !== "object" || p6 === null) return sum;
+              return sum + (p6?.total_tokens ?? (p6?.input_tokens ?? 0) + (p6?.output_tokens ?? 0));
+            }, 0);
+            if (total > 0) sessionTokens.value = total;
+          }
         }
       } catch (err) {
         console.warn("[ModelContextBar] status fetch failed:", err);
@@ -5312,6 +5328,26 @@ For tests, pass a Ghostty instance directly:
       return () => window.removeEventListener("piclaw:sse-connected", onConnect);
     }, []);
     y2(() => {
+      if (!isCompacting.value) return;
+      const interval = setInterval(() => {
+        compactElapsed.value = Math.round((Date.now() - compactStartTime.value) / 1e3);
+      }, 1e3);
+      return () => clearInterval(interval);
+    }, [isCompacting.value]);
+    y2(() => {
+      const onStatus = (e5) => {
+        const detail = e5.detail;
+        if (detail?.type === "done" || detail?.status === "idle") {
+          if (isCompacting.value) {
+            isCompacting.value = false;
+            setTimeout(() => fetchContext(), 1e3);
+          }
+        }
+      };
+      window.addEventListener("piclaw:agent-status", onStatus);
+      return () => window.removeEventListener("piclaw:agent-status", onStatus);
+    }, []);
+    y2(() => {
       if (!showPicker.value && !showThinkingPicker.value) return;
       const handleKeyDown = (e5) => {
         if (e5.key === "Escape") {
@@ -5333,15 +5369,20 @@ For tests, pass a Ghostty instance directly:
         document.removeEventListener("click", handleClickOutside);
       };
     }, [showPicker.value, showThinkingPicker.value]);
-    const handleCompact = (e5) => {
+    const handleCompact = async (e5) => {
       e5.stopPropagation();
-      fetch(getMessageUrl(), {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "/compact" })
-      }).catch(() => {
-      });
+      isCompacting.value = true;
+      compactStartTime.value = Date.now();
+      compactElapsed.value = 0;
+      try {
+        await fetch(getMessageUrl(), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: "/compact" })
+        });
+      } catch {
+      }
     };
     const handleBadgeClick = async (e5) => {
       e5.stopPropagation();
@@ -5407,7 +5448,7 @@ For tests, pass a Ghostty instance directly:
     const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
     const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
     const contextTokens = agentContext.value?.tokens ?? 0;
-    const contextWindow = agentContext.value?.contextWindow ?? 0;
+    const contextWindow = agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0;
     const contextPercent = agentContext.value?.percent ?? (contextWindow > 0 ? contextTokens / contextWindow * 100 : 0);
     const activeModel = currentModel.value ?? modelName;
     return /* @__PURE__ */ u4(
@@ -5450,6 +5491,11 @@ For tests, pass a Ghostty instance directly:
               })
             }
           ),
+          isCompacting.value && /* @__PURE__ */ u4("span", { className: "compaction-badge", children: [
+            "\u27F3 Compacting... ",
+            compactElapsed.value,
+            "s"
+          ] }),
           /* @__PURE__ */ u4(
             "span",
             {
@@ -5515,19 +5561,18 @@ For tests, pass a Ghostty instance directly:
                   }
                 ),
                 /* @__PURE__ */ u4(ContextRing, { percent: contextPercent, tokens: contextTokens, contextWindow, onClick: handleCompact }),
-                providerUsage.value?.hint_short && /* @__PURE__ */ u4(
+                sessionTokens.value > 0 && /* @__PURE__ */ u4(
                   "span",
                   {
                     className: "usage-badge",
                     title: [
-                      providerUsage.value.provider ? `Provider: ${providerUsage.value.provider}` : "",
-                      providerUsage.value.plan ? `Plan: ${providerUsage.value.plan}` : "",
-                      providerUsage.value.primary ? `${providerUsage.value.primary.label}: ${providerUsage.value.primary.used_percent}% used${providerUsage.value.primary.reset_description ? " (" + providerUsage.value.primary.reset_description + ")" : ""}` : "",
-                      providerUsage.value.secondary ? `${providerUsage.value.secondary.label}: ${providerUsage.value.secondary.used_percent}% used${providerUsage.value.secondary.reset_description ? " (" + providerUsage.value.secondary.reset_description + ")" : ""}` : ""
+                      providerUsage.value?.provider ? `Provider: ${providerUsage.value.provider}` : "",
+                      providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : "",
+                      `Session tokens: ${sessionTokens.value.toLocaleString()}`
                     ].filter(Boolean).join("\n"),
                     children: [
                       "\u25BC ",
-                      providerUsage.value.hint_short
+                      fmtTokens(sessionTokens.value)
                     ]
                   }
                 )
