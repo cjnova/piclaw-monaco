@@ -2759,7 +2759,6 @@ body {
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
-  padding-left: 192px;
 }
 .settings-panel__checkbox-row input[type="checkbox"] {
   width: 14px;
