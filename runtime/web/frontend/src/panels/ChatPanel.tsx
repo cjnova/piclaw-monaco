@@ -3,6 +3,7 @@ import { useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
 import { extractDisplayName } from "../utils/extractDisplayName";
+import { isSafeExtensionUrl } from "../utils/isSafeExtensionUrl";
 
 interface ExtensionRoute {
   prefix: string;
@@ -124,13 +125,15 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
             </button>
           </div>
         </>
-      ) : (
+      ) : isSafeExtensionUrl(activeTab.value) ? (
         <iframe
           className="chat-tabs__iframe"
           src={activeTab.value}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
           title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
         />
+      ) : (
+        <div className="chat-tabs__blocked">Blocked: unsafe extension URL</div>
       )}
     </section>
   );

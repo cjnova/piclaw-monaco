@@ -302,6 +302,11 @@
     return n4.__v.__b - l8.__v.__b;
   }, H.__r = 0, f = Math.random().toString(8), c = "__d" + f, s = "__a" + f, a = /(PointerCapture)$|Capture$/i, h = 0, p = V(false), v = V(true), y = 0;
 
+  // runtime/web/frontend/src/utils/isSafeExtensionUrl.ts
+  function isSafeExtensionUrl(url) {
+    return typeof url === "string" && url.startsWith("/") && !url.startsWith("//") && !url.includes("://");
+  }
+
   // node_modules/preact/hooks/dist/hooks.module.js
   var t2;
   var r2;
@@ -9815,7 +9820,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             }
           )
         ] })
-      ] }) : /* @__PURE__ */ u4(
+      ] }) : isSafeExtensionUrl(activeTab.value) ? /* @__PURE__ */ u4(
         "iframe",
         {
           className: "chat-tabs__iframe",
@@ -9823,7 +9828,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
           title: extractDisplayName(pages.find((p6) => p6.prefix === activeTab.value)?.extensionPath ?? "")
         }
-      )
+      ) : /* @__PURE__ */ u4("div", { className: "chat-tabs__blocked", children: "Blocked: unsafe extension URL" })
     ] });
   }
 
@@ -10167,7 +10172,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: extensionPageUrl.value ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
+          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
             /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
               /* @__PURE__ */ u4(
                 "button",
