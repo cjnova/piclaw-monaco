@@ -302,6 +302,24 @@
     return n4.__v.__b - l8.__v.__b;
   }, H.__r = 0, f = Math.random().toString(8), c = "__d" + f, s = "__a" + f, a = /(PointerCapture)$|Capture$/i, h = 0, p = V(false), v = V(true), y = 0;
 
+  // runtime/web/frontend/src/api/chat-jid.ts
+  function ensureChatJidInUrl() {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("chat_jid")) {
+      params.set("chat_jid", "web:default");
+      window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+    }
+  }
+  function getChatJid() {
+    if (typeof window === "undefined") return "web:default";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("chat_jid") || "web:default";
+  }
+  function getMessageUrl() {
+    return `/agent/${encodeURIComponent(getChatJid())}/message`;
+  }
+
   // node_modules/preact/hooks/dist/hooks.module.js
   var t2;
   var r2;
@@ -5201,16 +5219,6 @@ For tests, pass a Ghostty instance directly:
     ] });
   }
 
-  // runtime/web/frontend/src/api/chat-jid.ts
-  function getChatJid() {
-    if (typeof window === "undefined") return "web:default";
-    const params = new URLSearchParams(window.location.search);
-    return params.get("chat_jid") || "web:default";
-  }
-  function getMessageUrl() {
-    return `/agent/${encodeURIComponent(getChatJid())}/message`;
-  }
-
   // runtime/web/frontend/src/components/ModelContextBar.tsx
   var FALLBACK_MODELS = [
     { id: "github-copilot/claude-sonnet-4.6", context_window: 2e5 },
@@ -8808,6 +8816,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
 
   // runtime/web/frontend/src/App.tsx
   function AppContent() {
+    ensureChatJidInUrl();
     const themeControl = useThemeControl();
     const connectionStatus = useSignal("disconnected");
     const activePanel = useSignal("explorer");
