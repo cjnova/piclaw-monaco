@@ -12,6 +12,7 @@
 
 import { classHighlighter, highlightTree } from '@lezer/highlight';
 import { javascriptLanguage } from '@codemirror/lang-javascript';
+import DOMPurify from 'dompurify';
 
 // ── Attribute allowlist ────────────────────────────────────────────────────
 
@@ -264,11 +265,17 @@ function getMarked(): { parse(text: string): string } | null {
 }
 
 /**
- * Sanitise HTML produced by `marked` (or any other renderer):
- *  - removes event-handler attributes and `style`
- *  - strips `javascript:` URLs from href / src / action
+ * Sanitise HTML produced by `marked` (or any other renderer) using DOMPurify.
+ * Falls back to a lightweight custom sanitizer in non-DOM environments (e.g.
+ * server-side or test environments where DOMPurify.sanitize is unavailable).
  */
 function sanitizeHtml(html: string): string {
+  // DOMPurify.sanitize is only defined when running in a DOM environment.
+  // It is undefined in Node.js / bun without jsdom.
+  if (typeof DOMPurify.sanitize === 'function') {
+    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  }
+  // Fallback for non-DOM environments (test runner, SSR)
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const NodeFilterLocal = (globalThis as Record<string, unknown>)['NodeFilter'] as { SHOW_ELEMENT: number } | undefined;
   const SHOW_ELEMENT = NodeFilterLocal?.SHOW_ELEMENT ?? 1;
