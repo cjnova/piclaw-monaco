@@ -323,17 +323,22 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
     navigator.clipboard.writeText(node.path).catch(() => {});
   }, [node.path]);
 
+  const ext = node.path.split('.').pop()?.toLowerCase() ?? '';
+  const VIEWER_EXTS = ['csv', 'html', 'htm', 'pdf', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'mp4', 'webm', 'mov'];
+  const hasViewer = VIEWER_EXTS.includes(ext);
+
   const handleOpenFile = useCallback(() => {
     const ext = node.path.split('.').pop()?.toLowerCase() ?? '';
     const encoded = encodeURIComponent(node.path);
-    let viewerUrl: string;
+    let viewerUrl: string | null;
     if (ext === 'csv') viewerUrl = `/csv-viewer?path=${encoded}`;
     else if (['html', 'htm'].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
     else if (ext === 'pdf') viewerUrl = `/pdf-viewer?path=${encoded}`;
     else if (['docx', 'xlsx', 'pptx'].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
     else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
     else if (['mp4', 'webm', 'mov'].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
-    else viewerUrl = `/editor-vendor?path=${encoded}`;
+    else viewerUrl = null;
+    if (!viewerUrl) return;
     window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { url: viewerUrl, name: node.path.split('/').pop() } }));
   }, [node.path]);
 
@@ -391,6 +396,7 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
           <span className="codicon codicon-cloud-download" />
           Download
         </a>
+        {hasViewer && (
         <button
           className="workspace__preview-action-btn"
           onClick={handleOpenFile}
@@ -399,6 +405,7 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
           <span className="codicon codicon-open-preview" />
           Open
         </button>
+        )}
         <button
           className="workspace__preview-action-btn workspace__preview-action-btn--danger"
           disabled={isDeleting}

@@ -8832,17 +8832,21 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       navigator.clipboard.writeText(node.path).catch(() => {
       });
     }, [node.path]);
+    const ext = node.path.split(".").pop()?.toLowerCase() ?? "";
+    const VIEWER_EXTS = ["csv", "html", "htm", "pdf", "docx", "xlsx", "pptx", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "webm", "mov"];
+    const hasViewer = VIEWER_EXTS.includes(ext);
     const handleOpenFile = q2(() => {
-      const ext = node.path.split(".").pop()?.toLowerCase() ?? "";
+      const ext2 = node.path.split(".").pop()?.toLowerCase() ?? "";
       const encoded = encodeURIComponent(node.path);
       let viewerUrl;
-      if (ext === "csv") viewerUrl = `/csv-viewer?path=${encoded}`;
-      else if (["html", "htm"].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
-      else if (ext === "pdf") viewerUrl = `/pdf-viewer?path=${encoded}`;
-      else if (["docx", "xlsx", "pptx"].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
-      else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
-      else if (["mp4", "webm", "mov"].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
-      else viewerUrl = `/editor-vendor?path=${encoded}`;
+      if (ext2 === "csv") viewerUrl = `/csv-viewer?path=${encoded}`;
+      else if (["html", "htm"].includes(ext2)) viewerUrl = `/html-viewer?path=${encoded}`;
+      else if (ext2 === "pdf") viewerUrl = `/pdf-viewer?path=${encoded}`;
+      else if (["docx", "xlsx", "pptx"].includes(ext2)) viewerUrl = `/office-viewer?path=${encoded}`;
+      else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext2)) viewerUrl = `/image-viewer?path=${encoded}`;
+      else if (["mp4", "webm", "mov"].includes(ext2)) viewerUrl = `/video-viewer?path=${encoded}`;
+      else viewerUrl = null;
+      if (!viewerUrl) return;
       window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { url: viewerUrl, name: node.path.split("/").pop() } }));
     }, [node.path]);
     const handleDelete = q2(async () => {
@@ -8900,7 +8904,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             ]
           }
         ),
-        /* @__PURE__ */ u4(
+        hasViewer && /* @__PURE__ */ u4(
           "button",
           {
             className: "workspace__preview-action-btn",
