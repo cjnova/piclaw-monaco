@@ -2796,8 +2796,9 @@ body {
   justify-content: center;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 16px;
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
 }
@@ -2812,10 +2813,10 @@ body {
   border-radius: 0 4px 4px 0;
 }
 .settings-panel__stepper-value {
-  width: 80px;
+  width: 64px;
   height: 32px;
   text-align: center;
-  background: var(--bg-elevated);
+  background: transparent;
   border: 1px solid var(--border);
   border-left: none;
   border-right: none;
