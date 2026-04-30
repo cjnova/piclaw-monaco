@@ -10639,6 +10639,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const themeControl = useThemeControl();
     const connectionStatus = useSignal("disconnected");
     const activePanel = useSignal("explorer");
+    const previousPanel = useSignal("explorer");
     const paletteVisible = useSignal(false);
     const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
     const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
@@ -10800,13 +10801,17 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => cmds.forEach((c4) => commandRegistry.unregister(c4.id));
     }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl]);
     const handlePanelChange = q2((id) => {
-      if (id === activePanel.value) {
+      if (id === "settings" && activePanel.value === "settings") {
+        activePanel.value = previousPanel.value;
+        sidebarCollapsed.value = false;
+      } else if (id === activePanel.value) {
         sidebarCollapsed.value = !sidebarCollapsed.value;
       } else {
+        if (activePanel.value !== "settings") previousPanel.value = activePanel.value;
         activePanel.value = id;
         sidebarCollapsed.value = false;
       }
-    }, [activePanel, sidebarCollapsed]);
+    }, [activePanel, sidebarCollapsed, previousPanel]);
     const handlePageSelect = q2((url, name) => {
       extensionPageUrl.value = url;
       extensionPageName.value = name;

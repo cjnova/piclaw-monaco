@@ -17,6 +17,7 @@ function AppContent() {
   const themeControl = useThemeControl();
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
   const activePanel = useSignal("explorer");
+  const previousPanel = useSignal("explorer");
   const paletteVisible = useSignal(false);
   const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
   const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
@@ -137,13 +138,18 @@ function AppContent() {
   }, [activePanel, terminalVisible, terminalMaximized, sidebarCollapsed, paletteVisible, themeControl]);
 
   const handlePanelChange = useCallback((id: string) => {
-    if (id === activePanel.value) {
+    if (id === "settings" && activePanel.value === "settings") {
+      // Toggle back from settings to previous panel
+      activePanel.value = previousPanel.value;
+      sidebarCollapsed.value = false;
+    } else if (id === activePanel.value) {
       sidebarCollapsed.value = !sidebarCollapsed.value;
     } else {
+      if (activePanel.value !== "settings") previousPanel.value = activePanel.value;
       activePanel.value = id;
       sidebarCollapsed.value = false;
     }
-  }, [activePanel, sidebarCollapsed]);
+  }, [activePanel, sidebarCollapsed, previousPanel]);
 
   const handlePageSelect = useCallback((url: string, name: string) => {
     extensionPageUrl.value = url;
