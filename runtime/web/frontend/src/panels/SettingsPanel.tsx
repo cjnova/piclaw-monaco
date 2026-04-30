@@ -62,6 +62,9 @@ interface SettingsData {
   webTerminalEnabled?: boolean;
   sessionIsolation?: "none" | "summary" | "full";
   searchMatchMode?: "or" | "and";
+  composeUploadLimitMb?: number;
+  workspaceUploadLimitMb?: number;
+  instanceTotp?: { configured?: boolean };
   /* appearance */
   uiTheme?: string;
   uiTint?: string | null;
@@ -72,15 +75,18 @@ interface SettingsData {
   compactionBackoffMaxMin?: number;
   progressWatchdogEnabled?: boolean;
   progressWatchdogTimeoutSec?: number;
+  /* workspace */
+  workspaceSettings?: { treeMaxDepth?: number; treeMaxEntries?: number };
   /* providers */
   providers?: Provider[];
 }
 
-type Category = "general" | "sessions" | "appearance" | "compaction" | "providers";
+type Category = "general" | "sessions" | "workspace" | "appearance" | "compaction" | "providers";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
   { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
+  { id: "workspace", label: "Workspace", icon: "codicon-folder" },
   { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
   { id: "compaction", label: "Compaction", icon: "codicon-archive" },
   { id: "providers", label: "Providers", icon: "codicon-cloud" },
@@ -142,6 +148,24 @@ export function SettingsPanel() {
       })
       .catch(() => showError());
   }
+
+  const saveWorkspace = async (field: string, value: unknown) => {
+    try {
+      const res = await fetch("/agent/settings/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (res.ok) {
+        saveStatus.value = "Saved";
+        setTimeout(() => (saveStatus.value = null), 2000);
+      } else {
+        saveStatus.value = "Save failed";
+        setTimeout(() => (saveStatus.value = null), 3000);
+      }
+    } catch { saveStatus.value = "Save failed"; setTimeout(() => (saveStatus.value = null), 3000); }
+  };
 
   function saveCompaction(field: string, value: unknown) {
     fetch("/agent/settings/compaction", {
@@ -210,6 +234,9 @@ export function SettingsPanel() {
         {activeCategory.value === "compaction" && (
           <CompactionSection data={s} onSaveCompaction={saveCompaction} />
         )}
+        {activeCategory.value === "workspace" && (
+          <WorkspaceSection data={s} onSaveWorkspace={saveWorkspace} />
+        )}
         {activeCategory.value === "providers" && (
           <ProvidersSection providers={s.providers ?? []} />
         )}
@@ -228,6 +255,8 @@ function GeneralSection({
 }) {
   const assistantName = useSignal(data.assistantName ?? "");
   const userName = useSignal(data.userName ?? "");
+  const composeUploadMb = useSignal(data.composeUploadLimitMb ?? 32);
+  const workspaceUploadMb = useSignal(data.workspaceUploadLimitMb ?? 256);
 
   return (
     <section className="settings-panel__section">
@@ -265,6 +294,13 @@ function GeneralSection({
         </div>
       </div>
 
+      <h3 className="settings-panel__subsection-title">Notifications</h3>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Browser notifications</label>
+        <span className="settings-panel__description">Use the 🔔 bell button in the compose bar to enable/disable notifications. Web Push requires HTTPS or localhost.</span>
+      </div>
+
       <h3 className="settings-panel__subsection-title">Display</h3>
 
       <div className="settings-panel__field settings-panel__checkbox-row">
@@ -297,6 +333,34 @@ function GeneralSection({
           </select>
           <span className="settings-panel__description">How multiple search terms are combined</span>
         </div>
+      </div>
+
+      <h3 className="settings-panel__subsection-title">Instance Configuration</h3>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Compose upload (MB)</label>
+        <div className="settings-panel__field-content">
+          <NumberStepper value={composeUploadMb} min={1} max={256} onSave={(v) => onSaveGeneral("composeUploadLimitMb", v)} />
+          <span className="settings-panel__description">Chat/media attachments</span>
+        </div>
+      </div>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Workspace upload (MB)</label>
+        <div className="settings-panel__field-content">
+          <NumberStepper value={workspaceUploadMb} min={1} max={1024} onSave={(v) => onSaveGeneral("workspaceUploadLimitMb", v)} />
+          <span className="settings-panel__description">Defaults to 256 MB; chunked uploads allow up to 1 GB</span>
+        </div>
+      </div>
+
+      <h3 className="settings-panel__subsection-title">Authentication</h3>
+      <div className="settings-panel__card">
+        <strong>TOTP setup QR</strong>
+        <p className="settings-panel__description">
+          {data.instanceTotp?.configured
+            ? "TOTP is configured for this instance."
+            : "TOTP is not configured for this instance yet, so no setup QR is available."}
+        </p>
       </div>
     </section>
   );
@@ -481,6 +545,42 @@ function CompactionSection({
         <label className="settings-panel__label">Watchdog timeout (sec)</label>
         <NumberStepper value={watchdogTimeout} min={0} max={3600} step={10} onSave={(v) => onSaveCompaction("progressWatchdogTimeoutSec", v)} />
       </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Workspace ── */
+function WorkspaceSection({
+  data,
+  onSaveWorkspace,
+}: {
+  data: SettingsData;
+  onSaveWorkspace: (field: string, value: unknown) => void;
+}) {
+  const treeMaxDepth = useSignal(data.workspaceSettings?.treeMaxDepth ?? 10);
+  const treeMaxEntries = useSignal(data.workspaceSettings?.treeMaxEntries ?? 500);
+
+  return (
+    <section className="settings-panel__section">
+      <h2 className="settings-panel__section-title">Workspace</h2>
+
+      <h3 className="settings-panel__subsection-title">File Tree</h3>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Tree max depth</label>
+        <div className="settings-panel__field-content">
+          <NumberStepper value={treeMaxDepth} min={1} max={50} onSave={(v) => onSaveWorkspace("treeMaxDepth", v)} />
+          <span className="settings-panel__description">Maximum directory nesting level shown in file tree</span>
+        </div>
+      </div>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Tree max entries</label>
+        <div className="settings-panel__field-content">
+          <NumberStepper value={treeMaxEntries} min={50} max={5000} step={50} onSave={(v) => onSaveWorkspace("treeMaxEntries", v)} />
+          <span className="settings-panel__description">Maximum number of entries shown per directory</span>
+        </div>
       </div>
     </section>
   );

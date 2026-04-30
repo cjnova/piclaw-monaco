@@ -9866,6 +9866,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   var CATEGORIES = [
     { id: "general", label: "General", icon: "codicon-gear" },
     { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
+    { id: "workspace", label: "Workspace", icon: "codicon-folder" },
     { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
     { id: "compaction", label: "Compaction", icon: "codicon-archive" },
     { id: "providers", label: "Providers", icon: "codicon-cloud" }
@@ -9916,6 +9917,26 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         showSaved();
       }).catch(() => showError());
     }
+    const saveWorkspace = async (field, value) => {
+      try {
+        const res = await fetch("/agent/settings/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ [field]: value })
+        });
+        if (res.ok) {
+          saveStatus.value = "Saved";
+          setTimeout(() => saveStatus.value = null, 2e3);
+        } else {
+          saveStatus.value = "Save failed";
+          setTimeout(() => saveStatus.value = null, 3e3);
+        }
+      } catch {
+        saveStatus.value = "Save failed";
+        setTimeout(() => saveStatus.value = null, 3e3);
+      }
+    };
     function saveCompaction(field, value) {
       fetch("/agent/settings/compaction", {
         method: "POST",
@@ -9956,6 +9977,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         activeCategory.value === "sessions" && /* @__PURE__ */ u4(SessionsSection, { data: s4, onSaveGeneral: saveGeneral }),
         activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
         activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
+        activeCategory.value === "workspace" && /* @__PURE__ */ u4(WorkspaceSection, { data: s4, onSaveWorkspace: saveWorkspace }),
         activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] })
       ] })
     ] });
@@ -9966,6 +9988,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }) {
     const assistantName = useSignal(data.assistantName ?? "");
     const userName = useSignal(data.userName ?? "");
+    const composeUploadMb = useSignal(data.composeUploadLimitMb ?? 32);
+    const workspaceUploadMb = useSignal(data.workspaceUploadLimitMb ?? 256);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "General" }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Identity" }),
@@ -10003,6 +10027,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Your display name in chat" })
         ] })
       ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Notifications" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Browser notifications" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Use the \u{1F514} bell button in the compose bar to enable/disable notifications. Web Push requires HTTPS or localhost." })
+      ] }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Display" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
         /* @__PURE__ */ u4(
@@ -10034,6 +10063,26 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           ),
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "How multiple search terms are combined" })
         ] })
+      ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Instance Configuration" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Compose upload (MB)" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(NumberStepper, { value: composeUploadMb, min: 1, max: 256, onSave: (v6) => onSaveGeneral("composeUploadLimitMb", v6) }),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Chat/media attachments" })
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Workspace upload (MB)" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(NumberStepper, { value: workspaceUploadMb, min: 1, max: 1024, onSave: (v6) => onSaveGeneral("workspaceUploadLimitMb", v6) }),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Defaults to 256 MB; chunked uploads allow up to 1 GB" })
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Authentication" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: [
+        /* @__PURE__ */ u4("strong", { children: "TOTP setup QR" }),
+        /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: data.instanceTotp?.configured ? "TOTP is configured for this instance." : "TOTP is not configured for this instance yet, so no setup QR is available." })
       ] })
     ] });
   }
@@ -10181,6 +10230,31 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
           /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
           /* @__PURE__ */ u4(NumberStepper, { value: watchdogTimeout, min: 0, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("progressWatchdogTimeoutSec", v6) })
+        ] })
+      ] })
+    ] });
+  }
+  function WorkspaceSection({
+    data,
+    onSaveWorkspace
+  }) {
+    const treeMaxDepth = useSignal(data.workspaceSettings?.treeMaxDepth ?? 10);
+    const treeMaxEntries = useSignal(data.workspaceSettings?.treeMaxEntries ?? 500);
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Workspace" }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "File Tree" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tree max depth" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(NumberStepper, { value: treeMaxDepth, min: 1, max: 50, onSave: (v6) => onSaveWorkspace("treeMaxDepth", v6) }),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum directory nesting level shown in file tree" })
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tree max entries" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(NumberStepper, { value: treeMaxEntries, min: 50, max: 5e3, step: 50, onSave: (v6) => onSaveWorkspace("treeMaxEntries", v6) }),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum number of entries shown per directory" })
         ] })
       ] })
     ] });
