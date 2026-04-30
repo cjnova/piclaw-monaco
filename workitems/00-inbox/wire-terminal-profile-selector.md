@@ -20,6 +20,15 @@ owner:
 
 Add terminal profile selection to the Monaco terminal panel. Upstream added support for multiple terminal profiles (different shells, environments, or startup commands). The Monaco terminal panel header should expose a profile selector so users can choose which profile to use when opening new terminal sessions, with new sessions immediately using the selected profile.
 
+### Default Profiles
+
+| Profile | Command | Description |
+|---|---|---|
+| Shell | `bash -i` | Default interactive bash shell |
+| Pi TUI | `pi` or `piclaw tui` | Full Pi terminal UI with interactive components (SelectList, Editor, Markdown, etc.) |
+
+The Pi TUI profile launches the agent's TUI mode directly in the terminal panel, giving access to the full extensible component system (overlays, theming, keyboard input, focusable IME support).
+
 ## Acceptance Criteria
 
 - [ ] Terminal panel header shows a profile selector (dropdown or menu).
@@ -29,6 +38,9 @@ Add terminal profile selection to the Monaco terminal panel. Upstream added supp
 - [ ] Existing terminal sessions are not forcibly reset when switching profiles.
 - [ ] Default profile is pre-selected on load (falls back to first available if no preference is stored).
 - [ ] Profile selection persists across page refreshes (stored in local/session preference).
+- [ ] "Pi TUI" profile available that launches the pi CLI TUI directly
+- [ ] TUI interactive components render correctly in ghostty-web terminal
+- [ ] Profile persists across terminal panel close/reopen
 
 ## Implementation Paths
 
