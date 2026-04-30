@@ -2621,9 +2621,9 @@ body {
 
 .settings-panel__section-title { font-size: 13px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 
-.settings-panel__field { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.settings-panel__field { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 
-.settings-panel__label { font-size: 13px; color: var(--text-muted); min-width: 120px; }
+.settings-panel__label { font-size: 13px; color: var(--text-muted); min-width: 180px; max-width: 180px; text-align: right; }
 
 .settings-panel__input { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 3px; font-size: 13px; width: 200px; font-family: inherit; outline: none; }
 
@@ -2755,8 +2755,11 @@ body {
 .settings-panel__select:focus { border-color: var(--accent); }
 
 .settings-panel__checkbox-row {
+  display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 14px;
+  padding-left: 192px;
 }
 .settings-panel__checkbox-row input[type="checkbox"] {
   width: 14px;
