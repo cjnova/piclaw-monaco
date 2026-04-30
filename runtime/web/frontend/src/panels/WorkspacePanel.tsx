@@ -26,6 +26,17 @@ function getErrorMessage(value: unknown, fallback: string): string {
   return fallback;
 }
 
+// Patterns for user-actionable server validation messages that are safe to surface directly.
+const USER_SAFE_ERROR_RE =
+  /^(invalid (path|filename|upload id|chunk index|chunk total|file size)|path is (a|not a) directory|file too large|missing (filename|file content)|cannot (rename|move) workspace root|cannot move a folder into itself|unauthorized)$/i;
+
+function toUserFacingMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && USER_SAFE_ERROR_RE.test(error.message)) {
+    return error.message;
+  }
+  return fallback;
+}
+
 async function readJsonSafely<T>(response: Response): Promise<T | null> {
   const text = await response.text();
   if (!text.trim()) return null;
@@ -328,7 +339,8 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
       }
       onMutate({ nextNode: null });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Failed to delete file");
+      console.error("[WorkspacePanel] Failed to delete file:", error);
+      window.alert(toUserFacingMessage(error, "Failed to delete file"));
     } finally {
       setIsDeleting(false);
     }
@@ -522,7 +534,8 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
       }
       onMutate({ nextNode: makeTreeNodeFromMutation("file", data ?? {}) });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Failed to create file");
+      console.error("[WorkspacePanel] Failed to create file:", error);
+      window.alert(toUserFacingMessage(error, "Failed to create file"));
     } finally {
       setActionBusy(null);
     }
@@ -553,7 +566,8 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
         onMutate({ nextNode: lastUploadedNode });
       }
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Failed to upload file");
+      console.error("[WorkspacePanel] Failed to upload file:", error);
+      window.alert(toUserFacingMessage(error, "Failed to upload file"));
     } finally {
       if (uploadInputRef.current) uploadInputRef.current.value = "";
       setActionBusy(null);
