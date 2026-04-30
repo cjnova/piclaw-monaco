@@ -1097,6 +1097,7 @@
     { id: "search", icon: "search", label: "Search" },
     { id: "extensions", icon: "extensions", label: "Addons" },
     { id: "agent", icon: "dashboard", label: "Dashboards" },
+    { id: "tasks", icon: "tasklist", label: "Tasks" },
     { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
   function ActivityBar({ activePanel, onPanelChange }) {
@@ -9629,6 +9630,404 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }) }) });
   }
 
+  // runtime/web/frontend/src/panels/TasksPanel.tsx
+  function currentChatJid() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("chat_jid") ?? "web:default";
+  }
+  function chatName(entry) {
+    return entry.display_name ?? entry.name ?? entry.jid.split(":").pop() ?? entry.jid;
+  }
+  function TasksTab() {
+    return /* @__PURE__ */ u4("div", { className: "tasks-panel__list", children: /* @__PURE__ */ u4("div", { className: "tasks-panel__empty", children: [
+      "No scheduled tasks.",
+      " ",
+      /* @__PURE__ */ u4("span", { className: "tasks-panel__hint", children: [
+        "Use ",
+        /* @__PURE__ */ u4("code", { children: "/schedule" }),
+        " in chat to create one."
+      ] })
+    ] }) });
+  }
+  function SessionsTab({ activeChatJid }) {
+    const [sessions, setSessions] = d2([]);
+    const [branches, setBranches] = d2([]);
+    const [status, setStatus] = d2("loading");
+    const [errorMsg, setErrorMsg] = d2("");
+    const [actionBusy, setActionBusy] = d2(false);
+    const loadData = q2(async () => {
+      setStatus("loading");
+      setErrorMsg("");
+      try {
+        const [chatsRes, branchesRes] = await Promise.all([
+          fetch("/agent/active-chats", { credentials: "same-origin" }),
+          fetch(`/agent/branches?chat_jid=${encodeURIComponent(activeChatJid)}`, { credentials: "same-origin" })
+        ]);
+        if (chatsRes.status === 401 || branchesRes.status === 401) {
+          setErrorMsg("Authenticate to view sessions.");
+          setStatus("error");
+          return;
+        }
+        if (!chatsRes.ok) throw new Error(`active-chats: HTTP ${chatsRes.status}`);
+        if (!branchesRes.ok) throw new Error(`branches: HTTP ${branchesRes.status}`);
+        const chatsData = await chatsRes.json();
+        const branchesData = await branchesRes.json();
+        setSessions(Array.isArray(chatsData) ? chatsData : chatsData.chats ?? []);
+        setBranches(Array.isArray(branchesData) ? branchesData : branchesData.branches ?? []);
+        setStatus("done");
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : "Failed to load sessions.");
+        setStatus("error");
+      }
+    }, [activeChatJid]);
+    y2(() => {
+      loadData();
+    }, [loadData]);
+    const handleNewSession = q2(async () => {
+      if (actionBusy) return;
+      setActionBusy(true);
+      try {
+        await fetch("/agent/respond", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "/new-session", chat_jid: activeChatJid })
+        });
+        await loadData();
+      } catch {
+      } finally {
+        setActionBusy(false);
+      }
+    }, [actionBusy, activeChatJid, loadData]);
+    const handleRename = q2(async () => {
+      const newName = prompt("Enter new session name:");
+      if (!newName) return;
+      setActionBusy(true);
+      try {
+        await fetch("/agent/respond", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: `/session-name ${newName}`, chat_jid: activeChatJid })
+        });
+        await loadData();
+      } catch {
+      } finally {
+        setActionBusy(false);
+      }
+    }, [actionBusy, activeChatJid, loadData]);
+    if (status === "loading") {
+      return /* @__PURE__ */ u4("div", { className: "tasks-panel__list", children: /* @__PURE__ */ u4("div", { className: "tasks-panel__empty", children: "Loading sessions\u2026" }) });
+    }
+    if (status === "error") {
+      return /* @__PURE__ */ u4("div", { className: "tasks-panel__list", children: /* @__PURE__ */ u4("div", { className: "tasks-panel__error", children: [
+        errorMsg || "Failed to load sessions.",
+        " ",
+        /* @__PURE__ */ u4("button", { className: "tasks-panel__retry", onClick: loadData, children: "Retry" })
+      ] }) });
+    }
+    return /* @__PURE__ */ u4("div", { className: "tasks-panel__sessions", children: [
+      /* @__PURE__ */ u4("div", { className: "tasks-panel__list", children: [
+        sessions.length === 0 && branches.length === 0 && /* @__PURE__ */ u4("div", { className: "tasks-panel__empty", children: "No sessions found." }),
+        sessions.map((session) => {
+          const isCurrent = session.jid === activeChatJid;
+          return /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              className: `tasks-panel__item${isCurrent ? " tasks-panel__item--active" : ""}`,
+              onClick: () => {
+                window.location.href = `/?chat_jid=${encodeURIComponent(session.jid)}`;
+              },
+              children: [
+                /* @__PURE__ */ u4("span", { className: "tasks-panel__item-name", children: [
+                  "@",
+                  chatName(session)
+                ] }),
+                /* @__PURE__ */ u4("span", { className: "tasks-panel__item-sep", children: " \u2014 " }),
+                /* @__PURE__ */ u4("span", { className: "tasks-panel__item-jid", children: session.jid }),
+                isCurrent && /* @__PURE__ */ u4("span", { className: "tasks-panel__item-badge tasks-panel__item-badge--current", children: "current" })
+              ]
+            },
+            session.jid
+          );
+        }),
+        branches.map((branch) => {
+          const isCurrent = branch.jid === activeChatJid;
+          const isArchived = branch.archived || branch.status === "archived";
+          return /* @__PURE__ */ u4(
+            "button",
+            {
+              type: "button",
+              className: `tasks-panel__item tasks-panel__item--archived${isCurrent ? " tasks-panel__item--active" : ""}`,
+              onClick: () => {
+                window.location.href = `/?chat_jid=${encodeURIComponent(branch.jid)}`;
+              },
+              children: [
+                /* @__PURE__ */ u4("span", { className: "tasks-panel__item-name", children: [
+                  "@",
+                  chatName(branch)
+                ] }),
+                /* @__PURE__ */ u4("span", { className: "tasks-panel__item-sep", children: " \u2014 " }),
+                /* @__PURE__ */ u4("span", { className: "tasks-panel__item-jid", children: branch.jid }),
+                /* @__PURE__ */ u4("span", { className: `tasks-panel__item-badge tasks-panel__item-badge--${isArchived ? "archived" : "branch"}`, children: isArchived ? "archived" : "branch" })
+              ]
+            },
+            branch.jid
+          );
+        })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "tasks-panel__actions", children: [
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "tasks-panel__action-btn",
+            disabled: actionBusy,
+            onClick: handleNewSession,
+            title: "Create a new session",
+            children: "New"
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "tasks-panel__action-btn",
+            disabled: actionBusy,
+            onClick: handleRename,
+            title: "Rename current session",
+            children: "Rename"
+          }
+        )
+      ] })
+    ] });
+  }
+  function TasksPanel() {
+    const [activeTab, setActiveTab] = d2("tasks");
+    const activeChatJid = currentChatJid();
+    return /* @__PURE__ */ u4("div", { className: "tasks-panel", children: [
+      /* @__PURE__ */ u4("div", { className: "tasks-panel__tabs", role: "tablist", children: [
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            role: "tab",
+            "aria-selected": activeTab === "tasks",
+            className: `tasks-panel__tab${activeTab === "tasks" ? " tasks-panel__tab--active" : ""}`,
+            onClick: () => setActiveTab("tasks"),
+            children: "Tasks"
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            role: "tab",
+            "aria-selected": activeTab === "sessions",
+            className: `tasks-panel__tab${activeTab === "sessions" ? " tasks-panel__tab--active" : ""}`,
+            onClick: () => setActiveTab("sessions"),
+            children: "Sessions"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "tasks-panel__body", children: [
+        activeTab === "tasks" && /* @__PURE__ */ u4(TasksTab, {}),
+        activeTab === "sessions" && /* @__PURE__ */ u4(SessionsTab, { activeChatJid })
+      ] })
+    ] });
+  }
+
+  // runtime/web/frontend/src/panels/SettingsPanel.tsx
+  var CATEGORIES = [
+    { id: "general", label: "General", icon: "codicon-gear" },
+    { id: "providers", label: "Providers", icon: "codicon-cloud" },
+    { id: "models", label: "Models", icon: "codicon-hubot" },
+    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" }
+  ];
+  function SettingsPanel() {
+    const activeCategory = useSignal("general");
+    const settings = useSignal(null);
+    const loading = useSignal(true);
+    const error = useSignal(null);
+    const saveStatus = useSignal(null);
+    y2(() => {
+      fetch("/agent/settings-data", { credentials: "same-origin" }).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      }).then((data) => {
+        settings.value = data;
+        loading.value = false;
+      }).catch((err) => {
+        error.value = `Failed to load settings: ${err.message}`;
+        settings.value = {};
+        loading.value = false;
+      });
+    }, []);
+    function saveGeneral(field, value) {
+      const updated = { ...settings.value?.general ?? {}, [field]: value };
+      fetch("/agent/settings/general", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      }).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        saveStatus.value = "Saved";
+        setTimeout(() => saveStatus.value = null, 2e3);
+      }).catch(() => {
+        saveStatus.value = "Save failed";
+        setTimeout(() => saveStatus.value = null, 3e3);
+      });
+    }
+    if (loading.value) {
+      return /* @__PURE__ */ u4("div", { className: "settings-panel", children: /* @__PURE__ */ u4("div", { className: "settings-panel__loading", children: "Loading settings\u2026" }) });
+    }
+    const s4 = settings.value ?? {};
+    return /* @__PURE__ */ u4("div", { className: "settings-panel", children: [
+      /* @__PURE__ */ u4("nav", { className: "settings-panel__nav", children: CATEGORIES.map((cat) => /* @__PURE__ */ u4(
+        "button",
+        {
+          className: `settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`,
+          onClick: () => activeCategory.value = cat.id,
+          children: [
+            /* @__PURE__ */ u4("i", { className: `codicon ${cat.icon}` }),
+            /* @__PURE__ */ u4("span", { children: cat.label })
+          ]
+        },
+        cat.id
+      )) }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__content", children: [
+        error.value && /* @__PURE__ */ u4("div", { className: "settings-panel__error", children: error.value }),
+        saveStatus.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status", children: saveStatus.value }),
+        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4.general ?? {}, onSave: saveGeneral }),
+        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] }),
+        activeCategory.value === "models" && /* @__PURE__ */ u4(ModelsSection, { models: s4.models ?? {} }),
+        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { appearance: s4.appearance ?? {} })
+      ] })
+    ] });
+  }
+  function GeneralSection({
+    data,
+    onSave
+  }) {
+    const userName = useSignal(data.userName ?? "");
+    const agentName = useSignal(data.agentName ?? "");
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "General" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "User name" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input",
+            type: "text",
+            value: userName.value,
+            onInput: (e5) => userName.value = e5.target.value,
+            onBlur: () => onSave("userName", userName.value),
+            placeholder: "Your name"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Agent name" }),
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input",
+            type: "text",
+            value: agentName.value,
+            onInput: (e5) => agentName.value = e5.target.value,
+            onBlur: () => onSave("agentName", agentName.value),
+            placeholder: "Agent name"
+          }
+        )
+      ] }),
+      data.sessionTimeout !== void 0 && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Session timeout (min)" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: data.sessionTimeout })
+      ] }),
+      data.sessionMaxMessages !== void 0 && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max messages" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: data.sessionMaxMessages })
+      ] })
+    ] });
+  }
+  function ProvidersSection({
+    providers
+  }) {
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Providers" }),
+      providers.length === 0 && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No providers configured." }),
+      providers.map((p6) => /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: [
+          p6.name,
+          p6.type ? /* @__PURE__ */ u4("span", { className: "settings-panel__meta", children: [
+            " (",
+            p6.type,
+            ")"
+          ] }) : null
+        ] }),
+        /* @__PURE__ */ u4(
+          "span",
+          {
+            className: `settings-panel__status settings-panel__status--${p6.status.toLowerCase()}`,
+            children: p6.status
+          }
+        )
+      ] }, p6.id))
+    ] });
+  }
+  function ModelsSection({ models }) {
+    const available = models.available ?? [];
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
+      models.current && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Current model" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__value settings-panel__value--accent", children: models.current })
+      ] }),
+      available.length > 0 && /* @__PURE__ */ u4(S, { children: [
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Available models" }) }),
+        /* @__PURE__ */ u4("ul", { className: "settings-panel__list", children: available.map((m6) => /* @__PURE__ */ u4(
+          "li",
+          {
+            className: `settings-panel__list-item${m6.id === models.current ? " settings-panel__list-item--active" : ""}`,
+            children: [
+              /* @__PURE__ */ u4("span", { children: m6.name }),
+              m6.provider && /* @__PURE__ */ u4("span", { className: "settings-panel__meta", children: m6.provider })
+            ]
+          },
+          m6.id
+        )) })
+      ] }),
+      available.length === 0 && !models.current && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No model data available." })
+    ] });
+  }
+  function AppearanceSection({
+    appearance
+  }) {
+    const presets = appearance.presets ?? [];
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Appearance" }),
+      appearance.theme && /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Current theme" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__value settings-panel__value--accent", children: appearance.theme })
+      ] }),
+      presets.length > 0 && /* @__PURE__ */ u4(S, { children: [
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Theme presets" }) }),
+        /* @__PURE__ */ u4("ul", { className: "settings-panel__list", children: presets.map((preset) => /* @__PURE__ */ u4(
+          "li",
+          {
+            className: `settings-panel__list-item${preset === appearance.theme ? " settings-panel__list-item--active" : ""}`,
+            children: preset
+          },
+          preset
+        )) })
+      ] }),
+      presets.length === 0 && !appearance.theme && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No appearance data available." })
+    ] });
+  }
+
   // runtime/web/frontend/src/panels/PanelRouter.tsx
   function PanelRouter({ activePanel, onPageSelect }) {
     switch (activePanel) {
@@ -9642,8 +10041,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       case "agent":
         return /* @__PURE__ */ u4(AgentPanel, { onPageSelect: onPageSelect ?? (() => {
         }) });
+      case "tasks":
+        return /* @__PURE__ */ u4(TasksPanel, {});
       case "settings":
-        return /* @__PURE__ */ u4(Placeholder, { text: "Settings panels" });
+        return /* @__PURE__ */ u4(SettingsPanel, {});
       default:
         return /* @__PURE__ */ u4(Placeholder, { text: "Select a panel" });
     }
@@ -10435,7 +10836,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => window.removeEventListener("piclaw:open-page", onOpenPage);
     }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
     const connected = connectionStatus.value === "connected";
-    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
+    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", settings: "Settings" };
     const onTermDragStart = q2((e5) => {
       e5.preventDefault();
       termDragRef.current = { startY: e5.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };

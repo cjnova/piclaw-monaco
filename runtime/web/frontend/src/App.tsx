@@ -177,7 +177,7 @@ function AppContent() {
   }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
 
   const connected = connectionStatus.value === "connected";
-  const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
+  const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", settings: "Settings" };
 
   const onTermDragStart = useCallback((e: MouseEvent) => {
     e.preventDefault();
