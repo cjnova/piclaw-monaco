@@ -9,7 +9,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SystemStats } from "./components/SystemStats";
 import { ModelContextBar } from "./components/ModelContextBar";
 import { CommandPalette } from "./components/CommandPalette";
-import { PanelRouter, ChatPanel } from "./panels";
+import { PanelRouter, ChatPanel, SettingsPanel } from "./panels";
 import { commandRegistry } from "./services";
 import { ThemeProvider, useThemeControl } from "./theme/ThemeProvider";
 
@@ -201,7 +201,8 @@ function AppContent() {
   }, [terminalHeight, terminalMaximized]);
 
   const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
-  const sbWidth = sidebarCollapsed.value ? 0 : sidebarWidth.value;
+  const isSettingsActive = activePanel.value === "settings";
+  const sbWidth = (sidebarCollapsed.value || isSettingsActive) ? 0 : sidebarWidth.value;
 
   return (
     <div className="app-layout">
@@ -213,15 +214,15 @@ function AppContent() {
             className="app-layout__sidebar-wrapper"
             style={{
               width: `${sbWidth}px`,
-              minWidth: sidebarCollapsed.value ? 0 : 150,
-              maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5),
+              minWidth: (sidebarCollapsed.value || isSettingsActive) ? 0 : 150,
+              maxWidth: (sidebarCollapsed.value || isSettingsActive) ? 0 : Math.round(window.innerWidth * 0.5),
             }}
           >
             <Sidebar title={PANEL_NAMES[activePanel.value] || activePanel.value}>
               <PanelRouter activePanel={activePanel.value} onPageSelect={handlePageSelect} />
             </Sidebar>
           </div>
-          {!sidebarCollapsed.value && (
+          {!sidebarCollapsed.value && !isSettingsActive && (
             <div
               className="app-layout__resize-handle"
               onMouseDown={(e) => {
@@ -245,7 +246,9 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            {(extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value ? (
+            {isSettingsActive ? (
+              <SettingsPanel />
+            ) : (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value ? (
               <div className="extension-frame">
                 <div className="extension-frame__header">
                   <button

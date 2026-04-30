@@ -10858,7 +10858,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       document.addEventListener("mouseup", onUp);
     }, [terminalHeight, terminalMaximized]);
     const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
-    const sbWidth = sidebarCollapsed.value ? 0 : sidebarWidth.value;
+    const isSettingsActive = activePanel.value === "settings";
+    const sbWidth = sidebarCollapsed.value || isSettingsActive ? 0 : sidebarWidth.value;
     return /* @__PURE__ */ u4("div", { className: "app-layout", children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
       /* @__PURE__ */ u4("div", { className: "app-layout__main", children: [
@@ -10869,13 +10870,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               className: "app-layout__sidebar-wrapper",
               style: {
                 width: `${sbWidth}px`,
-                minWidth: sidebarCollapsed.value ? 0 : 150,
-                maxWidth: sidebarCollapsed.value ? 0 : Math.round(window.innerWidth * 0.5)
+                minWidth: sidebarCollapsed.value || isSettingsActive ? 0 : 150,
+                maxWidth: sidebarCollapsed.value || isSettingsActive ? 0 : Math.round(window.innerWidth * 0.5)
               },
               children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value, onPageSelect: handlePageSelect }) })
             }
           ),
-          !sidebarCollapsed.value && /* @__PURE__ */ u4(
+          !sidebarCollapsed.value && !isSettingsActive && /* @__PURE__ */ u4(
             "div",
             {
               className: "app-layout__resize-handle",
@@ -10899,7 +10900,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
+          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: isSettingsActive ? /* @__PURE__ */ u4(SettingsPanel, {}) : extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
             /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
               /* @__PURE__ */ u4(
                 "button",
