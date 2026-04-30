@@ -1043,6 +1043,16 @@
       return y3(i6, n4);
     })[0];
   }
+  function useComputed(i6, n4) {
+    var t4 = A2(i6);
+    t4.current = i6;
+    l4.__$f |= 4;
+    return T2(function() {
+      return g2(function() {
+        return t4.current();
+      }, n4);
+    }, []);
+  }
   var A3 = function(i6) {
     queueMicrotask(function() {
       queueMicrotask(i6);
@@ -5447,9 +5457,13 @@ For tests, pass a Ghostty instance directly:
     };
     const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
     const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
-    const contextTokens = agentContext.value?.tokens ?? 0;
-    const contextWindow = agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0;
-    const contextPercent = agentContext.value?.percent ?? (contextWindow > 0 ? contextTokens / contextWindow * 100 : 0);
+    const contextTokens = useComputed(() => agentContext.value?.tokens ?? 0);
+    const contextWindow = useComputed(() => agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0);
+    const contextPercent = useComputed(() => {
+      const w5 = contextWindow.value;
+      const t4 = contextTokens.value;
+      return agentContext.value?.percent ?? (w5 > 0 ? t4 / w5 * 100 : 0);
+    });
     const activeModel = currentModel.value ?? modelName;
     return /* @__PURE__ */ u4(
       "span",
@@ -5560,7 +5574,7 @@ For tests, pass a Ghostty instance directly:
                     ]
                   }
                 ),
-                /* @__PURE__ */ u4(ContextRing, { percent: contextPercent, tokens: contextTokens, contextWindow, onClick: handleCompact }),
+                /* @__PURE__ */ u4(ContextRing, { percent: contextPercent.value, tokens: contextTokens.value, contextWindow: contextWindow.value, onClick: handleCompact }),
                 sessionTokens.value > 0 && /* @__PURE__ */ u4(
                   "span",
                   {
