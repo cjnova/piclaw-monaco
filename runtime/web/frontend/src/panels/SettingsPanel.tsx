@@ -88,13 +88,13 @@ type Category = "general" | "sessions" | "workspace" | "models" | "keychain" | "
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
   { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
+  { id: "compaction", label: "Compaction", icon: "codicon-archive" },
   { id: "workspace", label: "Workspace", icon: "codicon-folder" },
+  { id: "providers", label: "Providers", icon: "codicon-cloud" },
   { id: "models", label: "Models", icon: "codicon-hubot" },
+  { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
   { id: "keychain", label: "Keychain", icon: "codicon-key" },
   { id: "tools", label: "Tools", icon: "codicon-tools" },
-  { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
-  { id: "compaction", label: "Compaction", icon: "codicon-archive" },
-  { id: "providers", label: "Providers", icon: "codicon-cloud" },
 ];
 
 export function SettingsPanel() {

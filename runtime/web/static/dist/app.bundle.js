@@ -9866,13 +9866,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   var CATEGORIES = [
     { id: "general", label: "General", icon: "codicon-gear" },
     { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
-    { id: "workspace", label: "Workspace", icon: "codicon-folder" },
-    { id: "models", label: "Models", icon: "codicon-hubot" },
-    { id: "keychain", label: "Keychain", icon: "codicon-key" },
-    { id: "tools", label: "Tools", icon: "codicon-tools" },
-    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
     { id: "compaction", label: "Compaction", icon: "codicon-archive" },
-    { id: "providers", label: "Providers", icon: "codicon-cloud" }
+    { id: "workspace", label: "Workspace", icon: "codicon-folder" },
+    { id: "providers", label: "Providers", icon: "codicon-cloud" },
+    { id: "models", label: "Models", icon: "codicon-hubot" },
+    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
+    { id: "keychain", label: "Keychain", icon: "codicon-key" },
+    { id: "tools", label: "Tools", icon: "codicon-tools" }
   ];
   function SettingsPanel() {
     const activeCategory = useSignal("general");
