@@ -1,4 +1,4 @@
-import { getChatJid, getMessageUrl, buildChatUrl } from "../api/chat-jid";
+import { getMessageUrl, buildChatUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { marked } from "marked";
 import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
@@ -227,7 +227,7 @@ export function MessageList() {
   useEffect(() => {
     async function fetchTimeline() {
       try {
-        const res = await fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, {
+        const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
           credentials: "include",
         });
         if (res.status === 401) {
@@ -340,7 +340,7 @@ export function MessageList() {
       setConnected(true);
       window.dispatchEvent(new Event("piclaw:sse-connected"));
       // Re-fetch timeline on reconnect (server may have restarted)
-      fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, { credentials: "include" })
+      fetch(buildChatUrl("/timeline", { limit: "50" }), { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (!data) return;
@@ -400,7 +400,7 @@ export function MessageList() {
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/timeline?limit=50&chat_jid=${getChatJid()}&before=${oldestId}`,
+        buildChatUrl("/timeline", { limit: "50", before: String(oldestId) }),
         { credentials: "include" }
       );
       if (!res.ok) return;

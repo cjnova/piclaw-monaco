@@ -8398,6 +8398,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }
     return fallback;
   }
+  var USER_SAFE_ERROR_RE = /^(invalid (path|filename|upload id|chunk index|chunk total|file size)|path is (a|not a) directory|file too large|missing (filename|file content)|cannot (rename|move) workspace root|cannot move a folder into itself|unauthorized)$/i;
+  function toUserFacingMessage(error, fallback) {
+    if (error instanceof Error && USER_SAFE_ERROR_RE.test(error.message)) {
+      return error.message;
+    }
+    return fallback;
+  }
   async function readJsonSafely(response) {
     const text2 = await response.text();
     if (!text2.trim()) return null;
@@ -8612,7 +8619,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         }
         onMutate({ nextNode: null });
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Failed to delete file");
+        console.error("[WorkspacePanel] Failed to delete file:", error);
+        window.alert(toUserFacingMessage(error, "Failed to delete file"));
       } finally {
         setIsDeleting(false);
       }
@@ -8762,7 +8770,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         }
         onMutate({ nextNode: makeTreeNodeFromMutation("file", data ?? {}) });
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Failed to create file");
+        console.error("[WorkspacePanel] Failed to create file:", error);
+        window.alert(toUserFacingMessage(error, "Failed to create file"));
       } finally {
         setActionBusy(null);
       }
@@ -8790,7 +8799,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           onMutate({ nextNode: lastUploadedNode });
         }
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Failed to upload file");
+        console.error("[WorkspacePanel] Failed to upload file:", error);
+        window.alert(toUserFacingMessage(error, "Failed to upload file"));
       } finally {
         if (uploadInputRef.current) uploadInputRef.current.value = "";
         setActionBusy(null);
@@ -9495,7 +9505,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     y2(() => {
       async function fetchTimeline() {
         try {
-          const res = await fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, {
+          const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
             credentials: "include"
           });
           if (res.status === 401) {
@@ -9594,7 +9604,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       es.onopen = () => {
         setConnected(true);
         window.dispatchEvent(new Event("piclaw:sse-connected"));
-        fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, { credentials: "include" }).then((r4) => r4.ok ? r4.json() : null).then((data) => {
+        fetch(buildChatUrl("/timeline", { limit: "50" }), { credentials: "include" }).then((r4) => r4.ok ? r4.json() : null).then((data) => {
           if (!data) return;
           const raw = data.posts ?? [];
           const parsed = raw.map((p6) => ({
@@ -9649,7 +9659,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       setLoadingMore(true);
       try {
         const res = await fetch(
-          `/timeline?limit=50&chat_jid=${getChatJid()}&before=${oldestId}`,
+          buildChatUrl("/timeline", { limit: "50", before: String(oldestId) }),
           { credentials: "include" }
         );
         if (!res.ok) return;
