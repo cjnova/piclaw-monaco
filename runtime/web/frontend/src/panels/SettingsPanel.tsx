@@ -79,14 +79,19 @@ interface SettingsData {
   workspaceSettings?: { treeMaxDepth?: number; treeMaxEntries?: number };
   /* providers */
   providers?: Provider[];
+  /* toolsets */
+  toolsets?: Array<{ name: string; tools?: Array<{ name: string; kind?: string; weight?: string }> }>;
 }
 
-type Category = "general" | "sessions" | "workspace" | "appearance" | "compaction" | "providers";
+type Category = "general" | "sessions" | "workspace" | "models" | "keychain" | "tools" | "appearance" | "compaction" | "providers";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
   { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
   { id: "workspace", label: "Workspace", icon: "codicon-folder" },
+  { id: "models", label: "Models", icon: "codicon-hubot" },
+  { id: "keychain", label: "Keychain", icon: "codicon-key" },
+  { id: "tools", label: "Tools", icon: "codicon-tools" },
   { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
   { id: "compaction", label: "Compaction", icon: "codicon-archive" },
   { id: "providers", label: "Providers", icon: "codicon-cloud" },
@@ -239,6 +244,15 @@ export function SettingsPanel() {
         )}
         {activeCategory.value === "providers" && (
           <ProvidersSection providers={s.providers ?? []} />
+        )}
+        {activeCategory.value === "models" && (
+          <ModelsSection data={s} />
+        )}
+        {activeCategory.value === "keychain" && (
+          <KeychainSection />
+        )}
+        {activeCategory.value === "tools" && (
+          <ToolsSection data={s} />
         )}
       </div>
     </div>
@@ -554,6 +568,90 @@ function WorkspaceSection({
           <span className="settings-panel__description">Maximum number of entries shown per directory</span>
         </div>
       </div>
+    </section>
+  );
+}
+
+/* ── Models ── */
+function ModelsSection({ data }: { data: SettingsData }) {
+  const models = useSignal<Array<{ label: string; name: string; provider: string; context_window?: number; reasoning?: boolean }>>([]);
+  const current = useSignal("");
+
+  useEffect(() => {
+    fetch("/agent/models", { credentials: "same-origin" })
+      .then(r => r.json())
+      .then((d: any) => {
+        current.value = d.current ?? "";
+        models.value = d.model_options ?? [];
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <section className="settings-panel__section">
+      <h2 className="settings-panel__section-title">Models</h2>
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Current model</label>
+        <span className="settings-panel__value">{current.value || "—"}</span>
+      </div>
+      <h3 className="settings-panel__subsection-title">Available Models</h3>
+      {models.value.map(m => (
+        <div key={m.label} className="settings-panel__model-row">
+          <span className="settings-panel__model-name">{m.name}</span>
+          <span className="settings-panel__model-provider">{m.provider}</span>
+          {m.context_window && <span className="settings-panel__model-ctx">{Math.round(m.context_window / 1000)}k</span>}
+          {m.label === current.value && <span className="settings-panel__status settings-panel__status--ok">Active</span>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/* ── Keychain ── */
+function KeychainSection() {
+  const entries = useSignal<string[]>([]);
+  useEffect(() => {
+    fetch("/agent/keychain", { credentials: "same-origin" })
+      .then(r => r.ok ? r.json() : { entries: [] })
+      .then((d: any) => { entries.value = (d.entries ?? d.keys ?? []).map((e: any) => typeof e === "string" ? e : e.name ?? e.id ?? ""); })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <section className="settings-panel__section">
+      <h2 className="settings-panel__section-title">Keychain</h2>
+      <p className="settings-panel__description">Stored credentials (names only — secrets are never displayed).</p>
+      {entries.value.length === 0 ? (
+        <p className="settings-panel__description">No keychain entries found, or API not available.</p>
+      ) : (
+        entries.value.map(name => (
+          <div key={name} className="settings-panel__field">
+            <i className="codicon codicon-key" style={{ opacity: 0.5 }} />
+            <span className="settings-panel__value">{name}</span>
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
+/* ── Tools ── */
+function ToolsSection({ data }: { data: SettingsData }) {
+  const toolsets = data.toolsets ?? [];
+  return (
+    <section className="settings-panel__section">
+      <h2 className="settings-panel__section-title">Tools</h2>
+      <p className="settings-panel__description">Available toolsets and their tools (read-only).</p>
+      {toolsets.map(ts => (
+        <div key={ts.name}>
+          <h3 className="settings-panel__subsection-title">{ts.name}</h3>
+          <div className="settings-panel__tools-list">
+            {(ts.tools ?? []).map(t => (
+              <span key={t.name} className="settings-panel__tool-badge">{t.name}</span>
+            ))}
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
