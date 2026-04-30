@@ -23,7 +23,7 @@ interface Interaction {
 }
 
 interface TimelineResponse {
-  interactions: Interaction[];
+  posts: Interaction[];
   has_more: boolean;
 }
 
@@ -236,10 +236,10 @@ export function MessageList() {
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        const raw = data.interactions ?? data.posts ?? [];
+        const raw = data.posts ?? [];
         const parsed: Interaction[] = raw.map((p: Record<string, unknown>) => ({
           id: p.id as number,
-          type: (p.type ?? (p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent") as "user" | "agent",
+          type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
           content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
           content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
           created_at: (p.created_at ?? p.timestamp ?? "") as string,
@@ -321,7 +321,7 @@ export function MessageList() {
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (!data) return;
-          const raw = data.posts ?? data.interactions ?? [];
+          const raw = data.posts ?? [];
           const parsed = raw.map((p: Record<string, unknown>) => ({
             id: p.id as number,
             type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
@@ -382,10 +382,10 @@ export function MessageList() {
       );
       if (!res.ok) return;
       const data: TimelineResponse = await res.json();
-      if (data.interactions?.length) {
+      if (data.posts?.length) {
         const el = listRef.current;
         const prevScrollHeight = el?.scrollHeight ?? 0;
-        setMessages((prev) => [...data.interactions, ...prev]);
+        setMessages((prev) => [...data.posts, ...prev]);
         setHasMore(data.has_more ?? false);
         // Restore scroll position
         requestAnimationFrame(() => {

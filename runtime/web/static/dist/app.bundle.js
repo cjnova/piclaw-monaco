@@ -8419,10 +8419,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          const raw = data.interactions ?? data.posts ?? [];
+          const raw = data.posts ?? [];
           const parsed = raw.map((p6) => ({
             id: p6.id,
-            type: p6.type ?? p6.data?.type === "user_message" ? "user" : "agent",
+            type: p6.type ?? (p6.data?.type === "user_message" ? "user" : "agent"),
             content: p6.content ?? p6.data?.content ?? "",
             content_blocks: p6.content_blocks ?? p6.data?.content_blocks,
             created_at: p6.created_at ?? p6.timestamp ?? "",
@@ -8488,7 +8488,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         window.dispatchEvent(new Event("piclaw:sse-connected"));
         fetch(`/timeline?limit=50&chat_jid=${getChatJid()}`, { credentials: "include" }).then((r4) => r4.ok ? r4.json() : null).then((data) => {
           if (!data) return;
-          const raw = data.posts ?? data.interactions ?? [];
+          const raw = data.posts ?? [];
           const parsed = raw.map((p6) => ({
             id: p6.id,
             type: p6.type ?? (p6.data?.type === "user_message" ? "user" : "agent"),
@@ -8546,10 +8546,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         );
         if (!res.ok) return;
         const data = await res.json();
-        if (data.interactions?.length) {
+        if (data.posts?.length) {
           const el = listRef.current;
           const prevScrollHeight = el?.scrollHeight ?? 0;
-          setMessages((prev) => [...data.interactions, ...prev]);
+          setMessages((prev) => [...data.posts, ...prev]);
           setHasMore(data.has_more ?? false);
           requestAnimationFrame(() => {
             if (el) {
