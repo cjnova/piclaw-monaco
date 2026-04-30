@@ -8832,9 +8832,21 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       navigator.clipboard.writeText(node.path).catch(() => {
       });
     }, [node.path]);
-    const handleOpenFile = q2(() => {
+    const handleOpenFile = q2(async () => {
       const ext = node.path.split(".").pop()?.toLowerCase() ?? "";
       const encoded = encodeURIComponent(node.path);
+      const name = node.path.split("/").pop() ?? node.name;
+      if (["md", "mdx", "markdown"].includes(ext)) {
+        try {
+          const res = await fetch(`/workspace/file?path=${encoded}`, { credentials: "same-origin" });
+          const data = await res.json();
+          const text2 = data.content ?? data.text ?? "";
+          const html2 = sanitizeRenderedMarkdown(g4(text2, { async: false }));
+          window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { html: html2, name, mode: "markdown" } }));
+        } catch {
+        }
+        return;
+      }
       let viewerUrl;
       if (ext === "csv") viewerUrl = `/csv-viewer?path=${encoded}`;
       else if (["html", "htm"].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
@@ -8842,9 +8854,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       else if (["docx", "xlsx", "pptx"].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
       else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
       else if (["mp4", "webm", "mov"].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
-      else viewerUrl = `/editor-vendor?path=${encoded}`;
-      window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { url: viewerUrl, name: node.path.split("/").pop() } }));
-    }, [node.path]);
+      else return;
+      window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { url: viewerUrl, name } }));
+    }, [node.path, node.name]);
     const handleDelete = q2(async () => {
       if (isDeleting) return;
       const confirmed = window.confirm(`Delete ${node.name}? This cannot be undone.`);
@@ -8900,11 +8912,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             ]
           }
         ),
-        /* @__PURE__ */ u4(
+        ["md", "mdx", "markdown", "csv", "pdf", "html", "htm", "docx", "xlsx", "pptx", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "webm", "mov"].includes(node.path.split(".").pop()?.toLowerCase() ?? "") && /* @__PURE__ */ u4(
           "button",
           {
             className: "workspace__preview-action-btn",
-            onClick: handleOpenFile,
+            onClick: () => void handleOpenFile(),
             title: "Open in central pane",
             children: [
               /* @__PURE__ */ u4("span", { className: "codicon codicon-open-preview" }),
@@ -10190,6 +10202,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
     const extensionPageUrl = useSignal(null);
     const extensionPageName = useSignal(null);
+    const extensionPageHtml = useSignal(null);
     const termDragRef = A2(null);
     y2(() => {
       localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
@@ -10352,19 +10365,27 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const handlePageSelect = q2((url, name) => {
       extensionPageUrl.value = url;
       extensionPageName.value = name;
-    }, [extensionPageUrl, extensionPageName]);
+      extensionPageHtml.value = null;
+    }, [extensionPageUrl, extensionPageName, extensionPageHtml]);
     const handleBackToChat = q2(() => {
       extensionPageUrl.value = null;
       extensionPageName.value = null;
-    }, [extensionPageUrl, extensionPageName]);
+      extensionPageHtml.value = null;
+    }, [extensionPageUrl, extensionPageName, extensionPageHtml]);
     y2(() => {
       const onOpenPage = (e5) => {
-        const { url, name } = e5.detail;
-        if (url && name) handlePageSelect(url, name);
+        const detail = e5.detail;
+        if (detail.mode === "markdown" && detail.html && detail.name) {
+          extensionPageUrl.value = null;
+          extensionPageName.value = detail.name;
+          extensionPageHtml.value = detail.html;
+        } else if (detail.url && detail.name) {
+          handlePageSelect(detail.url, detail.name);
+        }
       };
       window.addEventListener("piclaw:open-page", onOpenPage);
       return () => window.removeEventListener("piclaw:open-page", onOpenPage);
-    }, [handlePageSelect]);
+    }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
     const connected = connectionStatus.value === "connected";
     const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
     const onTermDragStart = q2((e5) => {
@@ -10429,7 +10450,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
+          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
             /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
               /* @__PURE__ */ u4(
                 "button",
@@ -10446,7 +10467,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               ),
               /* @__PURE__ */ u4("span", { className: "extension-frame__title", children: extensionPageName.value })
             ] }),
-            /* @__PURE__ */ u4(
+            extensionPageHtml.value ? /* @__PURE__ */ u4(
+              "div",
+              {
+                className: "workspace__preview-markdown extension-frame__markdown",
+                dangerouslySetInnerHTML: { __html: extensionPageHtml.value }
+              }
+            ) : /* @__PURE__ */ u4(
               "iframe",
               {
                 className: "extension-frame__iframe",
