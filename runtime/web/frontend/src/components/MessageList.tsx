@@ -290,8 +290,12 @@ export function MessageList() {
 
     es.addEventListener("agent_draft_delta", (e: MessageEvent) => {
       try {
-        const { delta } = JSON.parse(e.data) as { delta: string };
-        setDraft((prev) => prev + delta);
+        const parsed = JSON.parse(e.data);
+        if (parsed.delta) {
+          setDraft((prev) => prev + parsed.delta);
+        } else if (parsed.text !== undefined) {
+          setDraft(parsed.text);
+        }
         scrollToBottom();
       } catch {
         // ignore
@@ -300,17 +304,36 @@ export function MessageList() {
 
     es.addEventListener("agent_draft", (e: MessageEvent) => {
       try {
-        const { content } = JSON.parse(e.data) as { content: string };
-        setDraft(content);
+        const parsed = JSON.parse(e.data);
+        const text = parsed.text ?? parsed.content ?? "";
+        setDraft(text);
         scrollToBottom();
       } catch {
         // ignore
       }
     });
 
-    es.addEventListener("agent_response", () => {
-      setDraft("");
-      scrollToBottom(true);
+    es.addEventListener("agent_response", (e: MessageEvent) => {
+      try {
+        const raw = JSON.parse(e.data);
+        const interaction: Interaction = {
+          id: raw.id,
+          type: "agent" as const,
+          content: raw.data?.content ?? raw.content ?? "",
+          content_blocks: raw.data?.content_blocks ?? raw.content_blocks,
+          created_at: raw.timestamp ?? "",
+          data: raw.data,
+        };
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === interaction.id)) return prev;
+          return [...prev, interaction];
+        });
+        setDraft("");
+        scrollToBottom(true);
+      } catch {
+        setDraft("");
+        scrollToBottom(true);
+      }
     });
 
     es.onopen = () => {
