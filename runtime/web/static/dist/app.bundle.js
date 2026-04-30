@@ -5347,7 +5347,12 @@ For tests, pass a Ghostty instance directly:
     y2(() => {
       const onStatus = (e5) => {
         const detail = e5.detail;
-        if (detail?.type === "done" || detail?.status === "idle") {
+        if (detail?.intent_key === "compaction" && !isCompacting.value) {
+          isCompacting.value = true;
+          compactStartTime.value = Date.now();
+          compactElapsed.value = 0;
+        }
+        if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {
           if (isCompacting.value) {
             isCompacting.value = false;
             setTimeout(() => fetchContext(), 1e3);
@@ -5385,13 +5390,19 @@ For tests, pass a Ghostty instance directly:
       compactStartTime.value = Date.now();
       compactElapsed.value = 0;
       try {
-        await fetch(getMessageUrl(), {
+        const res = await fetch(getMessageUrl(), {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: "/compact" })
         });
+        const data = await res.json().catch(() => null);
+        if (data?.command) {
+          isCompacting.value = false;
+          setTimeout(() => fetchContext(), 1e3);
+        }
       } catch {
+        isCompacting.value = false;
       }
     };
     const handleBadgeClick = async (e5) => {
@@ -9876,9 +9887,18 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           });
           setDraft("");
           scrollToBottom(true);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
         } catch {
           setDraft("");
           scrollToBottom(true);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
+        }
+      });
+      es.addEventListener("agent_status", (e5) => {
+        try {
+          const data = JSON.parse(e5.data);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: data }));
+        } catch {
         }
       });
       es.onopen = () => {
