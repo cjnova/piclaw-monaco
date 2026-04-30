@@ -5276,6 +5276,7 @@ For tests, pass a Ghostty instance directly:
         if (modelsRes.ok) {
           const info = await modelsRes.json();
           if (info.current) currentModel.value = info.current;
+          if (info.provider_usage) providerUsage.value = info.provider_usage;
         }
       } catch (err) {
         console.warn("[ModelContextBar] status fetch failed:", err);
@@ -5513,7 +5514,23 @@ For tests, pass a Ghostty instance directly:
                     ]
                   }
                 ),
-                /* @__PURE__ */ u4(ContextRing, { percent: contextPercent, tokens: contextTokens, contextWindow, onClick: handleCompact })
+                /* @__PURE__ */ u4(ContextRing, { percent: contextPercent, tokens: contextTokens, contextWindow, onClick: handleCompact }),
+                providerUsage.value?.hint_short && /* @__PURE__ */ u4(
+                  "span",
+                  {
+                    className: "usage-badge",
+                    title: [
+                      providerUsage.value.provider ? `Provider: ${providerUsage.value.provider}` : "",
+                      providerUsage.value.plan ? `Plan: ${providerUsage.value.plan}` : "",
+                      providerUsage.value.primary ? `${providerUsage.value.primary.label}: ${providerUsage.value.primary.used_percent}% used${providerUsage.value.primary.reset_description ? " (" + providerUsage.value.primary.reset_description + ")" : ""}` : "",
+                      providerUsage.value.secondary ? `${providerUsage.value.secondary.label}: ${providerUsage.value.secondary.used_percent}% used${providerUsage.value.secondary.reset_description ? " (" + providerUsage.value.secondary.reset_description + ")" : ""}` : ""
+                    ].filter(Boolean).join("\n"),
+                    children: [
+                      "\u25BC ",
+                      providerUsage.value.hint_short
+                    ]
+                  }
+                )
               ]
             }
           )
@@ -8761,6 +8778,19 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       navigator.clipboard.writeText(node.path).catch(() => {
       });
     }, [node.path]);
+    const handleOpenFile = q2(() => {
+      const ext = node.path.split(".").pop()?.toLowerCase() ?? "";
+      const encoded = encodeURIComponent(node.path);
+      let viewerUrl;
+      if (ext === "csv") viewerUrl = `/csv-viewer?path=${encoded}`;
+      else if (["html", "htm"].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
+      else if (ext === "pdf") viewerUrl = `/pdf-viewer?path=${encoded}`;
+      else if (["docx", "xlsx", "pptx"].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
+      else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
+      else if (["mp4", "webm", "mov"].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
+      else viewerUrl = `/editor-vendor?path=${encoded}`;
+      window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { url: viewerUrl, name: node.path.split("/").pop() } }));
+    }, [node.path]);
     const handleDelete = q2(async () => {
       if (isDeleting) return;
       const confirmed = window.confirm(`Delete ${node.name}? This cannot be undone.`);
@@ -8813,6 +8843,18 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             children: [
               /* @__PURE__ */ u4("span", { className: "codicon codicon-cloud-download" }),
               "Download"
+            ]
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "workspace__preview-action-btn",
+            onClick: handleOpenFile,
+            title: "Open in central pane",
+            children: [
+              /* @__PURE__ */ u4("span", { className: "codicon codicon-open-preview" }),
+              "Open"
             ]
           }
         ),
@@ -10261,6 +10303,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       extensionPageUrl.value = null;
       extensionPageName.value = null;
     }, [extensionPageUrl, extensionPageName]);
+    y2(() => {
+      const onOpenPage = (e5) => {
+        const { url, name } = e5.detail;
+        if (url && name) handlePageSelect(url, name);
+      };
+      window.addEventListener("piclaw:open-page", onOpenPage);
+      return () => window.removeEventListener("piclaw:open-page", onOpenPage);
+    }, [handlePageSelect]);
     const connected = connectionStatus.value === "connected";
     const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
     const onTermDragStart = q2((e5) => {

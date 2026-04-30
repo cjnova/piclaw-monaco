@@ -154,6 +154,15 @@ function AppContent() {
     extensionPageName.value = null;
   }, [extensionPageUrl, extensionPageName]);
 
+  useEffect(() => {
+    const onOpenPage = (e: Event) => {
+      const { url, name } = (e as CustomEvent<{ url: string; name: string }>).detail;
+      if (url && name) handlePageSelect(url, name);
+    };
+    window.addEventListener('piclaw:open-page', onOpenPage);
+    return () => window.removeEventListener('piclaw:open-page', onOpenPage);
+  }, [handlePageSelect]);
+
   const connected = connectionStatus.value === "connected";
   const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
 
