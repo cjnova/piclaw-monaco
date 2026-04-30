@@ -1,5 +1,6 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
+import { extractDisplayName } from "../utils/extractDisplayName";
 
 interface ExtensionRoute {
   prefix: string;
@@ -8,14 +9,6 @@ interface ExtensionRoute {
 
 interface AgentPanelProps {
   onPageSelect: (url: string, name: string) => void;
-}
-
-function extractDisplayName(extensionPath: string): string {
-  const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
-  return withoutPrefix
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 export function AgentPanel({ onPageSelect }: AgentPanelProps) {

@@ -2,6 +2,7 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
+import { extractDisplayName } from "../utils/extractDisplayName";
 
 interface ExtensionRoute {
   prefix: string;
@@ -10,16 +11,6 @@ interface ExtensionRoute {
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
-}
-
-function extractDisplayName(extensionPath: string): string {
-  // e.g. "piclaw-fleet" → "Fleet", "piclaw-board" → "Board"
-  const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
-  // Capitalize first letter of each word
-  return withoutPrefix
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
