@@ -11,6 +11,7 @@ import {
   type WorkspaceFilePayload,
 } from "./workspace-panel-helpers";
 import { formatBytes } from "../utils/formatBytes";
+import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -412,9 +413,9 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
         {status === "done" && kind === "markdown" && content !== null && (
           <div
             className="workspace__preview-markdown"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: rendered markdown
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
             dangerouslySetInnerHTML={{
-              __html: marked(content, { async: false }) as string,
+              __html: sanitizeRenderedMarkdown(marked(content, { async: false }) as string),
             }}
           />
         )}
