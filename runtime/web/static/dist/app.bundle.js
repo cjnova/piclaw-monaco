@@ -8875,8 +8875,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       let viewerUrl;
       if (ext === "csv") viewerUrl = `/csv-viewer?path=${encoded}`;
       else if (["html", "htm"].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
-      else if (ext === "pdf") viewerUrl = `/pdf-viewer?path=${encoded}`;
-      else if (["docx", "xlsx", "pptx"].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
+      else if (ext === "pdf") {
+        window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { name, mode: "pdf", sourceUrl: `/workspace/raw?path=${encoded}` } }));
+        return;
+      } else if (["docx", "xlsx", "pptx"].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
       else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
       else if (["mp4", "webm", "mov"].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
       else return;
@@ -10413,6 +10415,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           extensionPageUrl.value = null;
           extensionPageName.value = detail.name;
           extensionPageHtml.value = detail.html;
+        } else if (detail.mode === "pdf" && detail.sourceUrl && detail.name) {
+          extensionPageUrl.value = detail.sourceUrl;
+          extensionPageName.value = detail.name;
+          extensionPageHtml.value = "__pdf__";
         } else if (detail.url && detail.name) {
           handlePageSelect(detail.url, detail.name);
         }
@@ -10501,7 +10507,19 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               ),
               /* @__PURE__ */ u4("span", { className: "extension-frame__title", children: extensionPageName.value })
             ] }),
-            extensionPageHtml.value ? /* @__PURE__ */ u4(
+            extensionPageHtml.value === "__pdf__" ? /* @__PURE__ */ u4(
+              "object",
+              {
+                data: extensionPageUrl.value,
+                type: "application/pdf",
+                style: { width: "100%", flex: 1, border: "none" },
+                "aria-label": extensionPageName.value ?? "PDF",
+                children: /* @__PURE__ */ u4("div", { style: { padding: "24px", textAlign: "center", color: "var(--text-muted)" }, children: [
+                  /* @__PURE__ */ u4("p", { children: "PDF cannot be displayed." }),
+                  /* @__PURE__ */ u4("a", { href: extensionPageUrl.value, target: "_blank", rel: "noopener noreferrer", style: { color: "var(--accent)" }, children: "Open PDF in new tab" })
+                ] })
+              }
+            ) : extensionPageHtml.value ? /* @__PURE__ */ u4(
               "div",
               {
                 className: "workspace__preview-markdown extension-frame__markdown",
