@@ -9836,6 +9836,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   // runtime/web/frontend/src/panels/SettingsPanel.tsx
   var CATEGORIES = [
     { id: "general", label: "General", icon: "codicon-gear" },
+    { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
     { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
     { id: "compaction", label: "Compaction", icon: "codicon-archive" },
     { id: "providers", label: "Providers", icon: "codicon-cloud" }
@@ -9923,6 +9924,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         error.value && /* @__PURE__ */ u4("div", { className: "settings-panel__error", children: error.value }),
         saveStatus.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status", children: saveStatus.value }),
         activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4, onSaveGeneral: saveGeneral }),
+        activeCategory.value === "sessions" && /* @__PURE__ */ u4(SessionsSection, { data: s4, onSaveGeneral: saveGeneral }),
         activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
         activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
         activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] })
@@ -9935,8 +9937,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }) {
     const assistantName = useSignal(data.assistantName ?? "");
     const userName = useSignal(data.userName ?? "");
-    const sessionMaxSizeMb = useSignal(data.sessionMaxSizeMb ?? 0);
-    const toolUseBudget = useSignal(data.toolUseBudget ?? 0);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "General" }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Identity" }),
@@ -9974,7 +9974,62 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Your display name in chat" })
         ] })
       ] }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Instance Configuration" }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Display" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "webTerminalEnabled",
+            type: "checkbox",
+            checked: data.webTerminalEnabled ?? false,
+            onChange: (e5) => onSaveGeneral("webTerminalEnabled", e5.target.checked)
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "webTerminalEnabled", className: "settings-panel__label", children: "Web terminal enabled" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Enable terminal access in the web UI" })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Search match mode" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "select",
+            {
+              className: "settings-panel__select",
+              value: data.searchMatchMode ?? "or",
+              onChange: (e5) => onSaveGeneral("searchMatchMode", e5.target.value),
+              children: [
+                /* @__PURE__ */ u4("option", { value: "or", children: "OR (any term)" }),
+                /* @__PURE__ */ u4("option", { value: "and", children: "AND (all terms)" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "How multiple search terms are combined" })
+        ] })
+      ] })
+    ] });
+  }
+  function SessionsSection({
+    data,
+    onSaveGeneral
+  }) {
+    const sessionMaxSizeMb = useSignal(data.sessionMaxSizeMb ?? 0);
+    const toolUseBudget = useSignal(data.toolUseBudget ?? 0);
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Sessions" }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Session Lifecycle" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "sessionAutoRotate",
+            type: "checkbox",
+            checked: data.sessionAutoRotate ?? false,
+            onChange: (e5) => onSaveGeneral("sessionAutoRotate", e5.target.checked)
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "sessionAutoRotate", className: "settings-panel__label", children: "Auto-rotate sessions" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Automatically start new session when context is full" })
+      ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max session size (MB)" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
@@ -9993,6 +10048,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum session context size before auto-compaction" })
         ] })
       ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Agent Behaviour" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tool use budget" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
@@ -10008,37 +10064,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               onBlur: () => onSaveGeneral("toolUseBudget", toolUseBudget.value)
             }
           ),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Max tool calls per agent turn" })
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Max tool-call messages per turn" })
         ] })
       ] }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Behavior" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            id: "sessionAutoRotate",
-            type: "checkbox",
-            checked: data.sessionAutoRotate ?? false,
-            onChange: (e5) => onSaveGeneral("sessionAutoRotate", e5.target.checked)
-          }
-        ),
-        /* @__PURE__ */ u4("label", { htmlFor: "sessionAutoRotate", className: "settings-panel__label", children: "Auto-rotate sessions" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Automatically start new session when context is full" })
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            id: "webTerminalEnabled",
-            type: "checkbox",
-            checked: data.webTerminalEnabled ?? false,
-            onChange: (e5) => onSaveGeneral("webTerminalEnabled", e5.target.checked)
-          }
-        ),
-        /* @__PURE__ */ u4("label", { htmlFor: "webTerminalEnabled", className: "settings-panel__label", children: "Web terminal enabled" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Enable terminal access in the web UI" })
-      ] }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Session" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Session isolation" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
@@ -10049,31 +10077,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               value: data.sessionIsolation ?? "none",
               onChange: (e5) => onSaveGeneral("sessionIsolation", e5.target.value),
               children: [
-                /* @__PURE__ */ u4("option", { value: "none", children: "None" }),
+                /* @__PURE__ */ u4("option", { value: "none", children: "None \u2014 full cross-session visibility" }),
                 /* @__PURE__ */ u4("option", { value: "summary", children: "Summary" }),
                 /* @__PURE__ */ u4("option", { value: "full", children: "Full" })
               ]
             }
           ),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "none = shared context, branch = isolated branches" })
-        ] })
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Search match mode" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(
-            "select",
-            {
-              className: "settings-panel__select",
-              value: data.searchMatchMode ?? "or",
-              onChange: (e5) => onSaveGeneral("searchMatchMode", e5.target.value),
-              children: [
-                /* @__PURE__ */ u4("option", { value: "or", children: "OR (any term)" }),
-                /* @__PURE__ */ u4("option", { value: "and", children: "AND (all terms)" })
-              ]
-            }
-          ),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "How multiple search terms are combined" })
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Controls visibility between sessions" })
         ] })
       ] })
     ] });

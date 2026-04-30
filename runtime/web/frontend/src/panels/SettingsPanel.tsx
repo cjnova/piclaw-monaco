@@ -40,10 +40,11 @@ interface SettingsData {
   providers?: Provider[];
 }
 
-type Category = "general" | "appearance" | "compaction" | "providers";
+type Category = "general" | "sessions" | "appearance" | "compaction" | "providers";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
+  { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
   { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
   { id: "compaction", label: "Compaction", icon: "codicon-archive" },
   { id: "providers", label: "Providers", icon: "codicon-cloud" },
@@ -164,6 +165,9 @@ export function SettingsPanel() {
         {activeCategory.value === "general" && (
           <GeneralSection data={s} onSaveGeneral={saveGeneral} />
         )}
+        {activeCategory.value === "sessions" && (
+          <SessionsSection data={s} onSaveGeneral={saveGeneral} />
+        )}
         {activeCategory.value === "appearance" && (
           <AppearanceSection data={s} onSaveGeneral={saveGeneral} />
         )}
@@ -188,8 +192,6 @@ function GeneralSection({
 }) {
   const assistantName = useSignal(data.assistantName ?? "");
   const userName = useSignal(data.userName ?? "");
-  const sessionMaxSizeMb = useSignal(data.sessionMaxSizeMb ?? 0);
-  const toolUseBudget = useSignal(data.toolUseBudget ?? 0);
 
   return (
     <section className="settings-panel__section">
@@ -227,7 +229,74 @@ function GeneralSection({
         </div>
       </div>
 
-      <h3 className="settings-panel__subsection-title">Instance Configuration</h3>
+      <h3 className="settings-panel__subsection-title">Display</h3>
+
+      <div className="settings-panel__field settings-panel__checkbox-row">
+        <input
+          id="webTerminalEnabled"
+          type="checkbox"
+          checked={data.webTerminalEnabled ?? false}
+          onChange={(e) =>
+            onSaveGeneral("webTerminalEnabled", (e.target as HTMLInputElement).checked)
+          }
+        />
+        <label htmlFor="webTerminalEnabled" className="settings-panel__label">
+          Web terminal enabled
+        </label>
+        <span className="settings-panel__description">Enable terminal access in the web UI</span>
+      </div>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Search match mode</label>
+        <div className="settings-panel__field-content">
+          <select
+            className="settings-panel__select"
+            value={data.searchMatchMode ?? "or"}
+            onChange={(e) =>
+              onSaveGeneral("searchMatchMode", (e.target as HTMLSelectElement).value)
+            }
+          >
+            <option value="or">OR (any term)</option>
+            <option value="and">AND (all terms)</option>
+          </select>
+          <span className="settings-panel__description">How multiple search terms are combined</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Sessions ── */
+function SessionsSection({
+  data,
+  onSaveGeneral,
+}: {
+  data: SettingsData;
+  onSaveGeneral: (field: string, value: unknown) => void;
+}) {
+  const sessionMaxSizeMb = useSignal(data.sessionMaxSizeMb ?? 0);
+  const toolUseBudget = useSignal(data.toolUseBudget ?? 0);
+
+  return (
+    <section className="settings-panel__section">
+      <h2 className="settings-panel__section-title">Sessions</h2>
+
+      <h3 className="settings-panel__subsection-title">Session Lifecycle</h3>
+
+      <div className="settings-panel__field settings-panel__checkbox-row">
+        <input
+          id="sessionAutoRotate"
+          type="checkbox"
+          checked={data.sessionAutoRotate ?? false}
+          onChange={(e) =>
+            onSaveGeneral("sessionAutoRotate", (e.target as HTMLInputElement).checked)
+          }
+        />
+        <label htmlFor="sessionAutoRotate" className="settings-panel__label">
+          Auto-rotate sessions
+        </label>
+        <span className="settings-panel__description">Automatically start new session when context is full</span>
+      </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Max session size (MB)</label>
@@ -245,6 +314,8 @@ function GeneralSection({
         </div>
       </div>
 
+      <h3 className="settings-panel__subsection-title">Agent Behaviour</h3>
+
       <div className="settings-panel__field">
         <label className="settings-panel__label">Tool use budget</label>
         <div className="settings-panel__field-content">
@@ -257,43 +328,9 @@ function GeneralSection({
             onInput={(e) => (toolUseBudget.value = Number((e.target as HTMLInputElement).value))}
             onBlur={() => onSaveGeneral("toolUseBudget", toolUseBudget.value)}
           />
-          <span className="settings-panel__description">Max tool calls per agent turn</span>
+          <span className="settings-panel__description">Max tool-call messages per turn</span>
         </div>
       </div>
-
-      <h3 className="settings-panel__subsection-title">Behavior</h3>
-
-      <div className="settings-panel__field settings-panel__checkbox-row">
-        <input
-          id="sessionAutoRotate"
-          type="checkbox"
-          checked={data.sessionAutoRotate ?? false}
-          onChange={(e) =>
-            onSaveGeneral("sessionAutoRotate", (e.target as HTMLInputElement).checked)
-          }
-        />
-        <label htmlFor="sessionAutoRotate" className="settings-panel__label">
-          Auto-rotate sessions
-        </label>
-        <span className="settings-panel__description">Automatically start new session when context is full</span>
-      </div>
-
-      <div className="settings-panel__field settings-panel__checkbox-row">
-        <input
-          id="webTerminalEnabled"
-          type="checkbox"
-          checked={data.webTerminalEnabled ?? false}
-          onChange={(e) =>
-            onSaveGeneral("webTerminalEnabled", (e.target as HTMLInputElement).checked)
-          }
-        />
-        <label htmlFor="webTerminalEnabled" className="settings-panel__label">
-          Web terminal enabled
-        </label>
-        <span className="settings-panel__description">Enable terminal access in the web UI</span>
-      </div>
-
-      <h3 className="settings-panel__subsection-title">Session</h3>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Session isolation</label>
@@ -305,28 +342,11 @@ function GeneralSection({
               onSaveGeneral("sessionIsolation", (e.target as HTMLSelectElement).value)
             }
           >
-            <option value="none">None</option>
+            <option value="none">None — full cross-session visibility</option>
             <option value="summary">Summary</option>
             <option value="full">Full</option>
           </select>
-          <span className="settings-panel__description">none = shared context, branch = isolated branches</span>
-        </div>
-      </div>
-
-      <div className="settings-panel__field">
-        <label className="settings-panel__label">Search match mode</label>
-        <div className="settings-panel__field-content">
-          <select
-            className="settings-panel__select"
-            value={data.searchMatchMode ?? "or"}
-            onChange={(e) =>
-              onSaveGeneral("searchMatchMode", (e.target as HTMLSelectElement).value)
-            }
-          >
-            <option value="or">OR (any term)</option>
-            <option value="and">AND (all terms)</option>
-          </select>
-          <span className="settings-panel__description">How multiple search terms are combined</span>
+          <span className="settings-panel__description">Controls visibility between sessions</span>
         </div>
       </div>
     </section>
