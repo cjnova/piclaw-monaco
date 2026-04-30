@@ -93,8 +93,9 @@ export function ModelContextBar() {
   const isCompacting = useSignal(false);
   const compactStartTime = useSignal<number>(0);
   const compactElapsed = useSignal<number>(0);
-  // billing: session token usage
+  // billing: session usage
   const sessionTokens = useSignal<number>(0);
+  const usageLabel = useSignal<string>("");
   const providerUsage = useSignal<ProviderUsage | null>(null);
 
   const fetchStatus = async () => {
@@ -115,16 +116,28 @@ export function ModelContextBar() {
         // #60: store context_window from current model's definition
         const currentOpt = info.model_options?.find((m: Record<string, unknown>) => m.label === info.current || m.id === info.current);
         if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window as number;
-        // billing: store provider_usage
+        // billing: store provider_usage (conditional on data shape)
         if (info.provider_usage) {
           providerUsage.value = info.provider_usage;
-          // Sum total tokens across providers
-          const pu = info.provider_usage as Record<string, ProviderUsage>;
-          const total = Object.values(pu).reduce((sum: number, p: ProviderUsage) => {
-            if (typeof p !== "object" || p === null) return sum;
-            return sum + (p?.total_tokens ?? ((p?.input_tokens ?? 0) + (p?.output_tokens ?? 0)));
-          }, 0);
-          if (total > 0) sessionTokens.value = total;
+          const pu = info.provider_usage as Record<string, unknown>;
+          // Check if percentage-based (GitHub Copilot style)
+          if (pu.primary && typeof (pu.primary as Record<string, unknown>).used_percent === "number") {
+            const pct = (pu.primary as Record<string, unknown>).used_percent as number;
+            const label = (pu.primary as Record<string, unknown>).label as string || "premium";
+            usageLabel.value = `${pct}% ${label}`;
+            sessionTokens.value = 0;
+          } else {
+            // Token-based provider (Anthropic, OpenAI, etc.)
+            const total = Object.values(pu).reduce((sum: number, p: unknown) => {
+              if (typeof p !== "object" || p === null) return sum;
+              const pp = p as Record<string, unknown>;
+              return sum + ((pp.total_tokens as number) ?? (((pp.input_tokens as number) ?? 0) + ((pp.output_tokens as number) ?? 0)));
+            }, 0);
+            if (total > 0) {
+              sessionTokens.value = total;
+              usageLabel.value = `▼ ${fmtTokens(total)}`;
+            }
+          }
         }
       }
     } catch (err) {
@@ -437,16 +450,15 @@ export function ModelContextBar() {
         )}
         <ContextRing percent={contextPercent.value} tokens={contextTokens.value} contextWindow={contextWindow.value} onClick={handleCompact} />
         {/* billing: show session token count if available */}
-        {sessionTokens.value > 0 && (
+        {usageLabel.value && (
           <span
             className="usage-badge"
             title={[
-              providerUsage.value?.provider ? `Provider: ${providerUsage.value.provider}` : "",
-              providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : "",
-              `Session tokens: ${sessionTokens.value.toLocaleString()}`,
+              providerUsage.value?.provider ? `Provider: ${(providerUsage.value as Record<string, unknown>).provider}` : "",
+              providerUsage.value?.plan ? `Plan: ${(providerUsage.value as Record<string, unknown>).plan}` : "",
             ].filter(Boolean).join("\n")}
           >
-            ▼ {fmtTokens(sessionTokens.value)}
+            {usageLabel.value}
           </span>
         )}
       </span>

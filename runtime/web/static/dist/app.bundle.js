@@ -5277,6 +5277,7 @@ For tests, pass a Ghostty instance directly:
     const compactStartTime = useSignal(0);
     const compactElapsed = useSignal(0);
     const sessionTokens = useSignal(0);
+    const usageLabel = useSignal("");
     const providerUsage = useSignal(null);
     const fetchStatus = async () => {
       try {
@@ -5297,11 +5298,22 @@ For tests, pass a Ghostty instance directly:
           if (info.provider_usage) {
             providerUsage.value = info.provider_usage;
             const pu = info.provider_usage;
-            const total = Object.values(pu).reduce((sum, p6) => {
-              if (typeof p6 !== "object" || p6 === null) return sum;
-              return sum + (p6?.total_tokens ?? (p6?.input_tokens ?? 0) + (p6?.output_tokens ?? 0));
-            }, 0);
-            if (total > 0) sessionTokens.value = total;
+            if (pu.primary && typeof pu.primary.used_percent === "number") {
+              const pct = pu.primary.used_percent;
+              const label = pu.primary.label || "premium";
+              usageLabel.value = `${pct}% ${label}`;
+              sessionTokens.value = 0;
+            } else {
+              const total = Object.values(pu).reduce((sum, p6) => {
+                if (typeof p6 !== "object" || p6 === null) return sum;
+                const pp = p6;
+                return sum + (pp.total_tokens ?? (pp.input_tokens ?? 0) + (pp.output_tokens ?? 0));
+              }, 0);
+              if (total > 0) {
+                sessionTokens.value = total;
+                usageLabel.value = `\u25BC ${fmtTokens(total)}`;
+              }
+            }
           }
         }
       } catch (err) {
@@ -5586,19 +5598,15 @@ For tests, pass a Ghostty instance directly:
                   }
                 ),
                 /* @__PURE__ */ u4(ContextRing, { percent: contextPercent.value, tokens: contextTokens.value, contextWindow: contextWindow.value, onClick: handleCompact }),
-                sessionTokens.value > 0 && /* @__PURE__ */ u4(
+                usageLabel.value && /* @__PURE__ */ u4(
                   "span",
                   {
                     className: "usage-badge",
                     title: [
                       providerUsage.value?.provider ? `Provider: ${providerUsage.value.provider}` : "",
-                      providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : "",
-                      `Session tokens: ${sessionTokens.value.toLocaleString()}`
+                      providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : ""
                     ].filter(Boolean).join("\n"),
-                    children: [
-                      "\u25BC ",
-                      fmtTokens(sessionTokens.value)
-                    ]
+                    children: usageLabel.value
                   }
                 )
               ]
