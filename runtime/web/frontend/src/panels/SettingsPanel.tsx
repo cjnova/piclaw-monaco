@@ -302,22 +302,6 @@ function GeneralSection({
       </div>
 
 
-      <div className="settings-panel__field">
-        <label className="settings-panel__label">Search match mode</label>
-        <div className="settings-panel__field-content">
-          <select
-            className="settings-panel__select"
-            value={data.searchMatchMode ?? "or"}
-            onChange={(e) =>
-              onSaveGeneral("searchMatchMode", (e.target as HTMLSelectElement).value)
-            }
-          >
-            <option value="or">OR (any term)</option>
-            <option value="and">AND (all terms)</option>
-          </select>
-          <span className="settings-panel__description">How multiple search terms are combined</span>
-        </div>
-      </div>
 
       <h3 className="settings-panel__subsection-title">Instance Configuration</h3>
 

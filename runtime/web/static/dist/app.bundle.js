@@ -10032,24 +10032,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Browser notifications" }),
         /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Use the \u{1F514} bell button in the compose bar to enable/disable notifications. Web Push requires HTTPS or localhost." })
       ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Search match mode" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(
-            "select",
-            {
-              className: "settings-panel__select",
-              value: data.searchMatchMode ?? "or",
-              onChange: (e5) => onSaveGeneral("searchMatchMode", e5.target.value),
-              children: [
-                /* @__PURE__ */ u4("option", { value: "or", children: "OR (any term)" }),
-                /* @__PURE__ */ u4("option", { value: "and", children: "AND (all terms)" })
-              ]
-            }
-          ),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "How multiple search terms are combined" })
-        ] })
-      ] }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Instance Configuration" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Compose upload (MB)" }),
