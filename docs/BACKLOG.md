@@ -153,7 +153,6 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | Task | Description | Status |
 |---|---|---|
 | full-compose-bar-redesign | Send/stop cycle, attachments, queue management, session pill | ⏳ |
-| command-palette-intellisense | Command palette: execute backend commands with parameter intellisense (#18) | ⏳ |
 | wire-side-prompt-panel-to-monaco | Side-prompt panel using upstream streaming API | ⏳ |
 | wire-fleet-batch-to-command-palette | Expose fleet_batch tool via UI | ⏳ |
 | wire-terminal-profile-selector | Terminal profile selection (Shell, Pi TUI) | ⏳ |
