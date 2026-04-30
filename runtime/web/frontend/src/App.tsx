@@ -1,4 +1,4 @@
-import { getChatJid, ensureChatJidInUrl } from "./api/chat-jid";
+import { getChatJid } from "./api/chat-jid";
 import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
@@ -13,7 +13,6 @@ import { commandRegistry } from "./services";
 import { ThemeProvider, useThemeControl } from "./theme/ThemeProvider";
 
 function AppContent() {
-  ensureChatJidInUrl();
   const themeControl = useThemeControl();
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
   const activePanel = useSignal("explorer");

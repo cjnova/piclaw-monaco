@@ -259,7 +259,7 @@ export function MessageList() {
 
   // SSE stream
   useEffect(() => {
-    const es = new EventSource(`/sse/stream?chat_jid=${getChatJid()}`);
+    const es = new EventSource("/sse/stream");
     sseRef.current = es;
 
     es.addEventListener("new_post", (e: MessageEvent) => {
