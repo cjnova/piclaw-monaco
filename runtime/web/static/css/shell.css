@@ -1043,6 +1043,7 @@ body {
 .message-list__item--user,
 .message-list__item--agent {
   flex-direction: row;
+  margin-left: 40px;
 }
 
 /* Avatar circle */
