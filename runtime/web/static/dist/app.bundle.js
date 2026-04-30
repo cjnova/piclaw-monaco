@@ -9640,13 +9640,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
   function TasksTab() {
     return /* @__PURE__ */ u4("div", { className: "tasks-panel__list", children: /* @__PURE__ */ u4("div", { className: "tasks-panel__empty", children: [
-      "No scheduled tasks.",
-      " ",
-      /* @__PURE__ */ u4("span", { className: "tasks-panel__hint", children: [
-        "Use ",
-        /* @__PURE__ */ u4("code", { children: "/schedule" }),
-        " in chat to create one."
-      ] })
+      /* @__PURE__ */ u4("i", { className: "codicon codicon-tasklist" }),
+      /* @__PURE__ */ u4("span", { children: "No scheduled tasks" })
     ] }) });
   }
   function SessionsTab({ activeChatJid }) {
