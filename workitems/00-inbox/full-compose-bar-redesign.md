@@ -57,6 +57,28 @@ Redesign the chat compose bar to match piclaw's full interaction model: dynamic 
 - Click opens Sessions tab in Activity Bar panel
 - Reflects current `?chat_jid=` from URL
 
+### Session & Branch Action Icons
+
+Small icon buttons next to the session pill (or in a dropdown) for quick session management. Each maps to a slash command sent via the message endpoint.
+
+| Icon | Codicon | Action | Command |
+|---|---|---|---|
+| ➕ New | `add` | Start a new session | `/new-session` |
+| 🔀 Fork | `git-branch` | Fork from current point | `/fork` |
+| 📋 Clone | `copy` | Clone into a new session | `/clone` |
+| 🔄 Rotate | `refresh` | Archive and start fresh | `/session-rotate` |
+| 🌳 Tree | `list-tree` | Show session tree / branches | `/tree` |
+| 📝 Rename | `edit` | Set session name | `/session-name <name>` |
+| ↔️ Switch | `arrow-swap` | Switch to another session | `/switch-session` |
+
+**Implementation**: Each icon sends the corresponding command as `POST /agent/{chat_jid}/message` with `{ content: "/command" }`. The response appears in chat (like typing the command manually).
+
+**Layout**: These icons appear as a horizontal row, either:
+- Next to the session pill (compact icon bar)
+- In a dropdown menu (▾) from the session pill (cleaner, less clutter)
+
+**Recommended**: Dropdown from session pill — click the pill to see all session actions.
+
 **2. Attachment badges** (above textarea):
 - Each uploaded file shows as pill: icon + filename + ✕ remove
 - Supports: file picker (📎 button) + clipboard paste (images auto-upload as PNG)
@@ -123,6 +145,9 @@ Redesign the chat compose bar to match piclaw's full interaction model: dynamic 
 - [ ] Steer moves message to priority position
 - [ ] Cancel removes from queue
 - [ ] Session pill shows current @name from URL chat_jid
+- [ ] Session pill dropdown shows: New, Fork, Clone, Rotate, Tree, Rename, Switch actions
+- [ ] Each action sends the corresponding /command and response shows in chat
+- [ ] Icons use codicons for visual consistency
 - [ ] All styles in CSS (BEM), no inline styles
 
 ## Implementation Paths
