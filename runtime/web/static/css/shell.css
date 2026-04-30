@@ -2760,6 +2760,11 @@ body {
   gap: 8px;
   margin-bottom: 14px;
 }
+.settings-panel__checkbox-row .settings-panel__label {
+  min-width: unset;
+  max-width: unset;
+  text-align: left;
+}
 .settings-panel__checkbox-row input[type="checkbox"] {
   width: 14px;
   height: 14px;
