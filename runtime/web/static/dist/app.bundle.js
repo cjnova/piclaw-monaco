@@ -5230,11 +5230,11 @@ For tests, pass a Ghostty instance directly:
   ];
   var FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
   function ContextRing({ percent, tokens, contextWindow, onClick }) {
-    const p6 = percent ?? 0;
+    const p6 = percent;
     const color = p6 > 95 ? "#f38ba8" : p6 > 80 ? "#f9e2af" : "#a6e3a1";
     const fmtTokens = (n4) => n4 >= 1e6 ? `${(n4 / 1e6).toFixed(1)}M` : `${(n4 / 1e3).toFixed(0)}k`;
-    const tokensK = tokens != null ? fmtTokens(tokens) : "--";
-    const totalK = contextWindow != null ? fmtTokens(contextWindow) : "--";
+    const tokensK = fmtTokens(tokens);
+    const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
     return /* @__PURE__ */ u4(
       "span",
       {
@@ -5403,12 +5403,11 @@ For tests, pass a Ghostty instance directly:
         console.warn("[ModelContextBar] thinking switch error:", err);
       }
     };
-    const isConnected = error.value ? lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value <= 3e4 : true;
-    const modelName = isConnected ? agentStatus.value?.data?.model ?? currentModel.value ?? "github-copilot/claude-sonnet-4.6" : "github-copilot/claude-sonnet-4.6";
-    const thinkingLevel = isConnected ? agentStatus.value?.data?.thinking_level || "medium" : "medium";
-    const contextPercent = isConnected ? agentContext.value?.percent ?? null : 42;
-    const contextTokens = isConnected ? agentContext.value?.tokens ?? null : 54e3;
-    const contextWindow = isConnected ? agentContext.value?.contextWindow ?? null : 128e3;
+    const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
+    const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
+    const contextTokens = agentContext.value?.tokens ?? 0;
+    const contextWindow = agentContext.value?.contextWindow ?? 0;
+    const contextPercent = agentContext.value?.percent ?? (contextWindow > 0 ? contextTokens / contextWindow * 100 : 0);
     const activeModel = currentModel.value ?? modelName;
     return /* @__PURE__ */ u4(
       "span",

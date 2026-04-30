@@ -41,12 +41,12 @@ const FALLBACK_MODELS: ModelEntry[] = [
 
 const FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
 
-function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number | null; tokens: number | null; contextWindow: number | null; onClick: (e: MouseEvent) => void }) {
-  const p = percent ?? 0;
+function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number; tokens: number; contextWindow: number; onClick: (e: MouseEvent) => void }) {
+  const p = percent;
   const color = p > 95 ? "#f38ba8" : p > 80 ? "#f9e2af" : "#a6e3a1";
   const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(0)}k`;
-  const tokensK = tokens != null ? fmtTokens(tokens) : "--";
-  const totalK = contextWindow != null ? fmtTokens(contextWindow) : "--";
+  const tokensK = fmtTokens(tokens);
+  const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
 
   return (
     <span
@@ -237,26 +237,11 @@ export function ModelContextBar() {
     }
   };
 
-  // Show mockup when not connected.
-  // If last successful fetch was > 30s ago and we now have an error, treat as stale/disconnected.
-  const isConnected = error.value
-    ? (lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value <= 30_000)
-    : true;
-  const modelName = isConnected
-    ? (agentStatus.value?.data?.model ?? currentModel.value ?? "github-copilot/claude-sonnet-4.6")
-    : "github-copilot/claude-sonnet-4.6";
-  const thinkingLevel = isConnected
-    ? (agentStatus.value?.data?.thinking_level || "medium")
-    : "medium";
-  const contextPercent = isConnected
-    ? (agentContext.value?.percent ?? null)
-    : 42;
-  const contextTokens = isConnected
-    ? (agentContext.value?.tokens ?? null)
-    : 54000;
-  const contextWindow = isConnected
-    ? (agentContext.value?.contextWindow ?? null)
-    : 128000;
+  const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
+  const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
+  const contextTokens = agentContext.value?.tokens ?? 0;
+  const contextWindow = agentContext.value?.contextWindow ?? 0;
+  const contextPercent = agentContext.value?.percent ?? (contextWindow > 0 ? (contextTokens / contextWindow) * 100 : 0);
 
   const activeModel = currentModel.value ?? modelName;
 
