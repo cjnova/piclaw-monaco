@@ -2,6 +2,8 @@ import { WorkspacePanel } from "./WorkspacePanel";
 import { SearchPanel } from "./SearchPanel";
 import { AddonsPanel } from "./AddonsPanel";
 import { AgentPanel } from "./AgentPanel";
+import { TasksPanel } from "./TasksPanel";
+import { SettingsPanel } from "./SettingsPanel";
 
 interface PanelRouterProps {
   activePanel: string;
@@ -19,8 +21,10 @@ export function PanelRouter({ activePanel, onPageSelect }: PanelRouterProps) {
       return <AddonsPanel />;
     case "agent":
       return <AgentPanel onPageSelect={onPageSelect ?? (() => {})} />;
+    case "tasks":
+      return <TasksPanel />;
     case "settings":
-      return <Placeholder text="Settings panels" />;
+      return <SettingsPanel />;
     default:
       return <Placeholder text="Select a panel" />;
   }
