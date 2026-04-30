@@ -2738,3 +2738,38 @@ body {
   cursor: pointer;
 }
 .tasks-panel__action-btn:hover { background: var(--accent); color: #fff; }
+
+/* ── SettingsPanel extras ── */
+.settings-panel__select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-size: 13px;
+  min-width: 160px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+.settings-panel__select:focus { border-color: var(--accent); }
+
+.settings-panel__checkbox-row {
+  align-items: center;
+  gap: 8px;
+}
+.settings-panel__checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.settings-panel__input--number { width: 100px; }
+
+.settings-panel__provider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
