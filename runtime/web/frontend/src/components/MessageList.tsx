@@ -1,4 +1,4 @@
-import { getChatJid, getMessageUrl } from "../api/chat-jid";
+import { getChatJid, getMessageUrl, buildChatUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { marked } from "marked";
 
@@ -259,7 +259,7 @@ export function MessageList() {
 
   // SSE stream
   useEffect(() => {
-    const es = new EventSource("/sse/stream");
+    const es = new EventSource(buildChatUrl("/sse/stream"));
     sseRef.current = es;
 
     es.addEventListener("new_post", (e: MessageEvent) => {

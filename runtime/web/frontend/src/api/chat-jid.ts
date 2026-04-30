@@ -13,3 +13,9 @@ export function getChatJid(): string {
 export function getMessageUrl(): string {
   return `/agent/${encodeURIComponent(getChatJid())}/message`;
 }
+
+/** Build a URL with ?chat_jid= (and optional extra params) for the current chat. */
+export function buildChatUrl(path: string, params?: Record<string, string>): string {
+  const qs = new URLSearchParams({ chat_jid: getChatJid(), ...params });
+  return `${path}?${qs}`;
+}
