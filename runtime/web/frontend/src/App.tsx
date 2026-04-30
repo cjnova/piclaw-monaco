@@ -25,6 +25,7 @@ function AppContent() {
   const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
+  const extensionPageHtml = useSignal<string | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
@@ -147,21 +148,29 @@ function AppContent() {
   const handlePageSelect = useCallback((url: string, name: string) => {
     extensionPageUrl.value = url;
     extensionPageName.value = name;
-  }, [extensionPageUrl, extensionPageName]);
+    extensionPageHtml.value = null;
+  }, [extensionPageUrl, extensionPageName, extensionPageHtml]);
 
   const handleBackToChat = useCallback(() => {
     extensionPageUrl.value = null;
     extensionPageName.value = null;
-  }, [extensionPageUrl, extensionPageName]);
+    extensionPageHtml.value = null;
+  }, [extensionPageUrl, extensionPageName, extensionPageHtml]);
 
   useEffect(() => {
     const onOpenPage = (e: Event) => {
-      const { url, name } = (e as CustomEvent<{ url: string; name: string }>).detail;
-      if (url && name) handlePageSelect(url, name);
+      const detail = (e as CustomEvent<{ url?: string; name: string; html?: string; mode?: string }>).detail;
+      if (detail.mode === 'markdown' && detail.html && detail.name) {
+        extensionPageUrl.value = null;
+        extensionPageName.value = detail.name;
+        extensionPageHtml.value = detail.html;
+      } else if (detail.url && detail.name) {
+        handlePageSelect(detail.url, detail.name);
+      }
     };
     window.addEventListener('piclaw:open-page', onOpenPage);
     return () => window.removeEventListener('piclaw:open-page', onOpenPage);
-  }, [handlePageSelect]);
+  }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
 
   const connected = connectionStatus.value === "connected";
   const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", settings: "Settings" };
@@ -232,7 +241,7 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            {extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) ? (
+            {(extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value ? (
               <div className="extension-frame">
                 <div className="extension-frame__header">
                   <button
@@ -245,12 +254,20 @@ function AppContent() {
                   </button>
                   <span className="extension-frame__title">{extensionPageName.value}</span>
                 </div>
-                <iframe
-                  className="extension-frame__iframe"
-                  src={extensionPageUrl.value}
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                  title={extensionPageName.value ?? "Extension Page"}
-                />
+                {extensionPageHtml.value ? (
+                  <div
+                    className="workspace__preview-markdown extension-frame__markdown"
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
+                    dangerouslySetInnerHTML={{ __html: extensionPageHtml.value }}
+                  />
+                ) : (
+                  <iframe
+                    className="extension-frame__iframe"
+                    src={extensionPageUrl.value!}
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                    title={extensionPageName.value ?? "Extension Page"}
+                  />
+                )}
               </div>
             ) : (
               <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />

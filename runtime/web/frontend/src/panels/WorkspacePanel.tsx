@@ -323,9 +323,25 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
     navigator.clipboard.writeText(node.path).catch(() => {});
   }, [node.path]);
 
-  const handleOpenFile = useCallback(() => {
+  const handleOpenFile = useCallback(async () => {
     const ext = node.path.split('.').pop()?.toLowerCase() ?? '';
     const encoded = encodeURIComponent(node.path);
+    const name = node.path.split('/').pop() ?? node.name;
+
+    // Markdown files: fetch content and render inline
+    if (['md', 'mdx', 'markdown'].includes(ext)) {
+      try {
+        const res = await fetch(`/workspace/file?path=${encoded}`, { credentials: 'same-origin' });
+        const data = await res.json() as { content?: string; text?: string };
+        const text = data.content ?? data.text ?? '';
+        const html = sanitizeRenderedMarkdown(marked(text, { async: false }) as string);
+        window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { html, name, mode: 'markdown' } }));
+      } catch {
+        // fallback: nothing
+      }
+      return;
+    }
+
     let viewerUrl: string;
     if (ext === 'csv') viewerUrl = `/csv-viewer?path=${encoded}`;
     else if (['html', 'htm'].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
@@ -333,9 +349,9 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
     else if (['docx', 'xlsx', 'pptx'].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
     else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
     else if (['mp4', 'webm', 'mov'].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
-    else viewerUrl = `/editor-vendor?path=${encoded}`;
-    window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { url: viewerUrl, name: node.path.split('/').pop() } }));
-  }, [node.path]);
+    else return; // no viewer for this type
+    window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { url: viewerUrl, name } }));
+  }, [node.path, node.name]);
 
   const handleDelete = useCallback(async () => {
     if (isDeleting) return;
@@ -391,14 +407,16 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
           <span className="codicon codicon-cloud-download" />
           Download
         </a>
-        <button
-          className="workspace__preview-action-btn"
-          onClick={handleOpenFile}
-          title="Open in central pane"
-        >
-          <span className="codicon codicon-open-preview" />
-          Open
-        </button>
+        {(['md', 'mdx', 'markdown', 'csv', 'pdf', 'html', 'htm', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'mp4', 'webm', 'mov'].includes(node.path.split('.').pop()?.toLowerCase() ?? '')) && (
+          <button
+            className="workspace__preview-action-btn"
+            onClick={() => void handleOpenFile()}
+            title="Open in central pane"
+          >
+            <span className="codicon codicon-open-preview" />
+            Open
+          </button>
+        )}
         <button
           className="workspace__preview-action-btn workspace__preview-action-btn--danger"
           disabled={isDeleting}
