@@ -37,6 +37,7 @@ interface CommandParam {
 const COMMAND_PARAMS: Record<string, CommandParam> = {
   "/model": { type: "autocomplete", fetch: "/agent/models", extractField: "models" },
   "/thinking": { type: "autocomplete", fetch: "/agent/models", extractField: "available_thinking_levels" },
+  "/switch-session": { type: "text", placeholder: "Session path or JID" },
   "/compact": { type: "bare" },
   "/stats": { type: "bare" },
   "/state": { type: "bare" },
@@ -59,9 +60,17 @@ const COMMAND_PARAMS: Record<string, CommandParam> = {
   "/user-name": { type: "text", placeholder: "Your display name" },
   "/user-avatar": { type: "text", placeholder: "Avatar URL" },
   "/new-session": { type: "bare" },
-  "/fork": { type: "bare" },
-  "/clone": { type: "bare" },
+  "/fork": { type: "text", placeholder: "Entry ID (use /forks to list)" },
+  "/clone": { type: "text", placeholder: "Entry ID" },
+  "/ask": { type: "text", placeholder: "instance_id prompt" },
+  "/queue": { type: "text", placeholder: "Follow-up message" },
+  "/queue-all": { type: "text", placeholder: "Follow-up message (batch)" },
+  "/steer": { type: "text", placeholder: "Steering message" },
+  "/followup-mode": { type: "text", placeholder: "all or one" },
+  "/steering-mode": { type: "text", placeholder: "all or one" },
   "/session-rotate": { type: "bare" },
+  "/abort-bash": { type: "bare" },
+  "/abort-retry": { type: "bare" },
 };
 
 const CATEGORY_BADGE_COLORS: Record<string, string> = {
