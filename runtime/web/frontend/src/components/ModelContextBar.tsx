@@ -73,50 +73,60 @@ export function ModelContextBar() {
   const thinkingLevels = useSignal<string[]>([]);
   const currentModel = useSignal<string | null>(null);
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch("/agent/status");
-        if (res.ok) {
-          agentStatus.value = await res.json() as AgentStatus;
-          error.value = false;
-          lastSuccessAt.value = Date.now();
-        } else {
-          error.value = true;
-        }
-        // Also fetch current model (status.data is null when idle)
-        const modelsRes = await fetch("/agent/models");
-        if (modelsRes.ok) {
-          const info = await modelsRes.json() as { current?: string; thinking_level?: string };
-          if (info.current) currentModel.value = info.current;
-        }
-      } catch (err) {
-        console.warn("[ModelContextBar] status fetch failed:", err);
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch("/agent/status");
+      if (res.ok) {
+        agentStatus.value = await res.json() as AgentStatus;
+        error.value = false;
+        lastSuccessAt.value = Date.now();
+      } else {
         error.value = true;
       }
-    };
+      // Also fetch current model (status.data is null when idle)
+      const modelsRes = await fetch("/agent/models");
+      if (modelsRes.ok) {
+        const info = await modelsRes.json() as { current?: string; thinking_level?: string };
+        if (info.current) currentModel.value = info.current;
+      }
+    } catch (err) {
+      console.warn("[ModelContextBar] status fetch failed:", err);
+      error.value = true;
+    }
+  };
 
+  const fetchContext = async () => {
+    try {
+      const res = await fetch("/agent/context");
+      if (res.ok) {
+        agentContext.value = await res.json() as AgentContext;
+      }
+    } catch (err) {
+      console.warn("[ModelContextBar] context fetch failed:", err);
+    }
+  };
+
+  useEffect(() => {
     fetchStatus();
     const interval = setInterval(fetchStatus, 5_000);
     return () => clearInterval(interval);
   }, [agentStatus, error]);
 
   useEffect(() => {
-    const fetchContext = async () => {
-      try {
-        const res = await fetch("/agent/context");
-        if (res.ok) {
-          agentContext.value = await res.json() as AgentContext;
-        }
-      } catch (err) {
-        console.warn("[ModelContextBar] context fetch failed:", err);
-      }
-    };
-
     fetchContext();
     const interval = setInterval(fetchContext, 10_000);
     return () => clearInterval(interval);
   }, [agentContext]);
+
+  // Immediately refresh model/context when SSE connects (first load + reconnects)
+  useEffect(() => {
+    const onConnect = () => {
+      fetchStatus();
+      fetchContext();
+    };
+    window.addEventListener("piclaw:sse-connected", onConnect);
+    return () => window.removeEventListener("piclaw:sse-connected", onConnect);
+  }, []);
 
   // Close pickers on outside click or Escape
   useEffect(() => {
