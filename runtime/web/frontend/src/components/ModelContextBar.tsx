@@ -1,6 +1,6 @@
 import { getMessageUrl } from "../api/chat-jid";
 import { useEffect } from "preact/hooks";
-import { useSignal } from "@preact/signals";
+import { useSignal, useComputed } from "@preact/signals";
 
 interface AgentStatus {
   status: "active" | "idle";
@@ -308,10 +308,14 @@ export function ModelContextBar() {
 
   const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
   const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
-  const contextTokens = agentContext.value?.tokens ?? 0;
+  const contextTokens = useComputed(() => agentContext.value?.tokens ?? 0);
   // #60: use model's context_window from /agent/models as fallback when /agent/context returns null
-  const contextWindow = agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0;
-  const contextPercent = agentContext.value?.percent ?? (contextWindow > 0 ? (contextTokens / contextWindow) * 100 : 0);
+  const contextWindow = useComputed(() => agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0);
+  const contextPercent = useComputed(() => {
+    const w = contextWindow.value;
+    const t = contextTokens.value;
+    return agentContext.value?.percent ?? (w > 0 ? (t / w) * 100 : 0);
+  });
 
   const activeModel = currentModel.value ?? modelName;
 
@@ -417,7 +421,7 @@ export function ModelContextBar() {
             )}
           </span>
         )}
-        <ContextRing percent={contextPercent} tokens={contextTokens} contextWindow={contextWindow} onClick={handleCompact} />
+        <ContextRing percent={contextPercent.value} tokens={contextTokens.value} contextWindow={contextWindow.value} onClick={handleCompact} />
         {/* billing: show session token count if available */}
         {sessionTokens.value > 0 && (
           <span
