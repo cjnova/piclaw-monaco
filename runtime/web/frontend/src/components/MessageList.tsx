@@ -1,6 +1,7 @@
 import { getChatJid, getMessageUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { marked } from "marked";
+import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,9 +44,8 @@ function relativeTime(isoDate: string): string {
 
 function renderMarkdown(content: string): string {
   try {
-    const result = marked(content, { async: false });
-    // marked returns string when async:false
-    return result as string;
+    const html = marked(content, { async: false }) as string;
+    return sanitizeRenderedMarkdown(html);
   } catch {
     return content;
   }
@@ -186,7 +186,7 @@ function MessageItem({ interaction }: MessageItemProps) {
         {interaction.content && (
           <div
             className="message-list__content"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown from trusted server
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeHtml()
             dangerouslySetInnerHTML={
               isUser
                 ? undefined
@@ -444,7 +444,7 @@ export function MessageList() {
             </div>
             <div
               className="message-list__content"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown from trusted server
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeHtml()
               dangerouslySetInnerHTML={{ __html: renderMarkdown(draft) }}
             />
           </div>
