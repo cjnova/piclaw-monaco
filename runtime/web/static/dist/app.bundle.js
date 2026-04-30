@@ -9867,6 +9867,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     { id: "general", label: "General", icon: "codicon-gear" },
     { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
     { id: "workspace", label: "Workspace", icon: "codicon-folder" },
+    { id: "models", label: "Models", icon: "codicon-hubot" },
+    { id: "keychain", label: "Keychain", icon: "codicon-key" },
+    { id: "tools", label: "Tools", icon: "codicon-tools" },
     { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
     { id: "compaction", label: "Compaction", icon: "codicon-archive" },
     { id: "providers", label: "Providers", icon: "codicon-cloud" }
@@ -9978,7 +9981,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
         activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
         activeCategory.value === "workspace" && /* @__PURE__ */ u4(WorkspaceSection, { data: s4, onSaveWorkspace: saveWorkspace }),
-        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] })
+        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] }),
+        activeCategory.value === "models" && /* @__PURE__ */ u4(ModelsSection, { data: s4 }),
+        activeCategory.value === "keychain" && /* @__PURE__ */ u4(KeychainSection, {}),
+        activeCategory.value === "tools" && /* @__PURE__ */ u4(ToolsSection, { data: s4 })
       ] })
     ] });
   }
@@ -10225,6 +10231,62 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum number of entries shown per directory" })
         ] })
       ] })
+    ] });
+  }
+  function ModelsSection({ data }) {
+    const models = useSignal([]);
+    const current = useSignal("");
+    y2(() => {
+      fetch("/agent/models", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
+        current.value = d5.current ?? "";
+        models.value = d5.model_options ?? [];
+      }).catch(() => {
+      });
+    }, []);
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Current model" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: current.value || "\u2014" })
+      ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Available Models" }),
+      models.value.map((m6) => /* @__PURE__ */ u4("div", { className: "settings-panel__model-row", children: [
+        /* @__PURE__ */ u4("span", { className: "settings-panel__model-name", children: m6.name }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__model-provider", children: m6.provider }),
+        m6.context_window && /* @__PURE__ */ u4("span", { className: "settings-panel__model-ctx", children: [
+          Math.round(m6.context_window / 1e3),
+          "k"
+        ] }),
+        m6.label === current.value && /* @__PURE__ */ u4("span", { className: "settings-panel__status settings-panel__status--ok", children: "Active" })
+      ] }, m6.label))
+    ] });
+  }
+  function KeychainSection() {
+    const entries2 = useSignal([]);
+    y2(() => {
+      fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.ok ? r4.json() : { entries: [] }).then((d5) => {
+        entries2.value = (d5.entries ?? d5.keys ?? []).map((e5) => typeof e5 === "string" ? e5 : e5.name ?? e5.id ?? "");
+      }).catch(() => {
+      });
+    }, []);
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Keychain" }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Stored credentials (names only \u2014 secrets are never displayed)." }),
+      entries2.value.length === 0 ? /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "No keychain entries found, or API not available." }) : entries2.value.map((name) => /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("i", { className: "codicon codicon-key", style: { opacity: 0.5 } }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: name })
+      ] }, name))
+    ] });
+  }
+  function ToolsSection({ data }) {
+    const toolsets = data.toolsets ?? [];
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+      /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Tools" }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Available toolsets and their tools (read-only)." }),
+      toolsets.map((ts) => /* @__PURE__ */ u4("div", { children: [
+        /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: ts.name }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__tools-list", children: (ts.tools ?? []).map((t4) => /* @__PURE__ */ u4("span", { className: "settings-panel__tool-badge", children: t4.name }, t4.name)) })
+      ] }, ts.name))
     ] });
   }
   function ProvidersSection({ providers }) {
