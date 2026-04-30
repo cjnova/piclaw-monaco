@@ -9834,6 +9834,35 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
 
   // runtime/web/frontend/src/panels/SettingsPanel.tsx
+  function NumberStepper({ value, min, max, step, onSave }) {
+    const s4 = step ?? 1;
+    const decrement = () => {
+      const next = Math.max(min ?? -Infinity, value.value - s4);
+      value.value = next;
+      onSave(next);
+    };
+    const increment = () => {
+      const next = Math.min(max ?? Infinity, value.value + s4);
+      value.value = next;
+      onSave(next);
+    };
+    return /* @__PURE__ */ u4("div", { className: "settings-panel__stepper", children: [
+      /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__stepper-btn", onClick: decrement, children: "\u2212" }),
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          className: "settings-panel__stepper-value",
+          type: "number",
+          min,
+          max,
+          value: value.value,
+          onInput: (e5) => value.value = Number(e5.target.value),
+          onBlur: () => onSave(value.value)
+        }
+      ),
+      /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__stepper-btn", onClick: increment, children: "+" })
+    ] });
+  }
   var CATEGORIES = [
     { id: "general", label: "General", icon: "codicon-gear" },
     { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
@@ -10033,18 +10062,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max session size (MB)" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input settings-panel__input--number",
-              type: "number",
-              min: 1,
-              max: 500,
-              value: sessionMaxSizeMb.value,
-              onInput: (e5) => sessionMaxSizeMb.value = Number(e5.target.value),
-              onBlur: () => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)
-            }
-          ),
+          /* @__PURE__ */ u4(NumberStepper, { value: sessionMaxSizeMb, min: 1, max: 500, onSave: (v6) => onSaveGeneral("sessionMaxSizeMb", v6) }),
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum session context size before auto-compaction" })
         ] })
       ] }),
@@ -10052,18 +10070,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tool use budget" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input settings-panel__input--number",
-              type: "number",
-              min: 0,
-              max: 200,
-              value: toolUseBudget.value,
-              onInput: (e5) => toolUseBudget.value = Number(e5.target.value),
-              onBlur: () => onSaveGeneral("toolUseBudget", toolUseBudget.value)
-            }
-          ),
+          /* @__PURE__ */ u4(NumberStepper, { value: toolUseBudget, min: 0, max: 200, onSave: (v6) => onSaveGeneral("toolUseBudget", v6) }),
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Max tool-call messages per turn" })
         ] })
       ] }),
@@ -10146,48 +10153,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Compaction Timeouts" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
           /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Timeout (sec)" }),
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input settings-panel__input--number",
-              type: "number",
-              min: 1,
-              max: 3600,
-              value: timeoutSec.value,
-              onInput: (e5) => timeoutSec.value = Number(e5.target.value),
-              onBlur: () => onSaveCompaction("compactionTimeoutSec", timeoutSec.value)
-            }
-          )
+          /* @__PURE__ */ u4(NumberStepper, { value: timeoutSec, min: 1, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("compactionTimeoutSec", v6) })
         ] }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
           /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff base (min)" }),
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input settings-panel__input--number",
-              type: "number",
-              min: 1,
-              max: 1440,
-              value: backoffBase.value,
-              onInput: (e5) => backoffBase.value = Number(e5.target.value),
-              onBlur: () => onSaveCompaction("compactionBackoffBaseMin", backoffBase.value)
-            }
-          )
+          /* @__PURE__ */ u4(NumberStepper, { value: backoffBase, min: 1, max: 1440, step: 5, onSave: (v6) => onSaveCompaction("compactionBackoffBaseMin", v6) })
         ] }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
           /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff max (min)" }),
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input settings-panel__input--number",
-              type: "number",
-              min: 1,
-              max: 10080,
-              value: backoffMax.value,
-              onInput: (e5) => backoffMax.value = Number(e5.target.value),
-              onBlur: () => onSaveCompaction("compactionBackoffMaxMin", backoffMax.value)
-            }
-          )
+          /* @__PURE__ */ u4(NumberStepper, { value: backoffMax, min: 1, max: 10080, step: 10, onSave: (v6) => onSaveCompaction("compactionBackoffMaxMin", v6) })
         ] }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
           /* @__PURE__ */ u4(
@@ -10206,18 +10180,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         ] }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
           /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input settings-panel__input--number",
-              type: "number",
-              min: 0,
-              max: 3600,
-              value: watchdogTimeout.value,
-              onInput: (e5) => watchdogTimeout.value = Number(e5.target.value),
-              onBlur: () => onSaveCompaction("progressWatchdogTimeoutSec", watchdogTimeout.value)
-            }
-          )
+          /* @__PURE__ */ u4(NumberStepper, { value: watchdogTimeout, min: 0, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("progressWatchdogTimeoutSec", v6) })
         ] })
       ] })
     ] });

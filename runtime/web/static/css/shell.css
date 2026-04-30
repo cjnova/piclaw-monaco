@@ -2783,6 +2783,54 @@ body {
 
 .settings-panel__input--number { width: 100px; }
 
+.settings-panel__stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.settings-panel__stepper-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.settings-panel__stepper-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.settings-panel__stepper-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.settings-panel__stepper-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.settings-panel__stepper-value {
+  width: 80px;
+  height: 32px;
+  text-align: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-right: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.settings-panel__stepper-value::-webkit-inner-spin-button,
+.settings-panel__stepper-value::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .settings-panel__provider-row {
   display: flex;
   align-items: center;

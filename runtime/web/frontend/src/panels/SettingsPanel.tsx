@@ -1,5 +1,41 @@
 import { useEffect } from "preact/hooks";
-import { useSignal } from "@preact/signals";
+import { useSignal, type Signal } from "@preact/signals";
+
+/* ── Number Stepper Component ── */
+function NumberStepper({ value, min, max, step, onSave }: {
+  value: Signal<number>;
+  min?: number;
+  max?: number;
+  step?: number;
+  onSave: (v: number) => void;
+}) {
+  const s = step ?? 1;
+  const decrement = () => {
+    const next = Math.max(min ?? -Infinity, value.value - s);
+    value.value = next;
+    onSave(next);
+  };
+  const increment = () => {
+    const next = Math.min(max ?? Infinity, value.value + s);
+    value.value = next;
+    onSave(next);
+  };
+  return (
+    <div className="settings-panel__stepper">
+      <button type="button" className="settings-panel__stepper-btn" onClick={decrement}>−</button>
+      <input
+        className="settings-panel__stepper-value"
+        type="number"
+        min={min}
+        max={max}
+        value={value.value}
+        onInput={(e) => (value.value = Number((e.target as HTMLInputElement).value))}
+        onBlur={() => onSave(value.value)}
+      />
+      <button type="button" className="settings-panel__stepper-btn" onClick={increment}>+</button>
+    </div>
+  );
+}
 
 /* ── Data shape returned by GET /agent/settings-data ── */
 interface Theme {
@@ -301,15 +337,7 @@ function SessionsSection({
       <div className="settings-panel__field">
         <label className="settings-panel__label">Max session size (MB)</label>
         <div className="settings-panel__field-content">
-          <input
-            className="settings-panel__input settings-panel__input--number"
-            type="number"
-            min={1}
-            max={500}
-            value={sessionMaxSizeMb.value}
-            onInput={(e) => (sessionMaxSizeMb.value = Number((e.target as HTMLInputElement).value))}
-            onBlur={() => onSaveGeneral("sessionMaxSizeMb", sessionMaxSizeMb.value)}
-          />
+          <NumberStepper value={sessionMaxSizeMb} min={1} max={500} onSave={(v) => onSaveGeneral("sessionMaxSizeMb", v)} />
           <span className="settings-panel__description">Maximum session context size before auto-compaction</span>
         </div>
       </div>
@@ -319,15 +347,7 @@ function SessionsSection({
       <div className="settings-panel__field">
         <label className="settings-panel__label">Tool use budget</label>
         <div className="settings-panel__field-content">
-          <input
-            className="settings-panel__input settings-panel__input--number"
-            type="number"
-            min={0}
-            max={200}
-            value={toolUseBudget.value}
-            onInput={(e) => (toolUseBudget.value = Number((e.target as HTMLInputElement).value))}
-            onBlur={() => onSaveGeneral("toolUseBudget", toolUseBudget.value)}
-          />
+          <NumberStepper value={toolUseBudget} min={0} max={200} onSave={(v) => onSaveGeneral("toolUseBudget", v)} />
           <span className="settings-panel__description">Max tool-call messages per turn</span>
         </div>
       </div>
@@ -427,41 +447,17 @@ function CompactionSection({
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Timeout (sec)</label>
-        <input
-          className="settings-panel__input settings-panel__input--number"
-          type="number"
-          min={1}
-          max={3600}
-          value={timeoutSec.value}
-          onInput={(e) => (timeoutSec.value = Number((e.target as HTMLInputElement).value))}
-          onBlur={() => onSaveCompaction("compactionTimeoutSec", timeoutSec.value)}
-        />
+        <NumberStepper value={timeoutSec} min={1} max={3600} step={10} onSave={(v) => onSaveCompaction("compactionTimeoutSec", v)} />
       </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Backoff base (min)</label>
-        <input
-          className="settings-panel__input settings-panel__input--number"
-          type="number"
-          min={1}
-          max={1440}
-          value={backoffBase.value}
-          onInput={(e) => (backoffBase.value = Number((e.target as HTMLInputElement).value))}
-          onBlur={() => onSaveCompaction("compactionBackoffBaseMin", backoffBase.value)}
-        />
+        <NumberStepper value={backoffBase} min={1} max={1440} step={5} onSave={(v) => onSaveCompaction("compactionBackoffBaseMin", v)} />
       </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Backoff max (min)</label>
-        <input
-          className="settings-panel__input settings-panel__input--number"
-          type="number"
-          min={1}
-          max={10080}
-          value={backoffMax.value}
-          onInput={(e) => (backoffMax.value = Number((e.target as HTMLInputElement).value))}
-          onBlur={() => onSaveCompaction("compactionBackoffMaxMin", backoffMax.value)}
-        />
+        <NumberStepper value={backoffMax} min={1} max={10080} step={10} onSave={(v) => onSaveCompaction("compactionBackoffMaxMin", v)} />
       </div>
 
       <div className="settings-panel__field settings-panel__checkbox-row">
@@ -483,17 +479,7 @@ function CompactionSection({
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Watchdog timeout (sec)</label>
-        <input
-          className="settings-panel__input settings-panel__input--number"
-          type="number"
-          min={0}
-          max={3600}
-          value={watchdogTimeout.value}
-          onInput={(e) => (watchdogTimeout.value = Number((e.target as HTMLInputElement).value))}
-          onBlur={() =>
-            onSaveCompaction("progressWatchdogTimeoutSec", watchdogTimeout.value)
-          }
-        />
+        <NumberStepper value={watchdogTimeout} min={0} max={3600} step={10} onSave={(v) => onSaveCompaction("progressWatchdogTimeoutSec", v)} />
       </div>
       </div>
     </section>
