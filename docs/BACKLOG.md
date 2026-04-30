@@ -152,6 +152,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
+| search-scope-media-filters | Search scope selector (Current/Branch/All) + Images/Attachments checkboxes + OR/AND toggle (#85) | ⏳ |
+| qr-code-pairing-settings | QR code device pairing in Settings panel (#86) | ⏳ |
 | full-compose-bar-redesign | Send/stop cycle, attachments, queue management, session pill | ⏳ |
 | wire-side-prompt-panel-to-monaco | Side-prompt panel using upstream streaming API | ⏳ |
 | wire-fleet-batch-to-command-palette | Expose fleet_batch tool via UI | ⏳ |
