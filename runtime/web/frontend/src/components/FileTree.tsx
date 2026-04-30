@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { formatBytes } from "../utils/formatBytes";
 
 /** Tree node shape returned by GET /workspace/tree */
 interface TreeNode {
@@ -26,12 +27,6 @@ interface TreeResponse {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
-}
 
 async function fetchTree(dirPath: string): Promise<TreeNode[]> {
   const params = new URLSearchParams({ path: dirPath, depth: "1" });

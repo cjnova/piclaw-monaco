@@ -10,14 +10,9 @@ import {
   type FolderChartSegment,
   type WorkspaceFilePayload,
 } from "./workspace-panel-helpers";
+import { formatBytes } from "../utils/formatBytes";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
-}
 
 interface WorkspaceMutationPayload {
   nextNode: TreeNode | null;
