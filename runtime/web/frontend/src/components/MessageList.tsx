@@ -186,7 +186,7 @@ function MessageItem({ interaction }: MessageItemProps) {
         {interaction.content && (
           <div
             className="message-list__content"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeHtml()
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
             dangerouslySetInnerHTML={
               isUser
                 ? undefined
@@ -444,7 +444,7 @@ export function MessageList() {
             </div>
             <div
               className="message-list__content"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeHtml()
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
               dangerouslySetInnerHTML={{ __html: renderMarkdown(draft) }}
             />
           </div>

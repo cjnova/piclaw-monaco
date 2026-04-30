@@ -17,7 +17,7 @@ export function sanitizeRenderedMarkdown(html: string): string {
       if (
         /^on/i.test(name) ||
         name === "style" ||
-        (/^(href|src|action|formaction)$/i.test(name) &&
+        (/^(href|src|action|formaction|xlink:href)$/i.test(name) &&
           /^javascript:/i.test(value))
       ) {
         node.removeAttribute(name);
