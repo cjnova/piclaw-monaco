@@ -612,6 +612,48 @@ body {
 }
 
 /* ===== Command Palette extras ===== */
+.command-palette__step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 4px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.command-palette__step-command {
+  color: #89b4fa;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+}
+
+.command-palette__step-arrow {
+  color: var(--text-muted, #6c7086);
+  font-size: 14px;
+}
+
+.command-palette__step-hint {
+  color: var(--text-muted, #6c7086);
+  font-size: 11px;
+}
+
+.command-palette__text-hint {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted, #6c7086);
+  border-top: 1px solid var(--border);
+}
+
+.command-palette__text-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--surface, rgba(255,255,255,0.05));
+  color: var(--text, #cdd6f4);
+}
+
 .command-palette__copied {
   padding: 4px 12px;
   font-size: 11px;

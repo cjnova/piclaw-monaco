@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { commandRegistry } from "../services";
+import { getMessageUrl } from "../api/chat-jid";
 
 interface CommandPaletteProps {
   visible: boolean;
@@ -24,6 +25,45 @@ interface MergedCommand {
   isBackend: boolean;
 }
 
+type ParamType = "bare" | "autocomplete" | "text";
+
+interface CommandParam {
+  type: ParamType;
+  fetch?: string;          // API endpoint for autocomplete options
+  extractField?: string;   // field in API response to get options from
+  placeholder?: string;    // for text input
+}
+
+const COMMAND_PARAMS: Record<string, CommandParam> = {
+  "/model": { type: "autocomplete", fetch: "/agent/models", extractField: "models" },
+  "/thinking": { type: "autocomplete", fetch: "/agent/models", extractField: "available_thinking_levels" },
+  "/compact": { type: "bare" },
+  "/stats": { type: "bare" },
+  "/state": { type: "bare" },
+  "/context": { type: "bare" },
+  "/abort": { type: "bare" },
+  "/last": { type: "bare" },
+  "/restart": { type: "bare" },
+  "/tree": { type: "bare" },
+  "/forks": { type: "bare" },
+  "/auto-compact": { type: "bare" },
+  "/auto-retry": { type: "bare" },
+  "/cycle-model": { type: "bare" },
+  "/cycle-thinking": { type: "bare" },
+  "/shell": { type: "text", placeholder: "Shell command" },
+  "/bash": { type: "text", placeholder: "Bash command" },
+  "/user-github": { type: "text", placeholder: "GitHub username or URL" },
+  "/session-name": { type: "text", placeholder: "Session name" },
+  "/agent-name": { type: "text", placeholder: "Agent display name" },
+  "/agent-avatar": { type: "text", placeholder: "Avatar URL" },
+  "/user-name": { type: "text", placeholder: "Your display name" },
+  "/user-avatar": { type: "text", placeholder: "Avatar URL" },
+  "/new-session": { type: "bare" },
+  "/fork": { type: "bare" },
+  "/clone": { type: "bare" },
+  "/session-rotate": { type: "bare" },
+};
+
 const CATEGORY_BADGE_COLORS: Record<string, string> = {
   navigation: "#89b4fa",
   terminal: "#a6e3a1",
@@ -36,47 +76,69 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
   template: "#89dceb",
 };
 
+function sendCommand(command: string) {
+  fetch(getMessageUrl(), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: command }),
+  }).catch((err) => console.warn("[CommandPalette] send failed:", err));
+}
+
 export function CommandPalette({ visible, onClose, onCommand }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+  const [step, setStep] = useState<"command" | "parameter">("command");
+  const [selectedCommand, setSelectedCommand] = useState<string>("");
+  const [autoCompleteOptions, setAutoCompleteOptions] = useState<string[]>([]);
+  const [paramPlaceholder, setParamPlaceholder] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch backend commands when palette opens
+  // Reset state when palette opens/closes
   useEffect(() => {
-    if (!visible) return;
+    if (visible) {
+      setQuery("");
+      setSelectedIndex(0);
+      setStep("command");
+      setSelectedCommand("");
+      setAutoCompleteOptions([]);
+      setParamPlaceholder("");
 
-    setQuery("");
-    setSelectedIndex(0);
+      const timer = window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
 
-    const timer = window.setTimeout(() => {
-      inputRef.current?.focus();
-    }, 0);
+      const controller = new AbortController();
 
-    const controller = new AbortController();
+      // Fetch real piclaw commands from backend
+      fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json() as Promise<{ commands: BackendCommand[] }>;
+        })
+        .then((data) => {
+          setBackendCommands(data.commands ?? []);
+        })
+        .catch((err) => {
+          if (err.name === "AbortError") return;
+          console.warn("[CommandPalette] Failed to fetch backend commands:", err);
+          setBackendCommands([]);
+        });
 
-    // Fetch real piclaw commands from backend
-    fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<{ commands: BackendCommand[] }>;
-      })
-      .then((data) => {
-        setBackendCommands(data.commands ?? []);
-      })
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        console.warn("[CommandPalette] Failed to fetch backend commands:", err);
-        setBackendCommands([]);
-      });
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
+      return () => {
+        window.clearTimeout(timer);
+        controller.abort();
+      };
+    } else {
+      // Reset on close
+      setStep("command");
+      setSelectedCommand("");
+      setAutoCompleteOptions([]);
+    }
   }, [visible]);
 
   // Merge local UI commands (first) with backend commands (after)
@@ -104,8 +166,21 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
     return [...localCmds, ...backendCmds];
   }, [backendCommands, visible]);
 
-  // Filter by query
+  // Filter by query (for both steps)
   const results = useMemo(() => {
+    if (step === "parameter" && autoCompleteOptions.length > 0) {
+      // Step 2: filter autocomplete options
+      const q = query.trim().toLowerCase();
+      if (!q) return autoCompleteOptions;
+      return autoCompleteOptions.filter((opt) => opt.toLowerCase().includes(q));
+    }
+
+    if (step === "parameter") {
+      // Free text step — no list
+      return [];
+    }
+
+    // Step 1: filter commands
     const q = query.trim().toLowerCase();
     if (!q) return allCommands;
     return allCommands.filter(
@@ -113,7 +188,7 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
         cmd.label.toLowerCase().includes(q) ||
         (cmd.description?.toLowerCase().includes(q) ?? false)
     );
-  }, [query, allCommands]);
+  }, [query, allCommands, step, autoCompleteOptions]);
 
   useEffect(() => {
     setSelectedIndex((current) => {
@@ -126,25 +201,82 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
     return null;
   }
 
-  const executeBackendCommand = (label: string) => {
-    navigator.clipboard.writeText(label).catch(() => {});
-    if (onCommand) onCommand(label);
-    // Show brief visual indicator
-    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-    setCopiedLabel(label);
-    copiedTimerRef.current = setTimeout(() => setCopiedLabel(null), 1500);
+  const executeBackendCommand = async (command: MergedCommand) => {
+    const name = command.label; // e.g., "/model"
+    const param = COMMAND_PARAMS[name];
+
+    if (!param || param.type === "bare") {
+      // Execute immediately
+      sendCommand(name);
+      if (onCommand) onCommand(name);
+      onClose();
+      return;
+    }
+
+    if (param.type === "autocomplete" && param.fetch) {
+      // Fetch options, switch to step 2
+      try {
+        const res = await fetch(param.fetch, { credentials: "same-origin" });
+        const data = await res.json();
+        const options = param.extractField ? data[param.extractField] ?? [] : [];
+        setAutoCompleteOptions(Array.isArray(options) ? options : []);
+      } catch (err) {
+        console.warn("[CommandPalette] Failed to fetch autocomplete options:", err);
+        setAutoCompleteOptions([]);
+      }
+      setSelectedCommand(name);
+      setStep("parameter");
+      setSelectedIndex(0);
+      setQuery(""); // clear query for parameter filtering
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+
+    if (param.type === "text") {
+      setSelectedCommand(name);
+      setParamPlaceholder(param.placeholder ?? "Enter value");
+      setStep("parameter");
+      setQuery(""); // clear for text input
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
   };
 
   const executeSelected = () => {
-    const command = results[selectedIndex];
+    if (step === "parameter") {
+      if (autoCompleteOptions.length > 0) {
+        // Autocomplete: user selected an option from the list
+        const selectedOption = (results as string[])[selectedIndex];
+        if (selectedOption != null) {
+          const fullCommand = `${selectedCommand} ${selectedOption}`;
+          sendCommand(fullCommand);
+          if (onCommand) onCommand(fullCommand);
+          onClose();
+        }
+      } else {
+        // Free text: user typed and pressed Enter
+        const trimmed = query.trim();
+        if (trimmed) {
+          const fullCommand = `${selectedCommand} ${trimmed}`;
+          sendCommand(fullCommand);
+          if (onCommand) onCommand(fullCommand);
+          onClose();
+        }
+      }
+      return;
+    }
+
+    const command = (results as MergedCommand[])[selectedIndex];
     if (!command) return;
 
     if (command.handler) {
       command.handler();
+      onClose();
     } else if (command.isBackend) {
-      executeBackendCommand(command.label);
+      executeBackendCommand(command);
+    } else {
+      onClose();
     }
-    onClose();
   };
 
   const scrollActiveIntoView = (index: number) => {
@@ -165,7 +297,16 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
 
     if (event.key === "Backspace" && query === "") {
       event.preventDefault();
-      onClose();
+      if (step === "parameter") {
+        // Go back to command list
+        setStep("command");
+        setSelectedCommand("");
+        setAutoCompleteOptions([]);
+        setQuery("");
+        setSelectedIndex(0);
+      } else {
+        onClose();
+      }
       return;
     }
 
@@ -234,16 +375,35 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
     }
   };
 
+  const isParameterStep = step === "parameter";
+  const isAutocompleteStep = isParameterStep && autoCompleteOptions.length > 0;
+  const isTextStep = isParameterStep && autoCompleteOptions.length === 0;
+
+  const inputPlaceholder = isAutocompleteStep
+    ? `${selectedCommand} > Select option...`
+    : isTextStep
+    ? `${selectedCommand} > ${paramPlaceholder}`
+    : "Type a command...";
+
   return (
     <div className="command-palette-backdrop" onClick={onClose}>
       <div
         className="command-palette"
         onClick={(event) => event.stopPropagation()}
       >
+        {isParameterStep && (
+          <div className="command-palette__step-indicator">
+            <span className="command-palette__step-command">{selectedCommand}</span>
+            <span className="command-palette__step-arrow">›</span>
+            <span className="command-palette__step-hint">
+              {isAutocompleteStep ? "Select option" : paramPlaceholder || "Enter value"}
+            </span>
+          </div>
+        )}
         <input
           ref={inputRef}
           className="command-palette__input"
-          placeholder="Type a command..."
+          placeholder={inputPlaceholder}
           value={query}
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
@@ -253,58 +413,85 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
             Copied to clipboard: <strong>{copiedLabel}</strong>
           </div>
         )}
-        <ul ref={listRef} className="command-palette__results" role="listbox" aria-label="Commands">
-          {results.map((command, index) => {
-            const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
-            return (
-              <li
-                key={command.id}
-                className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  if (command.handler) {
-                    command.handler();
-                  } else if (command.isBackend) {
-                    executeBackendCommand(command.label);
-                  }
-                  onClose();
-                }}
-              >
-                <span className="command-palette__row-content">
-                  <span className="command-palette__label">{command.label}</span>
-                  {command.description && (
-                    <span className="command-palette__description">
-                      {command.description}
-                    </span>
-                  )}
-                </span>
-                <span className="command-palette__row-meta">
-                  <span
-                    className="command-palette__badge"
-                    style={{
-                      background: `${badgeColor}22`,
-                      color: badgeColor,
-                      border: `1px solid ${badgeColor}44`,
+        {isTextStep ? (
+          <div className="command-palette__text-hint">
+            Press <kbd>Enter</kbd> to send{query.trim() ? `: ${selectedCommand} ${query.trim()}` : ""}
+          </div>
+        ) : (
+          <ul ref={listRef} className="command-palette__results" role="listbox" aria-label="Commands">
+            {isAutocompleteStep
+              ? (results as string[]).map((option, index) => (
+                <li
+                  key={option}
+                  className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
+                  style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    const fullCommand = `${selectedCommand} ${option}`;
+                    sendCommand(fullCommand);
+                    if (onCommand) onCommand(fullCommand);
+                    onClose();
+                  }}
+                >
+                  <span className="command-palette__row-content">
+                    <span className="command-palette__label">{option}</span>
+                  </span>
+                </li>
+              ))
+              : (results as MergedCommand[]).map((command, index) => {
+                const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
+                return (
+                  <li
+                    key={command.id}
+                    className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
+                    style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      if (command.handler) {
+                        command.handler();
+                        onClose();
+                      } else if (command.isBackend) {
+                        executeBackendCommand(command);
+                      } else {
+                        onClose();
+                      }
                     }}
                   >
-                    {command.category}
-                  </span>
-                  {command.keybinding && (
-                    <span className="command-palette__keybinding command-palette__keybinding--static">
-                      {command.keybinding}
+                    <span className="command-palette__row-content">
+                      <span className="command-palette__label">{command.label}</span>
+                      {command.description && (
+                        <span className="command-palette__description">
+                          {command.description}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
+                    <span className="command-palette__row-meta">
+                      <span
+                        className="command-palette__badge"
+                        style={{
+                          background: `${badgeColor}22`,
+                          color: badgeColor,
+                          border: `1px solid ${badgeColor}44`,
+                        }}
+                      >
+                        {command.category}
+                      </span>
+                      {command.keybinding && (
+                        <span className="command-palette__keybinding command-palette__keybinding--static">
+                          {command.keybinding}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            {results.length === 0 && !isTextStep && (
+              <li className="command-palette__empty">
+                No matching commands
               </li>
-            );
-          })}
-          {results.length === 0 && (
-            <li className="command-palette__empty">
-              No matching commands
-            </li>
-          )}
-        </ul>
+            )}
+          </ul>
+        )}
       </div>
     </div>
   );
