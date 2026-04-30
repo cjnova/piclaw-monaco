@@ -5292,7 +5292,7 @@ For tests, pass a Ghostty instance directly:
         if (modelsRes.ok) {
           const info = await modelsRes.json();
           if (info.current) currentModel.value = info.current;
-          const currentOpt = info.model_options?.find((m6) => m6.id === info.current);
+          const currentOpt = info.model_options?.find((m6) => m6.label === info.current || m6.id === info.current);
           if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window;
           if (info.provider_usage) {
             providerUsage.value = info.provider_usage;

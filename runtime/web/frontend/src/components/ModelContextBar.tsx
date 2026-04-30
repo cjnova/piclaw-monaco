@@ -113,8 +113,8 @@ export function ModelContextBar() {
         const info = await modelsRes.json() as ModelInfo;
         if (info.current) currentModel.value = info.current;
         // #60: store context_window from current model's definition
-        const currentOpt = info.model_options?.find((m) => m.id === info.current);
-        if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window;
+        const currentOpt = info.model_options?.find((m: Record<string, unknown>) => m.label === info.current || m.id === info.current);
+        if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window as number;
         // billing: store provider_usage
         if (info.provider_usage) {
           providerUsage.value = info.provider_usage;
