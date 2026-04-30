@@ -2509,6 +2509,27 @@ body {
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.7;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.extension-frame__markdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.extension-frame__markdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.extension-frame__markdown::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+
+.extension-frame__markdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
 }
 
 .compaction-badge {
