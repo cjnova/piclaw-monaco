@@ -27,6 +27,20 @@ interface ModelInfo {
   thinking_level_label: string | null;
   supports_thinking: boolean;
   available_thinking_levels: string[];
+  provider_usage?: ProviderUsage;
+}
+
+interface ProviderUsage {
+  provider?: string;
+  plan?: string;
+  hint_short?: string;
+  primary?: { label: string; used_percent: number; remaining_percent: number; resets_at?: string; reset_description?: string };
+  secondary?: { label: string; used_percent: number; remaining_percent: number; resets_at?: string; reset_description?: string };
+  credits_remaining?: number | null;
+  credits_unlimited?: boolean;
+  total_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 interface ModelEntry { id: string; context_window?: number }
@@ -41,10 +55,11 @@ const FALLBACK_MODELS: ModelEntry[] = [
 
 const FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
 
+const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(0)}k`;
+
 function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number; tokens: number; contextWindow: number; onClick: (e: MouseEvent) => void }) {
   const p = percent;
   const color = p > 95 ? "#f38ba8" : p > 80 ? "#f9e2af" : "#a6e3a1";
-  const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(0)}k`;
   const tokensK = fmtTokens(tokens);
   const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
 
@@ -72,6 +87,15 @@ export function ModelContextBar() {
   const models = useSignal<ModelEntry[]>([]);
   const thinkingLevels = useSignal<string[]>([]);
   const currentModel = useSignal<string | null>(null);
+  // #60: store model's context_window from /agent/models as fallback
+  const modelContextWindow = useSignal<number>(0);
+  // #68: compaction progress
+  const isCompacting = useSignal(false);
+  const compactStartTime = useSignal<number>(0);
+  const compactElapsed = useSignal<number>(0);
+  // billing: session token usage
+  const sessionTokens = useSignal<number>(0);
+  const providerUsage = useSignal<ProviderUsage | null>(null);
 
   const fetchStatus = async () => {
     try {
@@ -86,8 +110,22 @@ export function ModelContextBar() {
       // Also fetch current model (status.data is null when idle)
       const modelsRes = await fetch("/agent/models");
       if (modelsRes.ok) {
-        const info = await modelsRes.json() as { current?: string; thinking_level?: string };
+        const info = await modelsRes.json() as ModelInfo;
         if (info.current) currentModel.value = info.current;
+        // #60: store context_window from current model's definition
+        const currentOpt = info.model_options?.find((m) => m.id === info.current);
+        if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window;
+        // billing: store provider_usage
+        if (info.provider_usage) {
+          providerUsage.value = info.provider_usage;
+          // Sum total tokens across providers
+          const pu = info.provider_usage as Record<string, ProviderUsage>;
+          const total = Object.values(pu).reduce((sum: number, p: ProviderUsage) => {
+            if (typeof p !== "object" || p === null) return sum;
+            return sum + (p?.total_tokens ?? ((p?.input_tokens ?? 0) + (p?.output_tokens ?? 0)));
+          }, 0);
+          if (total > 0) sessionTokens.value = total;
+        }
       }
     } catch (err) {
       console.warn("[ModelContextBar] status fetch failed:", err);
@@ -128,6 +166,31 @@ export function ModelContextBar() {
     return () => window.removeEventListener("piclaw:sse-connected", onConnect);
   }, []);
 
+  // #68: elapsed timer during compaction
+  useEffect(() => {
+    if (!isCompacting.value) return;
+    const interval = setInterval(() => {
+      compactElapsed.value = Math.round((Date.now() - compactStartTime.value) / 1000);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isCompacting.value]);
+
+  // #68: listen for agent completion to clear compaction state
+  useEffect(() => {
+    const onStatus = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.type === "done" || detail?.status === "idle") {
+        if (isCompacting.value) {
+          isCompacting.value = false;
+          // Refresh context after compaction
+          setTimeout(() => fetchContext(), 1000);
+        }
+      }
+    };
+    window.addEventListener("piclaw:agent-status", onStatus);
+    return () => window.removeEventListener("piclaw:agent-status", onStatus);
+  }, []);
+
   // Close pickers on outside click or Escape
   useEffect(() => {
     if (!showPicker.value && !showThinkingPicker.value) return;
@@ -155,14 +218,20 @@ export function ModelContextBar() {
     };
   }, [showPicker.value, showThinkingPicker.value]);
 
-  const handleCompact = (e: MouseEvent) => {
+  // #68: handleCompact with progress tracking
+  const handleCompact = async (e: MouseEvent) => {
     e.stopPropagation();
-    fetch(getMessageUrl(), {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "/compact" }),
-    }).catch(() => {});
+    isCompacting.value = true;
+    compactStartTime.value = Date.now();
+    compactElapsed.value = 0;
+    try {
+      await fetch(getMessageUrl(), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "/compact" }),
+      });
+    } catch {}
   };
 
   const handleBadgeClick = async (e: MouseEvent) => {
@@ -240,7 +309,8 @@ export function ModelContextBar() {
   const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
   const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
   const contextTokens = agentContext.value?.tokens ?? 0;
-  const contextWindow = agentContext.value?.contextWindow ?? 0;
+  // #60: use model's context_window from /agent/models as fallback when /agent/context returns null
+  const contextWindow = agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0;
   const contextPercent = agentContext.value?.percent ?? (contextWindow > 0 ? (contextTokens / contextWindow) * 100 : 0);
 
   const activeModel = currentModel.value ?? modelName;
@@ -288,6 +358,13 @@ export function ModelContextBar() {
             );
           })}
         </div>
+      )}
+
+      {/* #68: compaction progress badge */}
+      {isCompacting.value && (
+        <span className="compaction-badge">
+          ⟳ Compacting... {compactElapsed.value}s
+        </span>
       )}
 
       {/* The badge itself */}
@@ -341,6 +418,19 @@ export function ModelContextBar() {
           </span>
         )}
         <ContextRing percent={contextPercent} tokens={contextTokens} contextWindow={contextWindow} onClick={handleCompact} />
+        {/* billing: show session token count if available */}
+        {sessionTokens.value > 0 && (
+          <span
+            className="usage-badge"
+            title={[
+              providerUsage.value?.provider ? `Provider: ${providerUsage.value.provider}` : "",
+              providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : "",
+              `Session tokens: ${sessionTokens.value.toLocaleString()}`,
+            ].filter(Boolean).join("\n")}
+          >
+            ▼ {fmtTokens(sessionTokens.value)}
+          </span>
+        )}
       </span>
     </span>
   );
