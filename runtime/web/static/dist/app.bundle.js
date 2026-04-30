@@ -5210,6 +5210,10 @@ For tests, pass a Ghostty instance directly:
   function getMessageUrl() {
     return `/agent/${encodeURIComponent(getChatJid())}/message`;
   }
+  function buildChatUrl(path, params) {
+    const qs = new URLSearchParams({ chat_jid: getChatJid(), ...params });
+    return `${path}?${qs}`;
+  }
 
   // runtime/web/frontend/src/components/ModelContextBar.tsx
   var FALLBACK_MODELS = [
@@ -7009,12 +7013,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   var Jt = b5.parse;
   var Vt = x5.lex;
 
-  // runtime/web/frontend/src/components/FileTree.tsx
+  // runtime/web/frontend/src/utils/formatBytes.ts
   function formatBytes(bytes) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
   }
+
+  // runtime/web/frontend/src/components/FileTree.tsx
   async function fetchTree(dirPath) {
     const params = new URLSearchParams({ path: dirPath, depth: "1" });
     const res = await fetch(`/workspace/tree?${params}`, { credentials: "same-origin" });
@@ -7300,11 +7306,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
 
   // runtime/web/frontend/src/panels/WorkspacePanel.tsx
-  function formatBytes2(bytes) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  }
   function getErrorMessage(value, fallback) {
     if (value && typeof value === "object") {
       if ("error" in value && typeof value.error === "string" && value.error.trim()) return value.error;
@@ -7435,14 +7436,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           children: /* @__PURE__ */ u4("title", { children: [
             arc.label,
             " \u2014 ",
-            formatBytes2(arc.size)
+            formatBytes(arc.size)
           ] })
         },
         i6
       )),
       /* @__PURE__ */ u4("circle", { cx: SB_CX, cy: SB_CY, r: "35", fill: "rgba(20,20,30,0.88)" }),
       /* @__PURE__ */ u4("foreignObject", { x: SB_CX - 35, y: SB_CY - 18, width: "70", height: "36", children: /* @__PURE__ */ u4("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" }, children: [
-        /* @__PURE__ */ u4("span", { className: "workspace__sunburst-total", children: formatBytes2(totalSize) }),
+        /* @__PURE__ */ u4("span", { className: "workspace__sunburst-total", children: formatBytes(totalSize) }),
         /* @__PURE__ */ u4("span", { className: "workspace__sunburst-label", children: "TOTAL" })
       ] }) })
     ] }) });
@@ -7534,7 +7535,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     return /* @__PURE__ */ u4("div", { className: "workspace__preview-info", children: [
       /* @__PURE__ */ u4("div", { className: "workspace__preview-name", children: node.name }),
       /* @__PURE__ */ u4("div", { className: "workspace__preview-path", children: node.path }),
-      node.size !== null && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: formatBytes2(node.size) }),
+      node.size !== null && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: formatBytes(node.size) }),
       node.mtime && /* @__PURE__ */ u4("div", { className: "workspace__preview-meta", children: [
         "Modified: ",
         new Date(node.mtime).toLocaleString()
@@ -7756,7 +7757,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("div", { className: "workspace__folder-toolbar", children: [
           totalSize !== null && /* @__PURE__ */ u4("div", { className: "workspace__folder-total", children: [
             "Total: ",
-            formatBytes2(totalSize)
+            formatBytes(totalSize)
           ] }),
           /* @__PURE__ */ u4("div", { className: "workspace__folder-view-toggle", role: "tablist", "aria-label": "Folder preview view", children: [
             /* @__PURE__ */ u4(
@@ -7801,7 +7802,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 child.type === "dir" ? "\u{1F4C1} " : "",
                 child.name
               ] }),
-              /* @__PURE__ */ u4("span", { className: `workspace__folder-breakdown-size${child.type === "dir" ? " workspace__folder-breakdown-size--dir" : ""}`, children: child.size !== null ? formatBytes2(child.size) : "\u2014" }),
+              /* @__PURE__ */ u4("span", { className: `workspace__folder-breakdown-size${child.type === "dir" ? " workspace__folder-breakdown-size--dir" : ""}`, children: child.size !== null ? formatBytes(child.size) : "\u2014" }),
               pct !== null && /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-pct", children: [
                 pct,
                 "%"
@@ -7828,14 +7829,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               chartSegments.map((segment, index) => renderChartSegment(segment, index, chartSegments))
             ] }),
             /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-center", children: [
-              /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-total", children: formatBytes2(totalSize ?? total) }),
+              /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-total", children: formatBytes(totalSize ?? total) }),
               /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-label", children: "Total size" })
             ] })
           ] }),
           /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-legend", children: chartSegments.map((segment) => /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-legend-item", children: [
             /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-dot", style: { backgroundColor: segment.color } }),
             /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-name", title: segment.label, children: segment.label }),
-            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-size", children: formatBytes2(segment.size) }),
+            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-size", children: formatBytes(segment.size) }),
             /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-pct", children: [
               segment.pct.toFixed(0),
               "%"
@@ -8184,11 +8185,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
 
-  // runtime/web/frontend/src/panels/AgentPanel.tsx
+  // runtime/web/frontend/src/utils/extractDisplayName.ts
   function extractDisplayName(extensionPath) {
     const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
     return withoutPrefix.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   }
+
+  // runtime/web/frontend/src/panels/AgentPanel.tsx
   function AgentPanel({ onPageSelect }) {
     const pages = useSignal([]);
     const loading = useSignal(true);
@@ -8416,10 +8419,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          const raw = data.interactions ?? data.posts ?? [];
+          const raw = data.posts ?? [];
           const parsed = raw.map((p6) => ({
             id: p6.id,
-            type: p6.type ?? p6.data?.type === "user_message" ? "user" : "agent",
+            type: p6.type ?? (p6.data?.type === "user_message" ? "user" : "agent"),
             content: p6.content ?? p6.data?.content ?? "",
             content_blocks: p6.content_blocks ?? p6.data?.content_blocks,
             created_at: p6.created_at ?? p6.timestamp ?? "",
@@ -8436,7 +8439,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       fetchTimeline();
     }, [scrollToBottom]);
     y2(() => {
-      const es = new EventSource("/sse/stream");
+      const es = new EventSource(buildChatUrl("/sse/stream"));
       sseRef.current = es;
       es.addEventListener("new_post", (e5) => {
         try {
@@ -8543,10 +8546,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         );
         if (!res.ok) return;
         const data = await res.json();
-        if (data.interactions?.length) {
+        if (data.posts?.length) {
           const el = listRef.current;
           const prevScrollHeight = el?.scrollHeight ?? 0;
-          setMessages((prev) => [...data.interactions, ...prev]);
+          setMessages((prev) => [...data.posts, ...prev]);
           setHasMore(data.has_more ?? false);
           requestAnimationFrame(() => {
             if (el) {
@@ -8595,10 +8598,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
 
   // runtime/web/frontend/src/panels/ChatPanel.tsx
-  function extractDisplayName2(extensionPath) {
-    const withoutPrefix = extensionPath.replace(/^piclaw-/, "");
-    return withoutPrefix.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-  }
   function ChatPanel({ onOpenPalette } = {}) {
     const textareaRef = A2(null);
     const activeTab = useSignal("chat");
@@ -8664,7 +8663,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             onClick: () => {
               activeTab.value = page.prefix;
             },
-            children: extractDisplayName2(page.extensionPath)
+            children: extractDisplayName(page.extensionPath)
           },
           page.prefix
         ))
@@ -8704,7 +8703,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           className: "chat-tabs__iframe",
           src: activeTab.value,
           sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
-          title: extractDisplayName2(pages.find((p6) => p6.prefix === activeTab.value)?.extensionPath ?? "")
+          title: extractDisplayName(pages.find((p6) => p6.prefix === activeTab.value)?.extensionPath ?? "")
         }
       )
     ] });
