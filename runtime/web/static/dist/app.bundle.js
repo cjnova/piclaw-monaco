@@ -5578,7 +5578,7 @@ For tests, pass a Ghostty instance directly:
     "/user-name": { type: "text", placeholder: "Your display name" },
     "/user-avatar": { type: "text", placeholder: "Avatar URL" },
     "/new-session": { type: "bare" },
-    "/fork": { type: "bare" },
+    "/fork": { type: "text", placeholder: "Entry ID" },
     "/clone": { type: "bare" },
     "/session-rotate": { type: "bare" }
   };
