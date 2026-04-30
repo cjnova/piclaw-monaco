@@ -46,7 +46,7 @@ function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: num
   const color = p > 95 ? "#f38ba8" : p > 80 ? "#f9e2af" : "#a6e3a1";
   const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(0)}k`;
   const tokensK = fmtTokens(tokens);
-  const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
+  const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "";
 
   return (
     <span
