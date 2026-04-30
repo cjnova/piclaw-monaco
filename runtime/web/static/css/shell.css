@@ -2772,4 +2772,15 @@ body {
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
+  padding: 6px 0;
+}
+.settings-panel__provider-row .settings-panel__label {
+  flex: 1;
+  min-width: 160px;
+  max-width: 200px;
+}
+.settings-panel__provider-row .settings-panel__status {
+  flex-shrink: 0;
+  min-width: 110px;
+  text-align: center;
 }
