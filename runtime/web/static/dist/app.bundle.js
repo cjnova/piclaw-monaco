@@ -10855,8 +10855,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function AppContent() {
     const themeControl = useThemeControl();
     const connectionStatus = useSignal("disconnected");
-    const activePanel = useSignal("explorer");
-    const previousPanel = useSignal("explorer");
+    const activePanel = useSignal(localStorage.getItem("piclaw-active-panel") || "explorer");
+    const previousPanel = useSignal(localStorage.getItem("piclaw-previous-panel") || "explorer");
     const paletteVisible = useSignal(false);
     const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
     const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
@@ -10870,6 +10870,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     y2(() => {
       localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
     }, [sidebarWidth.value]);
+    y2(() => {
+      localStorage.setItem("piclaw-active-panel", activePanel.value);
+    }, [activePanel.value]);
+    y2(() => {
+      localStorage.setItem("piclaw-previous-panel", previousPanel.value);
+    }, [previousPanel.value]);
     y2(() => {
       localStorage.setItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
     }, [sidebarCollapsed.value]);
