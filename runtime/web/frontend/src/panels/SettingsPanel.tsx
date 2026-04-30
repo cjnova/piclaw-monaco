@@ -301,22 +301,6 @@ function GeneralSection({
         <span className="settings-panel__description">Use the 🔔 bell button in the compose bar to enable/disable notifications. Web Push requires HTTPS or localhost.</span>
       </div>
 
-      <h3 className="settings-panel__subsection-title">Display</h3>
-
-      <div className="settings-panel__field settings-panel__checkbox-row">
-        <input
-          id="webTerminalEnabled"
-          type="checkbox"
-          checked={data.webTerminalEnabled ?? false}
-          onChange={(e) =>
-            onSaveGeneral("webTerminalEnabled", (e.target as HTMLInputElement).checked)
-          }
-        />
-        <label htmlFor="webTerminalEnabled" className="settings-panel__label">
-          Web terminal enabled
-        </label>
-        <span className="settings-panel__description">Enable terminal access in the web UI</span>
-      </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Search match mode</label>

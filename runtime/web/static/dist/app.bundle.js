@@ -10032,20 +10032,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Browser notifications" }),
         /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Use the \u{1F514} bell button in the compose bar to enable/disable notifications. Web Push requires HTTPS or localhost." })
       ] }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Display" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            id: "webTerminalEnabled",
-            type: "checkbox",
-            checked: data.webTerminalEnabled ?? false,
-            onChange: (e5) => onSaveGeneral("webTerminalEnabled", e5.target.checked)
-          }
-        ),
-        /* @__PURE__ */ u4("label", { htmlFor: "webTerminalEnabled", className: "settings-panel__label", children: "Web terminal enabled" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Enable terminal access in the web UI" })
-      ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Search match mode" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
