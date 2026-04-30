@@ -1045,6 +1045,10 @@ body {
   flex-direction: row;
 }
 
+.message-list__item--agent {
+  margin-left: 40px;
+}
+
 /* Avatar circle */
 .message-list__avatar-circle {
   width: 24px;
