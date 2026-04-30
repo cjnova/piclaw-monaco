@@ -2759,7 +2759,6 @@ body {
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
-  margin-left: 192px;
 }
 .settings-panel__checkbox-row .settings-panel__label {
   min-width: unset;
