@@ -122,7 +122,6 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | 029-task-extensions-api-endpoint | Backend API for installed extensions | ✅ |
 | 037-task-search-backend | Backend search endpoint (ripgrep) | ✅ (uses existing /search) |
 | 038-task-search-sidebar-ui | Search input + results UI in sidebar | ✅ |
-| render-extension-pages | Dashboards panel — extension page discovery + iframe | ✅ |
 | chat-send | Wire compose box to POST /agent/message | ✅ |
 
 ### Wave 10b — Upstream Sync & Foundation
@@ -144,19 +143,23 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
 | wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
 | wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ⏳ |
+| wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ⏳ |
+| leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ⏳ |
 
 ### Wave 11 — Full Functionality
 
-| Task | Description |
-|---|---|
-| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering |
-| 017-task-streaming-handler | Real-time agent streaming in chat |
-| 018-task-adaptive-cards-renderer | Adaptive cards in chat |
-| 019-task-widget-iframe-host | Dashboard widgets in chat |
-| 024-task-terminal-tabs | Multi-tab terminal |
-| 025-task-terminal-keybindings | Terminal keyboard shortcuts |
-| 030-task-extensions-list-component | Addons list UI |
-| 032-task-extension-details-component | Addon details view |
+| Task | Description | Status |
+|---|---|---|
+| full-compose-bar-redesign | Send/stop cycle, attachments, queue management, session pill | ⏳ |
+| wire-side-prompt-panel-to-monaco | Side-prompt panel using upstream streaming API | ⏳ |
+| wire-fleet-batch-to-command-palette | Expose fleet_batch tool via UI | ⏳ |
+| wire-terminal-profile-selector | Terminal profile selection (Shell, Pi TUI) | ⏳ |
+| leverage-tool-lifecycle-events-in-chat | Show tool_aborted, richer tool events in chat | ⏳ |
+| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering | ⏳ |
+| 017-task-streaming-handler | Real-time agent streaming improvements | ⏳ |
+| 018-task-adaptive-cards-renderer | Adaptive cards in chat | ⏳ |
+| 019-task-widget-iframe-host | Dashboard widgets in chat | ⏳ |
+| 024-task-terminal-tabs | Multi-tab terminal | ⏳ |
 
 ### Future (V2)
 
