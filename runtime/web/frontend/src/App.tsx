@@ -1,4 +1,5 @@
 import { getChatJid } from "./api/chat-jid";
+import { isSafeExtensionUrl } from "./utils/isSafeExtensionUrl";
 import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
@@ -222,7 +223,7 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            {extensionPageUrl.value ? (
+            {extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) ? (
               <div className="extension-frame">
                 <div className="extension-frame__header">
                   <button
