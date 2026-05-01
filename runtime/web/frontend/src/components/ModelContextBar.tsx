@@ -87,6 +87,7 @@ export function ModelContextBar() {
   const models = useSignal<ModelEntry[]>([]);
   const thinkingLevels = useSignal<string[]>([]);
   const currentModel = useSignal<string | null>(null);
+  const currentThinkingLevel = useSignal<string>("");
   // #60: store model's context_window from /agent/models as fallback
   const modelContextWindow = useSignal<number>(0);
   // #68: compaction progress
@@ -281,6 +282,7 @@ export function ModelContextBar() {
           : (info.models?.length ? info.models.map(id => ({ id })) : FALLBACK_MODELS);
         models.value = entries;
         currentModel.value = info.current ?? modelName;
+        if (info.thinking_level) currentThinkingLevel.value = info.thinking_level;
         thinkingLevels.value = info.available_thinking_levels?.length
           ? info.available_thinking_levels
           : FALLBACK_THINKING_LEVELS;
@@ -316,6 +318,7 @@ export function ModelContextBar() {
   };
 
   const handleSelectThinking = async (level: string) => {
+    currentThinkingLevel.value = level;
     try {
       const res = await fetch(getMessageUrl(), {
         method: "POST",
@@ -334,7 +337,7 @@ export function ModelContextBar() {
   };
 
   const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
-  const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
+  const thinkingLevel = agentStatus.value?.data?.thinking_level || currentThinkingLevel.value || "";
   const contextTokens = useComputed(() => agentContext.value?.tokens ?? 0);
   // #60: use model's context_window from /agent/models as fallback when /agent/context returns null
   const contextWindow = useComputed(() => agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0);

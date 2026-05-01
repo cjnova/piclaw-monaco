@@ -5273,6 +5273,7 @@ For tests, pass a Ghostty instance directly:
     const models = useSignal([]);
     const thinkingLevels = useSignal([]);
     const currentModel = useSignal(null);
+    const currentThinkingLevel = useSignal("");
     const modelContextWindow = useSignal(0);
     const isCompacting = useSignal(false);
     const compactStartTime = useSignal(0);
@@ -5433,6 +5434,7 @@ For tests, pass a Ghostty instance directly:
           const entries2 = info.model_options?.length ? info.model_options.map((o4) => ({ id: o4.id, context_window: o4.context_window })) : info.models?.length ? info.models.map((id) => ({ id })) : FALLBACK_MODELS;
           models.value = entries2;
           currentModel.value = info.current ?? modelName;
+          if (info.thinking_level) currentThinkingLevel.value = info.thinking_level;
           thinkingLevels.value = info.available_thinking_levels?.length ? info.available_thinking_levels : FALLBACK_THINKING_LEVELS;
         }
       } catch (err) {
@@ -5463,6 +5465,7 @@ For tests, pass a Ghostty instance directly:
       showPicker.value = false;
     };
     const handleSelectThinking = async (level) => {
+      currentThinkingLevel.value = level;
       try {
         const res = await fetch(getMessageUrl(), {
           method: "POST",
@@ -5480,7 +5483,7 @@ For tests, pass a Ghostty instance directly:
       }
     };
     const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
-    const thinkingLevel = agentStatus.value?.data?.thinking_level || "";
+    const thinkingLevel = agentStatus.value?.data?.thinking_level || currentThinkingLevel.value || "";
     const contextTokens = useComputed(() => agentContext.value?.tokens ?? 0);
     const contextWindow = useComputed(() => agentContext.value?.contextWindow ?? modelContextWindow.value ?? 0);
     const contextPercent = useComputed(() => {
