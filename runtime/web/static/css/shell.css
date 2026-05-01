@@ -3192,3 +3192,30 @@ body {
   flex: 1;
   max-width: 400px;
 }
+
+.settings-panel__tools-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.settings-panel__tools-filter-row .settings-panel__tools-filter {
+  flex: 1;
+}
+.settings-panel__tools-match-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.settings-panel__tools-match-mode input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+.settings-panel__toolset-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}

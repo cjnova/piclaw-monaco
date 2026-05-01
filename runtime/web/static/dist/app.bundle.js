@@ -10526,16 +10526,22 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     })).filter((ts) => ts.tools.length > 0) : toolsets;
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Tools" }),
-      /* @__PURE__ */ u4(
-        "input",
-        {
-          className: "settings-panel__input settings-panel__tools-filter",
-          type: "text",
-          placeholder: "Filter tools...",
-          value: filter.value,
-          onInput: (e5) => filter.value = e5.target.value
-        }
-      ),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__tools-filter-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__tools-filter",
+            type: "text",
+            placeholder: "Filter tools...",
+            value: filter.value,
+            onInput: (e5) => filter.value = e5.target.value
+          }
+        ),
+        /* @__PURE__ */ u4("label", { className: "settings-panel__tools-match-mode", children: [
+          /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true }),
+          "Any keyword (OR)"
+        ] })
+      ] }),
       filteredToolsets.map((ts) => {
         const isCollapsed = collapsed.value[ts.name] ?? false;
         const tools = ts.tools ?? [];
@@ -10544,6 +10550,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-toggle", children: isCollapsed ? "\u25B6" : "\u25BC" }),
             /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true, className: "settings-panel__toolset-checkbox" }),
             /* @__PURE__ */ u4("strong", { className: "settings-panel__toolset-name", children: ts.name }),
+            /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-count", children: [
+              "(",
+              tools.length,
+              ")"
+            ] }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-desc", children: ts.description ?? "" })
           ] }),
           !isCollapsed && /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-tools", children: tools.map((t4) => /* @__PURE__ */ u4("div", { className: "settings-panel__tool-row", children: [

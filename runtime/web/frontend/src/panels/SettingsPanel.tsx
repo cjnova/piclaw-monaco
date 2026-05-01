@@ -934,13 +934,19 @@ function ToolsSection({ data }: { data: SettingsData }) {
     <section className="settings-panel__section" style={{ maxWidth: "720px" }}>
       <h2 className="settings-panel__section-title">Tools</h2>
 
-      <input
-        className="settings-panel__input settings-panel__tools-filter"
-        type="text"
-        placeholder="Filter tools..."
-        value={filter.value}
-        onInput={(e) => (filter.value = (e.target as HTMLInputElement).value)}
-      />
+      <div className="settings-panel__tools-filter-row">
+        <input
+          className="settings-panel__input settings-panel__tools-filter"
+          type="text"
+          placeholder="Filter tools..."
+          value={filter.value}
+          onInput={(e) => (filter.value = (e.target as HTMLInputElement).value)}
+        />
+        <label className="settings-panel__tools-match-mode">
+          <input type="checkbox" checked={true} readOnly />
+          Any keyword (OR)
+        </label>
+      </div>
 
       {filteredToolsets.map((ts: any) => {
         const isCollapsed = collapsed.value[ts.name] ?? false;
@@ -951,6 +957,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
               <span className="settings-panel__toolset-toggle">{isCollapsed ? "▶" : "▼"}</span>
               <input type="checkbox" checked={true} readOnly className="settings-panel__toolset-checkbox" />
               <strong className="settings-panel__toolset-name">{ts.name}</strong>
+              <span className="settings-panel__toolset-count">({tools.length})</span>
               <span className="settings-panel__toolset-desc">{ts.description ?? ""}</span>
             </div>
             {!isCollapsed && (
