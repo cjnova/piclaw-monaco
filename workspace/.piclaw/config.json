@@ -1,0 +1,18 @@
+{
+  "ui": {
+    "tint": null,
+    "theme": "default"
+  },
+  "compaction": {
+    "timeoutMs": 180000,
+    "backoffBaseMs": 900000,
+    "backoffMaxMs": 21600000,
+    "progressWatchdogEnabled": false,
+    "progressWatchdogTimeoutMs": 120000
+  },
+  "sessionMaxSizeMb": 32,
+  "sessionAutoRotate": true,
+  "web": {
+    "terminalEnabled": true
+  }
+}
