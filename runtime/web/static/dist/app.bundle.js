@@ -11012,7 +11012,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           if (interaction.type === "agent") {
             setDraft("");
           }
-          scrollToBottom();
+          scrollToBottom(true);
         } catch {
         }
       });

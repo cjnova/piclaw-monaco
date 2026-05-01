@@ -1178,6 +1178,27 @@ body {
   white-space: pre-wrap;
 }
 
+/* User messages: slightly different text color */
+.message-list__item--user .message-list__content {
+  color: #e0e0e0;
+}
+
+/* Agent messages: lighter/brighter for distinction */
+.message-list__item--agent .message-list__content {
+  color: #cdd6f4;
+}
+
+/* Links in messages — readable on dark background */
+.message-list__content a {
+  color: #7cc4fa;
+  text-decoration: underline;
+  text-decoration-color: rgba(124, 196, 250, 0.4);
+}
+.message-list__content a:hover {
+  color: #a8d8ff;
+  text-decoration-color: rgba(168, 216, 255, 0.7);
+}
+
 .message-list__item--agent .message-list__content {
   white-space: normal;
 }

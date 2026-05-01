@@ -282,7 +282,7 @@ export function MessageList() {
         if (interaction.type === "agent") {
           setDraft("");
         }
-        scrollToBottom();
+        scrollToBottom(true);
       } catch {
         // ignore parse errors
       }
