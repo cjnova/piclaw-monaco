@@ -139,13 +139,13 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
-| wire-settings-panel-to-piclaw-config | Full settings panel (General, Providers, Models, Appearance, etc.) | ⏳ |
+| wire-settings-panel-to-piclaw-config | Full settings panel (General, Providers, Models, Appearance, etc.) | 🔄 In progress — 9 categories wired, visual refinement ongoing (#91) |
 | adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
 | wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
-| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ⏳ |
-| wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ⏳ |
-| leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ⏳ |
-| open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ⏳ |
+| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ✅ |
+| wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ✅ |
+| leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ✅ |
+| open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ✅ |
 | browser-voice-integration | Speech-to-text input + text-to-speech output (browser APIs) | ⏳ |
 
 ### Wave 11 — Full Functionality
