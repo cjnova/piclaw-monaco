@@ -3365,8 +3365,7 @@ body {
   font-size: 12px;
   font-family: inherit;
   outline: none;
-  resize: vertical;
-  min-height: 120px;
+  resize: none;
   flex: 1;
   min-height: 50px;
   box-sizing: border-box;
@@ -3486,4 +3485,15 @@ body {
   background: rgba(255,255,255,0.08);
   padding: 1px 6px;
   border-radius: 8px;
+}
+
+.scratchpad-panel__divider {
+  height: 4px;
+  background: var(--border);
+  cursor: row-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.scratchpad-panel__divider:hover {
+  background: var(--accent);
 }

@@ -103,10 +103,34 @@ export function ScratchpadPanel() {
     } catch {}
   };
 
+  const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50); // percentage
+
+  const onDragStart = (e: MouseEvent) => {
+    e.preventDefault();
+    const panel = (e.target as HTMLElement).closest(".scratchpad-panel") as HTMLElement;
+    if (!panel) return;
+    const panelRect = panel.getBoundingClientRect();
+    const onMove = (ev: MouseEvent) => {
+      const pct = Math.max(20, Math.min(80, ((ev.clientY - panelRect.top) / panelRect.height) * 100));
+      listHeight.value = Math.round(pct);
+    };
+    const onUp = () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      localStorage.setItem("piclaw-scratchpad-split", String(listHeight.value));
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "row-resize";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   return (
     <div className="scratchpad-panel">
       {/* Upper pane: items list */}
-      <div className="scratchpad-panel__section">
+      <div className="scratchpad-panel__section" style={{ height: `${listHeight.value}%`, flex: 'none' }}>
         <div className="scratchpad-panel__section-header">
           <span className="scratchpad-panel__section-label">Items</span>
           <span className="scratchpad-panel__section-count">{items.value.length}</span>
@@ -160,6 +184,9 @@ export function ScratchpadPanel() {
           </div>
         )}
       </div>
+
+      {/* Drag handle */}
+      <div className="scratchpad-panel__divider" onMouseDown={onDragStart} />
 
       {/* Lower pane: editor */}
       <div className="scratchpad-panel__section scratchpad-panel__editor">

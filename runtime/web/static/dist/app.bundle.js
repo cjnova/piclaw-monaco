@@ -10688,8 +10688,30 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       } catch {
       }
     };
+    const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50);
+    const onDragStart = (e5) => {
+      e5.preventDefault();
+      const panel = e5.target.closest(".scratchpad-panel");
+      if (!panel) return;
+      const panelRect = panel.getBoundingClientRect();
+      const onMove = (ev) => {
+        const pct = Math.max(20, Math.min(80, (ev.clientY - panelRect.top) / panelRect.height * 100));
+        listHeight.value = Math.round(pct);
+      };
+      const onUp = () => {
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        localStorage.setItem("piclaw-scratchpad-split", String(listHeight.value));
+      };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "row-resize";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    };
     return /* @__PURE__ */ u4("div", { className: "scratchpad-panel", children: [
-      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section", children: [
+      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section", style: { height: `${listHeight.value}%`, flex: "none" }, children: [
         /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section-header", children: [
           /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-label", children: "Items" }),
           /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-count", children: items.value.length }),
@@ -10740,6 +10762,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           }
         ) })
       ] }),
+      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__divider", onMouseDown: onDragStart }),
       /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section scratchpad-panel__editor", children: [
         /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section-header", children: /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-label", children: isNew.value ? "New item" : "Editing" }) }),
         /* @__PURE__ */ u4(
