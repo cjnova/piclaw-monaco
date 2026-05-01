@@ -5251,7 +5251,16 @@ For tests, pass a Ghostty instance directly:
       "span",
       {
         className: "context-ring",
+        role: "button",
+        tabIndex: 0,
         onClick,
+        onKeyDown: (e5) => {
+          if (e5.key === "Enter" || e5.key === " ") {
+            e5.preventDefault();
+            e5.stopPropagation();
+            onClick(e5);
+          }
+        },
         title: `Context: ${tokensK}/${totalK} (${p6.toFixed(0)}%) \u2014 click to compact`,
         children: [
           /* @__PURE__ */ u4("svg", { width: "12", height: "12", viewBox: "0 0 12 12", children: /* @__PURE__ */ u4("circle", { cx: "6", cy: "6", r: "5", fill: color, opacity: "0.9" }) }),
@@ -5512,7 +5521,15 @@ For tests, pass a Ghostty instance directly:
                   "div",
                   {
                     className: "model-picker__item",
+                    role: "button",
+                    tabIndex: 0,
                     onClick: () => handleSelectModel(entry.id),
+                    onKeyDown: (e5) => {
+                      if (e5.key === "Enter" || e5.key === " ") {
+                        e5.preventDefault();
+                        handleSelectModel(entry.id);
+                      }
+                    },
                     style: {
                       color: isCurrent ? "#cba6f7" : "#cdd6f4",
                       background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent"
@@ -5543,7 +5560,15 @@ For tests, pass a Ghostty instance directly:
             "span",
             {
               className: "model-badge",
+              role: "button",
+              tabIndex: 0,
               onClick: handleBadgeClick,
+              onKeyDown: (e5) => {
+                if (e5.key === "Enter" || e5.key === " ") {
+                  e5.preventDefault();
+                  handleBadgeClick(e5);
+                }
+              },
               title: `${modelName}${thinkingLevel ? ` \u2022 ${thinkingLevel}` : ""} \u2014 click to switch model`,
               children: /* @__PURE__ */ u4("span", { className: "model-badge__name-wrapper", children: [
                 /* @__PURE__ */ u4("span", { className: "model-badge__provider", children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
@@ -5561,7 +5586,15 @@ For tests, pass a Ghostty instance directly:
                   "span",
                   {
                     className: "thinking-badge",
+                    role: "button",
+                    tabIndex: 0,
                     onClick: handleThinkingClick,
+                    onKeyDown: (e5) => {
+                      if (e5.key === "Enter" || e5.key === " ") {
+                        e5.preventDefault();
+                        handleThinkingClick(e5);
+                      }
+                    },
                     title: "Click to change thinking level",
                     children: thinkingLevel
                   }
@@ -5577,9 +5610,18 @@ For tests, pass a Ghostty instance directly:
                         "div",
                         {
                           className: "thinking-picker__item",
+                          role: "button",
+                          tabIndex: 0,
                           onClick: (ev) => {
                             ev.stopPropagation();
                             handleSelectThinking(level);
+                          },
+                          onKeyDown: (e5) => {
+                            if (e5.key === "Enter" || e5.key === " ") {
+                              e5.preventDefault();
+                              e5.stopPropagation();
+                              handleSelectThinking(level);
+                            }
                           },
                           style: {
                             color: isActive ? "#a6e3a1" : "#cdd6f4",
@@ -9390,8 +9432,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         {
           className: "search-panel__item",
           "data-message-id": r4.id,
+          tabIndex: 0,
+          role: "button",
           onClick: () => {
             window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r4.id } }));
+          },
+          onKeyDown: (e5) => {
+            if (e5.key === "Enter" || e5.key === " ") {
+              e5.preventDefault();
+              window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r4.id } }));
+            }
           },
           children: [
             /* @__PURE__ */ u4("div", { className: "search-panel__item-header", children: [
@@ -10391,7 +10441,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           "tr",
           {
             className: m6.label === current.value ? "settings-panel__model-table-row--active" : "",
+            tabIndex: 0,
             onClick: () => switchModel(m6.label),
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter" || e5.key === " ") {
+                e5.preventDefault();
+                switchModel(m6.label);
+              }
+            },
             style: { cursor: "pointer" },
             children: [
               /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("input", { type: "radio", name: "model", checked: m6.label === current.value, readOnly: true }) }),
@@ -10424,7 +10481,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           "span",
           {
             className: `settings-panel__thinking-label${l8 === thinkingLevel.value ? " settings-panel__thinking-label--active" : ""}`,
+            role: "button",
+            tabIndex: 0,
             onClick: () => switchThinking(l8),
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter" || e5.key === " ") {
+                e5.preventDefault();
+                switchThinking(l8);
+              }
+            },
             children: l8.charAt(0).toUpperCase() + l8.slice(1)
           },
           l8
@@ -10601,7 +10666,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         const isCollapsed = collapsed.value[ts.name] ?? false;
         const tools = ts.tools ?? [];
         return /* @__PURE__ */ u4("div", { className: "settings-panel__toolset", children: [
-          /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-header", onClick: () => toggleCollapse(ts.name), children: [
+          /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-header", role: "button", tabIndex: 0, onClick: () => toggleCollapse(ts.name), onKeyDown: (e5) => {
+            if (e5.key === "Enter" || e5.key === " ") {
+              e5.preventDefault();
+              toggleCollapse(ts.name);
+            }
+          }, children: [
             /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-toggle", children: isCollapsed ? "\u25B6" : "\u25BC" }),
             /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, disabled: true, className: "settings-panel__toolset-checkbox" }),
             /* @__PURE__ */ u4("strong", { className: "settings-panel__toolset-name", children: ts.name }),
@@ -10788,7 +10858,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           "div",
           {
             className: `scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`,
+            role: "button",
+            tabIndex: 0,
             onClick: () => selectItem(item),
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter" || e5.key === " ") {
+                e5.preventDefault();
+                selectItem(item);
+              }
+            },
             children: [
               /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-body", children: [
                 /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-header", children: [

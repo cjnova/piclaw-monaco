@@ -57,7 +57,7 @@ const FALLBACK_THINKING_LEVELS = ["none", "low", "medium", "high", "max"];
 
 const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(0)}k`;
 
-function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number; tokens: number; contextWindow: number; onClick: (e: MouseEvent) => void }) {
+function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number; tokens: number; contextWindow: number; onClick: (e: Event) => void }) {
   const p = percent;
   const color = p > 95 ? "#f38ba8" : p > 80 ? "#f9e2af" : "#a6e3a1";
   const tokensK = fmtTokens(tokens);
@@ -66,7 +66,10 @@ function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: num
   return (
     <span
       className="context-ring"
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onClick(e); } }}
       title={`Context: ${tokensK}/${totalK} (${p.toFixed(0)}%) \u2014 click to compact`}
     >
       <svg width="12" height="12" viewBox="0 0 12 12">
@@ -240,7 +243,7 @@ export function ModelContextBar() {
   }, [showPicker.value, showThinkingPicker.value]);
 
   // #68: handleCompact with progress tracking
-  const handleCompact = async (e: MouseEvent) => {
+  const handleCompact = async (e: Event) => {
     e.stopPropagation();
     isCompacting.value = true;
     compactStartTime.value = Date.now();
@@ -263,7 +266,7 @@ export function ModelContextBar() {
     }
   };
 
-  const handleBadgeClick = async (e: MouseEvent) => {
+  const handleBadgeClick = async (e: Event) => {
     e.stopPropagation();
     if (showPicker.value) {
       showPicker.value = false;
@@ -312,7 +315,7 @@ export function ModelContextBar() {
     }
   };
 
-  const handleThinkingClick = (e: MouseEvent) => {
+  const handleThinkingClick = (e: Event) => {
     e.stopPropagation();
     showThinkingPicker.value = !showThinkingPicker.value;
     showPicker.value = false;
@@ -368,7 +371,10 @@ export function ModelContextBar() {
               <div
                 key={entry.id}
                 className="model-picker__item"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelectModel(entry.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectModel(entry.id); } }}
                 style={{
                   color: isCurrent ? "#cba6f7" : "#cdd6f4",
                   background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent",
@@ -405,7 +411,10 @@ export function ModelContextBar() {
       {/* The badge itself */}
       <span
         className="model-badge"
+        role="button"
+        tabIndex={0}
         onClick={handleBadgeClick}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleBadgeClick(e); } }}
         title={`${modelName}${thinkingLevel ? ` • ${thinkingLevel}` : ""} — click to switch model`}
       >
         <span className="model-badge__name-wrapper">
@@ -420,7 +429,10 @@ export function ModelContextBar() {
           >
             <span
               className="thinking-badge"
+              role="button"
+              tabIndex={0}
               onClick={handleThinkingClick}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleThinkingClick(e); } }}
               title="Click to change thinking level"
             >
               {thinkingLevel}
@@ -436,7 +448,10 @@ export function ModelContextBar() {
                     <div
                       key={level}
                       className="thinking-picker__item"
+                      role="button"
+                      tabIndex={0}
                       onClick={(ev) => { ev.stopPropagation(); handleSelectThinking(level); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); handleSelectThinking(level); } }}
                       style={{
                         color: isActive ? "#a6e3a1" : "#cdd6f4",
                         background: isActive ? "rgba(166,227,161,0.1)" : "transparent",
