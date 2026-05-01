@@ -59,7 +59,7 @@ const fmtTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` :
 
 function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: number; tokens: number; contextWindow: number; onClick: (e: Event) => void }) {
   const p = percent;
-  const color = p > 95 ? "#f38ba8" : p > 80 ? "#f9e2af" : "#a6e3a1";
+  const color = p > 95 ? "var(--error)" : p > 80 ? "var(--warning)" : "var(--success)";
   const tokensK = fmtTokens(tokens);
   const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
 
