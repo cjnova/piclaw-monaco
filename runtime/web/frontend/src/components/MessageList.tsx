@@ -24,8 +24,8 @@ interface Interaction {
 }
 
 interface TimelineResponse {
-  posts: Interaction[];
-  has_more: boolean;
+  posts?: Array<Record<string, unknown>>;
+  has_more?: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -53,6 +53,38 @@ function renderMarkdown(content: string): string {
 
 function getBlockKey(block: ContentBlock, index: number): string {
   return block.id ?? `block-${index}`;
+}
+
+function normalizePost(raw: Record<string, unknown>): Interaction {
+  const data =
+    raw.data && typeof raw.data === "object"
+      ? (raw.data as Record<string, unknown>)
+      : undefined;
+  const rawType = raw.type ?? data?.type;
+
+  return {
+    id: Number(raw.id ?? 0),
+    type: (rawType === "user" || rawType === "user_message"
+      ? "user"
+      : "agent") as "user" | "agent",
+    content: String(raw.content ?? data?.content ?? ""),
+    content_blocks: (raw.content_blocks ?? data?.content_blocks) as
+      | ContentBlock[]
+      | undefined,
+    created_at: String(raw.created_at ?? raw.timestamp ?? ""),
+    data,
+  };
+}
+
+function mergeInteractions(existing: Interaction[], incoming: Interaction[]): Interaction[] {
+  const byId = new Map<number, Interaction>();
+  for (const msg of existing) {
+    byId.set(msg.id, msg);
+  }
+  for (const msg of incoming) {
+    byId.set(msg.id, msg);
+  }
+  return Array.from(byId.values()).sort((a, b) => a.id - b.id);
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -214,6 +246,8 @@ export function MessageList() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const userScrolledRef = useRef(false);
+  const initialTimelineFetchedRef = useRef(false);
+  const hasHandledFirstOpenRef = useRef(false);
 
   const scrollToBottom = useCallback((force = false) => {
     if (force || !userScrolledRef.current) {
@@ -224,39 +258,46 @@ export function MessageList() {
     }
   }, []);
 
+  const fetchTimeline = useCallback(async () => {
+    const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
+      credentials: "include",
+    });
+    if (res.status === 401) {
+      setConnected(false);
+      return null;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json() as { posts?: Array<Record<string, unknown>>; has_more?: boolean };
+    const posts = (data.posts ?? []).map(normalizePost);
+    return { posts, hasMore: data.has_more ?? false };
+  }, []);
+
+  const refetchTimelineOnReconnect = useCallback(async () => {
+    const timeline = await fetchTimeline();
+    if (!timeline) return;
+    setMessages((prev) => mergeInteractions(prev, timeline.posts));
+    setHasMore(timeline.hasMore);
+    scrollToBottom(true);
+  }, [fetchTimeline, scrollToBottom]);
+
   // Initial fetch
   useEffect(() => {
-    async function fetchTimeline() {
+    async function fetchInitialTimeline() {
       try {
-        const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
-          credentials: "include",
-        });
-        if (res.status === 401) {
-          setConnected(false);
-          return;
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const raw = data.posts ?? [];
-        const parsed: Interaction[] = raw.map((p: Record<string, unknown>) => ({
-          id: p.id as number,
-          type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
-          content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
-          content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
-          created_at: (p.created_at ?? p.timestamp ?? "") as string,
-          data: p.data as Record<string, unknown> | undefined,
-        }));
-        setMessages(parsed);
-        setHasMore(data.has_more ?? false);
+        const timeline = await fetchTimeline();
+        if (!timeline) return;
+        setMessages((prev) => mergeInteractions(prev, timeline.posts));
+        setHasMore(timeline.hasMore);
         setConnected(true);
+        initialTimelineFetchedRef.current = true;
         // Scroll to bottom after first load
         setTimeout(() => scrollToBottom(true), 50);
       } catch {
         setConnected(false);
       }
     }
-    fetchTimeline();
-  }, [scrollToBottom]);
+    fetchInitialTimeline();
+  }, [fetchTimeline, scrollToBottom]);
 
   // SSE stream
   useEffect(() => {
@@ -265,15 +306,8 @@ export function MessageList() {
 
     es.addEventListener("new_post", (e: MessageEvent) => {
       try {
-        const raw = JSON.parse(e.data);
-        const interaction: Interaction = {
-          id: raw.id,
-          type: raw.type ?? (raw.data?.type === "user_message" ? "user" : "agent"),
-          content: raw.content ?? raw.data?.content ?? "",
-          content_blocks: raw.content_blocks ?? raw.data?.content_blocks,
-          created_at: raw.created_at ?? raw.timestamp ?? "",
-          data: raw.data,
-        };
+        const raw = JSON.parse(e.data) as Record<string, unknown>;
+        const interaction = normalizePost(raw);
         setMessages((prev) => {
           // Avoid duplicates
           if (prev.some((m) => m.id === interaction.id)) return prev;
@@ -316,15 +350,8 @@ export function MessageList() {
 
     es.addEventListener("agent_response", (e: MessageEvent) => {
       try {
-        const raw = JSON.parse(e.data);
-        const interaction: Interaction = {
-          id: raw.id,
-          type: "agent" as const,
-          content: raw.data?.content ?? raw.content ?? "",
-          content_blocks: raw.data?.content_blocks ?? raw.content_blocks,
-          created_at: raw.timestamp ?? "",
-          data: raw.data,
-        };
+        const raw = JSON.parse(e.data) as Record<string, unknown>;
+        const interaction = normalizePost({ ...raw, type: "agent" });
         setMessages((prev) => {
           if (prev.some((m) => m.id === interaction.id)) return prev;
           return [...prev, interaction];
@@ -350,32 +377,26 @@ export function MessageList() {
     es.onopen = () => {
       setConnected(true);
       window.dispatchEvent(new Event("piclaw:sse-connected"));
-      // Re-fetch timeline on reconnect (server may have restarted)
-      fetch(buildChatUrl("/timeline", { limit: "50" }), { credentials: "include" })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (!data) return;
-          const raw = data.posts ?? [];
-          const parsed = raw.map((p: Record<string, unknown>) => ({
-            id: p.id as number,
-            type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
-            content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
-            content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
-            created_at: (p.created_at ?? p.timestamp ?? "") as string,
-            data: p.data as Record<string, unknown> | undefined,
-          }));
-          setMessages(parsed);
-          scrollToBottom(true);
-        })
-        .catch(() => {});
+
+      const isFirstOpen = !hasHandledFirstOpenRef.current;
+      hasHandledFirstOpenRef.current = true;
+
+      // Skip first open — initial fetch handles it
+      if (isFirstOpen) return;
+
+      // Reconnection — merge new messages
+      refetchTimelineOnReconnect().catch(() => {});
     };
-    es.onerror = () => { setConnected(false); window.dispatchEvent(new Event("piclaw:sse-disconnected")); };
+    es.onerror = () => {
+      setConnected(false);
+      window.dispatchEvent(new Event("piclaw:sse-disconnected"));
+    };
 
     return () => {
       es.close();
       sseRef.current = null;
     };
-  }, [scrollToBottom]);
+  }, [refetchTimelineOnReconnect, scrollToBottom]);
 
   // Listen for optimistic user messages from compose box
   useEffect(() => {
@@ -414,16 +435,9 @@ export function MessageList() {
         const res = await fetch(buildChatUrl("/timeline", { around_row: String(id), limit: "50" }), { credentials: "include" });
         if (res.ok) {
           const data = await res.json() as { posts?: Array<Record<string, unknown>> };
-          const posts = data.posts ?? [];
+          const posts = (data.posts ?? []).map(normalizePost);
           if (posts.length) {
-            setMessages(posts.map((p: Record<string, unknown>) => ({
-              id: p.id as number,
-              type: ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent") as "user" | "agent",
-              content: (p.data as Record<string, unknown>)?.content as string ?? "",
-              content_blocks: (p.data as Record<string, unknown>)?.content_blocks as ContentBlock[],
-              created_at: p.timestamp as string ?? "",
-              data: p.data as Record<string, unknown>,
-            })));
+            setMessages(posts);
             // Wait for render, then scroll
             setTimeout(() => {
               el = listRef.current?.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
@@ -460,11 +474,12 @@ export function MessageList() {
       );
       if (!res.ok) return;
       const data: TimelineResponse = await res.json();
-      if (data.posts?.length) {
+      const olderPosts = (data.posts ?? []).map(normalizePost);
+      setHasMore(data.has_more ?? false);
+      if (olderPosts.length) {
         const el = listRef.current;
         const prevScrollHeight = el?.scrollHeight ?? 0;
-        setMessages((prev) => [...data.posts, ...prev]);
-        setHasMore(data.has_more ?? false);
+        setMessages((prev) => mergeInteractions(olderPosts, prev));
         // Restore scroll position
         requestAnimationFrame(() => {
           if (el) {
