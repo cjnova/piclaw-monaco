@@ -10331,7 +10331,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     };
     const filtered = filter.value ? models.value.filter((m6) => m6.name.toLowerCase().includes(filter.value.toLowerCase()) || m6.provider.toLowerCase().includes(filter.value.toLowerCase())) : models.value;
     const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high"];
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section settings-panel__section--models", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
       /* @__PURE__ */ u4(
         "input",

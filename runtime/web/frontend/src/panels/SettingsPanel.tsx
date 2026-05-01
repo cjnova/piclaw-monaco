@@ -699,7 +699,7 @@ function ModelsSection({ data }: { data: SettingsData }) {
   const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high"];
 
   return (
-    <section className="settings-panel__section">
+    <section className="settings-panel__section settings-panel__section--models">
       <h2 className="settings-panel__section-title">Models</h2>
 
       <input

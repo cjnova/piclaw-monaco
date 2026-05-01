@@ -3066,3 +3066,19 @@ body {
   color: var(--accent);
   font-weight: 600;
 }
+
+.settings-panel__section--models {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.settings-panel__section--models .settings-panel__model-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.settings-panel__section--models .settings-panel__thinking-slider {
+  flex-shrink: 0;
+  padding-top: 16px;
+}
