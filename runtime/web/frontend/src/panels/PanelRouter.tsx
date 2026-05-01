@@ -4,6 +4,7 @@ import { AddonsPanel } from "./AddonsPanel";
 import { AgentPanel } from "./AgentPanel";
 import { TasksPanel } from "./TasksPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { NotepadPanel } from "./NotepadPanel";
 
 interface PanelRouterProps {
   activePanel: string;
@@ -23,6 +24,8 @@ export function PanelRouter({ activePanel, onPageSelect }: PanelRouterProps) {
       return <AgentPanel onPageSelect={onPageSelect ?? (() => {})} />;
     case "tasks":
       return <TasksPanel />;
+    case "notepad":
+      return <NotepadPanel />;
     case "settings":
       return <SettingsPanel />;
     default:
