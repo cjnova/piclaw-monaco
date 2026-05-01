@@ -88,9 +88,9 @@ export function ScratchpadPanel() {
   const selectedCount = useComputed(() => items.value.filter(n => n.selected).length);
 
   const sendToChat = async () => {
-    const selected = items.value.filter(n => n.selected);
-    if (!selected.length) return;
-    const content = selected.map(n => n.content || n.title).join("\n\n");
+    const active = items.value.find(n => n.id === activeId.value);
+    if (!active) return;
+    const content = active.content || active.title;
     try {
       await fetch("/agent/web:default/message", {
         method: "POST",
@@ -99,7 +99,7 @@ export function ScratchpadPanel() {
         body: JSON.stringify({ content }),
       });
       const now = new Date().toISOString();
-      persist(items.value.map(n => n.selected ? { ...n, selected: false, sentAt: now } : n));
+      persist(items.value.map(n => n.id === active.id ? { ...n, sentAt: now } : n));
     } catch {}
   };
 
@@ -134,7 +134,7 @@ export function ScratchpadPanel() {
         <div className="scratchpad-panel__section-header">
           <span className="scratchpad-panel__section-label">Items</span>
           <span className="scratchpad-panel__section-count">{items.value.length}</span>
-          <button type="button" className={`scratchpad-panel__icon-btn scratchpad-panel__send-icon${selectedCount.value === 0 ? " scratchpad-panel__send-icon--disabled" : ""}`} onClick={sendToChat} disabled={selectedCount.value === 0} title={`Send ${selectedCount.value} selected to chat`}>
+          <button type="button" className={`scratchpad-panel__icon-btn scratchpad-panel__send-icon${!activeId.value ? " scratchpad-panel__send-icon--disabled" : ""}`} onClick={sendToChat} disabled={!activeId.value} title="Send active item to chat">
             <i className="codicon codicon-play" />
           </button>
           <button type="button" className="scratchpad-panel__icon-btn" onClick={newItem} title="New item">
@@ -154,12 +154,6 @@ export function ScratchpadPanel() {
                 className={`scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}
                 onClick={() => selectItem(item)}
               >
-                <input
-                  type="checkbox"
-                  checked={item.selected}
-                  onChange={(e) => toggleCheck(item.id, e)}
-                  className="scratchpad-panel__checkbox"
-                />
                 <div className="scratchpad-panel__item-body">
                   <div className="scratchpad-panel__item-header">
                     <span className="scratchpad-panel__item-title">{item.title}</span>
