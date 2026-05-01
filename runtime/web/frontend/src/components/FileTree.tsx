@@ -109,7 +109,16 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
           .filter(Boolean)
           .join(" ")}
         style={{ paddingLeft: `${depth * 16}px` }}
+        role="treeitem"
+        tabIndex={0}
+        aria-expanded={isDir ? expanded : undefined}
         onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            void toggle();
+          }
+        }}
         title={node.path}
       >
         <span
@@ -244,12 +253,12 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   );
 
   if (loading) {
-    return <div className="file-tree file-tree__loading">Loading workspace…</div>;
+    return <div className="file-tree file-tree__loading" role="tree">Loading workspace…</div>;
   }
 
   if (error) {
     return (
-      <div className="file-tree">
+      <div className="file-tree" role="tree">
         <div className="file-tree__error">
           {error === "auth"
             ? "Authenticate to browse files"
@@ -264,14 +273,14 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
 
   if (!rootChildren || rootChildren.length === 0) {
     return (
-      <div className="file-tree">
+      <div className="file-tree" role="tree">
         <div className="file-tree__empty">No files found</div>
       </div>
     );
   }
 
   return (
-    <div className="file-tree">
+    <div className="file-tree" role="tree">
       {rootChildren.map((node) => (
         <TreeItem
           key={node.path}

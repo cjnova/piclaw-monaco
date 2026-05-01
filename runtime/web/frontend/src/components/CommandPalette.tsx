@@ -389,6 +389,9 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     : isTextStep
     ? `${selectedCommand} > ${paramPlaceholder}`
     : "Type a command...";
+  const activeOptionId = !isTextStep && results.length > 0
+    ? `command-palette-option-${selectedIndex}`
+    : undefined;
 
   return (
     <div className="command-palette-backdrop" onClick={onClose}>
@@ -410,6 +413,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
           className="command-palette__input"
           placeholder={inputPlaceholder}
           value={query}
+          aria-activedescendant={activeOptionId}
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
@@ -428,6 +432,9 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
               ? (results as string[]).map((option, index) => (
                 <li
                   key={option}
+                  id={`command-palette-option-${index}`}
+                  role="option"
+                  aria-selected={index === selectedIndex}
                   className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
                   style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                   onMouseDown={(event) => event.preventDefault()}
@@ -447,6 +454,9 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
                 return (
                   <li
                     key={command.id}
+                    id={`command-palette-option-${index}`}
+                    role="option"
+                    aria-selected={index === selectedIndex}
                     className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
                     style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                     onMouseDown={(event) => event.preventDefault()}
