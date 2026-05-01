@@ -2863,7 +2863,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 }
 .settings-panel__provider-name {
   font-size: 14px;
