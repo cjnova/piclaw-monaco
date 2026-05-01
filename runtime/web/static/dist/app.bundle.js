@@ -10707,7 +10707,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             placeholder: "Content...",
             value: newContent.value,
             onInput: (e5) => newContent.value = e5.target.value,
-            rows: 3
+            rows: 5
           }
         ),
         /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__add-btn", onClick: addItem, disabled: !newTitle.value.trim(), children: "+ Add" })
@@ -10747,7 +10747,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               value: editContent.value,
               placeholder: "Content...",
               onInput: (e5) => editContent.value = e5.target.value,
-              rows: 3
+              rows: 5
             }
           ),
           /* @__PURE__ */ u4("div", { className: "scratchpad-panel__edit-actions", children: [
@@ -10759,7 +10759,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-title", children: item.title }),
             item.sentAt && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__sent-badge", title: `Sent ${new Date(item.sentAt).toLocaleString()}`, children: "\u2713 sent" })
           ] }),
-          item.content && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-content", children: item.content.length > 80 ? item.content.slice(0, 80) + "\u2026" : item.content })
+          item.content && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-content", children: item.content.length > 150 ? item.content.slice(0, 150) + "\u2026" : item.content })
         ] }),
         /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn scratchpad-panel__delete-btn", onClick: () => deleteItem(item.id), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
       ] }, item.id)) }),

@@ -117,7 +117,7 @@ export function ScratchpadPanel() {
           placeholder="Content..."
           value={newContent.value}
           onInput={(e) => (newContent.value = (e.target as HTMLTextAreaElement).value)}
-          rows={3}
+          rows={5}
         />
         <button type="button" className="scratchpad-panel__add-btn" onClick={addItem} disabled={!newTitle.value.trim()}>
           + Add
@@ -156,7 +156,7 @@ export function ScratchpadPanel() {
                     value={editContent.value}
                     placeholder="Content..."
                     onInput={(e) => (editContent.value = (e.target as HTMLTextAreaElement).value)}
-                    rows={3}
+                    rows={5}
                   />
                   <div className="scratchpad-panel__edit-actions">
                     <button type="button" className="scratchpad-panel__icon-btn" onClick={saveEdit} title="Save">✓</button>
@@ -169,7 +169,7 @@ export function ScratchpadPanel() {
                     <span className="scratchpad-panel__item-title">{item.title}</span>
                     {item.sentAt && <span className="scratchpad-panel__sent-badge" title={`Sent ${new Date(item.sentAt).toLocaleString()}`}>✓ sent</span>}
                   </div>
-                  {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 80 ? item.content.slice(0, 80) + "…" : item.content}</span>}
+                  {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 150 ? item.content.slice(0, 150) + "…" : item.content}</span>}
                 </div>
               )}
               <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__delete-btn" onClick={() => deleteItem(item.id)} title="Delete">
