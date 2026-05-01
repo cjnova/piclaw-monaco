@@ -8694,6 +8694,36 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     return purify.sanitize(html2, { USE_PROFILES: { html: true } });
   }
 
+  // runtime/web/frontend/src/utils/storage.ts
+  function safeGetItem(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  function safeSetItem(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+    }
+  }
+  function safeRemoveItem(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+    }
+  }
+  function safeParseJSON(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  }
+
   // runtime/web/frontend/src/panels/WorkspacePanel.tsx
   function getErrorMessage(value, fallback) {
     if (value && typeof value === "object") {
@@ -9285,7 +9315,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
   function WorkspacePanel() {
-    const [topHeight, setTopHeight] = d2(() => Number(localStorage.getItem("piclaw-workspace-split")) || 260);
+    const [topHeight, setTopHeight] = d2(() => Number(safeGetItem("piclaw-workspace-split")) || 260);
     const containerRef = A2(null);
     const heightRef = A2(topHeight);
     const [selectedNode, setSelectedNode] = d2(null);
@@ -9307,7 +9337,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         setTopHeight(next);
       };
       const onUp = () => {
-        localStorage.setItem("piclaw-workspace-split", String(heightRef.current));
+        safeSetItem("piclaw-workspace-split", String(heightRef.current));
         document.body.style.userSelect = "";
         document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMove);
@@ -10206,8 +10236,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const ws = data.workspaceSettings ?? {};
     const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
     const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5e3);
-    const refreshInterval = useSignal(Number(localStorage.getItem("piclaw-ws-refresh-interval")) || 60);
-    const folderPreviewDepth = useSignal(Number(localStorage.getItem("piclaw-ws-folder-preview-depth")) || 3);
+    const refreshInterval = useSignal(Number(safeGetItem("piclaw-ws-refresh-interval")) || 60);
+    const folderPreviewDepth = useSignal(Number(safeGetItem("piclaw-ws-folder-preview-depth")) || 3);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Workspace" }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Access" }),
@@ -10254,11 +10284,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "This browser" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Refresh interval (seconds)" }),
-        /* @__PURE__ */ u4(NumberStepper, { value: refreshInterval, min: 5, max: 600, step: 5, onSave: (v6) => localStorage.setItem("piclaw-ws-refresh-interval", String(v6)) })
+        /* @__PURE__ */ u4(NumberStepper, { value: refreshInterval, min: 5, max: 600, step: 5, onSave: (v6) => safeSetItem("piclaw-ws-refresh-interval", String(v6)) })
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Folder preview scan depth" }),
-        /* @__PURE__ */ u4(NumberStepper, { value: folderPreviewDepth, min: 0, max: 20, onSave: (v6) => localStorage.setItem("piclaw-ws-folder-preview-depth", String(v6)) }),
+        /* @__PURE__ */ u4(NumberStepper, { value: folderPreviewDepth, min: 0, max: 20, onSave: (v6) => safeSetItem("piclaw-ws-folder-preview-depth", String(v6)) }),
         /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "set to 0 to disable folder size preview scans" })
       ] }),
       /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI." })
@@ -10637,7 +10667,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     { id: "tools", label: "Tools", icon: "codicon-tools" }
   ];
   function SettingsPanel() {
-    const activeCategory = useSignal(localStorage.getItem("piclaw-settings-category") || "general");
+    const activeCategory = useSignal(safeGetItem("piclaw-settings-category") || "general");
     const settings = useSignal(null);
     const loading = useSignal(true);
     const error = useSignal(null);
@@ -10726,7 +10756,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           className: `settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`,
           onClick: () => {
             activeCategory.value = cat.id;
-            localStorage.setItem("piclaw-settings-category", cat.id);
+            safeSetItem("piclaw-settings-category", cat.id);
           },
           children: [
             /* @__PURE__ */ u4("i", { className: `codicon ${cat.icon}` }),
@@ -10759,15 +10789,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const editorContent = useSignal("");
     const isNew = useSignal(true);
     y2(() => {
-      try {
-        const stored = localStorage.getItem("piclaw-scratchpad-items");
-        if (stored) items.value = JSON.parse(stored);
-      } catch {
-      }
+      items.value = safeParseJSON("piclaw-scratchpad-items", []);
     }, []);
     const persist = (updated) => {
       items.value = updated;
-      localStorage.setItem("piclaw-scratchpad-items", JSON.stringify(updated));
+      safeSetItem("piclaw-scratchpad-items", JSON.stringify(updated));
     };
     const resetEditor = () => {
       activeId.value = null;
@@ -10839,7 +10865,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         console.warn("[scratchpad] send failed:", err);
       }
     };
-    const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50);
+    const listHeight = useSignal(Number(safeGetItem("piclaw-scratchpad-split")) || 50);
     const onDragStart = (e5) => {
       e5.preventDefault();
       const panel = e5.target.closest(".scratchpad-panel");
@@ -10854,7 +10880,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
-        localStorage.setItem("piclaw-scratchpad-split", String(listHeight.value));
+        safeSetItem("piclaw-scratchpad-split", String(listHeight.value));
       };
       document.body.style.userSelect = "none";
       document.body.style.cursor = "row-resize";
@@ -10990,6 +11016,28 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function getBlockKey(block, index) {
     return block.id ?? `block-${index}`;
   }
+  function normalizePost(raw) {
+    const data = raw.data && typeof raw.data === "object" ? raw.data : void 0;
+    const rawType = raw.type ?? data?.type;
+    return {
+      id: Number(raw.id ?? 0),
+      type: rawType === "user" || rawType === "user_message" ? "user" : "agent",
+      content: String(raw.content ?? data?.content ?? ""),
+      content_blocks: raw.content_blocks ?? data?.content_blocks,
+      created_at: String(raw.created_at ?? raw.timestamp ?? ""),
+      data
+    };
+  }
+  function mergeInteractions(existing, incoming) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const msg of existing) {
+      byId.set(msg.id, msg);
+    }
+    for (const msg of incoming) {
+      byId.set(msg.id, msg);
+    }
+    return Array.from(byId.values()).sort((a4, b6) => a4.id - b6.id);
+  }
   function ToolCallBlock({ useBlock, resultBlock }) {
     const [open, setOpen] = d2(false);
     const inputStr = useBlock.input ? JSON.stringify(useBlock.input, null, 2) : "";
@@ -11111,6 +11159,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const bottomRef = A2(null);
     const sseRef = A2(null);
     const userScrolledRef = A2(false);
+    const initialTimelineFetchedRef = A2(false);
+    const hasHandledFirstOpenRef = A2(false);
     const scrollToBottom = q2((force = false) => {
       if (force || !userScrolledRef.current) {
         const el = listRef.current;
@@ -11119,51 +11169,49 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         }
       }
     }, []);
+    const fetchTimeline = q2(async () => {
+      const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
+        credentials: "include"
+      });
+      if (res.status === 401) {
+        setConnected(false);
+        return null;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const posts = (data.posts ?? []).map(normalizePost);
+      return { posts, hasMore: data.has_more ?? false };
+    }, []);
+    const refetchTimelineOnReconnect = q2(async () => {
+      const timeline = await fetchTimeline();
+      if (!timeline) return;
+      setMessages((prev) => mergeInteractions(prev, timeline.posts));
+      setHasMore(timeline.hasMore);
+      scrollToBottom(true);
+    }, [fetchTimeline, scrollToBottom]);
     y2(() => {
-      async function fetchTimeline() {
+      async function fetchInitialTimeline() {
         try {
-          const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
-            credentials: "include"
-          });
-          if (res.status === 401) {
-            setConnected(false);
-            return;
-          }
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
-          const raw = data.posts ?? [];
-          const parsed = raw.map((p6) => ({
-            id: p6.id,
-            type: p6.type ?? (p6.data?.type === "user_message" ? "user" : "agent"),
-            content: p6.content ?? p6.data?.content ?? "",
-            content_blocks: p6.content_blocks ?? p6.data?.content_blocks,
-            created_at: p6.created_at ?? p6.timestamp ?? "",
-            data: p6.data
-          }));
-          setMessages(parsed);
-          setHasMore(data.has_more ?? false);
+          const timeline = await fetchTimeline();
+          if (!timeline) return;
+          setMessages((prev) => mergeInteractions(prev, timeline.posts));
+          setHasMore(timeline.hasMore);
           setConnected(true);
+          initialTimelineFetchedRef.current = true;
           setTimeout(() => scrollToBottom(true), 50);
         } catch {
           setConnected(false);
         }
       }
-      fetchTimeline();
-    }, [scrollToBottom]);
+      fetchInitialTimeline();
+    }, [fetchTimeline, scrollToBottom]);
     y2(() => {
       const es = new EventSource(buildChatUrl("/sse/stream"));
       sseRef.current = es;
       es.addEventListener("new_post", (e5) => {
         try {
           const raw = JSON.parse(e5.data);
-          const interaction = {
-            id: raw.id,
-            type: raw.type ?? (raw.data?.type === "user_message" ? "user" : "agent"),
-            content: raw.content ?? raw.data?.content ?? "",
-            content_blocks: raw.content_blocks ?? raw.data?.content_blocks,
-            created_at: raw.created_at ?? raw.timestamp ?? "",
-            data: raw.data
-          };
+          const interaction = normalizePost(raw);
           setMessages((prev) => {
             if (prev.some((m6) => m6.id === interaction.id)) return prev;
             return [...prev, interaction];
@@ -11199,14 +11247,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       es.addEventListener("agent_response", (e5) => {
         try {
           const raw = JSON.parse(e5.data);
-          const interaction = {
-            id: raw.id,
-            type: "agent",
-            content: raw.data?.content ?? raw.content ?? "",
-            content_blocks: raw.data?.content_blocks ?? raw.content_blocks,
-            created_at: raw.timestamp ?? "",
-            data: raw.data
-          };
+          const interaction = normalizePost({ ...raw, type: "agent" });
           setMessages((prev) => {
             if (prev.some((m6) => m6.id === interaction.id)) return prev;
             return [...prev, interaction];
@@ -11230,20 +11271,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       es.onopen = () => {
         setConnected(true);
         window.dispatchEvent(new Event("piclaw:sse-connected"));
-        fetch(buildChatUrl("/timeline", { limit: "50" }), { credentials: "include" }).then((r4) => r4.ok ? r4.json() : null).then((data) => {
-          if (!data) return;
-          const raw = data.posts ?? [];
-          const parsed = raw.map((p6) => ({
-            id: p6.id,
-            type: p6.type ?? (p6.data?.type === "user_message" ? "user" : "agent"),
-            content: p6.content ?? p6.data?.content ?? "",
-            content_blocks: p6.content_blocks ?? p6.data?.content_blocks,
-            created_at: p6.created_at ?? p6.timestamp ?? "",
-            data: p6.data
-          }));
-          setMessages(parsed);
-          scrollToBottom(true);
-        }).catch(() => {
+        const isFirstOpen = !hasHandledFirstOpenRef.current;
+        hasHandledFirstOpenRef.current = true;
+        if (isFirstOpen) return;
+        refetchTimelineOnReconnect().catch(() => {
         });
       };
       es.onerror = () => {
@@ -11254,7 +11285,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         es.close();
         sseRef.current = null;
       };
-    }, [scrollToBottom]);
+    }, [refetchTimelineOnReconnect, scrollToBottom]);
     y2(() => {
       const handler = (e5) => {
         const msg = e5.detail;
@@ -11293,16 +11324,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           const res = await fetch(buildChatUrl("/timeline", { around_row: String(id), limit: "50" }), { credentials: "include" });
           if (res.ok) {
             const data = await res.json();
-            const posts = data.posts ?? [];
+            const posts = (data.posts ?? []).map(normalizePost);
             if (posts.length) {
-              setMessages(posts.map((p6) => ({
-                id: p6.id,
-                type: p6.data?.type === "user_message" ? "user" : "agent",
-                content: p6.data?.content ?? "",
-                content_blocks: p6.data?.content_blocks,
-                created_at: p6.timestamp ?? "",
-                data: p6.data
-              })));
+              setMessages(posts);
               setTimeout(() => {
                 el = listRef.current?.querySelector(`[data-message-id="${id}"]`);
                 if (el) highlight(el);
@@ -11336,11 +11360,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         );
         if (!res.ok) return;
         const data = await res.json();
-        if (data.posts?.length) {
+        const olderPosts = (data.posts ?? []).map(normalizePost);
+        setHasMore(data.has_more ?? false);
+        if (olderPosts.length) {
           const el = listRef.current;
           const prevScrollHeight = el?.scrollHeight ?? 0;
-          setMessages((prev) => [...data.posts, ...prev]);
-          setHasMore(data.has_more ?? false);
+          setMessages((prev) => mergeInteractions(olderPosts, prev));
           requestAnimationFrame(() => {
             if (el) {
               el.scrollTop = el.scrollHeight - prevScrollHeight;
@@ -11607,35 +11632,35 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function AppContent() {
     const themeControl = useThemeControl();
     const connectionStatus = useSignal("disconnected");
-    const activePanel = useSignal(localStorage.getItem("piclaw-active-panel") || "explorer");
-    const previousPanel = useSignal(localStorage.getItem("piclaw-previous-panel") || "explorer");
+    const activePanel = useSignal(safeGetItem("piclaw-active-panel") || "explorer");
+    const previousPanel = useSignal(safeGetItem("piclaw-previous-panel") || "explorer");
     const paletteVisible = useSignal(false);
-    const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
-    const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
+    const terminalVisible = useSignal(safeGetItem("piclaw-terminal-visible") === "true");
+    const terminalHeight = useSignal(Number(safeGetItem("piclaw-terminal-height")) || 200);
     const terminalMaximized = useSignal(false);
-    const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
-    const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
+    const sidebarCollapsed = useSignal(safeGetItem("piclaw-sidebar-collapsed") === "true");
+    const sidebarWidth = useSignal(Number(safeGetItem("piclaw-sidebar-width")) || 250);
     const extensionPageUrl = useSignal(null);
     const extensionPageName = useSignal(null);
     const extensionPageHtml = useSignal(null);
     const termDragRef = A2(null);
     y2(() => {
-      localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
+      safeSetItem("piclaw-sidebar-width", String(sidebarWidth.value));
     }, [sidebarWidth.value]);
     y2(() => {
-      localStorage.setItem("piclaw-active-panel", activePanel.value);
+      safeSetItem("piclaw-active-panel", activePanel.value);
     }, [activePanel.value]);
     y2(() => {
-      localStorage.setItem("piclaw-previous-panel", previousPanel.value);
+      safeSetItem("piclaw-previous-panel", previousPanel.value);
     }, [previousPanel.value]);
     y2(() => {
-      localStorage.setItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
+      safeSetItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
     }, [sidebarCollapsed.value]);
     y2(() => {
-      localStorage.setItem("piclaw-terminal-visible", String(terminalVisible.value));
+      safeSetItem("piclaw-terminal-visible", String(terminalVisible.value));
     }, [terminalVisible.value]);
     y2(() => {
-      localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value));
+      safeSetItem("piclaw-terminal-height", String(terminalHeight.value));
     }, [terminalHeight.value]);
     y2(() => {
       const onConnected = () => {
@@ -11773,7 +11798,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           paletteVisible.value = !paletteVisible.value;
         } },
         { id: "general.clearLocalStorage", label: "Clear Layout State", category: "general", handler: () => {
-          ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k5) => localStorage.removeItem(k5));
+          ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k5) => safeRemoveItem(k5));
         } }
       ];
       cmds.forEach((c4) => commandRegistry.register(c4));
