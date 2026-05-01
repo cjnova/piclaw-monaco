@@ -134,6 +134,9 @@ export function ScratchpadPanel() {
         <div className="scratchpad-panel__section-header">
           <span className="scratchpad-panel__section-label">Items</span>
           <span className="scratchpad-panel__section-count">{items.value.length}</span>
+          <button type="button" className={`scratchpad-panel__icon-btn scratchpad-panel__send-icon${selectedCount.value === 0 ? " scratchpad-panel__send-icon--disabled" : ""}`} onClick={sendToChat} disabled={selectedCount.value === 0} title={`Send ${selectedCount.value} selected to chat`}>
+            <i className="codicon codicon-play" />
+          </button>
           <button type="button" className="scratchpad-panel__icon-btn" onClick={newItem} title="New item">
             <i className="codicon codicon-add" />
           </button>
@@ -171,18 +174,6 @@ export function ScratchpadPanel() {
             ))
           )}
         </div>
-        {items.value.length > 0 && (
-          <div className="scratchpad-panel__actions">
-            <button
-              type="button"
-              className="scratchpad-panel__action-btn scratchpad-panel__action-btn--send"
-              onClick={sendToChat}
-              disabled={selectedCount.value === 0}
-            >
-              Send ({selectedCount.value})
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Drag handle */}

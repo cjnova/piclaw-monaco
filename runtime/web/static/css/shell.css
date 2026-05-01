@@ -3497,3 +3497,10 @@ body {
 .scratchpad-panel__divider:hover {
   background: var(--accent);
 }
+
+.scratchpad-panel__send-icon {
+  color: var(--accent);
+}
+.scratchpad-panel__send-icon--disabled {
+  opacity: 0.3;
+}
