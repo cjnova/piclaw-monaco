@@ -10300,29 +10300,101 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function ModelsSection({ data }) {
     const models = useSignal([]);
     const current = useSignal("");
+    const thinkingLevel = useSignal("medium");
+    const filter = useSignal("");
     y2(() => {
       fetch("/agent/models", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
         current.value = d5.current ?? "";
+        thinkingLevel.value = d5.thinking_level ?? "medium";
         models.value = d5.model_options ?? [];
       }).catch(() => {
       });
     }, []);
+    const sendCommand2 = async (cmd) => {
+      try {
+        await fetch("/agent/web:default/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ content: cmd })
+        });
+      } catch {
+      }
+    };
+    const switchModel = (label) => {
+      current.value = label;
+      sendCommand2(`/model ${label}`);
+    };
+    const switchThinking = (level) => {
+      thinkingLevel.value = level;
+      sendCommand2(`/thinking ${level}`);
+    };
+    const filtered = filter.value ? models.value.filter((m6) => m6.name.toLowerCase().includes(filter.value.toLowerCase()) || m6.provider.toLowerCase().includes(filter.value.toLowerCase())) : models.value;
+    const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high"];
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Current model" }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: current.value || "\u2014" })
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          className: "settings-panel__input settings-panel__model-filter",
+          type: "text",
+          placeholder: "Filter models...",
+          value: filter.value,
+          onInput: (e5) => filter.value = e5.target.value
+        }
+      ),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Model and provider names may wrap in narrow panes to avoid clipping." }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__model-table-wrapper", children: /* @__PURE__ */ u4("table", { className: "settings-panel__table settings-panel__model-table", children: [
+        /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+          /* @__PURE__ */ u4("th", {}),
+          /* @__PURE__ */ u4("th", { children: "Model" }),
+          /* @__PURE__ */ u4("th", { children: "Provider" }),
+          /* @__PURE__ */ u4("th", { children: "Context" }),
+          /* @__PURE__ */ u4("th", { children: "Reasoning" })
+        ] }) }),
+        /* @__PURE__ */ u4("tbody", { children: filtered.map((m6) => /* @__PURE__ */ u4(
+          "tr",
+          {
+            className: m6.label === current.value ? "settings-panel__model-table-row--active" : "",
+            onClick: () => switchModel(m6.label),
+            style: { cursor: "pointer" },
+            children: [
+              /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("input", { type: "radio", name: "model", checked: m6.label === current.value, readOnly: true }) }),
+              /* @__PURE__ */ u4("td", { children: m6.name }),
+              /* @__PURE__ */ u4("td", { children: m6.provider }),
+              /* @__PURE__ */ u4("td", { children: m6.context_window ? `${Math.round(m6.context_window / 1e3)}K` : "\u2014" }),
+              /* @__PURE__ */ u4("td", { children: m6.reasoning ? "\u{1F9E0}" : "\u2014" })
+            ]
+          },
+          m6.label
+        )) })
+      ] }) }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", style: { marginTop: "24px" }, children: [
+        "Thinking level: ",
+        /* @__PURE__ */ u4("strong", { children: thinkingLevel.value })
       ] }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Available Models" }),
-      models.value.map((m6) => /* @__PURE__ */ u4("div", { className: "settings-panel__model-row", children: [
-        /* @__PURE__ */ u4("span", { className: "settings-panel__model-name", children: m6.name }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__model-provider", children: m6.provider }),
-        m6.context_window && /* @__PURE__ */ u4("span", { className: "settings-panel__model-ctx", children: [
-          Math.round(m6.context_window / 1e3),
-          "k"
-        ] }),
-        m6.label === current.value && /* @__PURE__ */ u4("span", { className: "settings-panel__status settings-panel__status--ok", children: "Active" })
-      ] }, m6.label))
+      /* @__PURE__ */ u4("div", { className: "settings-panel__thinking-slider", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "range",
+            min: 0,
+            max: 4,
+            value: THINKING_LEVELS.indexOf(thinkingLevel.value),
+            onInput: (e5) => switchThinking(THINKING_LEVELS[Number(e5.target.value)]),
+            className: "settings-panel__thinking-range"
+          }
+        ),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__thinking-labels", children: THINKING_LEVELS.map((l8) => /* @__PURE__ */ u4(
+          "span",
+          {
+            className: `settings-panel__thinking-label${l8 === thinkingLevel.value ? " settings-panel__thinking-label--active" : ""}`,
+            onClick: () => switchThinking(l8),
+            children: l8.charAt(0).toUpperCase() + l8.slice(1)
+          },
+          l8
+        )) })
+      ] })
     ] });
   }
   function KeychainSection() {
