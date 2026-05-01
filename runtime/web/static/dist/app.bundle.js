@@ -10236,6 +10236,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const ws = data.workspaceSettings ?? {};
     const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
     const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5e3);
+    const refreshInterval = useSignal(Number(localStorage.getItem("piclaw-ws-refresh-interval")) || 60);
+    const folderPreviewDepth = useSignal(Number(localStorage.getItem("piclaw-ws-folder-preview-depth")) || 3);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Workspace" }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Access" }),
@@ -10280,6 +10282,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "truncate oversized tree walks earlier" })
       ] }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "This browser" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Refresh interval (seconds)" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: refreshInterval, min: 5, max: 600, step: 5, onSave: (v6) => localStorage.setItem("piclaw-ws-refresh-interval", String(v6)) })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Folder preview scan depth" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: folderPreviewDepth, min: 0, max: 20, onSave: (v6) => localStorage.setItem("piclaw-ws-folder-preview-depth", String(v6)) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "set to 0 to disable folder size preview scans" })
+      ] }),
       /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI." })
     ] });
   }

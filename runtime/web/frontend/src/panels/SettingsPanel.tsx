@@ -580,6 +580,8 @@ function WorkspaceSection({
   const ws = data.workspaceSettings ?? {};
   const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
   const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5000);
+  const refreshInterval = useSignal(Number(localStorage.getItem("piclaw-ws-refresh-interval")) || 60);
+  const folderPreviewDepth = useSignal(Number(localStorage.getItem("piclaw-ws-folder-preview-depth")) || 3);
 
   return (
     <section className="settings-panel__section">
@@ -632,6 +634,17 @@ function WorkspaceSection({
       </div>
 
       <h3 className="settings-panel__subsection-title">This browser</h3>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Refresh interval (seconds)</label>
+        <NumberStepper value={refreshInterval} min={5} max={600} step={5} onSave={(v) => localStorage.setItem("piclaw-ws-refresh-interval", String(v))} />
+      </div>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Folder preview scan depth</label>
+        <NumberStepper value={folderPreviewDepth} min={0} max={20} onSave={(v) => localStorage.setItem("piclaw-ws-folder-preview-depth", String(v))} />
+        <span className="settings-panel__description">set to 0 to disable folder size preview scans</span>
+      </div>
 
       <p className="settings-panel__description">Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI.</p>
     </section>
