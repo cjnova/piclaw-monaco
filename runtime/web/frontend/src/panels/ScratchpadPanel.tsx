@@ -1,6 +1,7 @@
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
+import { safeGetItem, safeSetItem, safeParseJSON } from "../utils/storage";
 
 interface ScratchItem {
   id: string;
@@ -19,15 +20,12 @@ export function ScratchpadPanel() {
   const isNew = useSignal(true); // true = creating new, false = editing existing
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("piclaw-scratchpad-items");
-      if (stored) items.value = JSON.parse(stored);
-    } catch {}
+    items.value = safeParseJSON<ScratchItem[]>("piclaw-scratchpad-items", []);
   }, []);
 
   const persist = (updated: ScratchItem[]) => {
     items.value = updated;
-    localStorage.setItem("piclaw-scratchpad-items", JSON.stringify(updated));
+    safeSetItem("piclaw-scratchpad-items", JSON.stringify(updated));
   };
 
   const resetEditor = () => {
@@ -112,7 +110,7 @@ export function ScratchpadPanel() {
     }
   };
 
-  const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50); // percentage
+  const listHeight = useSignal(Number(safeGetItem("piclaw-scratchpad-split")) || 50); // percentage
 
   const onDragStart = (e: MouseEvent) => {
     e.preventDefault();
@@ -128,7 +126,7 @@ export function ScratchpadPanel() {
       document.body.style.cursor = "";
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      localStorage.setItem("piclaw-scratchpad-split", String(listHeight.value));
+      safeSetItem("piclaw-scratchpad-split", String(listHeight.value));
     };
     document.body.style.userSelect = "none";
     document.body.style.cursor = "row-resize";

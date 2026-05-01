@@ -11,6 +11,7 @@ import { ModelsSection } from "./settings/ModelsSection";
 import { KeychainSection } from "./settings/KeychainSection";
 import { ToolsSection } from "./settings/ToolsSection";
 import { ProvidersSection } from "./settings/ProvidersSection";
+import { safeGetItem, safeSetItem } from "../utils/storage";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
@@ -25,7 +26,7 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
 ];
 
 export function SettingsPanel() {
-  const activeCategory = useSignal<Category>((localStorage.getItem("piclaw-settings-category") as Category) || "general");
+  const activeCategory = useSignal<Category>((safeGetItem("piclaw-settings-category") as Category) || "general");
   const settings = useSignal<SettingsData | null>(null);
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
@@ -137,7 +138,7 @@ export function SettingsPanel() {
           <button
             key={cat.id}
             className={`settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`}
-            onClick={() => { activeCategory.value = cat.id; localStorage.setItem("piclaw-settings-category", cat.id); }}
+            onClick={() => { activeCategory.value = cat.id; safeSetItem("piclaw-settings-category", cat.id); }}
           >
             <i className={`codicon ${cat.icon}`} />
             <span>{cat.label}</span>
