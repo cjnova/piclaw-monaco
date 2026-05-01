@@ -139,11 +139,11 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
-| wire-settings-panel-to-piclaw-config | Full settings panel (General, Providers, Models, Appearance, etc.) | 🔄 In progress — 9 categories wired, visual refinement ongoing (#91) |
+| wire-settings-panel-to-piclaw-config | Full settings panel (9 categories, all wired) | ✅ |
 | adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
 | wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
 | wire-scheduled-tasks-api | Wire GET /agent/scheduled-tasks endpoint + scheduled task cards in Tasks panel (#104) | ⏳ |
-| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | 🔄 v1 done — enhancement in #104 |
+| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ✅ |
 | wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ✅ |
 | leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ✅ |
 | open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ✅ |
@@ -161,14 +161,14 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
-| dead-code-cleanup | Remove orphaned files, unused modules/exports, stale CSS/localStorage (#109) | ⏳ |
-| fix-hardcoded-chat-jid | Use active chat JID instead of hardcoded web:default (#106) — after #109 | ⏳ |
+| dead-code-cleanup | Remove orphaned files, unused modules/exports, stale CSS/localStorage (#109) | ✅ |
+| fix-hardcoded-chat-jid | Use active chat JID instead of hardcoded web:default (#106) | ✅ |
 
 **Wave 2 (after Wave 1):**
 
 | Task | Description | Status |
 |---|---|---|
-| fix-silent-errors | Add user-facing error feedback across all panels (#107) | ⏳ |
+| fix-silent-errors | Add user-facing error feedback across all panels (#107) | ✅ |
 | accessibility-keyboard-aria | Add keyboard nav + ARIA roles to interactive elements (#108) | ⏳ |
 | settings-panel-refactor | Split SettingsPanel.tsx into section modules, fix timer leak + types (#110) | ⏳ |
 
