@@ -1178,14 +1178,14 @@ body {
   white-space: pre-wrap;
 }
 
-/* User messages: slightly different text color */
+/* User messages: warm bright white */
 .message-list__item--user .message-list__content {
-  color: #e0e0e0;
+  color: #f5f5f5;
 }
 
-/* Agent messages: lighter/brighter for distinction */
+/* Agent messages: cooler, slightly muted blue-tint */
 .message-list__item--agent .message-list__content {
-  color: #cdd6f4;
+  color: #b4befe;
 }
 
 /* Links in messages — readable on dark background */
