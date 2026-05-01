@@ -10508,13 +10508,58 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
   function ToolsSection({ data }) {
     const toolsets = data.toolsets ?? [];
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+    const filter = useSignal("");
+    const collapsed = useSignal({});
+    const toggleCollapse = (name) => {
+      collapsed.value = { ...collapsed.value, [name]: !collapsed.value[name] };
+    };
+    const kindIcon = (kind) => {
+      if (kind === "read-only") return "\u{1F50D}";
+      if (kind === "mutating") return "\u270F\uFE0F";
+      return "\u{1F535}";
+    };
+    const filteredToolsets = filter.value ? toolsets.map((ts) => ({
+      ...ts,
+      tools: (ts.tools ?? []).filter(
+        (t4) => t4.name.toLowerCase().includes(filter.value.toLowerCase()) || (t4.description ?? t4.summary ?? "").toLowerCase().includes(filter.value.toLowerCase())
+      )
+    })).filter((ts) => ts.tools.length > 0) : toolsets;
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Tools" }),
-      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Available toolsets and their tools (read-only)." }),
-      toolsets.map((ts) => /* @__PURE__ */ u4("div", { children: [
-        /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: ts.name }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__tools-list", children: (ts.tools ?? []).map((t4) => /* @__PURE__ */ u4("span", { className: "settings-panel__tool-badge", children: t4.name }, t4.name)) })
-      ] }, ts.name))
+      /* @__PURE__ */ u4(
+        "input",
+        {
+          className: "settings-panel__input settings-panel__tools-filter",
+          type: "text",
+          placeholder: "Filter tools...",
+          value: filter.value,
+          onInput: (e5) => filter.value = e5.target.value
+        }
+      ),
+      filteredToolsets.map((ts) => {
+        const isCollapsed = collapsed.value[ts.name] ?? false;
+        const tools = ts.tools ?? [];
+        return /* @__PURE__ */ u4("div", { className: "settings-panel__toolset", children: [
+          /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-header", onClick: () => toggleCollapse(ts.name), children: [
+            /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-toggle", children: isCollapsed ? "\u25B6" : "\u25BC" }),
+            /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true, className: "settings-panel__toolset-checkbox" }),
+            /* @__PURE__ */ u4("strong", { className: "settings-panel__toolset-name", children: ts.name }),
+            /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-desc", children: ts.description ?? "" })
+          ] }),
+          !isCollapsed && /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-tools", children: tools.map((t4) => /* @__PURE__ */ u4("div", { className: "settings-panel__tool-row", children: [
+            /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true, className: "settings-panel__tool-checkbox" }),
+            /* @__PURE__ */ u4("span", { className: "settings-panel__tool-name", children: t4.name }),
+            /* @__PURE__ */ u4("span", { className: "settings-panel__tool-kind", children: kindIcon(t4.kind) }),
+            (t4.description ?? t4.summary) && /* @__PURE__ */ u4("span", { className: "settings-panel__tool-desc", children: (t4.description ?? t4.summary).length > 60 ? (t4.description ?? t4.summary).slice(0, 60) + "\u2026" : t4.description ?? t4.summary }),
+            /* @__PURE__ */ u4("span", { className: "settings-panel__tool-category", children: t4.weight ?? "" })
+          ] }, t4.name)) })
+        ] }, ts.name);
+      }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", style: { marginTop: "16px" }, children: [
+        "Tool activation is managed by the agent runtime. Group checkboxes collapse/expand; individual tools use ",
+        /* @__PURE__ */ u4("code", { children: "activate_tools" }),
+        "."
+      ] })
     ] });
   }
   function ProvidersSection({ providers }) {
