@@ -412,7 +412,8 @@ export function ModelContextBar() {
           <span className="model-badge__provider">{modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}</span>
           <span className="model-badge__name">{modelName.split("/").pop() || modelName}</span>
         </span>
-        {thinkingLevel && (
+      </span>
+      {thinkingLevel && (
           <span
             data-model-picker
             className="thinking-badge-wrapper"
@@ -465,7 +466,6 @@ export function ModelContextBar() {
             {usageLabel.value}
           </span>
         )}
-      </span>
     </span>
   );
 }

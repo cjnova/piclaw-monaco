@@ -5544,77 +5544,75 @@ For tests, pass a Ghostty instance directly:
               className: "model-badge",
               onClick: handleBadgeClick,
               title: `${modelName}${thinkingLevel ? ` \u2022 ${thinkingLevel}` : ""} \u2014 click to switch model`,
+              children: /* @__PURE__ */ u4("span", { className: "model-badge__name-wrapper", children: [
+                /* @__PURE__ */ u4("span", { className: "model-badge__provider", children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
+                /* @__PURE__ */ u4("span", { className: "model-badge__name", children: modelName.split("/").pop() || modelName })
+              ] })
+            }
+          ),
+          thinkingLevel && /* @__PURE__ */ u4(
+            "span",
+            {
+              "data-model-picker": true,
+              className: "thinking-badge-wrapper",
               children: [
-                /* @__PURE__ */ u4("span", { className: "model-badge__name-wrapper", children: [
-                  /* @__PURE__ */ u4("span", { className: "model-badge__provider", children: modelName.includes("/") ? modelName.split("/")[0] + "/" : "" }),
-                  /* @__PURE__ */ u4("span", { className: "model-badge__name", children: modelName.split("/").pop() || modelName })
-                ] }),
-                thinkingLevel && /* @__PURE__ */ u4(
+                /* @__PURE__ */ u4(
                   "span",
                   {
-                    "data-model-picker": true,
-                    className: "thinking-badge-wrapper",
-                    children: [
-                      /* @__PURE__ */ u4(
-                        "span",
-                        {
-                          className: "thinking-badge",
-                          onClick: handleThinkingClick,
-                          title: "Click to change thinking level",
-                          children: thinkingLevel
-                        }
-                      ),
-                      showThinkingPicker.value && /* @__PURE__ */ u4(
-                        "div",
-                        {
-                          "data-model-picker": true,
-                          className: "thinking-picker",
-                          children: (thinkingLevels.value.length ? thinkingLevels.value : FALLBACK_THINKING_LEVELS).map((level) => {
-                            const isActive = level === thinkingLevel;
-                            return /* @__PURE__ */ u4(
-                              "div",
-                              {
-                                className: "thinking-picker__item",
-                                onClick: (ev) => {
-                                  ev.stopPropagation();
-                                  handleSelectThinking(level);
-                                },
-                                style: {
-                                  color: isActive ? "#a6e3a1" : "#cdd6f4",
-                                  background: isActive ? "rgba(166,227,161,0.1)" : "transparent"
-                                },
-                                onMouseEnter: (ev) => {
-                                  ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)";
-                                },
-                                onMouseLeave: (ev) => {
-                                  ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent";
-                                },
-                                children: [
-                                  /* @__PURE__ */ u4("span", { className: "thinking-picker__item__check", children: isActive ? "\u2713" : "" }),
-                                  /* @__PURE__ */ u4("span", { children: level })
-                                ]
-                              },
-                              level
-                            );
-                          })
-                        }
-                      )
-                    ]
+                    className: "thinking-badge",
+                    onClick: handleThinkingClick,
+                    title: "Click to change thinking level",
+                    children: thinkingLevel
                   }
                 ),
-                /* @__PURE__ */ u4(ContextRing, { percent: contextPercent.value, tokens: contextTokens.value, contextWindow: contextWindow.value, onClick: handleCompact }),
-                usageLabel.value && /* @__PURE__ */ u4(
-                  "span",
+                showThinkingPicker.value && /* @__PURE__ */ u4(
+                  "div",
                   {
-                    className: "usage-badge",
-                    title: [
-                      providerUsage.value?.provider ? `Provider: ${providerUsage.value.provider}` : "",
-                      providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : ""
-                    ].filter(Boolean).join("\n"),
-                    children: usageLabel.value
+                    "data-model-picker": true,
+                    className: "thinking-picker",
+                    children: (thinkingLevels.value.length ? thinkingLevels.value : FALLBACK_THINKING_LEVELS).map((level) => {
+                      const isActive = level === thinkingLevel;
+                      return /* @__PURE__ */ u4(
+                        "div",
+                        {
+                          className: "thinking-picker__item",
+                          onClick: (ev) => {
+                            ev.stopPropagation();
+                            handleSelectThinking(level);
+                          },
+                          style: {
+                            color: isActive ? "#a6e3a1" : "#cdd6f4",
+                            background: isActive ? "rgba(166,227,161,0.1)" : "transparent"
+                          },
+                          onMouseEnter: (ev) => {
+                            ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)";
+                          },
+                          onMouseLeave: (ev) => {
+                            ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent";
+                          },
+                          children: [
+                            /* @__PURE__ */ u4("span", { className: "thinking-picker__item__check", children: isActive ? "\u2713" : "" }),
+                            /* @__PURE__ */ u4("span", { children: level })
+                          ]
+                        },
+                        level
+                      );
+                    })
                   }
                 )
               ]
+            }
+          ),
+          /* @__PURE__ */ u4(ContextRing, { percent: contextPercent.value, tokens: contextTokens.value, contextWindow: contextWindow.value, onClick: handleCompact }),
+          usageLabel.value && /* @__PURE__ */ u4(
+            "span",
+            {
+              className: "usage-badge",
+              title: [
+                providerUsage.value?.provider ? `Provider: ${providerUsage.value.provider}` : "",
+                providerUsage.value?.plan ? `Plan: ${providerUsage.value.plan}` : ""
+              ].filter(Boolean).join("\n"),
+              children: usageLabel.value
             }
           )
         ]
