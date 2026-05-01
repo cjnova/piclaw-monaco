@@ -27,27 +27,32 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
 
 export function SettingsPanel() {
   const activeCategory = useSignal<Category>((safeGetItem("piclaw-settings-category") as Category) || "general");
-  const settings = useSignal<SettingsData | null>(null);
+  const settings = useSignal<SettingsData>({});
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
   const saveStatus = useSignal<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    fetch("/agent/settings-data", { credentials: "same-origin" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      })
-      .then((data: SettingsData) => {
+    void (async () => {
+      try {
+        const res = await fetch("/agent/settings-data", { credentials: "same-origin" });
+        if (!res.ok) throw new Error("Load failed");
+        const data: SettingsData = await res.json();
         settings.value = data;
-        loading.value = false;
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         error.value = `Failed to load settings: ${err instanceof Error ? err.message : String(err)}`;
         settings.value = {};
+      } finally {
         loading.value = false;
-      });
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
   }, []);
 
   function showSaved(msg = "Saved ✓") {
@@ -62,62 +67,23 @@ export function SettingsPanel() {
     saveTimer.current = setTimeout(() => (saveStatus.value = null), 3000);
   }
 
-  function saveGeneral(field: string, value: unknown) {
-    fetch("/agent/settings/general", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      })
-      .then((body: { settings?: SettingsData }) => {
-        if (body.settings) {
-          settings.value = { ...(settings.value ?? {}), ...body.settings };
-        }
-        showSaved();
-      })
-      .catch(() => showError());
-  }
-
-  const saveWorkspace = async (field: string, value: unknown) => {
+  async function saveSetting(endpoint: string, field: string, value: unknown) {
     try {
-      const res = await fetch("/agent/settings/workspace", {
+      const res = await fetch(`/agent/settings/${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value }),
       });
-      if (res.ok) {
-        showSaved("Saved");
-      } else {
-        showError("Save failed");
+      if (!res.ok) throw new Error("Save failed");
+      const body: { settings?: SettingsData } = await res.json();
+      if (body.settings) {
+        settings.value = { ...settings.value, ...body.settings };
       }
+      showSaved();
     } catch {
-      showError("Save failed");
+      showError();
     }
-  };
-
-  function saveCompaction(field: string, value: unknown) {
-    fetch("/agent/settings/compaction", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      })
-      .then((body: { settings?: SettingsData }) => {
-        if (body.settings) {
-          settings.value = { ...(settings.value ?? {}), ...body.settings };
-        }
-        showSaved();
-      })
-      .catch(() => showError());
   }
 
   if (loading.value) {
@@ -128,7 +94,7 @@ export function SettingsPanel() {
     );
   }
 
-  const s = settings.value ?? {};
+  const s = settings.value;
 
   return (
     <div className="settings-panel">
@@ -156,19 +122,19 @@ export function SettingsPanel() {
         )}
 
         {activeCategory.value === "general" && (
-          <GeneralSection data={s} onSaveGeneral={saveGeneral} />
+          <GeneralSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
         )}
         {activeCategory.value === "sessions" && (
-          <SessionsSection data={s} onSaveGeneral={saveGeneral} />
+          <SessionsSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
         )}
         {activeCategory.value === "appearance" && (
-          <AppearanceSection data={s} onSaveGeneral={saveGeneral} />
+          <AppearanceSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
         )}
         {activeCategory.value === "compaction" && (
-          <CompactionSection data={s} onSaveCompaction={saveCompaction} />
+          <CompactionSection data={s} onSaveCompaction={(field, value) => saveSetting("compaction", field, value)} />
         )}
         {activeCategory.value === "workspace" && (
-          <WorkspaceSection data={s} onSaveWorkspace={saveWorkspace} />
+          <WorkspaceSection data={s} onSaveWorkspace={(field, value) => saveSetting("workspace", field, value)} />
         )}
         {activeCategory.value === "providers" && (
           <ProvidersSection providers={s.providers ?? []} />
