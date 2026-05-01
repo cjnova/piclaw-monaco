@@ -46,26 +46,32 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const el = textareaRef.current;
     if (!el) return;
     const content = el.value.trim();
     if (!content) return;
-    el.value = "";
-    el.style.height = "auto";
-    fetch(getMessageUrl(), {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.user_message) {
-          window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
-        }
-      })
-      .catch((err) => console.warn("[chat] send failed:", err));
+    try {
+      const res = await fetch(getMessageUrl(), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) {
+        console.warn("[chat] send failed:", res.status);
+        return;
+      }
+      // Only clear draft after confirmed success
+      el.value = "";
+      el.style.height = "auto";
+      const data = await res.json();
+      if (data?.user_message) {
+        window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
+      }
+    } catch (err) {
+      console.warn("[chat] send failed:", err);
+    }
   };
 
   const pages = extensionPages.value;

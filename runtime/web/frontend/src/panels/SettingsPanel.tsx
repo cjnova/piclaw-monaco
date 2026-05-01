@@ -113,7 +113,7 @@ export function SettingsPanel() {
   useEffect(() => {
     fetch("/agent/settings-data", { credentials: "same-origin" })
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Save failed");
         return res.json();
       })
       .then((data: SettingsData) => {
@@ -147,7 +147,7 @@ export function SettingsPanel() {
       body: JSON.stringify({ [field]: value }),
     })
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Save failed");
         return res.json();
       })
       .then((body: { settings?: SettingsData }) => {
@@ -185,7 +185,7 @@ export function SettingsPanel() {
       body: JSON.stringify({ [field]: value }),
     })
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Save failed");
         return res.json();
       })
       .then((body: { settings?: SettingsData }) => {
@@ -780,6 +780,14 @@ function KeychainSection() {
   const newName = useSignal("");
   const newSecret = useSignal("");
   const newType = useSignal("secret");
+  const keychainError = useSignal<string | null>(null);
+  let keychainErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const showKeychainError = (msg: string) => {
+    keychainError.value = msg;
+    if (keychainErrorTimer) clearTimeout(keychainErrorTimer);
+    keychainErrorTimer = setTimeout(() => (keychainError.value = null), 3000);
+  };
 
   const fetchEntries = () => {
     fetch("/agent/keychain", { credentials: "same-origin" })
@@ -793,30 +801,46 @@ function KeychainSection() {
   const addEntry = async () => {
     if (!newName.value.trim() || !newSecret.value.trim()) return;
     try {
-      await fetch("/agent/keychain", {
+      const res = await fetch("/agent/keychain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ name: newName.value.trim(), secret: newSecret.value, type: newType.value }),
       });
+      if (!res.ok) {
+        console.warn("[keychain] add failed:", res.status);
+        showKeychainError("Couldn't add entry. Please try again.");
+        return;
+      }
       newName.value = "";
       newSecret.value = "";
       showAdd.value = false;
       fetchEntries();
-    } catch {}
+    } catch (err) {
+      console.warn("[keychain] add failed:", err);
+      showKeychainError("Failed to add entry");
+    }
   };
 
   const deleteEntry = async (name: string) => {
     if (!confirm(`Delete keychain entry "${name}"?`)) return;
     try {
-      await fetch("/agent/keychain", {
+      const res = await fetch("/agent/keychain", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ name }),
       });
+      if (!res.ok) {
+        console.warn("[keychain] delete failed:", res.status);
+        showKeychainError("Couldn't delete entry. Please try again.");
+        return;
+      }
       fetchEntries();
-    } catch {}
+    } catch (err) {
+      console.warn("[keychain] delete failed:", err);
+      showKeychainError("Failed to delete entry");
+    }
   };
 
   const filtered = filter.value
@@ -826,6 +850,10 @@ function KeychainSection() {
   return (
     <section className="settings-panel__section" style={{ maxWidth: '720px' }}>
       <h2 className="settings-panel__section-title">Keychain</h2>
+
+      {keychainError.value && (
+        <div className="settings-panel__save-status settings-panel__save-status--error">{keychainError.value}</div>
+      )}
 
       <div className="settings-panel__keychain-header">
         <input
@@ -995,13 +1023,18 @@ function ToolsSection({ data }: { data: SettingsData }) {
 function ProvidersSection({ providers }: { providers: Provider[] }) {
   const sendCommand = async (command: string) => {
     try {
-      await fetch(getMessageUrl(), {
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ content: command }),
       });
-    } catch { /* ignore */ }
+      if (!res.ok) {
+        console.warn("[providers] command failed:", res.status);
+      }
+    } catch (err) {
+      console.warn("[providers] command failed:", err);
+    }
   };
 
   return (

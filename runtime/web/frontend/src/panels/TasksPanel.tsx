@@ -48,6 +48,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setStatus("loading");
@@ -85,16 +86,23 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   const handleNewSession = useCallback(async () => {
     if (actionBusy) return;
     setActionBusy(true);
+    setActionError(null);
     try {
-      await fetch("/agent/respond", {
+      const res = await fetch("/agent/respond", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: "/new-session", chat_jid: activeChatJid }),
       });
+      if (!res.ok) {
+        console.warn("[tasks] new session failed:", res.status);
+        setActionError("Couldn't create session. Please try again.");
+        return;
+      }
       await loadData();
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[tasks] new session failed:", err);
+      setActionError("Failed to create session.");
     } finally {
       setActionBusy(false);
     }
@@ -104,16 +112,23 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     const newName = prompt("Enter new session name:");
     if (!newName) return;
     setActionBusy(true);
+    setActionError(null);
     try {
-      await fetch("/agent/respond", {
+      const res = await fetch("/agent/respond", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: `/session-name ${newName}`, chat_jid: activeChatJid }),
       });
+      if (!res.ok) {
+        console.warn("[tasks] rename failed:", res.status);
+        setActionError("Couldn't rename session. Please try again.");
+        return;
+      }
       await loadData();
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[tasks] rename failed:", err);
+      setActionError("Failed to rename session.");
     } finally {
       setActionBusy(false);
     }
@@ -190,6 +205,9 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       </div>
 
       <div className="tasks-panel__actions">
+        {actionError && (
+          <div className="tasks-panel__error tasks-panel__error--action">{actionError}</div>
+        )}
         <button
           type="button"
           className="tasks-panel__action-btn"
