@@ -31,6 +31,7 @@ export function AddonsPanel() {
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [filter, setFilter] = useState<string>("");
   const [actionState, setActionState] = useState<Record<string, "installing" | "uninstalling">>({});
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadAddons = useCallback(async () => {
     setStatus("loading");
@@ -40,7 +41,7 @@ export function AddonsPanel() {
         setStatus("error");
         return;
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error("Load failed");
       const data: AddonsResponse = await res.json();
       setAddons(Array.isArray(data.addons) ? data.addons : []);
       setSource(data.source ?? (data.sources ? data.sources.join(", ") : ""));
@@ -56,6 +57,7 @@ export function AddonsPanel() {
 
   const handleInstall = useCallback(async (slug: string) => {
     setActionState((prev) => ({ ...prev, [slug]: "installing" }));
+    setActionError(null);
     try {
       const res = await fetch("/agent/addons/install", {
         method: "POST",
@@ -63,10 +65,15 @@ export function AddonsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: slug }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        console.warn("[addons] install failed:", res.status);
+        setActionError("Couldn't install add-on. Please try again.");
+        return;
+      }
       await loadAddons();
-    } catch {
-      // ignore, just refresh
+    } catch (err) {
+      console.warn("[addons] install failed:", err);
+      setActionError("Install failed.");
     } finally {
       setActionState((prev) => {
         const next = { ...prev };
@@ -78,6 +85,7 @@ export function AddonsPanel() {
 
   const handleUninstall = useCallback(async (slug: string) => {
     setActionState((prev) => ({ ...prev, [slug]: "uninstalling" }));
+    setActionError(null);
     try {
       const res = await fetch("/agent/addons/uninstall", {
         method: "POST",
@@ -85,10 +93,15 @@ export function AddonsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: slug }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        console.warn("[addons] uninstall failed:", res.status);
+        setActionError("Couldn't uninstall add-on. Please try again.");
+        return;
+      }
       await loadAddons();
-    } catch {
-      // ignore, just refresh
+    } catch (err) {
+      console.warn("[addons] uninstall failed:", err);
+      setActionError("Uninstall failed.");
     } finally {
       setActionState((prev) => {
         const next = { ...prev };
@@ -140,6 +153,9 @@ export function AddonsPanel() {
           onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
         />
       </div>
+      {actionError && (
+        <div className="addons-panel__error">{actionError}</div>
+      )}
       {source && (
         <div className="addons-panel__source">Catalog from {source}</div>
       )}

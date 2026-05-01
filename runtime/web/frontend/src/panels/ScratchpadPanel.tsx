@@ -94,15 +94,22 @@ export function ScratchpadPanel() {
     if (!item) return;
     const content = item.content || item.title;
     try {
-      await fetch(getMessageUrl(), {
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ content }),
       });
+      if (!res.ok) {
+        console.warn("[scratchpad] send failed:", res.status);
+        return;
+      }
+      // Only mark sent after confirmed success
       const now = new Date().toISOString();
       persist(items.value.map(n => n.id === id ? { ...n, sentAt: now } : n));
-    } catch {}
+    } catch (err) {
+      console.warn("[scratchpad] send failed:", err);
+    }
   };
 
   const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50); // percentage

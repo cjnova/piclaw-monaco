@@ -9431,6 +9431,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const [status, setStatus] = d2("loading");
     const [filter, setFilter] = d2("");
     const [actionState, setActionState] = d2({});
+    const [actionError, setActionError] = d2(null);
     const loadAddons = q2(async () => {
       setStatus("loading");
       try {
@@ -9439,7 +9440,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           setStatus("error");
           return;
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Load failed");
         const data = await res.json();
         setAddons(Array.isArray(data.addons) ? data.addons : []);
         setSource(data.source ?? (data.sources ? data.sources.join(", ") : ""));
@@ -9453,6 +9454,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }, [loadAddons]);
     const handleInstall = q2(async (slug) => {
       setActionState((prev) => ({ ...prev, [slug]: "installing" }));
+      setActionError(null);
       try {
         const res = await fetch("/agent/addons/install", {
           method: "POST",
@@ -9460,9 +9462,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: slug })
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          console.warn("[addons] install failed:", res.status);
+          setActionError("Couldn't install add-on. Please try again.");
+          return;
+        }
         await loadAddons();
-      } catch {
+      } catch (err) {
+        console.warn("[addons] install failed:", err);
+        setActionError("Install failed.");
       } finally {
         setActionState((prev) => {
           const next = { ...prev };
@@ -9473,6 +9481,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }, [loadAddons]);
     const handleUninstall = q2(async (slug) => {
       setActionState((prev) => ({ ...prev, [slug]: "uninstalling" }));
+      setActionError(null);
       try {
         const res = await fetch("/agent/addons/uninstall", {
           method: "POST",
@@ -9480,9 +9489,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: slug })
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          console.warn("[addons] uninstall failed:", res.status);
+          setActionError("Couldn't uninstall add-on. Please try again.");
+          return;
+        }
         await loadAddons();
-      } catch {
+      } catch (err) {
+        console.warn("[addons] uninstall failed:", err);
+        setActionError("Uninstall failed.");
       } finally {
         setActionState((prev) => {
           const next = { ...prev };
@@ -9517,6 +9532,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           onInput: (e5) => setFilter(e5.target.value)
         }
       ) }),
+      actionError && /* @__PURE__ */ u4("div", { className: "addons-panel__error", children: actionError }),
       source && /* @__PURE__ */ u4("div", { className: "addons-panel__source", children: [
         "Catalog from ",
         source
@@ -9651,6 +9667,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const [status, setStatus] = d2("loading");
     const [errorMsg, setErrorMsg] = d2("");
     const [actionBusy, setActionBusy] = d2(false);
+    const [actionError, setActionError] = d2(null);
     const loadData = q2(async () => {
       setStatus("loading");
       setErrorMsg("");
@@ -9682,15 +9699,23 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const handleNewSession = q2(async () => {
       if (actionBusy) return;
       setActionBusy(true);
+      setActionError(null);
       try {
-        await fetch("/agent/respond", {
+        const res = await fetch("/agent/respond", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: "/new-session", chat_jid: activeChatJid })
         });
+        if (!res.ok) {
+          console.warn("[tasks] new session failed:", res.status);
+          setActionError("Couldn't create session. Please try again.");
+          return;
+        }
         await loadData();
-      } catch {
+      } catch (err) {
+        console.warn("[tasks] new session failed:", err);
+        setActionError("Failed to create session.");
       } finally {
         setActionBusy(false);
       }
@@ -9699,15 +9724,23 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       const newName = prompt("Enter new session name:");
       if (!newName) return;
       setActionBusy(true);
+      setActionError(null);
       try {
-        await fetch("/agent/respond", {
+        const res = await fetch("/agent/respond", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: `/session-name ${newName}`, chat_jid: activeChatJid })
         });
+        if (!res.ok) {
+          console.warn("[tasks] rename failed:", res.status);
+          setActionError("Couldn't rename session. Please try again.");
+          return;
+        }
         await loadData();
-      } catch {
+      } catch (err) {
+        console.warn("[tasks] rename failed:", err);
+        setActionError("Failed to rename session.");
       } finally {
         setActionBusy(false);
       }
@@ -9774,6 +9807,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         })
       ] }),
       /* @__PURE__ */ u4("div", { className: "tasks-panel__actions", children: [
+        actionError && /* @__PURE__ */ u4("div", { className: "tasks-panel__error tasks-panel__error--action", children: actionError }),
         /* @__PURE__ */ u4(
           "button",
           {
@@ -9884,7 +9918,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     let saveTimer = null;
     y2(() => {
       fetch("/agent/settings-data", { credentials: "same-origin" }).then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Save failed");
         return res.json();
       }).then((data) => {
         settings.value = data;
@@ -9912,7 +9946,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value })
       }).then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Save failed");
         return res.json();
       }).then((body) => {
         if (body.settings) {
@@ -9948,7 +9982,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value })
       }).then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("Save failed");
         return res.json();
       }).then((body) => {
         if (body.settings) {
@@ -10405,6 +10439,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const newName = useSignal("");
     const newSecret = useSignal("");
     const newType = useSignal("secret");
+    const keychainError = useSignal(null);
+    let keychainErrorTimer = null;
+    const showKeychainError = (msg) => {
+      keychainError.value = msg;
+      if (keychainErrorTimer) clearTimeout(keychainErrorTimer);
+      keychainErrorTimer = setTimeout(() => keychainError.value = null, 3e3);
+    };
     const fetchEntries = () => {
       fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
         entries2.value = d5.entries ?? [];
@@ -10417,35 +10458,50 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const addEntry = async () => {
       if (!newName.value.trim() || !newSecret.value.trim()) return;
       try {
-        await fetch("/agent/keychain", {
+        const res = await fetch("/agent/keychain", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({ name: newName.value.trim(), secret: newSecret.value, type: newType.value })
         });
+        if (!res.ok) {
+          console.warn("[keychain] add failed:", res.status);
+          showKeychainError("Couldn't add entry. Please try again.");
+          return;
+        }
         newName.value = "";
         newSecret.value = "";
         showAdd.value = false;
         fetchEntries();
-      } catch {
+      } catch (err) {
+        console.warn("[keychain] add failed:", err);
+        showKeychainError("Failed to add entry");
       }
     };
     const deleteEntry = async (name) => {
       if (!confirm(`Delete keychain entry "${name}"?`)) return;
       try {
-        await fetch("/agent/keychain", {
+        const res = await fetch("/agent/keychain", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({ name })
         });
+        if (!res.ok) {
+          console.warn("[keychain] delete failed:", res.status);
+          showKeychainError("Couldn't delete entry. Please try again.");
+          return;
+        }
         fetchEntries();
-      } catch {
+      } catch (err) {
+        console.warn("[keychain] delete failed:", err);
+        showKeychainError("Failed to delete entry");
       }
     };
     const filtered = filter.value ? entries2.value.filter((e5) => e5.name.toLowerCase().includes(filter.value.toLowerCase())) : entries2.value;
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Keychain" }),
+      keychainError.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status settings-panel__save-status--error", children: keychainError.value }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__keychain-header", children: [
         /* @__PURE__ */ u4(
           "input",
@@ -10575,13 +10631,17 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function ProvidersSection({ providers }) {
     const sendCommand2 = async (command) => {
       try {
-        await fetch(getMessageUrl(), {
+        const res = await fetch(getMessageUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({ content: command })
         });
-      } catch {
+        if (!res.ok) {
+          console.warn("[providers] command failed:", res.status);
+        }
+      } catch (err) {
+        console.warn("[providers] command failed:", err);
       }
     };
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
@@ -10676,15 +10736,20 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       if (!item) return;
       const content = item.content || item.title;
       try {
-        await fetch(getMessageUrl(), {
+        const res = await fetch(getMessageUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({ content })
         });
+        if (!res.ok) {
+          console.warn("[scratchpad] send failed:", res.status);
+          return;
+        }
         const now = (/* @__PURE__ */ new Date()).toISOString();
         persist(items.value.map((n4) => n4.id === id ? { ...n4, sentAt: now } : n4));
-      } catch {
+      } catch (err) {
+        console.warn("[scratchpad] send failed:", err);
       }
     };
     const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50);
@@ -11252,23 +11317,31 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
       el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
     };
-    const sendMessage = () => {
+    const sendMessage = async () => {
       const el = textareaRef.current;
       if (!el) return;
       const content = el.value.trim();
       if (!content) return;
-      el.value = "";
-      el.style.height = "auto";
-      fetch(getMessageUrl(), {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content })
-      }).then((res) => res.json()).then((data) => {
+      try {
+        const res = await fetch(getMessageUrl(), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content })
+        });
+        if (!res.ok) {
+          console.warn("[chat] send failed:", res.status);
+          return;
+        }
+        el.value = "";
+        el.style.height = "auto";
+        const data = await res.json();
         if (data?.user_message) {
           window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
         }
-      }).catch((err) => console.warn("[chat] send failed:", err));
+      } catch (err) {
+        console.warn("[chat] send failed:", err);
+      }
     };
     const pages = extensionPages.value;
     const showTabs = pages.length > 0;
