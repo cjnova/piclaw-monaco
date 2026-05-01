@@ -3237,7 +3237,6 @@ body {
   min-height: 0;
 }
 .scratchpad-panel__input {
-  flex: 1;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--text);
@@ -3246,6 +3245,7 @@ body {
   font-size: 12px;
   font-family: inherit;
   outline: none;
+  flex-shrink: 0;
 }
 .scratchpad-panel__input:focus {
   border-color: var(--accent);
