@@ -10752,6 +10752,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             onInput: (e5) => {
               editorTitle.value = e5.target.value;
               if (!isNew.value) saveEdit();
+            },
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter" && isNew.value && editorTitle.value.trim()) addItem();
             }
           }
         ),
@@ -10764,6 +10767,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             onInput: (e5) => {
               editorContent.value = e5.target.value;
               if (!isNew.value) saveEdit();
+            },
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter" && !e5.shiftKey && isNew.value && editorTitle.value.trim()) {
+                e5.preventDefault();
+                addItem();
+              }
             }
           }
         ),

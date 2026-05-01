@@ -177,6 +177,7 @@ export function ScratchpadPanel() {
             editorTitle.value = (e.target as HTMLInputElement).value;
             if (!isNew.value) saveEdit();
           }}
+          onKeyDown={(e) => { if (e.key === "Enter" && isNew.value && editorTitle.value.trim()) addItem(); }}
         />
         <textarea
           className="scratchpad-panel__textarea"
@@ -185,6 +186,12 @@ export function ScratchpadPanel() {
           onInput={(e) => {
             editorContent.value = (e.target as HTMLTextAreaElement).value;
             if (!isNew.value) saveEdit();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && isNew.value && editorTitle.value.trim()) {
+              e.preventDefault();
+              addItem();
+            }
           }}
         />
         {isNew.value && (
