@@ -1098,7 +1098,7 @@
     { id: "extensions", icon: "extensions", label: "Addons" },
     { id: "agent", icon: "dashboard", label: "Dashboards" },
     { id: "tasks", icon: "tasklist", label: "Tasks" },
-    { id: "notepad", icon: "notebook", label: "Notepad" },
+    { id: "scratchpad", icon: "notebook", label: "Scratchpad" },
     { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
   function ActivityBar({ activePanel, onPanelChange }) {
@@ -10606,60 +10606,69 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
 
-  // runtime/web/frontend/src/panels/NotepadPanel.tsx
-  function NotepadPanel() {
-    const notes = useSignal([]);
-    const newNoteText = useSignal("");
+  // runtime/web/frontend/src/panels/ScratchpadPanel.tsx
+  function ScratchpadPanel() {
+    const items = useSignal([]);
+    const newTitle = useSignal("");
+    const newContent = useSignal("");
     const editingId = useSignal(null);
-    const editText = useSignal("");
+    const editTitle = useSignal("");
+    const editContent = useSignal("");
+    const contentRef = A2(null);
     y2(() => {
       try {
-        const stored = localStorage.getItem("piclaw-notepad-notes");
-        if (stored) notes.value = JSON.parse(stored);
+        const stored = localStorage.getItem("piclaw-scratchpad-items");
+        if (stored) items.value = JSON.parse(stored);
       } catch {
       }
     }, []);
     const persist = (updated) => {
-      notes.value = updated;
-      localStorage.setItem("piclaw-notepad-notes", JSON.stringify(updated));
+      items.value = updated;
+      localStorage.setItem("piclaw-scratchpad-items", JSON.stringify(updated));
     };
-    const addNote = () => {
-      const text2 = newNoteText.value.trim();
-      if (!text2) return;
-      const note = {
+    const addItem = () => {
+      const title = newTitle.value.trim();
+      if (!title) return;
+      const item = {
         id: crypto.randomUUID(),
-        text: text2,
+        title,
+        content: newContent.value.trim(),
         selected: false,
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        sentAt: null
       };
-      persist([note, ...notes.value]);
-      newNoteText.value = "";
+      persist([item, ...items.value]);
+      newTitle.value = "";
+      newContent.value = "";
     };
     const toggleSelect = (id) => {
-      persist(notes.value.map((n4) => n4.id === id ? { ...n4, selected: !n4.selected } : n4));
+      persist(items.value.map((n4) => n4.id === id ? { ...n4, selected: !n4.selected } : n4));
     };
-    const deleteNote = (id) => {
-      persist(notes.value.filter((n4) => n4.id !== id));
+    const deleteItem = (id) => {
+      persist(items.value.filter((n4) => n4.id !== id));
     };
-    const startEdit = (note) => {
-      editingId.value = note.id;
-      editText.value = note.text;
+    const startEdit = (item) => {
+      editingId.value = item.id;
+      editTitle.value = item.title;
+      editContent.value = item.content;
     };
     const saveEdit = () => {
       if (!editingId.value) return;
-      persist(notes.value.map((n4) => n4.id === editingId.value ? { ...n4, text: editText.value } : n4));
+      persist(items.value.map((n4) => n4.id === editingId.value ? { ...n4, title: editTitle.value, content: editContent.value } : n4));
       editingId.value = null;
-      editText.value = "";
+      editTitle.value = "";
+      editContent.value = "";
     };
     const cancelEdit = () => {
       editingId.value = null;
-      editText.value = "";
+      editTitle.value = "";
+      editContent.value = "";
     };
-    const selectedCount = notes.value.filter((n4) => n4.selected).length;
+    const selectedCount = items.value.filter((n4) => n4.selected).length;
     const sendToChat = async () => {
-      const selected = notes.value.filter((n4) => n4.selected);
+      const selected = items.value.filter((n4) => n4.selected);
       if (!selected.length) return;
-      const content = selected.map((n4) => `\u2022 ${n4.text}`).join("\n");
+      const content = selected.map((n4) => n4.content || n4.title).join("\n\n");
       try {
         await fetch("/agent/web:default/message", {
           method: "POST",
@@ -10667,69 +10676,99 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           credentials: "same-origin",
           body: JSON.stringify({ content })
         });
-        persist(notes.value.filter((n4) => !n4.selected));
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        persist(items.value.map((n4) => n4.selected ? { ...n4, selected: false, sentAt: now } : n4));
       } catch {
       }
     };
     const clearSelected = () => {
-      persist(notes.value.map((n4) => ({ ...n4, selected: false })));
+      persist(items.value.map((n4) => ({ ...n4, selected: false })));
     };
-    return /* @__PURE__ */ u4("div", { className: "notepad-panel", children: [
-      /* @__PURE__ */ u4("div", { className: "notepad-panel__add", children: [
+    return /* @__PURE__ */ u4("div", { className: "scratchpad-panel", children: [
+      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__add", children: [
         /* @__PURE__ */ u4(
           "input",
           {
-            className: "notepad-panel__input",
+            className: "scratchpad-panel__input",
             type: "text",
-            placeholder: "Add a note...",
-            value: newNoteText.value,
-            onInput: (e5) => newNoteText.value = e5.target.value,
+            placeholder: "Title...",
+            value: newTitle.value,
+            onInput: (e5) => newTitle.value = e5.target.value,
             onKeyDown: (e5) => {
-              if (e5.key === "Enter") addNote();
+              if (e5.key === "Enter" && newTitle.value.trim()) contentRef.current?.focus();
             }
           }
         ),
-        /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__add-btn", onClick: addNote, children: "+" })
+        /* @__PURE__ */ u4(
+          "textarea",
+          {
+            ref: contentRef,
+            className: "scratchpad-panel__textarea",
+            placeholder: "Content...",
+            value: newContent.value,
+            onInput: (e5) => newContent.value = e5.target.value,
+            rows: 3
+          }
+        ),
+        /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__add-btn", onClick: addItem, disabled: !newTitle.value.trim(), children: "+ Add" })
       ] }),
-      /* @__PURE__ */ u4("div", { className: "notepad-panel__list", children: notes.value.length === 0 ? /* @__PURE__ */ u4("div", { className: "notepad-panel__empty", children: [
+      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__list", children: items.value.length === 0 ? /* @__PURE__ */ u4("div", { className: "scratchpad-panel__empty", children: [
         /* @__PURE__ */ u4("i", { className: "codicon codicon-notebook" }),
-        /* @__PURE__ */ u4("span", { children: "No notes yet" })
-      ] }) : notes.value.map((note) => /* @__PURE__ */ u4("div", { className: `notepad-panel__note${note.selected ? " notepad-panel__note--selected" : ""}`, children: [
+        /* @__PURE__ */ u4("span", { children: "No items yet" })
+      ] }) : items.value.map((item) => /* @__PURE__ */ u4("div", { className: `scratchpad-panel__item${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`, children: [
         /* @__PURE__ */ u4(
           "input",
           {
             type: "checkbox",
-            checked: note.selected,
-            onChange: () => toggleSelect(note.id),
-            className: "notepad-panel__checkbox"
+            checked: item.selected,
+            onChange: () => toggleSelect(item.id),
+            className: "scratchpad-panel__checkbox"
           }
         ),
-        editingId.value === note.id ? /* @__PURE__ */ u4("div", { className: "notepad-panel__edit-row", children: [
+        editingId.value === item.id ? /* @__PURE__ */ u4("div", { className: "scratchpad-panel__edit-row", children: [
           /* @__PURE__ */ u4(
             "input",
             {
-              className: "notepad-panel__edit-input",
+              className: "scratchpad-panel__edit-input",
               type: "text",
-              value: editText.value,
-              onInput: (e5) => editText.value = e5.target.value,
+              value: editTitle.value,
+              placeholder: "Title...",
+              onInput: (e5) => editTitle.value = e5.target.value,
               onKeyDown: (e5) => {
-                if (e5.key === "Enter") saveEdit();
                 if (e5.key === "Escape") cancelEdit();
               },
               autoFocus: true
             }
           ),
-          /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__icon-btn", onClick: saveEdit, title: "Save", children: "\u2713" }),
-          /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__icon-btn", onClick: cancelEdit, title: "Cancel", children: "\u2715" })
-        ] }) : /* @__PURE__ */ u4("span", { className: "notepad-panel__text", onDblClick: () => startEdit(note), children: note.text }),
-        /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__icon-btn notepad-panel__delete-btn", onClick: () => deleteNote(note.id), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
-      ] }, note.id)) }),
-      notes.value.length > 0 && /* @__PURE__ */ u4("div", { className: "notepad-panel__actions", children: [
+          /* @__PURE__ */ u4(
+            "textarea",
+            {
+              className: "scratchpad-panel__edit-textarea",
+              value: editContent.value,
+              placeholder: "Content...",
+              onInput: (e5) => editContent.value = e5.target.value,
+              rows: 3
+            }
+          ),
+          /* @__PURE__ */ u4("div", { className: "scratchpad-panel__edit-actions", children: [
+            /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn", onClick: saveEdit, title: "Save", children: "\u2713" }),
+            /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn", onClick: cancelEdit, title: "Cancel", children: "\u2715" })
+          ] })
+        ] }) : /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-body", onDblClick: () => startEdit(item), children: [
+          /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-header", children: [
+            /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-title", children: item.title }),
+            item.sentAt && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__sent-badge", title: `Sent ${new Date(item.sentAt).toLocaleString()}`, children: "\u2713 sent" })
+          ] }),
+          item.content && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-content", children: item.content.length > 80 ? item.content.slice(0, 80) + "\u2026" : item.content })
+        ] }),
+        /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn scratchpad-panel__delete-btn", onClick: () => deleteItem(item.id), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
+      ] }, item.id)) }),
+      items.value.length > 0 && /* @__PURE__ */ u4("div", { className: "scratchpad-panel__actions", children: [
         /* @__PURE__ */ u4(
           "button",
           {
             type: "button",
-            className: "notepad-panel__action-btn notepad-panel__action-btn--send",
+            className: "scratchpad-panel__action-btn scratchpad-panel__action-btn--send",
             onClick: sendToChat,
             disabled: selectedCount === 0,
             children: [
@@ -10743,7 +10782,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           "button",
           {
             type: "button",
-            className: "notepad-panel__action-btn",
+            className: "scratchpad-panel__action-btn",
             onClick: clearSelected,
             disabled: selectedCount === 0,
             children: "Clear selection"
@@ -10768,8 +10807,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         }) });
       case "tasks":
         return /* @__PURE__ */ u4(TasksPanel, {});
-      case "notepad":
-        return /* @__PURE__ */ u4(NotepadPanel, {});
+      case "scratchpad":
+        return /* @__PURE__ */ u4(ScratchpadPanel, {});
       case "settings":
         return /* @__PURE__ */ u4(SettingsPanel, {});
       default:
@@ -11578,7 +11617,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => window.removeEventListener("piclaw:open-page", onOpenPage);
     }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
     const connected = connectionStatus.value === "connected";
-    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", notepad: "Notepad", settings: "Settings" };
+    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings" };
     const onTermDragStart = q2((e5) => {
       e5.preventDefault();
       termDragRef.current = { startY: e5.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
