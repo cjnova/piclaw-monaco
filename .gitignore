@@ -23,6 +23,10 @@ node_modules/
 coverage/
 .bun/
 
+# Workspace persistent state (never delete)
+workspace/.piclaw/store/
+workspace/.piclaw/data/
+
 # Pack artifacts
 **/piclaw-*.tgz
 
