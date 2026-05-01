@@ -1,27 +1,29 @@
 # Current Dream state
 
-Generated: 2026-04-30T09:16:03.645Z
+Generated: 2026-05-01T06:23:48.754Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 1
-- Partial days: 1
+- Complete days: 2
+- Partial days: 0
 - Unsummarised days: 0
 - Latest complete day: 2026-04-30
 
 ## Complete days
 
 - 2026-04-30
-  - Summary: Agent activity recorded with 15 messages (7 user inputs, 8 agent responses) during early morning session.
-  - Summarised until: 2026-04-30T00:51:23.570Z
-  - Messages: 15
+  - Summary: Full-day session with 41 messages (20 user, 21 assistant) spanning 00:00–19:31 UTC. Early morning activity (15 messages through ~00:51 UTC) followed by continu…
+  - Summarised until: 2026-04-30T19:31:04.076Z
+  - Messages: 41
   - Session trees: 1
   - Session chats: 1
-
-## Partial days
-
-- 2026-04-29 — missing_watermark
+- 2026-04-29
+  - Summary: Bootstrap day: Dream memory system initialized with foundational note structure and memory layer. No user interactions recorded.
+  - Summarised until: 2026-04-29T23:59:59.999Z
+  - Messages: 0
+  - Session trees: 0
+  - Session chats: 0
 
 ## Source
 

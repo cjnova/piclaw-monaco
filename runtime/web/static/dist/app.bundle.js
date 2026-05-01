@@ -10000,23 +10000,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "General" }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Identity" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Agent name" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "settings-panel__input",
-              type: "text",
-              value: assistantName.value,
-              onInput: (e5) => assistantName.value = e5.target.value,
-              onBlur: () => onSaveGeneral("assistantName", assistantName.value),
-              placeholder: "Agent display name"
-            }
-          ),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Display name for the AI agent" })
-        ] })
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "User name" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
           /* @__PURE__ */ u4(
@@ -10031,6 +10014,23 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             }
           ),
           /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Your display name in chat" })
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Agent name" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "settings-panel__input",
+              type: "text",
+              value: assistantName.value,
+              onInput: (e5) => assistantName.value = e5.target.value,
+              onBlur: () => onSaveGeneral("assistantName", assistantName.value),
+              placeholder: "Agent display name"
+            }
+          ),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Display name for the AI agent" })
         ] })
       ] }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Notifications" }),
@@ -10054,9 +10054,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         ] })
       ] }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Authentication" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "TOTP setup" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: data.instanceTotp?.configured ? "TOTP is configured for this instance." : "Not configured \u2014 no setup QR available." }) }) })
+      /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: [
+        /* @__PURE__ */ u4("strong", { style: { fontSize: "13px", color: "var(--text)" }, children: "TOTP setup QR" }),
+        /* @__PURE__ */ u4("p", { className: "settings-panel__description", style: { marginTop: "6px" }, children: data.instanceTotp?.configured ? "TOTP is configured for this instance." : "TOTP is not configured for this instance yet, so no setup QR is available." })
       ] })
     ] });
   }

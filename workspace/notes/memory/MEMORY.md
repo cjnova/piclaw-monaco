@@ -2,13 +2,13 @@
 
 Dream-maintained memory index generated from the message database plus human-readable daily notes.
 
-Generated: 2026-04-30T09:16:03.645Z
+Generated: 2026-05-01T06:23:48.754Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 1
-- Partial days: 1
+- Complete days: 2
+- Partial days: 0
 - Unsummarised days: 0
 - Latest complete day: 2026-04-30
 
@@ -19,14 +19,12 @@ Generated: 2026-04-30T09:16:03.645Z
 - [Project memory](project.md) — ongoing work, recent outcomes, and pending follow-up
 - [Reference memory](reference.md) — note index and durable external pointers
 
-## Attention needed
-
-- 2026-04-29 — missing_watermark
-
 ## Recent daily memories
 
 - [2026-04-30](../daily/2026-04-30.md)
-  - Agent activity recorded with 15 messages (7 user inputs, 8 agent responses) during early morning session.
+  - Full-day session with 41 messages (20 user, 21 assistant) spanning 00:00–19:31 UTC. Early morning activity (1…
+- [2026-04-29](../daily/2026-04-29.md)
+  - Bootstrap day: Dream memory system initialized with foundational note structure and memory layer. No user int…
 
 ## Sources
 

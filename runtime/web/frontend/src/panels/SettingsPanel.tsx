@@ -279,21 +279,6 @@ function GeneralSection({
       <h3 className="settings-panel__subsection-title">Identity</h3>
 
       <div className="settings-panel__field">
-        <label className="settings-panel__label">Agent name</label>
-        <div className="settings-panel__field-content">
-          <input
-            className="settings-panel__input"
-            type="text"
-            value={assistantName.value}
-            onInput={(e) => (assistantName.value = (e.target as HTMLInputElement).value)}
-            onBlur={() => onSaveGeneral("assistantName", assistantName.value)}
-            placeholder="Agent display name"
-          />
-          <span className="settings-panel__description">Display name for the AI agent</span>
-        </div>
-      </div>
-
-      <div className="settings-panel__field">
         <label className="settings-panel__label">User name</label>
         <div className="settings-panel__field-content">
           <input
@@ -305,6 +290,21 @@ function GeneralSection({
             placeholder="Your name"
           />
           <span className="settings-panel__description">Your display name in chat</span>
+        </div>
+      </div>
+
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">Agent name</label>
+        <div className="settings-panel__field-content">
+          <input
+            className="settings-panel__input"
+            type="text"
+            value={assistantName.value}
+            onInput={(e) => (assistantName.value = (e.target as HTMLInputElement).value)}
+            onBlur={() => onSaveGeneral("assistantName", assistantName.value)}
+            placeholder="Agent display name"
+          />
+          <span className="settings-panel__description">Display name for the AI agent</span>
         </div>
       </div>
 
@@ -336,17 +336,13 @@ function GeneralSection({
       </div>
 
       <h3 className="settings-panel__subsection-title">Authentication</h3>
-      <div className="settings-panel__field">
-        <label className="settings-panel__label">TOTP setup</label>
-        <div className="settings-panel__field-content">
-          <div className="settings-panel__card">
-            <span className="settings-panel__description">
-              {data.instanceTotp?.configured
-                ? "TOTP is configured for this instance."
-                : "Not configured — no setup QR available."}
-            </span>
-          </div>
-        </div>
+      <div className="settings-panel__card">
+        <strong style={{ fontSize: '13px', color: 'var(--text)' }}>TOTP setup QR</strong>
+        <p className="settings-panel__description" style={{ marginTop: '6px' }}>
+          {data.instanceTotp?.configured
+            ? "TOTP is configured for this instance."
+            : "TOTP is not configured for this instance yet, so no setup QR is available."}
+        </p>
       </div>
     </section>
   );
