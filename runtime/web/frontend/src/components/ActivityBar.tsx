@@ -6,6 +6,7 @@ const PANELS = [
   { id: "extensions", icon: "extensions", label: "Addons" },
   { id: "agent", icon: "dashboard", label: "Dashboards" },
   { id: "tasks", icon: "tasklist", label: "Tasks" },
+  { id: "notepad", icon: "notebook", label: "Notepad" },
   { id: "settings", icon: "gear", label: "Settings", alignBottom: true },
 ] as const;
 

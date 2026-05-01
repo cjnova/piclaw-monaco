@@ -1098,6 +1098,7 @@
     { id: "extensions", icon: "extensions", label: "Addons" },
     { id: "agent", icon: "dashboard", label: "Dashboards" },
     { id: "tasks", icon: "tasklist", label: "Tasks" },
+    { id: "notepad", icon: "notebook", label: "Notepad" },
     { id: "settings", icon: "gear", label: "Settings", alignBottom: true }
   ];
   function ActivityBar({ activePanel, onPanelChange }) {
@@ -10605,6 +10606,153 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
 
+  // runtime/web/frontend/src/panels/NotepadPanel.tsx
+  function NotepadPanel() {
+    const notes = useSignal([]);
+    const newNoteText = useSignal("");
+    const editingId = useSignal(null);
+    const editText = useSignal("");
+    y2(() => {
+      try {
+        const stored = localStorage.getItem("piclaw-notepad-notes");
+        if (stored) notes.value = JSON.parse(stored);
+      } catch {
+      }
+    }, []);
+    const persist = (updated) => {
+      notes.value = updated;
+      localStorage.setItem("piclaw-notepad-notes", JSON.stringify(updated));
+    };
+    const addNote = () => {
+      const text2 = newNoteText.value.trim();
+      if (!text2) return;
+      const note = {
+        id: crypto.randomUUID(),
+        text: text2,
+        selected: false,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      persist([note, ...notes.value]);
+      newNoteText.value = "";
+    };
+    const toggleSelect = (id) => {
+      persist(notes.value.map((n4) => n4.id === id ? { ...n4, selected: !n4.selected } : n4));
+    };
+    const deleteNote = (id) => {
+      persist(notes.value.filter((n4) => n4.id !== id));
+    };
+    const startEdit = (note) => {
+      editingId.value = note.id;
+      editText.value = note.text;
+    };
+    const saveEdit = () => {
+      if (!editingId.value) return;
+      persist(notes.value.map((n4) => n4.id === editingId.value ? { ...n4, text: editText.value } : n4));
+      editingId.value = null;
+      editText.value = "";
+    };
+    const cancelEdit = () => {
+      editingId.value = null;
+      editText.value = "";
+    };
+    const selectedCount = notes.value.filter((n4) => n4.selected).length;
+    const sendToChat = async () => {
+      const selected = notes.value.filter((n4) => n4.selected);
+      if (!selected.length) return;
+      const content = selected.map((n4) => `\u2022 ${n4.text}`).join("\n");
+      try {
+        await fetch("/agent/web:default/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ content })
+        });
+        persist(notes.value.filter((n4) => !n4.selected));
+      } catch {
+      }
+    };
+    const clearSelected = () => {
+      persist(notes.value.map((n4) => ({ ...n4, selected: false })));
+    };
+    return /* @__PURE__ */ u4("div", { className: "notepad-panel", children: [
+      /* @__PURE__ */ u4("div", { className: "notepad-panel__add", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "notepad-panel__input",
+            type: "text",
+            placeholder: "Add a note...",
+            value: newNoteText.value,
+            onInput: (e5) => newNoteText.value = e5.target.value,
+            onKeyDown: (e5) => {
+              if (e5.key === "Enter") addNote();
+            }
+          }
+        ),
+        /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__add-btn", onClick: addNote, children: "+" })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "notepad-panel__list", children: notes.value.length === 0 ? /* @__PURE__ */ u4("div", { className: "notepad-panel__empty", children: [
+        /* @__PURE__ */ u4("i", { className: "codicon codicon-notebook" }),
+        /* @__PURE__ */ u4("span", { children: "No notes yet" })
+      ] }) : notes.value.map((note) => /* @__PURE__ */ u4("div", { className: `notepad-panel__note${note.selected ? " notepad-panel__note--selected" : ""}`, children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            type: "checkbox",
+            checked: note.selected,
+            onChange: () => toggleSelect(note.id),
+            className: "notepad-panel__checkbox"
+          }
+        ),
+        editingId.value === note.id ? /* @__PURE__ */ u4("div", { className: "notepad-panel__edit-row", children: [
+          /* @__PURE__ */ u4(
+            "input",
+            {
+              className: "notepad-panel__edit-input",
+              type: "text",
+              value: editText.value,
+              onInput: (e5) => editText.value = e5.target.value,
+              onKeyDown: (e5) => {
+                if (e5.key === "Enter") saveEdit();
+                if (e5.key === "Escape") cancelEdit();
+              },
+              autoFocus: true
+            }
+          ),
+          /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__icon-btn", onClick: saveEdit, title: "Save", children: "\u2713" }),
+          /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__icon-btn", onClick: cancelEdit, title: "Cancel", children: "\u2715" })
+        ] }) : /* @__PURE__ */ u4("span", { className: "notepad-panel__text", onDblClick: () => startEdit(note), children: note.text }),
+        /* @__PURE__ */ u4("button", { type: "button", className: "notepad-panel__icon-btn notepad-panel__delete-btn", onClick: () => deleteNote(note.id), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
+      ] }, note.id)) }),
+      notes.value.length > 0 && /* @__PURE__ */ u4("div", { className: "notepad-panel__actions", children: [
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "notepad-panel__action-btn notepad-panel__action-btn--send",
+            onClick: sendToChat,
+            disabled: selectedCount === 0,
+            children: [
+              "Send to chat (",
+              selectedCount,
+              ")"
+            ]
+          }
+        ),
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "notepad-panel__action-btn",
+            onClick: clearSelected,
+            disabled: selectedCount === 0,
+            children: "Clear selection"
+          }
+        )
+      ] })
+    ] });
+  }
+
   // runtime/web/frontend/src/panels/PanelRouter.tsx
   function PanelRouter({ activePanel, onPageSelect }) {
     switch (activePanel) {
@@ -10620,6 +10768,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         }) });
       case "tasks":
         return /* @__PURE__ */ u4(TasksPanel, {});
+      case "notepad":
+        return /* @__PURE__ */ u4(NotepadPanel, {});
       case "settings":
         return /* @__PURE__ */ u4(SettingsPanel, {});
       default:
@@ -11428,7 +11578,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => window.removeEventListener("piclaw:open-page", onOpenPage);
     }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
     const connected = connectionStatus.value === "connected";
-    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", settings: "Settings" };
+    const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", notepad: "Notepad", settings: "Settings" };
     const onTermDragStart = q2((e5) => {
       e5.preventDefault();
       termDragRef.current = { startY: e5.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
