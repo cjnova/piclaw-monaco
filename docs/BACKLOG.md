@@ -142,7 +142,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | wire-settings-panel-to-piclaw-config | Full settings panel (General, Providers, Models, Appearance, etc.) | 🔄 In progress — 9 categories wired, visual refinement ongoing (#91) |
 | adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
 | wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
-| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ✅ |
+| wire-scheduled-tasks-api | Wire GET /agent/scheduled-tasks endpoint + scheduled task cards in Tasks panel (#104) | ⏳ |
+| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | 🔄 v1 done — enhancement in #104 |
 | wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ✅ |
 | leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ✅ |
 | open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ✅ |
@@ -152,7 +153,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
-| notepad-panel | Activity Bar notepad — atomic editable notes, selectable, send to chat (#100) | ⏳ |
+| notepad-panel | Activity Bar scratchpad — atomic editable notes, send to chat (#100) | ✅ |
 
 ### Wave 11 — Full Functionality
 
