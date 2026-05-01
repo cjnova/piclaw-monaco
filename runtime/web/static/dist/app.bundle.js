@@ -10233,25 +10233,54 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     data,
     onSaveWorkspace
   }) {
-    const treeMaxDepth = useSignal(data.workspaceSettings?.treeMaxDepth ?? 10);
-    const treeMaxEntries = useSignal(data.workspaceSettings?.treeMaxEntries ?? 500);
+    const ws = data.workspaceSettings ?? {};
+    const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
+    const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5e3);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Workspace" }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "File Tree" }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Access" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "ws-webTerminalEnabled",
+            type: "checkbox",
+            checked: ws.webTerminalEnabled ?? false,
+            onChange: (e5) => onSaveWorkspace("webTerminalEnabled", e5.target.checked)
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "ws-webTerminalEnabled", className: "settings-panel__label", children: "Enable web terminal" })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "ws-vncAllowDirect",
+            type: "checkbox",
+            checked: ws.vncAllowDirect ?? false,
+            onChange: (e5) => onSaveWorkspace("vncAllowDirect", e5.target.checked)
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "ws-vncAllowDirect", className: "settings-panel__label", children: "Allow direct VNC targets" })
+      ] }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Terminal access updates immediately. Direct VNC target policy applies to new VNC requests." }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Server scan guardrails" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tree max depth" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(NumberStepper, { value: treeMaxDepth, min: 1, max: 50, onSave: (v6) => onSaveWorkspace("treeMaxDepth", v6) }),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum directory nesting level shown in file tree" })
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max tree depth" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: treeMaxDepth, min: 1, max: 50, onSave: (v6) => onSaveWorkspace("treeMaxDepth", v6) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: [
+          "caps all ",
+          /* @__PURE__ */ u4("code", { children: "/workspace/tree" }),
+          " requests"
         ] })
       ] }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Tree max entries" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field-content", children: [
-          /* @__PURE__ */ u4(NumberStepper, { value: treeMaxEntries, min: 50, max: 5e3, step: 50, onSave: (v6) => onSaveWorkspace("treeMaxEntries", v6) }),
-          /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Maximum number of entries shown per directory" })
-        ] })
-      ] })
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max entries per scan" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: treeMaxEntries, min: 50, max: 1e4, step: 50, onSave: (v6) => onSaveWorkspace("treeMaxEntries", v6) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "truncate oversized tree walks earlier" })
+      ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "This browser" }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI." })
     ] });
   }
   function ModelsSection({ data }) {

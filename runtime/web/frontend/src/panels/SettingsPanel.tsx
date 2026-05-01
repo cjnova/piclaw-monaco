@@ -78,7 +78,7 @@ interface SettingsData {
   compactionBackoffs?: string[];
   progressWatchdogPhases?: Array<{ chat?: string; phase?: string; started?: string; lastHeartbeat?: string }>;
   /* workspace */
-  workspaceSettings?: { treeMaxDepth?: number; treeMaxEntries?: number };
+  workspaceSettings?: { webTerminalEnabled?: boolean; vncAllowDirect?: boolean; treeMaxDepth?: number; treeMaxEntries?: number };
   /* providers */
   providers?: Provider[];
   /* toolsets */
@@ -577,30 +577,63 @@ function WorkspaceSection({
   data: SettingsData;
   onSaveWorkspace: (field: string, value: unknown) => void;
 }) {
-  const treeMaxDepth = useSignal(data.workspaceSettings?.treeMaxDepth ?? 10);
-  const treeMaxEntries = useSignal(data.workspaceSettings?.treeMaxEntries ?? 500);
+  const ws = data.workspaceSettings ?? {};
+  const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
+  const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5000);
 
   return (
     <section className="settings-panel__section">
       <h2 className="settings-panel__section-title">Workspace</h2>
 
-      <h3 className="settings-panel__subsection-title">File Tree</h3>
+      <h3 className="settings-panel__subsection-title">Access</h3>
+
+      <div className="settings-panel__field settings-panel__checkbox-row">
+        <input
+          id="ws-webTerminalEnabled"
+          type="checkbox"
+          checked={ws.webTerminalEnabled ?? false}
+          onChange={(e) =>
+            onSaveWorkspace("webTerminalEnabled", (e.target as HTMLInputElement).checked)
+          }
+        />
+        <label htmlFor="ws-webTerminalEnabled" className="settings-panel__label">
+          Enable web terminal
+        </label>
+      </div>
+
+      <div className="settings-panel__field settings-panel__checkbox-row">
+        <input
+          id="ws-vncAllowDirect"
+          type="checkbox"
+          checked={ws.vncAllowDirect ?? false}
+          onChange={(e) =>
+            onSaveWorkspace("vncAllowDirect", (e.target as HTMLInputElement).checked)
+          }
+        />
+        <label htmlFor="ws-vncAllowDirect" className="settings-panel__label">
+          Allow direct VNC targets
+        </label>
+      </div>
+
+      <p className="settings-panel__description">Terminal access updates immediately. Direct VNC target policy applies to new VNC requests.</p>
+
+      <h3 className="settings-panel__subsection-title">Server scan guardrails</h3>
 
       <div className="settings-panel__field">
-        <label className="settings-panel__label">Tree max depth</label>
-        <div className="settings-panel__field-content">
-          <NumberStepper value={treeMaxDepth} min={1} max={50} onSave={(v) => onSaveWorkspace("treeMaxDepth", v)} />
-          <span className="settings-panel__description">Maximum directory nesting level shown in file tree</span>
-        </div>
+        <label className="settings-panel__label">Max tree depth</label>
+        <NumberStepper value={treeMaxDepth} min={1} max={50} onSave={(v) => onSaveWorkspace("treeMaxDepth", v)} />
+        <span className="settings-panel__description">caps all <code>/workspace/tree</code> requests</span>
       </div>
 
       <div className="settings-panel__field">
-        <label className="settings-panel__label">Tree max entries</label>
-        <div className="settings-panel__field-content">
-          <NumberStepper value={treeMaxEntries} min={50} max={5000} step={50} onSave={(v) => onSaveWorkspace("treeMaxEntries", v)} />
-          <span className="settings-panel__description">Maximum number of entries shown per directory</span>
-        </div>
+        <label className="settings-panel__label">Max entries per scan</label>
+        <NumberStepper value={treeMaxEntries} min={50} max={10000} step={50} onSave={(v) => onSaveWorkspace("treeMaxEntries", v)} />
+        <span className="settings-panel__description">truncate oversized tree walks earlier</span>
       </div>
+
+      <h3 className="settings-panel__subsection-title">This browser</h3>
+
+      <p className="settings-panel__description">Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI.</p>
     </section>
   );
 }
