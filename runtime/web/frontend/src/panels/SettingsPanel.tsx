@@ -47,9 +47,11 @@ interface Theme {
 interface Provider {
   id: string;
   name: string;
-  configured: boolean;
+  hasOAuth?: boolean;
+  hasApiKey?: boolean;
+  configured?: boolean;
   authType?: string | null;
-  isCustom?: boolean;
+  apiKeyHint?: string;
 }
 
 interface SettingsData {
@@ -737,6 +739,17 @@ function ToolsSection({ data }: { data: SettingsData }) {
 
 /* ── Providers ── */
 function ProvidersSection({ providers }: { providers: Provider[] }) {
+  const sendCommand = async (command: string) => {
+    try {
+      await fetch("/agent/web:default/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ content: command }),
+      });
+    } catch { /* ignore */ }
+  };
+
   return (
     <section className="settings-panel__section">
       <h2 className="settings-panel__section-title">Providers</h2>
@@ -744,16 +757,24 @@ function ProvidersSection({ providers }: { providers: Provider[] }) {
         <p className="settings-panel__empty">No providers found.</p>
       )}
       {providers.map((p) => (
-        <div key={p.id} className="settings-panel__provider-row">
-          <span className="settings-panel__label">{p.name}</span>
-          <span
-            className={`settings-panel__status settings-panel__status--${p.configured ? "ok" : "unknown"}`}
-          >
-            {p.configured ? "Configured" : "Not configured"}
-          </span>
-          {p.authType && (
-            <span className="settings-panel__meta">{p.authType}</span>
-          )}
+        <div key={p.id} className={`settings-panel__provider-card${p.configured ? " settings-panel__provider-card--active" : ""}`}>
+          <div className="settings-panel__provider-info">
+            <span className="settings-panel__provider-name">{p.name}</span>
+            <span className="settings-panel__provider-id">{p.id}</span>
+            {p.hasOAuth && <span className="settings-panel__auth-badge settings-panel__auth-badge--oauth">OAuth</span>}
+            {p.hasApiKey && <span className="settings-panel__auth-badge settings-panel__auth-badge--apikey">API Key</span>}
+            {!p.hasOAuth && !p.hasApiKey && <span className="settings-panel__auth-badge settings-panel__auth-badge--custom">Custom</span>}
+          </div>
+          <div className="settings-panel__provider-actions">
+            {p.configured ? (
+              <>
+                <button type="button" className="settings-panel__provider-btn settings-panel__provider-btn--logout" onClick={() => sendCommand(`/logout ${p.id}`)}>Logout</button>
+                <button type="button" className="settings-panel__provider-btn" onClick={() => sendCommand(`/login ${p.id}`)}>Reconfigure</button>
+              </>
+            ) : (
+              <button type="button" className="settings-panel__provider-btn" onClick={() => sendCommand(`/login ${p.id}`)}>Set up</button>
+            )}
+          </div>
         </div>
       ))}
     </section>

@@ -10354,19 +10354,32 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
   function ProvidersSection({ providers }) {
+    const sendCommand2 = async (command) => {
+      try {
+        await fetch("/agent/web:default/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ content: command })
+        });
+      } catch {
+      }
+    };
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Providers" }),
       providers.length === 0 && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No providers found." }),
-      providers.map((p6) => /* @__PURE__ */ u4("div", { className: "settings-panel__provider-row", children: [
-        /* @__PURE__ */ u4("span", { className: "settings-panel__label", children: p6.name }),
-        /* @__PURE__ */ u4(
-          "span",
-          {
-            className: `settings-panel__status settings-panel__status--${p6.configured ? "ok" : "unknown"}`,
-            children: p6.configured ? "Configured" : "Not configured"
-          }
-        ),
-        p6.authType && /* @__PURE__ */ u4("span", { className: "settings-panel__meta", children: p6.authType })
+      providers.map((p6) => /* @__PURE__ */ u4("div", { className: `settings-panel__provider-card${p6.configured ? " settings-panel__provider-card--active" : ""}`, children: [
+        /* @__PURE__ */ u4("div", { className: "settings-panel__provider-info", children: [
+          /* @__PURE__ */ u4("span", { className: "settings-panel__provider-name", children: p6.name }),
+          /* @__PURE__ */ u4("span", { className: "settings-panel__provider-id", children: p6.id }),
+          p6.hasOAuth && /* @__PURE__ */ u4("span", { className: "settings-panel__auth-badge settings-panel__auth-badge--oauth", children: "OAuth" }),
+          p6.hasApiKey && /* @__PURE__ */ u4("span", { className: "settings-panel__auth-badge settings-panel__auth-badge--apikey", children: "API Key" }),
+          !p6.hasOAuth && !p6.hasApiKey && /* @__PURE__ */ u4("span", { className: "settings-panel__auth-badge settings-panel__auth-badge--custom", children: "Custom" })
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__provider-actions", children: p6.configured ? /* @__PURE__ */ u4(S, { children: [
+          /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn settings-panel__provider-btn--logout", onClick: () => sendCommand2(`/logout ${p6.id}`), children: "Logout" }),
+          /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => sendCommand2(`/login ${p6.id}`), children: "Reconfigure" })
+        ] }) : /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => sendCommand2(`/login ${p6.id}`), children: "Set up" }) })
       ] }, p6.id))
     ] });
   }
