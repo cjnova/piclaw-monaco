@@ -943,7 +943,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
           onInput={(e) => (filter.value = (e.target as HTMLInputElement).value)}
         />
         <label className="settings-panel__tools-match-mode">
-          <input type="checkbox" checked={true} readOnly />
+          <input type="checkbox" checked={true} disabled />
           Any keyword (OR)
         </label>
       </div>
@@ -955,7 +955,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
           <div key={ts.name} className="settings-panel__toolset">
             <div className="settings-panel__toolset-header" onClick={() => toggleCollapse(ts.name)}>
               <span className="settings-panel__toolset-toggle">{isCollapsed ? "▶" : "▼"}</span>
-              <input type="checkbox" checked={true} readOnly className="settings-panel__toolset-checkbox" />
+              <input type="checkbox" checked={true} disabled className="settings-panel__toolset-checkbox" />
               <strong className="settings-panel__toolset-name">{ts.name}</strong>
               <span className="settings-panel__toolset-count">({tools.length})</span>
               <span className="settings-panel__toolset-desc">{ts.description ?? ""}</span>
@@ -964,7 +964,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
               <div className="settings-panel__toolset-tools">
                 {tools.map((t: any) => (
                   <div key={t.name} className="settings-panel__tool-row">
-                    <input type="checkbox" checked={true} readOnly className="settings-panel__tool-checkbox" />
+                    <input type="checkbox" checked={true} disabled className="settings-panel__tool-checkbox" />
                     <span className="settings-panel__tool-name">{t.name}</span>
                     <span className="settings-panel__tool-kind">{kindIcon(t.kind)}</span>
                     {(t.description ?? t.summary) && (

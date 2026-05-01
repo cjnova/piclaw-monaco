@@ -10538,7 +10538,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           }
         ),
         /* @__PURE__ */ u4("label", { className: "settings-panel__tools-match-mode", children: [
-          /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true }),
+          /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, disabled: true }),
           "Any keyword (OR)"
         ] })
       ] }),
@@ -10548,7 +10548,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         return /* @__PURE__ */ u4("div", { className: "settings-panel__toolset", children: [
           /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-header", onClick: () => toggleCollapse(ts.name), children: [
             /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-toggle", children: isCollapsed ? "\u25B6" : "\u25BC" }),
-            /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true, className: "settings-panel__toolset-checkbox" }),
+            /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, disabled: true, className: "settings-panel__toolset-checkbox" }),
             /* @__PURE__ */ u4("strong", { className: "settings-panel__toolset-name", children: ts.name }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-count", children: [
               "(",
@@ -10558,7 +10558,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             /* @__PURE__ */ u4("span", { className: "settings-panel__toolset-desc", children: ts.description ?? "" })
           ] }),
           !isCollapsed && /* @__PURE__ */ u4("div", { className: "settings-panel__toolset-tools", children: tools.map((t4) => /* @__PURE__ */ u4("div", { className: "settings-panel__tool-row", children: [
-            /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, readOnly: true, className: "settings-panel__tool-checkbox" }),
+            /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, disabled: true, className: "settings-panel__tool-checkbox" }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__tool-name", children: t4.name }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__tool-kind", children: kindIcon(t4.kind) }),
             (t4.description ?? t4.summary) && /* @__PURE__ */ u4("span", { className: "settings-panel__tool-desc", children: (t4.description ?? t4.summary).length > 60 ? (t4.description ?? t4.summary).slice(0, 60) + "\u2026" : t4.description ?? t4.summary }),
