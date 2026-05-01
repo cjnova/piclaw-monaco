@@ -395,22 +395,41 @@ export function MessageList() {
 
   // Scroll to a specific message (triggered from search panel)
   useEffect(() => {
-    const scrollTo = (id: string, attempt = 0) => {
-      if (!listRef.current) return;
-      const el = listRef.current.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.style.outline = "2px solid var(--accent)";
-        el.style.borderRadius = "4px";
-        setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 2500);
-      } else if (attempt < 3) {
-        // Message not loaded yet — retry after a short delay
-        setTimeout(() => scrollTo(id, attempt + 1), 300);
-      }
+    const highlight = (el: HTMLElement) => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.style.outline = "2px solid var(--accent)";
+      el.style.borderRadius = "4px";
+      setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 2500);
     };
-    const handler = (e: Event) => {
+    const handler = async (e: Event) => {
       const id = (e as CustomEvent).detail?.id;
-      if (id) scrollTo(id);
+      if (!id || !listRef.current) return;
+      // Try to find in DOM first
+      let el = listRef.current.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
+      if (el) { highlight(el); return; }
+      // Not in DOM — load messages around this ID
+      try {
+        const res = await fetch(buildChatUrl("/timeline", { around_row: String(id), limit: "50" }), { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json() as { posts?: Array<Record<string, unknown>> };
+          const posts = data.posts ?? [];
+          if (posts.length) {
+            setMessages(posts.map((p: Record<string, unknown>) => ({
+              id: p.id as number,
+              type: ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent") as "user" | "agent",
+              content: (p.data as Record<string, unknown>)?.content as string ?? "",
+              content_blocks: (p.data as Record<string, unknown>)?.content_blocks as ContentBlock[],
+              created_at: p.timestamp as string ?? "",
+              data: p.data as Record<string, unknown>,
+            })));
+            // Wait for render, then scroll
+            setTimeout(() => {
+              el = listRef.current?.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
+              if (el) highlight(el);
+            }, 100);
+          }
+        }
+      } catch {}
     };
     window.addEventListener("piclaw:scroll-to-message", handler);
     return () => window.removeEventListener("piclaw:scroll-to-message", handler);

@@ -32,7 +32,8 @@ function formatTime(ts: string | undefined): string {
 }
 
 function getSnippet(result: SearchResult): string {
-  return result.text ?? result.content ?? "";
+  const text = result.text ?? result.content ?? (result as unknown as Record<string, unknown>).data && ((result as unknown as Record<string, unknown>).data as Record<string, unknown>)?.content;
+  return typeof text === "string" ? text.slice(0, 300) : "";
 }
 
 function getTimestamp(result: SearchResult): string {
@@ -136,7 +137,7 @@ export function SearchPanel() {
             }}
           >
             <div className="search-panel__item-header">
-              <span className="search-panel__item-type">{(r as unknown as Record<string, unknown>).type === "user" ? "You" : "Agent"}</span>
+              <span className="search-panel__item-type">{((r as unknown as Record<string, unknown>).data as Record<string, unknown>)?.type === "user_message" ? "You" : "Agent"}</span>
               {getTimestamp(r) && (
                 <span className="search-panel__item-time">{formatTime(getTimestamp(r))}</span>
               )}
