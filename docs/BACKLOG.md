@@ -157,12 +157,12 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 ### Wave 10e — Code Quality Fixes (from review)
 
-**Wave 1 (parallel):**
+**Wave 1 (sequential):**
 
 | Task | Description | Status |
 |---|---|---|
 | dead-code-cleanup | Remove orphaned files, unused modules/exports, stale CSS/localStorage (#109) | ⏳ |
-| fix-hardcoded-chat-jid | Use active chat JID instead of hardcoded web:default (#106) | ⏳ |
+| fix-hardcoded-chat-jid | Use active chat JID instead of hardcoded web:default (#106) — after #109 | ⏳ |
 
 **Wave 2 (after Wave 1):**
 
