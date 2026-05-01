@@ -2051,28 +2051,31 @@ body {
 .search-panel__item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 5px 12px;
+  gap: 4px;
+  padding: 8px 12px;
   cursor: pointer;
   border-radius: 3px;
-  margin: 0 4px;
+  margin: 2px 4px;
+  border-left: 2px solid transparent;
 }
 
 .search-panel__item:hover {
-  background: var(--border);
+  background: var(--bg-elevated);
+  border-left-color: var(--accent);
 }
 
 .search-panel__item-text {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
 }
 
 .search-panel__item-time {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -3545,4 +3548,16 @@ body {
 }
 .scratchpad-panel__item:hover .scratchpad-panel__play-btn {
   opacity: 1;
+}
+
+.search-panel__item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.search-panel__item-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
 }

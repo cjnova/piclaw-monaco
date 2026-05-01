@@ -395,16 +395,22 @@ export function MessageList() {
 
   // Scroll to a specific message (triggered from search panel)
   useEffect(() => {
-    const handler = (e: Event) => {
-      const id = (e as CustomEvent).detail?.id;
-      if (!id || !listRef.current) return;
+    const scrollTo = (id: string, attempt = 0) => {
+      if (!listRef.current) return;
       const el = listRef.current.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.style.outline = "2px solid var(--accent)";
         el.style.borderRadius = "4px";
-        setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 2000);
+        setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 2500);
+      } else if (attempt < 3) {
+        // Message not loaded yet — retry after a short delay
+        setTimeout(() => scrollTo(id, attempt + 1), 300);
       }
+    };
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail?.id;
+      if (id) scrollTo(id);
     };
     window.addEventListener("piclaw:scroll-to-message", handler);
     return () => window.removeEventListener("piclaw:scroll-to-message", handler);

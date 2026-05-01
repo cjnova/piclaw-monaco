@@ -9395,8 +9395,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r4.id } }));
           },
           children: [
-            /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) }),
-            getTimestamp(r4) && /* @__PURE__ */ u4("span", { className: "search-panel__item-time", children: formatTime(getTimestamp(r4)) })
+            /* @__PURE__ */ u4("div", { className: "search-panel__item-header", children: [
+              /* @__PURE__ */ u4("span", { className: "search-panel__item-type", children: r4.type === "user" ? "You" : "Agent" }),
+              getTimestamp(r4) && /* @__PURE__ */ u4("span", { className: "search-panel__item-time", children: formatTime(getTimestamp(r4)) })
+            ] }),
+            /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) })
           ]
         },
         r4.id
@@ -11112,9 +11115,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => window.removeEventListener("piclaw:new-message", handler);
     }, [scrollToBottom]);
     y2(() => {
-      const handler = (e5) => {
-        const id = e5.detail?.id;
-        if (!id || !listRef.current) return;
+      const scrollTo = (id, attempt = 0) => {
+        if (!listRef.current) return;
         const el = listRef.current.querySelector(`[data-message-id="${id}"]`);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -11123,8 +11125,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           setTimeout(() => {
             el.style.outline = "";
             el.style.borderRadius = "";
-          }, 2e3);
+          }, 2500);
+        } else if (attempt < 3) {
+          setTimeout(() => scrollTo(id, attempt + 1), 300);
         }
+      };
+      const handler = (e5) => {
+        const id = e5.detail?.id;
+        if (id) scrollTo(id);
       };
       window.addEventListener("piclaw:scroll-to-message", handler);
       return () => window.removeEventListener("piclaw:scroll-to-message", handler);

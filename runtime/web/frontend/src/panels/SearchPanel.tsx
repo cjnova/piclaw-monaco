@@ -135,10 +135,13 @@ export function SearchPanel() {
               window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } }));
             }}
           >
+            <div className="search-panel__item-header">
+              <span className="search-panel__item-type">{(r as unknown as Record<string, unknown>).type === "user" ? "You" : "Agent"}</span>
+              {getTimestamp(r) && (
+                <span className="search-panel__item-time">{formatTime(getTimestamp(r))}</span>
+              )}
+            </div>
             <span className="search-panel__item-text">{getSnippet(r)}</span>
-            {getTimestamp(r) && (
-              <span className="search-panel__item-time">{formatTime(getTimestamp(r))}</span>
-            )}
           </li>
         ))}
       </ul>
