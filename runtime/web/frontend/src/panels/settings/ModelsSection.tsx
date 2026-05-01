@@ -90,11 +90,10 @@ export function ModelsSection({ data: _data }: { data: SettingsData }) {
             {filtered.map(m => (
               <tr
                 key={m.label}
-                className={m.label === current.value ? "settings-panel__model-table-row--active" : ""}
                 tabIndex={0}
                 onClick={() => switchModel(m.label)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchModel(m.label); } }}
-                style={{ cursor: "pointer" }}
+                className={`${m.label === current.value ? "settings-panel__model-table-row--active" : ""} settings-panel__model-table-row`}
               >
                 <td>
                   <input type="radio" name="model" checked={m.label === current.value} readOnly />
@@ -109,7 +108,7 @@ export function ModelsSection({ data: _data }: { data: SettingsData }) {
         </table>
       </div>
 
-      <h3 className="settings-panel__subsection-title" style={{ marginTop: "24px" }}>Thinking level: <strong>{thinkingLevel.value}</strong></h3>
+      <h3 className="settings-panel__subsection-title settings-panel__subsection-title--spaced">Thinking level: <strong>{thinkingLevel.value}</strong></h3>
 
       <div className="settings-panel__thinking-slider">
         <input

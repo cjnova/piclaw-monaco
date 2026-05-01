@@ -1,5 +1,5 @@
 import { getMessageUrl } from "../api/chat-jid";
-import { useEffect } from "preact/hooks";
+import { useCallback, useEffect } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 
 interface AgentStatus {
@@ -102,7 +102,7 @@ export function ModelContextBar() {
   const usageLabel = useSignal<string>("");
   const providerUsage = useSignal<ProviderUsage | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch("/agent/status");
       if (res.ok) {
@@ -149,9 +149,9 @@ export function ModelContextBar() {
       console.warn("[ModelContextBar] status fetch failed:", err);
       error.value = true;
     }
-  };
+  }, []);
 
-  const fetchContext = async () => {
+  const fetchContext = useCallback(async () => {
     try {
       const res = await fetch("/agent/context");
       if (res.ok) {
@@ -160,29 +160,33 @@ export function ModelContextBar() {
     } catch (err) {
       console.warn("[ModelContextBar] context fetch failed:", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5_000);
+    void fetchStatus();
+    const interval = setInterval(() => {
+      void fetchStatus();
+    }, 5_000);
     return () => clearInterval(interval);
-  }, [agentStatus, error]);
+  }, [fetchStatus]);
 
   useEffect(() => {
-    fetchContext();
-    const interval = setInterval(fetchContext, 10_000);
+    void fetchContext();
+    const interval = setInterval(() => {
+      void fetchContext();
+    }, 10_000);
     return () => clearInterval(interval);
-  }, [agentContext]);
+  }, [fetchContext]);
 
   // Immediately refresh model/context when SSE connects (first load + reconnects)
   useEffect(() => {
     const onConnect = () => {
-      fetchStatus();
-      fetchContext();
+      void fetchStatus();
+      void fetchContext();
     };
     window.addEventListener("piclaw:sse-connected", onConnect);
     return () => window.removeEventListener("piclaw:sse-connected", onConnect);
-  }, []);
+  }, [fetchStatus, fetchContext]);
 
   // #68: elapsed timer during compaction
   useEffect(() => {
@@ -207,13 +211,15 @@ export function ModelContextBar() {
       if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {
         if (isCompacting.value) {
           isCompacting.value = false;
-          setTimeout(() => fetchContext(), 1000);
+          setTimeout(() => {
+            void fetchContext();
+          }, 1000);
         }
       }
     };
     window.addEventListener("piclaw:agent-status", onStatus);
     return () => window.removeEventListener("piclaw:agent-status", onStatus);
-  }, []);
+  }, [fetchContext]);
 
   // Close pickers on outside click or Escape
   useEffect(() => {
@@ -259,7 +265,9 @@ export function ModelContextBar() {
       // Command responded immediately ("Already compacted" or similar) — no agent turn
       if (data?.command) {
         isCompacting.value = false;
-        setTimeout(() => fetchContext(), 1000);
+        setTimeout(() => {
+          void fetchContext();
+        }, 1000);
       }
     } catch {
       isCompacting.value = false;
@@ -370,25 +378,11 @@ export function ModelContextBar() {
             return (
               <div
                 key={entry.id}
-                className="model-picker__item"
+                className={`model-picker__item${isCurrent ? " model-picker__item--active" : ""}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleSelectModel(entry.id)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectModel(entry.id); } }}
-                style={{
-                  color: isCurrent ? "#cba6f7" : "#cdd6f4",
-                  background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = isCurrent
-                    ? "rgba(203,166,247,0.18)"
-                    : "rgba(255,255,255,0.07)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = isCurrent
-                    ? "rgba(203,166,247,0.1)"
-                    : "transparent";
-                }}
               >
                 <span className="model-picker__item__check">
                   {isCurrent ? "✓" : ""}
@@ -447,17 +441,11 @@ export function ModelContextBar() {
                   return (
                     <div
                       key={level}
-                      className="thinking-picker__item"
+                      className={`thinking-picker__item${isActive ? " thinking-picker__item--active" : ""}`}
                       role="button"
                       tabIndex={0}
                       onClick={(ev) => { ev.stopPropagation(); handleSelectThinking(level); }}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); handleSelectThinking(level); } }}
-                      style={{
-                        color: isActive ? "#a6e3a1" : "#cdd6f4",
-                        background: isActive ? "rgba(166,227,161,0.1)" : "transparent",
-                      }}
-                      onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)"; }}
-                      onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent"; }}
                     >
                       <span className="thinking-picker__item__check">{isActive ? "✓" : ""}</span>
                       <span>{level}</span>

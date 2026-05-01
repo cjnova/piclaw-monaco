@@ -235,7 +235,7 @@ function SunburstChart({ root, totalSize }: SunburstChartProps) {
         <circle cx={SB_CX} cy={SB_CY} r="35" fill="rgba(20,20,30,0.88)" />
         {/* Center text — use foreignObject for reliable centering */}
         <foreignObject x={SB_CX - 35} y={SB_CY - 18} width="70" height="36">
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" }}>
+          <div className="workspace__sunburst-center">
             <span className="workspace__sunburst-total">{formatBytes(totalSize)}</span>
             <span className="workspace__sunburst-label">TOTAL</span>
           </div>
@@ -622,7 +622,7 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
   return (
     <div className="workspace__preview-info">
       <div className="workspace__preview-name workspace__preview-name--wrap">
-        <span className="codicon codicon-folder-opened" style={{ marginRight: "4px" }} />
+        <span className="codicon codicon-folder-opened workspace__folder-icon" />
         {node.name}
       </div>
 
@@ -705,10 +705,9 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
                 const color = DOT_COLORS[i % DOT_COLORS.length];
                 return (
                   <div key={child.path} className="workspace__folder-breakdown-item">
-                    <span
-                      className="workspace__folder-breakdown-dot"
-                      style={{ backgroundColor: color }}
-                    />
+                    <svg className="workspace__folder-breakdown-dot" viewBox="0 0 8 8" aria-hidden="true">
+                      <circle cx="4" cy="4" r="4" fill={color} />
+                    </svg>
                     <span className="workspace__folder-breakdown-name" title={child.name}>
                       {child.type === "dir" ? "📁 " : ""}{child.name}
                     </span>
@@ -752,7 +751,9 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
                   <div className="workspace__folder-chart-legend">
                     {chartSegments.map((segment) => (
                       <div key={`${segment.label}-${segment.type}`} className="workspace__folder-chart-legend-item">
-                        <span className="workspace__folder-breakdown-dot" style={{ backgroundColor: segment.color }} />
+                        <svg className="workspace__folder-breakdown-dot" viewBox="0 0 8 8" aria-hidden="true">
+                          <circle cx="4" cy="4" r="4" fill={segment.color} />
+                        </svg>
                         <span className="workspace__folder-breakdown-name" title={segment.label}>{segment.label}</span>
                         <span className="workspace__folder-breakdown-size">{formatBytes(segment.size)}</span>
                         <span className="workspace__folder-breakdown-pct">{segment.pct.toFixed(0)}%</span>
@@ -776,9 +777,16 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
 export function WorkspacePanel() {
   const [topHeight, setTopHeight] = useState(() => Number(safeGetItem("piclaw-workspace-split")) || 260);
   const containerRef = useRef<HTMLDivElement>(null);
+  const topPaneRef = useRef<HTMLDivElement>(null);
   const heightRef = useRef(topHeight);
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [treeVersion, setTreeVersion] = useState(0);
+
+  useEffect(() => {
+    if (topPaneRef.current) {
+      topPaneRef.current.style.height = `${topHeight}px`;
+    }
+  }, [topHeight]);
 
   const handleMutation = useCallback((payload: WorkspaceMutationPayload) => {
     setTreeVersion((current) => current + 1);
@@ -813,7 +821,7 @@ export function WorkspacePanel() {
 
   return (
     <div ref={containerRef} className="workspace">
-      <div className="workspace__pane-top" style={{ height: `${topHeight}px` }}>
+      <div className="workspace__pane-top" ref={topPaneRef}>
         <div className="workspace__section-header workspace__section-header--padded">Files</div>
         <FileTree key={treeVersion} onFileSelect={setSelectedNode} />
       </div>

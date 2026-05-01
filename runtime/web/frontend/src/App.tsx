@@ -1,5 +1,5 @@
 import { isSafeExtensionUrl } from "./utils/isSafeExtensionUrl";
-import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
+import { useEffect, useCallback, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
 import { ActivityBar } from "./components/ActivityBar";
@@ -28,6 +28,8 @@ function AppContent() {
   const extensionPageName = useSignal<string | null>(null);
   const extensionPageHtml = useSignal<string | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const sidebarWrapperRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     safeSetItem("piclaw-sidebar-width", String(sidebarWidth.value));
@@ -190,7 +192,7 @@ function AppContent() {
     };
     window.addEventListener('piclaw:open-page', onOpenPage);
     return () => window.removeEventListener('piclaw:open-page', onOpenPage);
-  }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
+  }, [handlePageSelect]);
 
   const connected = connectionStatus.value === "connected";
   const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings" };
@@ -216,9 +218,24 @@ function AppContent() {
     document.addEventListener("mouseup", onUp);
   }, [terminalHeight, terminalMaximized]);
 
-  const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
   const isSettingsActive = activePanel.value === "settings";
-  const sbWidth = (sidebarCollapsed.value || isSettingsActive) ? 0 : sidebarWidth.value;
+  const isExtensionPageOpen = (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value;
+
+  useEffect(() => {
+    const el = sidebarWrapperRef.current;
+    if (!el) return;
+    const isClosed = sidebarCollapsed.value || isSettingsActive;
+    el.style.width = isClosed ? "0px" : `${sidebarWidth.value}px`;
+    el.style.minWidth = isClosed ? "0px" : "150px";
+    el.style.maxWidth = isClosed ? "0px" : `${Math.round(window.innerWidth * 0.5)}px`;
+  }, [sidebarCollapsed.value, isSettingsActive, sidebarWidth.value]);
+
+  useEffect(() => {
+    const el = terminalRef.current;
+    if (!el) return;
+    el.style.height = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
+  }, [terminalMaximized.value, terminalHeight.value]);
+
   const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -239,11 +256,7 @@ function AppContent() {
         <div className="app-layout__content-area">
           <div
             className="app-layout__sidebar-wrapper"
-            style={{
-              width: `${sbWidth}px`,
-              minWidth: (sidebarCollapsed.value || isSettingsActive) ? 0 : 150,
-              maxWidth: (sidebarCollapsed.value || isSettingsActive) ? 0 : Math.round(window.innerWidth * 0.5),
-            }}
+            ref={sidebarWrapperRef}
           >
             <Sidebar title={PANEL_NAMES[activePanel.value] || activePanel.value}>
               <PanelRouter activePanel={activePanel.value} onPageSelect={handlePageSelect} />
@@ -289,7 +302,7 @@ function AppContent() {
             {isSettingsActive && (
               <SettingsPanel />
             )}
-            {!isSettingsActive && ((extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value) ? (
+            {!isSettingsActive && isExtensionPageOpen ? (
               <div className="extension-frame">
                 <div className="extension-frame__header">
                   <button
@@ -306,12 +319,12 @@ function AppContent() {
                   <object
                     data={extensionPageUrl.value!}
                     type="application/pdf"
-                    style={{ width: '100%', flex: 1, border: 'none' }}
+                    className="extension-frame__pdf-object"
                     aria-label={extensionPageName.value ?? 'PDF'}
                   >
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <div className="extension-frame__pdf-fallback">
                       <p>PDF cannot be displayed.</p>
-                      <a href={extensionPageUrl.value!} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>Open PDF in new tab</a>
+                      <a href={extensionPageUrl.value!} target="_blank" rel="noopener noreferrer" className="extension-frame__pdf-link">Open PDF in new tab</a>
                     </div>
                   </object>
                 ) : extensionPageHtml.value ? (
@@ -330,14 +343,14 @@ function AppContent() {
                 )}
               </div>
             ) : null}
-            <div style={{ display: (isSettingsActive || ((extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value)) ? 'none' : 'contents' }}>
+            <div className={isSettingsActive || isExtensionPageOpen ? "app-layout__chat-wrapper app-layout__chat-wrapper--hidden" : "app-layout__chat-wrapper"}>
               <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
             </div>
           </div>
         </div>
 
         {terminalVisible.value && (
-          <div className="app-layout__terminal" style={{ height: tH }}>
+          <div className="app-layout__terminal" ref={terminalRef}>
             <div
               className="app-layout__term-drag-handle"
               onMouseDown={onTermDragStart}
@@ -398,8 +411,7 @@ function AppContent() {
         <div className="app-layout__status-bar">
           <span className="status-bar__conn">
             <span
-              className="status-bar__conn-dot"
-              style={{ background: connected ? "var(--success)" : "var(--error)" }}
+              className={`status-bar__conn-dot ${connected ? "status-bar__conn-dot--connected" : "status-bar__conn-dot--disconnected"}`}
             />
             <span className="status-bar__conn-text">{connected ? "Connected" : "Disconnected"}</span>
           </span>

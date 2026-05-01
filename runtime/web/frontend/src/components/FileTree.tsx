@@ -41,12 +41,11 @@ async function fetchTree(dirPath: string): Promise<TreeNode[]> {
 
 interface TreeItemProps {
   node: TreeNode;
-  depth: number;
   selectedPath: string | null;
   onSelect: (node: TreeNode) => void;
 }
 
-function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
+function TreeItem({ node, selectedPath, onSelect }: TreeItemProps) {
   const isDir = node.type === "dir";
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<TreeNode[] | null>(
@@ -108,7 +107,6 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
         ]
           .filter(Boolean)
           .join(" ")}
-        style={{ paddingLeft: `${depth * 16}px` }}
         role="treeitem"
         tabIndex={0}
         aria-expanded={isDir ? expanded : undefined}
@@ -130,19 +128,13 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
       </div>
 
       {loading && (
-        <div
-          className="file-tree__loading"
-          style={{ paddingLeft: `${(depth + 1) * 16}px` }}
-        >
+        <div className="file-tree__loading file-tree__children-indent">
           Loading…
         </div>
       )}
 
       {error && (
-        <div
-          className="file-tree__error"
-          style={{ paddingLeft: `${(depth + 1) * 16}px` }}
-        >
+        <div className="file-tree__error file-tree__children-indent">
           {error === "auth" ? "Authenticate to browse files" : "Failed to load"}
           <button
             className="file-tree__retry"
@@ -159,12 +151,11 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
       )}
 
       {expanded && !loading && children && children.length > 0 && (
-        <div>
+        <div className="file-tree__children">
           {children.map((child) => (
             <TreeItem
               key={child.path}
               node={child}
-              depth={depth + 1}
               selectedPath={selectedPath}
               onSelect={onSelect}
             />
@@ -173,10 +164,7 @@ function TreeItem({ node, depth, selectedPath, onSelect }: TreeItemProps) {
       )}
 
       {expanded && !loading && children && children.length === 0 && (
-        <div
-          className="file-tree__empty"
-          style={{ paddingLeft: `${(depth + 1) * 16}px` }}
-        >
+        <div className="file-tree__empty file-tree__children-indent">
           Empty folder
         </div>
       )}
@@ -285,7 +273,6 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         <TreeItem
           key={node.path}
           node={node}
-          depth={0}
           selectedPath={selectedPath}
           onSelect={handleSelect}
         />

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useCallback, useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 
 interface KeychainEntry {
@@ -28,14 +28,14 @@ export function KeychainSection() {
     keychainErrorTimer.current = setTimeout(() => (keychainError.value = null), 3000);
   };
 
-  const fetchEntries = () => {
+  const fetchEntries = useCallback(() => {
     fetch("/agent/keychain", { credentials: "same-origin" })
       .then(r => r.json())
       .then((d: KeychainResponse) => { entries.value = d.entries ?? []; })
       .catch(() => {});
-  };
+  }, []);
 
-  useEffect(() => { fetchEntries(); }, []);
+  useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
   const addEntry = async () => {
     if (!newName.value.trim() || !newSecret.value.trim()) return;
@@ -87,7 +87,7 @@ export function KeychainSection() {
     : entries.value;
 
   return (
-    <section className="settings-panel__section" style={{ maxWidth: '720px' }}>
+    <section className="settings-panel__section settings-panel__section--narrow">
       <h2 className="settings-panel__section-title">Keychain</h2>
 
       {keychainError.value && (
@@ -112,7 +112,7 @@ export function KeychainSection() {
       </p>
 
       {showAdd.value && (
-        <div className="settings-panel__card" style={{ marginBottom: "12px" }}>
+        <div className="settings-panel__card settings-panel__card--spaced">
           <h3 className="settings-panel__subsection-title">New entry</h3>
           <div className="settings-panel__field">
             <label className="settings-panel__label">Name</label>
@@ -131,7 +131,7 @@ export function KeychainSection() {
               <option value="basic">Basic</option>
             </select>
           </div>
-          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+          <div className="settings-panel__actions-row">
             <button type="button" className="settings-panel__provider-btn" onClick={addEntry}>Save</button>
             <button type="button" className="settings-panel__provider-btn" onClick={() => (showAdd.value = false)}>Cancel</button>
           </div>
@@ -150,13 +150,13 @@ export function KeychainSection() {
         </thead>
         <tbody>
           {filtered.length === 0 ? (
-            <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>No keychain entries.</td></tr>
+            <tr><td colSpan={5} className="settings-panel__table-empty">No keychain entries.</td></tr>
           ) : (
             filtered.map(e => (
               <tr key={e.name}>
                 <td>{e.name}</td>
                 <td>{e.type ?? "—"}</td>
-                <td><code style={{ fontSize: "11px", color: "var(--text-muted)" }}>{e.envVar ?? "—"}</code></td>
+                <td><code className="settings-panel__env-var">{e.envVar ?? "—"}</code></td>
                 <td>{e.updatedAt ? new Date(e.updatedAt).toLocaleDateString() : "—"}</td>
                 <td>
                   <button type="button" className="settings-panel__provider-btn settings-panel__provider-btn--logout" onClick={() => deleteEntry(e.name)} title="Delete">

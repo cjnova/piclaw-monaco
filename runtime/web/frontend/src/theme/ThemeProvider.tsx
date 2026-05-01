@@ -1,6 +1,6 @@
 import { createContext } from "preact";
 import type { ComponentChildren } from "preact";
-import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { DARK_THEME, LIGHT_THEME, getSystemTheme, type Theme } from "./theme";
 
 export const ThemeContext = createContext<Theme>(DARK_THEME);
@@ -38,15 +38,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return () => mediaQuery.removeEventListener("change", onChange);
   }, [manualOverride]);
 
-  const setMode = (newMode: "dark" | "light") => {
+  const setMode = useCallback((newMode: "dark" | "light") => {
     setManualOverride(true);
     setModeState(newMode);
-  };
+  }, []);
 
-  const toggleMode = () => {
+  const toggleMode = useCallback(() => {
     setManualOverride(true);
     setModeState((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+  }, []);
 
   const theme = useMemo(() => (mode === "dark" ? DARK_THEME : LIGHT_THEME), [mode]);
 
@@ -69,7 +69,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     root.style.setProperty("--input-border", theme.inputBorder);
   }, [theme]);
 
-  const control: ThemeControl = useMemo(() => ({ mode, setMode, toggleMode }), [mode]);
+  const control: ThemeControl = useMemo(() => ({ mode, setMode, toggleMode }), [mode, setMode, toggleMode]);
 
   return (
     <ThemeControlContext.Provider value={control}>
