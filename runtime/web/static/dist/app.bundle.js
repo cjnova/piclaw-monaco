@@ -9918,7 +9918,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     ] });
   }
 
-  // runtime/web/frontend/src/panels/SettingsPanel.tsx
+  // runtime/web/frontend/src/panels/settings/NumberStepper.tsx
   function NumberStepper({ value, min, max, step, onSave }) {
     const s4 = step ?? 1;
     const decrement = () => {
@@ -9948,134 +9948,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__stepper-btn", onClick: increment, children: "+" })
     ] });
   }
-  var CATEGORIES = [
-    { id: "general", label: "General", icon: "codicon-gear" },
-    { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
-    { id: "compaction", label: "Compaction", icon: "codicon-archive" },
-    { id: "workspace", label: "Workspace", icon: "codicon-folder" },
-    { id: "providers", label: "Providers", icon: "codicon-cloud" },
-    { id: "models", label: "Models", icon: "codicon-hubot" },
-    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
-    { id: "keychain", label: "Keychain", icon: "codicon-key" },
-    { id: "tools", label: "Tools", icon: "codicon-tools" }
-  ];
-  function SettingsPanel() {
-    const activeCategory = useSignal(localStorage.getItem("piclaw-settings-category") || "general");
-    const settings = useSignal(null);
-    const loading = useSignal(true);
-    const error = useSignal(null);
-    const saveStatus = useSignal(null);
-    let saveTimer = null;
-    y2(() => {
-      fetch("/agent/settings-data", { credentials: "same-origin" }).then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      }).then((data) => {
-        settings.value = data;
-        loading.value = false;
-      }).catch((err) => {
-        error.value = `Failed to load settings: ${err instanceof Error ? err.message : String(err)}`;
-        settings.value = {};
-        loading.value = false;
-      });
-    }, []);
-    function showSaved(msg = "Saved \u2713") {
-      saveStatus.value = msg;
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => saveStatus.value = null, 2e3);
-    }
-    function showError(msg = "Save failed") {
-      saveStatus.value = msg;
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => saveStatus.value = null, 3e3);
-    }
-    function saveGeneral(field, value) {
-      fetch("/agent/settings/general", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value })
-      }).then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      }).then((body) => {
-        if (body.settings) {
-          settings.value = { ...settings.value ?? {}, ...body.settings };
-        }
-        showSaved();
-      }).catch(() => showError());
-    }
-    const saveWorkspace = async (field, value) => {
-      try {
-        const res = await fetch("/agent/settings/workspace", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ [field]: value })
-        });
-        if (res.ok) {
-          saveStatus.value = "Saved";
-          setTimeout(() => saveStatus.value = null, 2e3);
-        } else {
-          saveStatus.value = "Save failed";
-          setTimeout(() => saveStatus.value = null, 3e3);
-        }
-      } catch {
-        saveStatus.value = "Save failed";
-        setTimeout(() => saveStatus.value = null, 3e3);
-      }
-    };
-    function saveCompaction(field, value) {
-      fetch("/agent/settings/compaction", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value })
-      }).then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      }).then((body) => {
-        if (body.settings) {
-          settings.value = { ...settings.value ?? {}, ...body.settings };
-        }
-        showSaved();
-      }).catch(() => showError());
-    }
-    if (loading.value) {
-      return /* @__PURE__ */ u4("div", { className: "settings-panel", children: /* @__PURE__ */ u4("div", { className: "settings-panel__loading", children: "Loading settings\u2026" }) });
-    }
-    const s4 = settings.value ?? {};
-    return /* @__PURE__ */ u4("div", { className: "settings-panel", children: [
-      /* @__PURE__ */ u4("nav", { className: "settings-panel__nav", children: CATEGORIES.map((cat) => /* @__PURE__ */ u4(
-        "button",
-        {
-          className: `settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`,
-          onClick: () => {
-            activeCategory.value = cat.id;
-            localStorage.setItem("piclaw-settings-category", cat.id);
-          },
-          children: [
-            /* @__PURE__ */ u4("i", { className: `codicon ${cat.icon}` }),
-            /* @__PURE__ */ u4("span", { children: cat.label })
-          ]
-        },
-        cat.id
-      )) }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__content", children: [
-        error.value && /* @__PURE__ */ u4("div", { className: "settings-panel__error", children: error.value }),
-        saveStatus.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status", children: saveStatus.value }),
-        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4, onSaveGeneral: saveGeneral }),
-        activeCategory.value === "sessions" && /* @__PURE__ */ u4(SessionsSection, { data: s4, onSaveGeneral: saveGeneral }),
-        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
-        activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
-        activeCategory.value === "workspace" && /* @__PURE__ */ u4(WorkspaceSection, { data: s4, onSaveWorkspace: saveWorkspace }),
-        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] }),
-        activeCategory.value === "models" && /* @__PURE__ */ u4(ModelsSection, { data: s4 }),
-        activeCategory.value === "keychain" && /* @__PURE__ */ u4(KeychainSection, {}),
-        activeCategory.value === "tools" && /* @__PURE__ */ u4(ToolsSection, { data: s4 })
-      ] })
-    ] });
-  }
+
+  // runtime/web/frontend/src/panels/settings/GeneralSection.tsx
   function GeneralSection({
     data,
     onSaveGeneral
@@ -10148,6 +10022,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/SessionsSection.tsx
   function SessionsSection({
     data,
     onSaveGeneral
@@ -10206,6 +10082,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/AppearanceSection.tsx
   function AppearanceSection({
     data,
     onSaveGeneral
@@ -10250,6 +10128,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/CompactionSection.tsx
   function CompactionSection({
     data,
     onSaveCompaction
@@ -10317,6 +10197,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/WorkspaceSection.tsx
   function WorkspaceSection({
     data,
     onSaveWorkspace
@@ -10382,7 +10264,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI." })
     ] });
   }
-  function ModelsSection({ data }) {
+
+  // runtime/web/frontend/src/panels/settings/ModelsSection.tsx
+  var THINKING_LEVELS = ["off", "minimal", "low", "medium", "high"];
+  function ModelsSection({ data: _data }) {
     const models = useSignal([]);
     const current = useSignal("");
     const thinkingLevel = useSignal("medium");
@@ -10415,7 +10300,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       sendCommand2(`/thinking ${level}`);
     };
     const filtered = filter.value ? models.value.filter((m6) => m6.name.toLowerCase().includes(filter.value.toLowerCase()) || m6.provider.toLowerCase().includes(filter.value.toLowerCase())) : models.value;
-    const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high"];
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section settings-panel__section--models", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
       /* @__PURE__ */ u4(
@@ -10497,6 +10381,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/KeychainSection.tsx
   function KeychainSection() {
     const entries2 = useSignal([]);
     const filter = useSignal("");
@@ -10505,11 +10391,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const newSecret = useSignal("");
     const newType = useSignal("secret");
     const keychainError = useSignal(null);
-    let keychainErrorTimer = null;
+    const keychainErrorTimer = A2(null);
     const showKeychainError = (msg) => {
       keychainError.value = msg;
-      if (keychainErrorTimer) clearTimeout(keychainErrorTimer);
-      keychainErrorTimer = setTimeout(() => keychainError.value = null, 3e3);
+      if (keychainErrorTimer.current) clearTimeout(keychainErrorTimer.current);
+      keychainErrorTimer.current = setTimeout(() => keychainError.value = null, 3e3);
     };
     const fetchEntries = () => {
       fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
@@ -10626,6 +10512,13 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/ToolsSection.tsx
+  function kindIcon(kind) {
+    if (kind === "read-only") return "\u{1F50D}";
+    if (kind === "mutating") return "\u270F\uFE0F";
+    return "\u{1F535}";
+  }
   function ToolsSection({ data }) {
     const toolsets = data.toolsets ?? [];
     const filter = useSignal("");
@@ -10633,17 +10526,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const toggleCollapse = (name) => {
       collapsed.value = { ...collapsed.value, [name]: !collapsed.value[name] };
     };
-    const kindIcon = (kind) => {
-      if (kind === "read-only") return "\u{1F50D}";
-      if (kind === "mutating") return "\u270F\uFE0F";
-      return "\u{1F535}";
-    };
     const filteredToolsets = filter.value ? toolsets.map((ts) => ({
       ...ts,
       tools: (ts.tools ?? []).filter(
         (t4) => t4.name.toLowerCase().includes(filter.value.toLowerCase()) || (t4.description ?? t4.summary ?? "").toLowerCase().includes(filter.value.toLowerCase())
       )
-    })).filter((ts) => ts.tools.length > 0) : toolsets;
+    })).filter((ts) => (ts.tools ?? []).length > 0) : toolsets;
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Tools" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__tools-filter-row", children: [
@@ -10686,7 +10574,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             /* @__PURE__ */ u4("input", { type: "checkbox", checked: true, disabled: true, className: "settings-panel__tool-checkbox" }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__tool-name", children: t4.name }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__tool-kind", children: kindIcon(t4.kind) }),
-            (t4.description ?? t4.summary) && /* @__PURE__ */ u4("span", { className: "settings-panel__tool-desc", children: (t4.description ?? t4.summary).length > 60 ? (t4.description ?? t4.summary).slice(0, 60) + "\u2026" : t4.description ?? t4.summary }),
+            (t4.description ?? t4.summary) && /* @__PURE__ */ u4("span", { className: "settings-panel__tool-desc", children: (t4.description ?? t4.summary ?? "").length > 60 ? (t4.description ?? t4.summary ?? "").slice(0, 60) + "\u2026" : t4.description ?? t4.summary }),
             /* @__PURE__ */ u4("span", { className: "settings-panel__tool-category", children: t4.weight ?? "" })
           ] }, t4.name)) })
         ] }, ts.name);
@@ -10698,6 +10586,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] })
     ] });
   }
+
+  // runtime/web/frontend/src/panels/settings/ProvidersSection.tsx
   function ProvidersSection({ providers }) {
     const sendCommand2 = async (command) => {
       try {
@@ -10731,6 +10621,133 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => sendCommand2(`/login ${p6.id}`), children: "Reconfigure" })
         ] }) : /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => sendCommand2(`/login ${p6.id}`), children: "Set up" }) })
       ] }, p6.id))
+    ] });
+  }
+
+  // runtime/web/frontend/src/panels/SettingsPanel.tsx
+  var CATEGORIES = [
+    { id: "general", label: "General", icon: "codicon-gear" },
+    { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
+    { id: "compaction", label: "Compaction", icon: "codicon-archive" },
+    { id: "workspace", label: "Workspace", icon: "codicon-folder" },
+    { id: "providers", label: "Providers", icon: "codicon-cloud" },
+    { id: "models", label: "Models", icon: "codicon-hubot" },
+    { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
+    { id: "keychain", label: "Keychain", icon: "codicon-key" },
+    { id: "tools", label: "Tools", icon: "codicon-tools" }
+  ];
+  function SettingsPanel() {
+    const activeCategory = useSignal(localStorage.getItem("piclaw-settings-category") || "general");
+    const settings = useSignal(null);
+    const loading = useSignal(true);
+    const error = useSignal(null);
+    const saveStatus = useSignal(null);
+    const saveTimer = A2(null);
+    y2(() => {
+      fetch("/agent/settings-data", { credentials: "same-origin" }).then((res) => {
+        if (!res.ok) throw new Error("Save failed");
+        return res.json();
+      }).then((data) => {
+        settings.value = data;
+        loading.value = false;
+      }).catch((err) => {
+        error.value = `Failed to load settings: ${err instanceof Error ? err.message : String(err)}`;
+        settings.value = {};
+        loading.value = false;
+      });
+    }, []);
+    function showSaved(msg = "Saved \u2713") {
+      saveStatus.value = msg;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => saveStatus.value = null, 2e3);
+    }
+    function showError(msg = "Save failed") {
+      saveStatus.value = msg;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => saveStatus.value = null, 3e3);
+    }
+    function saveGeneral(field, value) {
+      fetch("/agent/settings/general", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value })
+      }).then((res) => {
+        if (!res.ok) throw new Error("Save failed");
+        return res.json();
+      }).then((body) => {
+        if (body.settings) {
+          settings.value = { ...settings.value ?? {}, ...body.settings };
+        }
+        showSaved();
+      }).catch(() => showError());
+    }
+    const saveWorkspace = async (field, value) => {
+      try {
+        const res = await fetch("/agent/settings/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ [field]: value })
+        });
+        if (res.ok) {
+          showSaved("Saved");
+        } else {
+          showError("Save failed");
+        }
+      } catch {
+        showError("Save failed");
+      }
+    };
+    function saveCompaction(field, value) {
+      fetch("/agent/settings/compaction", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value })
+      }).then((res) => {
+        if (!res.ok) throw new Error("Save failed");
+        return res.json();
+      }).then((body) => {
+        if (body.settings) {
+          settings.value = { ...settings.value ?? {}, ...body.settings };
+        }
+        showSaved();
+      }).catch(() => showError());
+    }
+    if (loading.value) {
+      return /* @__PURE__ */ u4("div", { className: "settings-panel", children: /* @__PURE__ */ u4("div", { className: "settings-panel__loading", children: "Loading settings\u2026" }) });
+    }
+    const s4 = settings.value ?? {};
+    return /* @__PURE__ */ u4("div", { className: "settings-panel", children: [
+      /* @__PURE__ */ u4("nav", { className: "settings-panel__nav", children: CATEGORIES.map((cat) => /* @__PURE__ */ u4(
+        "button",
+        {
+          className: `settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`,
+          onClick: () => {
+            activeCategory.value = cat.id;
+            localStorage.setItem("piclaw-settings-category", cat.id);
+          },
+          children: [
+            /* @__PURE__ */ u4("i", { className: `codicon ${cat.icon}` }),
+            /* @__PURE__ */ u4("span", { children: cat.label })
+          ]
+        },
+        cat.id
+      )) }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__content", children: [
+        error.value && /* @__PURE__ */ u4("div", { className: "settings-panel__error", children: error.value }),
+        saveStatus.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status", children: saveStatus.value }),
+        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4, onSaveGeneral: saveGeneral }),
+        activeCategory.value === "sessions" && /* @__PURE__ */ u4(SessionsSection, { data: s4, onSaveGeneral: saveGeneral }),
+        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
+        activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
+        activeCategory.value === "workspace" && /* @__PURE__ */ u4(WorkspaceSection, { data: s4, onSaveWorkspace: saveWorkspace }),
+        activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] }),
+        activeCategory.value === "models" && /* @__PURE__ */ u4(ModelsSection, { data: s4 }),
+        activeCategory.value === "keychain" && /* @__PURE__ */ u4(KeychainSection, {}),
+        activeCategory.value === "tools" && /* @__PURE__ */ u4(ToolsSection, { data: s4 })
+      ] })
     ] });
   }
 
