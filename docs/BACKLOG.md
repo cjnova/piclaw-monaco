@@ -148,6 +148,12 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ✅ |
 | browser-voice-integration | Speech-to-text input + text-to-speech output (browser APIs) | ⏳ |
 
+### Wave 10d — Notepad Panel
+
+| Task | Description | Status |
+|---|---|---|
+| notepad-panel | Activity Bar notepad — atomic editable notes, selectable, send to chat (#100) | ⏳ |
+
 ### Wave 11 — Full Functionality
 
 | Task | Description | Status |
