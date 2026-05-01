@@ -3233,7 +3233,8 @@ body {
   gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
 }
 .scratchpad-panel__input {
   flex: 1;

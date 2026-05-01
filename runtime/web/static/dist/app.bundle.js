@@ -10707,7 +10707,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             placeholder: "Content...",
             value: newContent.value,
             onInput: (e5) => newContent.value = e5.target.value,
-            rows: 8
+            rows: 3
           }
         ),
         /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__add-btn", onClick: addItem, disabled: !newTitle.value.trim(), children: "+ Add" })
@@ -10747,7 +10747,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               value: editContent.value,
               placeholder: "Content...",
               onInput: (e5) => editContent.value = e5.target.value,
-              rows: 8
+              rows: 3
             }
           ),
           /* @__PURE__ */ u4("div", { className: "scratchpad-panel__edit-actions", children: [
