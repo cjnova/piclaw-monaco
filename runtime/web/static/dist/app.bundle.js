@@ -10743,7 +10743,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       ] }),
       /* @__PURE__ */ u4("div", { className: "scratchpad-panel__divider", onMouseDown: onDragStart }),
       /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section scratchpad-panel__editor", children: [
-        /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section-header", children: /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-label", children: isNew.value ? "New item" : "Editing" }) }),
         /* @__PURE__ */ u4(
           "input",
           {

@@ -176,11 +176,6 @@ export function ScratchpadPanel() {
 
       {/* Lower pane: editor */}
       <div className="scratchpad-panel__section scratchpad-panel__editor">
-        <div className="scratchpad-panel__section-header">
-          <span className="scratchpad-panel__section-label">
-            {isNew.value ? "New item" : "Editing"}
-          </span>
-        </div>
         <input
           className="scratchpad-panel__input"
           type="text"
