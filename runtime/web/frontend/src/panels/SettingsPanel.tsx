@@ -338,13 +338,15 @@ function GeneralSection({
       </div>
 
       <h3 className="settings-panel__subsection-title">Authentication</h3>
-      <div className="settings-panel__card">
-        <strong style={{ fontSize: '13px', color: 'var(--text)' }}>TOTP setup QR</strong>
-        <p className="settings-panel__description" style={{ marginTop: '6px' }}>
-          {data.instanceTotp?.configured
-            ? "TOTP is configured for this instance."
-            : "TOTP is not configured for this instance yet, so no setup QR is available."}
-        </p>
+      <div className="settings-panel__field">
+        <label className="settings-panel__label">TOTP setup QR</label>
+        <div className="settings-panel__card">
+          <span className="settings-panel__description">
+            {data.instanceTotp?.configured
+              ? "TOTP is configured for this instance."
+              : "TOTP is not configured for this instance yet, so no setup QR is available."}
+          </span>
+        </div>
       </div>
     </section>
   );

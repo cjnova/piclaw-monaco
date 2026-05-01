@@ -10054,9 +10054,9 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         ] })
       ] }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Authentication" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: [
-        /* @__PURE__ */ u4("strong", { style: { fontSize: "13px", color: "var(--text)" }, children: "TOTP setup QR" }),
-        /* @__PURE__ */ u4("p", { className: "settings-panel__description", style: { marginTop: "6px" }, children: data.instanceTotp?.configured ? "TOTP is configured for this instance." : "TOTP is not configured for this instance yet, so no setup QR is available." })
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "TOTP setup QR" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: data.instanceTotp?.configured ? "TOTP is configured for this instance." : "TOTP is not configured for this instance yet, so no setup QR is available." }) })
       ] })
     ] });
   }
