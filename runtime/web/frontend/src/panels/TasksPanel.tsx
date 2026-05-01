@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { getChatJid } from "../api/chat-jid";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,11 +18,6 @@ interface Branch {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function currentChatJid(): string {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("chat_jid") ?? "web:default";
-}
 
 function chatName(entry: { jid: string; name?: string; display_name?: string }): string {
   return entry.display_name ?? entry.name ?? entry.jid.split(":").pop() ?? entry.jid;
@@ -223,7 +219,7 @@ type TabId = "tasks" | "sessions";
 
 export function TasksPanel() {
   const [activeTab, setActiveTab] = useState<TabId>("tasks");
-  const activeChatJid = currentChatJid();
+  const activeChatJid = getChatJid();
 
   return (
     <div className="tasks-panel">

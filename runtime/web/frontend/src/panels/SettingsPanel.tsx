@@ -1,5 +1,6 @@
 import { useEffect } from "preact/hooks";
 import { useSignal, type Signal } from "@preact/signals";
+import { getMessageUrl } from "../api/chat-jid";
 
 /* ── Number Stepper Component ── */
 function NumberStepper({ value, min, max, step, onSave }: {
@@ -673,7 +674,7 @@ function ModelsSection({ data }: { data: SettingsData }) {
 
   const sendCommand = async (cmd: string) => {
     try {
-      await fetch("/agent/web:default/message", {
+      await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -994,7 +995,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
 function ProvidersSection({ providers }: { providers: Provider[] }) {
   const sendCommand = async (command: string) => {
     try {
-      await fetch("/agent/web:default/message", {
+      await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
