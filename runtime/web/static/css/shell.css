@@ -1129,6 +1129,9 @@ body {
 .message-list__body {
   flex: 1;
   min-width: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 10px 14px;
 }
 
 /* Agent replies get a subtle left-border thread indent */
@@ -1136,6 +1139,8 @@ body {
   border-left: 3px solid var(--accent);
   padding-left: 12px;
   margin-left: 0;
+  background: rgba(100, 120, 200, 0.06);
+  border-radius: 8px;
 }
 
 .message-list__body--draft {
