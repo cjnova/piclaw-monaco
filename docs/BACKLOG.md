@@ -157,12 +157,6 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 ### Wave 10e — Code Quality Fixes (from review)
 
-**⚡ Hotfix:**
-
-| Task | Description | Status |
-|---|---|---|
-| fix-queryselector-hotfix | Fix invalid querySelector in search scroll-to-message (#114) | ⏳ |
-
 **Wave 1 (parallel):**
 
 | Task | Description | Status |
@@ -185,6 +179,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | localstorage-robustness | Guard quota/parse/blocked errors in localStorage (#112) | ⏳ |
 | sse-reconnection-races | Fix SSE error recovery + timeline load races (#113) | ⏳ |
 | theming-debt | Replace hardcoded colors with CSS variables in ModelContextBar (#111) | ⏳ |
+| minor-cleanup | Unused memo deps, inline DOM styling, duplicate CSS selectors (#114) | ⏳ |
 
 ### Wave 11 — Full Functionality
 
