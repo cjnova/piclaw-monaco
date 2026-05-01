@@ -823,7 +823,7 @@ function KeychainSection() {
     : entries.value;
 
   return (
-    <section className="settings-panel__section">
+    <section className="settings-panel__section" style={{ maxWidth: '720px' }}>
       <h2 className="settings-panel__section-title">Keychain</h2>
 
       <div className="settings-panel__keychain-header">

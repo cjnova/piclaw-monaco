@@ -10446,7 +10446,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       }
     };
     const filtered = filter.value ? entries2.value.filter((e5) => e5.name.toLowerCase().includes(filter.value.toLowerCase())) : entries2.value;
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Keychain" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__keychain-header", children: [
         /* @__PURE__ */ u4(
