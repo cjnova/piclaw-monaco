@@ -134,9 +134,12 @@ export function SearchPanel() {
             key={r.id}
             className="search-panel__item"
             data-message-id={r.id}
+            tabIndex={0}
+            role="button"
             onClick={() => {
               window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } }));
             }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } })); } }}
           >
             <div className="search-panel__item-header">
               <span className="search-panel__item-type">{((r as unknown as Record<string, unknown>).data as Record<string, unknown>)?.type === "user_message" ? "You" : "Agent"}</span>

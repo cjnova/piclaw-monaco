@@ -158,7 +158,10 @@ export function ScratchpadPanel() {
               <div
                 key={item.id}
                 className={`scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => selectItem(item)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectItem(item); } }}
               >
                 <div className="scratchpad-panel__item-body">
                   <div className="scratchpad-panel__item-header">

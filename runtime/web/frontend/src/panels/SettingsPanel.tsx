@@ -729,7 +729,9 @@ function ModelsSection({ data }: { data: SettingsData }) {
               <tr
                 key={m.label}
                 className={m.label === current.value ? "settings-panel__model-table-row--active" : ""}
+                tabIndex={0}
                 onClick={() => switchModel(m.label)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchModel(m.label); } }}
                 style={{ cursor: "pointer" }}
               >
                 <td>
@@ -761,7 +763,10 @@ function ModelsSection({ data }: { data: SettingsData }) {
             <span
               key={l}
               className={`settings-panel__thinking-label${l === thinkingLevel.value ? " settings-panel__thinking-label--active" : ""}`}
+              role="button"
+              tabIndex={0}
               onClick={() => switchThinking(l)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchThinking(l); } }}
             >
               {l.charAt(0).toUpperCase() + l.slice(1)}
             </span>
@@ -982,7 +987,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
         const tools = ts.tools ?? [];
         return (
           <div key={ts.name} className="settings-panel__toolset">
-            <div className="settings-panel__toolset-header" onClick={() => toggleCollapse(ts.name)}>
+            <div className="settings-panel__toolset-header" role="button" tabIndex={0} onClick={() => toggleCollapse(ts.name)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCollapse(ts.name); } }}>
               <span className="settings-panel__toolset-toggle">{isCollapsed ? "▶" : "▼"}</span>
               <input type="checkbox" checked={true} disabled className="settings-panel__toolset-checkbox" />
               <strong className="settings-panel__toolset-name">{ts.name}</strong>
