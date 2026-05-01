@@ -758,6 +758,7 @@ function ProvidersSection({ providers }: { providers: Provider[] }) {
       )}
       {providers.map((p) => (
         <div key={p.id} className={`settings-panel__provider-card${p.configured ? " settings-panel__provider-card--active" : ""}`}>
+          <div className={`settings-panel__provider-status-dot settings-panel__provider-status-dot--${p.configured ? "on" : "off"}`} />
           <div className="settings-panel__provider-info">
             <span className="settings-panel__provider-name">{p.name}</span>
             <span className="settings-panel__provider-id">{p.id}</span>

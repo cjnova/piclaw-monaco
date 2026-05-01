@@ -2841,10 +2841,23 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-elevated);
-  border-left: 3px solid transparent;
 }
 .settings-panel__provider-card--active {
-  border-left-color: #4caf50;
+}
+.settings-panel__provider-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+.settings-panel__provider-status-dot--on {
+  background: #4caf50;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+}
+.settings-panel__provider-status-dot--off {
+  background: #f44336;
+  box-shadow: 0 0 6px rgba(244, 67, 54, 0.3);
 }
 .settings-panel__provider-info {
   display: flex;

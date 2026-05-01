@@ -10369,6 +10369,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Providers" }),
       providers.length === 0 && /* @__PURE__ */ u4("p", { className: "settings-panel__empty", children: "No providers found." }),
       providers.map((p6) => /* @__PURE__ */ u4("div", { className: `settings-panel__provider-card${p6.configured ? " settings-panel__provider-card--active" : ""}`, children: [
+        /* @__PURE__ */ u4("div", { className: `settings-panel__provider-status-dot settings-panel__provider-status-dot--${p6.configured ? "on" : "off"}` }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__provider-info", children: [
           /* @__PURE__ */ u4("span", { className: "settings-panel__provider-name", children: p6.name }),
           /* @__PURE__ */ u4("span", { className: "settings-panel__provider-id", children: p6.id }),
