@@ -1183,14 +1183,14 @@ body {
   white-space: pre-wrap;
 }
 
-/* User messages: warm bright white */
+/* User messages */
 .message-list__item--user .message-list__content {
-  color: #f5f5f5;
+  color: var(--text);
 }
 
-/* Agent messages: cooler, slightly muted blue-tint */
+/* Agent messages */
 .message-list__item--agent .message-list__content {
-  color: #b4befe;
+  color: var(--text);
 }
 
 /* Links in messages — readable on dark background */
