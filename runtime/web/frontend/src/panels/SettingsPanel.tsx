@@ -100,7 +100,7 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
 ];
 
 export function SettingsPanel() {
-  const activeCategory = useSignal<Category>("general");
+  const activeCategory = useSignal<Category>((localStorage.getItem("piclaw-settings-category") as Category) || "general");
   const settings = useSignal<SettingsData | null>(null);
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
@@ -212,7 +212,7 @@ export function SettingsPanel() {
           <button
             key={cat.id}
             className={`settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`}
-            onClick={() => (activeCategory.value = cat.id)}
+            onClick={() => { activeCategory.value = cat.id; localStorage.setItem("piclaw-settings-category", cat.id); }}
           >
             <i className={`codicon ${cat.icon}`} />
             <span>{cat.label}</span>

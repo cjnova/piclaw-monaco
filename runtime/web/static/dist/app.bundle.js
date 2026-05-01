@@ -9875,7 +9875,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     { id: "tools", label: "Tools", icon: "codicon-tools" }
   ];
   function SettingsPanel() {
-    const activeCategory = useSignal("general");
+    const activeCategory = useSignal(localStorage.getItem("piclaw-settings-category") || "general");
     const settings = useSignal(null);
     const loading = useSignal(true);
     const error = useSignal(null);
@@ -9965,7 +9965,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         "button",
         {
           className: `settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`,
-          onClick: () => activeCategory.value = cat.id,
+          onClick: () => {
+            activeCategory.value = cat.id;
+            localStorage.setItem("piclaw-settings-category", cat.id);
+          },
           children: [
             /* @__PURE__ */ u4("i", { className: `codicon ${cat.icon}` }),
             /* @__PURE__ */ u4("span", { children: cat.label })
