@@ -219,6 +219,17 @@ function AppContent() {
   const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
   const isSettingsActive = activePanel.value === "settings";
   const sbWidth = (sidebarCollapsed.value || isSettingsActive) ? 0 : sidebarWidth.value;
+  const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handler();
+    }
+  };
+  const resizeSidebarBy = (delta: number) => {
+    const min = 150;
+    const max = Math.round(window.innerWidth * 0.5);
+    sidebarWidth.value = Math.max(min, Math.min(max, sidebarWidth.value + delta));
+  };
 
   return (
     <div className="app-layout">
@@ -241,6 +252,10 @@ function AppContent() {
           {!sidebarCollapsed.value && !isSettingsActive && (
             <div
               className="app-layout__resize-handle"
+              role="separator"
+              aria-orientation="vertical"
+              tabIndex={0}
+              aria-label="Resize sidebar"
               onMouseDown={(e) => {
                 e.preventDefault();
                 const startX = e.clientX;
@@ -258,6 +273,15 @@ function AppContent() {
                 document.body.style.cursor = "col-resize";
                 document.addEventListener("mousemove", onMove);
                 document.addEventListener("mouseup", onUp);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  resizeSidebarBy(-20);
+                } else if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  resizeSidebarBy(20);
+                }
               }}
             />
           )}
@@ -323,29 +347,45 @@ function AppContent() {
               <div className="terminal__actions">
                 <span
                   className="terminal__btn"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => { terminalMaximized.value = !terminalMaximized.value; }}
+                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { terminalMaximized.value = !terminalMaximized.value; })}
                   title={terminalMaximized.value ? "Restore" : "Maximize"}
+                  aria-label={terminalMaximized.value ? "Restore" : "Maximize"}
                 >
                   <i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} />
                 </span>
                 <span
                   className="terminal__btn"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); }}
+                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); })}
                   title="Open in new tab"
+                  aria-label="Open in new tab"
                 >
                   <i className="codicon codicon-link-external" />
                 </span>
                 <span
                   className="terminal__btn"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); }}
+                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); })}
                   title="Pop out to window"
+                  aria-label="Pop out to window"
                 >
                   <i className="codicon codicon-multiple-windows" />
                 </span>
                 <span
                   className="terminal__btn"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => { terminalVisible.value = false; terminalMaximized.value = false; }}
+                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { terminalVisible.value = false; terminalMaximized.value = false; })}
                   title="Close (Ctrl+`)"
+                  aria-label="Close (Ctrl+`)"
                 >
                   &#x2715;
                 </span>
@@ -369,8 +409,12 @@ function AppContent() {
             {!terminalVisible.value && (
               <span
                 className="status-bar__terminal-btn"
+                role="button"
+                tabIndex={0}
                 onClick={() => { terminalVisible.value = true; }}
+                onKeyDown={(e) => activateOnEnterOrSpace(e, () => { terminalVisible.value = true; })}
                 title="Open Terminal (Ctrl+`)"
+                aria-label="Open Terminal (Ctrl+`)"
               >
                 Terminal
               </span>
