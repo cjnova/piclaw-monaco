@@ -3321,6 +3321,10 @@ body {
 .scratchpad-panel__delete-btn {
   opacity: 0;
   transition: opacity 0.15s;
+  color: var(--text-muted);
+}
+.scratchpad-panel__delete-btn:hover {
+  color: #f44336;
 }
 .scratchpad-panel__item:hover .scratchpad-panel__delete-btn {
   opacity: 1;
