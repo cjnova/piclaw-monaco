@@ -155,6 +155,37 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 |---|---|---|
 | notepad-panel | Activity Bar scratchpad — atomic editable notes, send to chat (#100) | ✅ |
 
+### Wave 10e — Code Quality Fixes (from review)
+
+**⚡ Hotfix:**
+
+| Task | Description | Status |
+|---|---|---|
+| fix-queryselector-hotfix | Fix invalid querySelector in search scroll-to-message (#114) | ⏳ |
+
+**Wave 1 (parallel):**
+
+| Task | Description | Status |
+|---|---|---|
+| dead-code-cleanup | Remove orphaned files, unused modules/exports, stale CSS/localStorage (#109) | ⏳ |
+| fix-hardcoded-chat-jid | Use active chat JID instead of hardcoded web:default (#106) | ⏳ |
+
+**Wave 2 (after Wave 1):**
+
+| Task | Description | Status |
+|---|---|---|
+| fix-silent-errors | Add user-facing error feedback across all panels (#107) | ⏳ |
+| accessibility-keyboard-aria | Add keyboard nav + ARIA roles to interactive elements (#108) | ⏳ |
+| settings-panel-refactor | Split SettingsPanel.tsx into section modules, fix timer leak + types (#110) | ⏳ |
+
+**Wave 3 (after Wave 2):**
+
+| Task | Description | Status |
+|---|---|---|
+| localstorage-robustness | Guard quota/parse/blocked errors in localStorage (#112) | ⏳ |
+| sse-reconnection-races | Fix SSE error recovery + timeline load races (#113) | ⏳ |
+| theming-debt | Replace hardcoded colors with CSS variables in ModelContextBar (#111) | ⏳ |
+
 ### Wave 11 — Full Functionality
 
 | Task | Description | Status |
