@@ -11118,14 +11118,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => window.removeEventListener("piclaw:new-message", handler);
     }, [scrollToBottom]);
     y2(() => {
+      let lastHighlighted = null;
       const highlight = (el) => {
+        if (lastHighlighted) {
+          lastHighlighted.style.outline = "";
+          lastHighlighted.style.borderRadius = "";
+        }
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.style.outline = "2px solid var(--accent)";
         el.style.borderRadius = "4px";
-        setTimeout(() => {
-          el.style.outline = "";
-          el.style.borderRadius = "";
-        }, 2500);
+        lastHighlighted = el;
       };
       const handler = async (e5) => {
         const id = e5.detail?.id;

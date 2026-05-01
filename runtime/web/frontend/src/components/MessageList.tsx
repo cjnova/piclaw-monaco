@@ -395,11 +395,13 @@ export function MessageList() {
 
   // Scroll to a specific message (triggered from search panel)
   useEffect(() => {
+    let lastHighlighted: HTMLElement | null = null;
     const highlight = (el: HTMLElement) => {
+      if (lastHighlighted) { lastHighlighted.style.outline = ""; lastHighlighted.style.borderRadius = ""; }
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.style.outline = "2px solid var(--accent)";
       el.style.borderRadius = "4px";
-      setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 2500);
+      lastHighlighted = el;
     };
     const handler = async (e: Event) => {
       const id = (e as CustomEvent).detail?.id;
