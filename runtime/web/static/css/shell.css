@@ -9,6 +9,7 @@
   --text-soft: #a6adc8;
   --accent: #89b4fa;
   --success: #a6e3a1;
+  --warning: #f9e2af;
   --error: #f38ba8;
   --handle-hover: #89b4fa;
   --handle: #313244;
@@ -30,6 +31,7 @@
     --text-soft: #4b5563;
     --accent: #89b4fa;
     --success: #16a34a;
+    --warning: #d97706;
     --error: #dc2626;
     --handle-hover: #89b4fa;
     --handle: #d4d4d4;
