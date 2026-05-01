@@ -10402,19 +10402,109 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
   function KeychainSection() {
     const entries2 = useSignal([]);
-    y2(() => {
-      fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.ok ? r4.json() : { entries: [] }).then((d5) => {
-        entries2.value = (d5.entries ?? d5.keys ?? []).map((e5) => typeof e5 === "string" ? e5 : e5.name ?? e5.id ?? "");
+    const filter = useSignal("");
+    const showAdd = useSignal(false);
+    const newName = useSignal("");
+    const newSecret = useSignal("");
+    const newType = useSignal("secret");
+    const fetchEntries = () => {
+      fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
+        entries2.value = d5.entries ?? [];
       }).catch(() => {
       });
+    };
+    y2(() => {
+      fetchEntries();
     }, []);
+    const addEntry = async () => {
+      if (!newName.value.trim() || !newSecret.value.trim()) return;
+      try {
+        await fetch("/agent/keychain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ name: newName.value.trim(), secret: newSecret.value, type: newType.value })
+        });
+        newName.value = "";
+        newSecret.value = "";
+        showAdd.value = false;
+        fetchEntries();
+      } catch {
+      }
+    };
+    const deleteEntry = async (name) => {
+      if (!confirm(`Delete keychain entry "${name}"?`)) return;
+      try {
+        await fetch("/agent/keychain", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ name })
+        });
+        fetchEntries();
+      } catch {
+      }
+    };
+    const filtered = filter.value ? entries2.value.filter((e5) => e5.name.toLowerCase().includes(filter.value.toLowerCase())) : entries2.value;
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Keychain" }),
-      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Stored credentials (names only \u2014 secrets are never displayed)." }),
-      entries2.value.length === 0 ? /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "No keychain entries found, or API not available." }) : entries2.value.map((name) => /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("i", { className: "codicon codicon-key", style: { opacity: 0.5 } }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__value", children: name })
-      ] }, name))
+      /* @__PURE__ */ u4("div", { className: "settings-panel__keychain-header", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            className: "settings-panel__input settings-panel__keychain-filter",
+            type: "text",
+            placeholder: "Filter entries...",
+            value: filter.value,
+            onInput: (e5) => filter.value = e5.target.value
+          }
+        ),
+        /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => showAdd.value = !showAdd.value, children: "+ Add entry" })
+      ] }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: [
+        entries2.value.length,
+        " entries, encrypted at rest."
+      ] }),
+      showAdd.value && /* @__PURE__ */ u4("div", { className: "settings-panel__card", style: { marginBottom: "12px" }, children: [
+        /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "New entry" }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Name" }),
+          /* @__PURE__ */ u4("input", { className: "settings-panel__input", type: "text", placeholder: "entry-name", value: newName.value, onInput: (e5) => newName.value = e5.target.value })
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Secret" }),
+          /* @__PURE__ */ u4("input", { className: "settings-panel__input", type: "password", placeholder: "secret value", value: newSecret.value, onInput: (e5) => newSecret.value = e5.target.value })
+        ] }),
+        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Type" }),
+          /* @__PURE__ */ u4("select", { className: "settings-panel__select", value: newType.value, onChange: (e5) => newType.value = e5.target.value, children: [
+            /* @__PURE__ */ u4("option", { value: "secret", children: "Secret" }),
+            /* @__PURE__ */ u4("option", { value: "token", children: "Token" }),
+            /* @__PURE__ */ u4("option", { value: "password", children: "Password" }),
+            /* @__PURE__ */ u4("option", { value: "basic", children: "Basic" })
+          ] })
+        ] }),
+        /* @__PURE__ */ u4("div", { style: { display: "flex", gap: "8px", marginTop: "8px" }, children: [
+          /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: addEntry, children: "Save" }),
+          /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => showAdd.value = false, children: "Cancel" })
+        ] })
+      ] }),
+      /* @__PURE__ */ u4("table", { className: "settings-panel__table", children: [
+        /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+          /* @__PURE__ */ u4("th", { children: "Name" }),
+          /* @__PURE__ */ u4("th", { children: "Type" }),
+          /* @__PURE__ */ u4("th", { children: "Env Var" }),
+          /* @__PURE__ */ u4("th", { children: "Updated" }),
+          /* @__PURE__ */ u4("th", {})
+        ] }) }),
+        /* @__PURE__ */ u4("tbody", { children: filtered.length === 0 ? /* @__PURE__ */ u4("tr", { children: /* @__PURE__ */ u4("td", { colSpan: 5, style: { textAlign: "center", color: "var(--text-muted)" }, children: "No keychain entries." }) }) : filtered.map((e5) => /* @__PURE__ */ u4("tr", { children: [
+          /* @__PURE__ */ u4("td", { children: e5.name }),
+          /* @__PURE__ */ u4("td", { children: e5.type ?? "\u2014" }),
+          /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { style: { fontSize: "11px", color: "var(--text-muted)" }, children: e5.envVar ?? "\u2014" }) }),
+          /* @__PURE__ */ u4("td", { children: e5.updatedAt ? new Date(e5.updatedAt).toLocaleDateString() : "\u2014" }),
+          /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn settings-panel__provider-btn--logout", onClick: () => deleteEntry(e5.name), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) }) })
+        ] }, e5.name)) })
+      ] })
     ] });
   }
   function ToolsSection({ data }) {

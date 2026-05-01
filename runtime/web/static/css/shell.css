@@ -3083,3 +3083,14 @@ body {
   flex-shrink: 0;
   padding-top: 16px;
 }
+
+.settings-panel__keychain-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.settings-panel__keychain-filter {
+  flex: 1;
+  max-width: 400px;
+}
