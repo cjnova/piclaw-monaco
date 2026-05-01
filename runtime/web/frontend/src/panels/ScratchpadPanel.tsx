@@ -1,5 +1,5 @@
-import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useSignal, useComputed } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 
 interface ScratchItem {
   id: string;
@@ -12,14 +12,11 @@ interface ScratchItem {
 
 export function ScratchpadPanel() {
   const items = useSignal<ScratchItem[]>([]);
-  const newTitle = useSignal("");
-  const newContent = useSignal("");
-  const editingId = useSignal<string | null>(null);
-  const editTitle = useSignal("");
-  const editContent = useSignal("");
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const activeId = useSignal<string | null>(null); // currently editing item
+  const editorTitle = useSignal("");
+  const editorContent = useSignal("");
+  const isNew = useSignal(true); // true = creating new, false = editing existing
 
-  // Load from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem("piclaw-scratchpad-items");
@@ -27,57 +24,68 @@ export function ScratchpadPanel() {
     } catch {}
   }, []);
 
-  // Save to localStorage whenever items change
   const persist = (updated: ScratchItem[]) => {
     items.value = updated;
     localStorage.setItem("piclaw-scratchpad-items", JSON.stringify(updated));
   };
 
+  const resetEditor = () => {
+    activeId.value = null;
+    editorTitle.value = "";
+    editorContent.value = "";
+    isNew.value = true;
+  };
+
+  const selectItem = (item: ScratchItem) => {
+    if (activeId.value === item.id) return; // already active
+    // Auto-save current edit if dirty
+    if (activeId.value && !isNew.value) {
+      persist(items.value.map(n => n.id === activeId.value ? { ...n, title: editorTitle.value, content: editorContent.value } : n));
+    }
+    activeId.value = item.id;
+    editorTitle.value = item.title;
+    editorContent.value = item.content;
+    isNew.value = false;
+  };
+
   const addItem = () => {
-    const title = newTitle.value.trim();
+    const title = editorTitle.value.trim();
     if (!title) return;
     const item: ScratchItem = {
       id: crypto.randomUUID(),
       title,
-      content: newContent.value.trim(),
+      content: editorContent.value.trim(),
       selected: false,
       createdAt: new Date().toISOString(),
       sentAt: null,
     };
     persist([item, ...items.value]);
-    newTitle.value = "";
-    newContent.value = "";
-  };
-
-  const toggleSelect = (id: string) => {
-    persist(items.value.map(n => n.id === id ? { ...n, selected: !n.selected } : n));
-  };
-
-  const deleteItem = (id: string) => {
-    persist(items.value.filter(n => n.id !== id));
-  };
-
-  const startEdit = (item: ScratchItem) => {
-    editingId.value = item.id;
-    editTitle.value = item.title;
-    editContent.value = item.content;
+    resetEditor();
   };
 
   const saveEdit = () => {
-    if (!editingId.value) return;
-    persist(items.value.map(n => n.id === editingId.value ? { ...n, title: editTitle.value, content: editContent.value } : n));
-    editingId.value = null;
-    editTitle.value = "";
-    editContent.value = "";
+    if (!activeId.value) return;
+    persist(items.value.map(n => n.id === activeId.value ? { ...n, title: editorTitle.value, content: editorContent.value } : n));
   };
 
-  const cancelEdit = () => {
-    editingId.value = null;
-    editTitle.value = "";
-    editContent.value = "";
+  const newItem = () => {
+    // Auto-save if editing
+    if (activeId.value && !isNew.value) saveEdit();
+    resetEditor();
   };
 
-  const selectedCount = items.value.filter(n => n.selected).length;
+  const toggleCheck = (id: string, e: Event) => {
+    e.stopPropagation();
+    persist(items.value.map(n => n.id === id ? { ...n, selected: !n.selected } : n));
+  };
+
+  const deleteItem = (id: string, e: Event) => {
+    e.stopPropagation();
+    persist(items.value.filter(n => n.id !== id));
+    if (activeId.value === id) resetEditor();
+  };
+
+  const selectedCount = useComputed(() => items.value.filter(n => n.selected).length);
 
   const sendToChat = async () => {
     const selected = items.value.filter(n => n.selected);
@@ -90,40 +98,52 @@ export function ScratchpadPanel() {
         credentials: "same-origin",
         body: JSON.stringify({ content }),
       });
-      // Mark as sent (don't remove)
       const now = new Date().toISOString();
       persist(items.value.map(n => n.selected ? { ...n, selected: false, sentAt: now } : n));
     } catch {}
   };
 
-  const clearSelected = () => {
-    persist(items.value.map(n => ({ ...n, selected: false })));
-  };
-
   return (
     <div className="scratchpad-panel">
-      <div className="scratchpad-panel__add">
+      {/* Upper pane: editor */}
+      <div className="scratchpad-panel__editor">
+        <div className="scratchpad-panel__editor-header">
+          <span className="scratchpad-panel__editor-label">
+            {isNew.value ? "New item" : "Editing"}
+          </span>
+          {!isNew.value && (
+            <button type="button" className="scratchpad-panel__icon-btn" onClick={newItem} title="New item">
+              <i className="codicon codicon-add" />
+            </button>
+          )}
+        </div>
         <input
           className="scratchpad-panel__input"
           type="text"
           placeholder="Title..."
-          value={newTitle.value}
-          onInput={(e) => (newTitle.value = (e.target as HTMLInputElement).value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && newTitle.value.trim()) contentRef.current?.focus(); }}
+          value={editorTitle.value}
+          onInput={(e) => {
+            editorTitle.value = (e.target as HTMLInputElement).value;
+            if (!isNew.value) saveEdit();
+          }}
         />
         <textarea
-          ref={contentRef}
           className="scratchpad-panel__textarea"
           placeholder="Content..."
-          value={newContent.value}
-          onInput={(e) => (newContent.value = (e.target as HTMLTextAreaElement).value)}
-          rows={3}
+          value={editorContent.value}
+          onInput={(e) => {
+            editorContent.value = (e.target as HTMLTextAreaElement).value;
+            if (!isNew.value) saveEdit();
+          }}
         />
-        <button type="button" className="scratchpad-panel__add-btn" onClick={addItem} disabled={!newTitle.value.trim()}>
-          + Add
-        </button>
+        {isNew.value && (
+          <button type="button" className="scratchpad-panel__add-btn" onClick={addItem} disabled={!editorTitle.value.trim()}>
+            + Add
+          </button>
+        )}
       </div>
 
+      {/* Lower pane: items list */}
       <div className="scratchpad-panel__list">
         {items.value.length === 0 ? (
           <div className="scratchpad-panel__empty">
@@ -132,47 +152,25 @@ export function ScratchpadPanel() {
           </div>
         ) : (
           items.value.map(item => (
-            <div key={item.id} className={`scratchpad-panel__item${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}>
+            <div
+              key={item.id}
+              className={`scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}
+              onClick={() => selectItem(item)}
+            >
               <input
                 type="checkbox"
                 checked={item.selected}
-                onChange={() => toggleSelect(item.id)}
+                onChange={(e) => toggleCheck(item.id, e)}
                 className="scratchpad-panel__checkbox"
               />
-              {editingId.value === item.id ? (
-                <div className="scratchpad-panel__edit-row">
-                  <input
-                    className="scratchpad-panel__edit-input"
-                    type="text"
-                    value={editTitle.value}
-                    placeholder="Title..."
-                    onInput={(e) => (editTitle.value = (e.target as HTMLInputElement).value)}
-                    onKeyDown={(e) => { if (e.key === "Escape") cancelEdit(); }}
-                    // biome-ignore lint/a11y/noAutofocus: intentional focus on edit activation
-                    autoFocus
-                  />
-                  <textarea
-                    className="scratchpad-panel__edit-textarea"
-                    value={editContent.value}
-                    placeholder="Content..."
-                    onInput={(e) => (editContent.value = (e.target as HTMLTextAreaElement).value)}
-                    rows={3}
-                  />
-                  <div className="scratchpad-panel__edit-actions">
-                    <button type="button" className="scratchpad-panel__icon-btn" onClick={saveEdit} title="Save">✓</button>
-                    <button type="button" className="scratchpad-panel__icon-btn" onClick={cancelEdit} title="Cancel">✕</button>
-                  </div>
+              <div className="scratchpad-panel__item-body">
+                <div className="scratchpad-panel__item-header">
+                  <span className="scratchpad-panel__item-title">{item.title}</span>
+                  {item.sentAt && <span className="scratchpad-panel__sent-badge" title={`Sent ${new Date(item.sentAt).toLocaleString()}`}>✓</span>}
                 </div>
-              ) : (
-                <div className="scratchpad-panel__item-body" onDblClick={() => startEdit(item)}>
-                  <div className="scratchpad-panel__item-header">
-                    <span className="scratchpad-panel__item-title">{item.title}</span>
-                    {item.sentAt && <span className="scratchpad-panel__sent-badge" title={`Sent ${new Date(item.sentAt).toLocaleString()}`}>✓ sent</span>}
-                  </div>
-                  {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 150 ? item.content.slice(0, 150) + "…" : item.content}</span>}
-                </div>
-              )}
-              <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__delete-btn" onClick={() => deleteItem(item.id)} title="Delete">
+                {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 80 ? item.content.slice(0, 80) + "…" : item.content}</span>}
+              </div>
+              <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__delete-btn" onClick={(e) => deleteItem(item.id, e)} title="Delete">
                 <i className="codicon codicon-trash" />
               </button>
             </div>
@@ -180,23 +178,16 @@ export function ScratchpadPanel() {
         )}
       </div>
 
+      {/* Bottom actions */}
       {items.value.length > 0 && (
         <div className="scratchpad-panel__actions">
           <button
             type="button"
             className="scratchpad-panel__action-btn scratchpad-panel__action-btn--send"
             onClick={sendToChat}
-            disabled={selectedCount === 0}
+            disabled={selectedCount.value === 0}
           >
-            Send to chat ({selectedCount})
-          </button>
-          <button
-            type="button"
-            className="scratchpad-panel__action-btn"
-            onClick={clearSelected}
-            disabled={selectedCount === 0}
-          >
-            Clear selection
+            Send ({selectedCount.value})
           </button>
         </div>
       )}

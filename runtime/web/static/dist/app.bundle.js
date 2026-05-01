@@ -10609,12 +10609,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   // runtime/web/frontend/src/panels/ScratchpadPanel.tsx
   function ScratchpadPanel() {
     const items = useSignal([]);
-    const newTitle = useSignal("");
-    const newContent = useSignal("");
-    const editingId = useSignal(null);
-    const editTitle = useSignal("");
-    const editContent = useSignal("");
-    const contentRef = A2(null);
+    const activeId = useSignal(null);
+    const editorTitle = useSignal("");
+    const editorContent = useSignal("");
+    const isNew = useSignal(true);
     y2(() => {
       try {
         const stored = localStorage.getItem("piclaw-scratchpad-items");
@@ -10626,45 +10624,54 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       items.value = updated;
       localStorage.setItem("piclaw-scratchpad-items", JSON.stringify(updated));
     };
+    const resetEditor = () => {
+      activeId.value = null;
+      editorTitle.value = "";
+      editorContent.value = "";
+      isNew.value = true;
+    };
+    const selectItem = (item) => {
+      if (activeId.value === item.id) return;
+      if (activeId.value && !isNew.value) {
+        persist(items.value.map((n4) => n4.id === activeId.value ? { ...n4, title: editorTitle.value, content: editorContent.value } : n4));
+      }
+      activeId.value = item.id;
+      editorTitle.value = item.title;
+      editorContent.value = item.content;
+      isNew.value = false;
+    };
     const addItem = () => {
-      const title = newTitle.value.trim();
+      const title = editorTitle.value.trim();
       if (!title) return;
       const item = {
         id: crypto.randomUUID(),
         title,
-        content: newContent.value.trim(),
+        content: editorContent.value.trim(),
         selected: false,
         createdAt: (/* @__PURE__ */ new Date()).toISOString(),
         sentAt: null
       };
       persist([item, ...items.value]);
-      newTitle.value = "";
-      newContent.value = "";
-    };
-    const toggleSelect = (id) => {
-      persist(items.value.map((n4) => n4.id === id ? { ...n4, selected: !n4.selected } : n4));
-    };
-    const deleteItem = (id) => {
-      persist(items.value.filter((n4) => n4.id !== id));
-    };
-    const startEdit = (item) => {
-      editingId.value = item.id;
-      editTitle.value = item.title;
-      editContent.value = item.content;
+      resetEditor();
     };
     const saveEdit = () => {
-      if (!editingId.value) return;
-      persist(items.value.map((n4) => n4.id === editingId.value ? { ...n4, title: editTitle.value, content: editContent.value } : n4));
-      editingId.value = null;
-      editTitle.value = "";
-      editContent.value = "";
+      if (!activeId.value) return;
+      persist(items.value.map((n4) => n4.id === activeId.value ? { ...n4, title: editorTitle.value, content: editorContent.value } : n4));
     };
-    const cancelEdit = () => {
-      editingId.value = null;
-      editTitle.value = "";
-      editContent.value = "";
+    const newItem = () => {
+      if (activeId.value && !isNew.value) saveEdit();
+      resetEditor();
     };
-    const selectedCount = items.value.filter((n4) => n4.selected).length;
+    const toggleCheck = (id, e5) => {
+      e5.stopPropagation();
+      persist(items.value.map((n4) => n4.id === id ? { ...n4, selected: !n4.selected } : n4));
+    };
+    const deleteItem = (id, e5) => {
+      e5.stopPropagation();
+      persist(items.value.filter((n4) => n4.id !== id));
+      if (activeId.value === id) resetEditor();
+    };
+    const selectedCount = useComputed(() => items.value.filter((n4) => n4.selected).length);
     const sendToChat = async () => {
       const selected = items.value.filter((n4) => n4.selected);
       if (!selected.length) return;
@@ -10681,114 +10688,83 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       } catch {
       }
     };
-    const clearSelected = () => {
-      persist(items.value.map((n4) => ({ ...n4, selected: false })));
-    };
     return /* @__PURE__ */ u4("div", { className: "scratchpad-panel", children: [
-      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__add", children: [
+      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__editor", children: [
+        /* @__PURE__ */ u4("div", { className: "scratchpad-panel__editor-header", children: [
+          /* @__PURE__ */ u4("span", { className: "scratchpad-panel__editor-label", children: isNew.value ? "New item" : "Editing" }),
+          !isNew.value && /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn", onClick: newItem, title: "New item", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-add" }) })
+        ] }),
         /* @__PURE__ */ u4(
           "input",
           {
             className: "scratchpad-panel__input",
             type: "text",
             placeholder: "Title...",
-            value: newTitle.value,
-            onInput: (e5) => newTitle.value = e5.target.value,
-            onKeyDown: (e5) => {
-              if (e5.key === "Enter" && newTitle.value.trim()) contentRef.current?.focus();
+            value: editorTitle.value,
+            onInput: (e5) => {
+              editorTitle.value = e5.target.value;
+              if (!isNew.value) saveEdit();
             }
           }
         ),
         /* @__PURE__ */ u4(
           "textarea",
           {
-            ref: contentRef,
             className: "scratchpad-panel__textarea",
             placeholder: "Content...",
-            value: newContent.value,
-            onInput: (e5) => newContent.value = e5.target.value,
-            rows: 3
+            value: editorContent.value,
+            onInput: (e5) => {
+              editorContent.value = e5.target.value;
+              if (!isNew.value) saveEdit();
+            }
           }
         ),
-        /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__add-btn", onClick: addItem, disabled: !newTitle.value.trim(), children: "+ Add" })
+        isNew.value && /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__add-btn", onClick: addItem, disabled: !editorTitle.value.trim(), children: "+ Add" })
       ] }),
       /* @__PURE__ */ u4("div", { className: "scratchpad-panel__list", children: items.value.length === 0 ? /* @__PURE__ */ u4("div", { className: "scratchpad-panel__empty", children: [
         /* @__PURE__ */ u4("i", { className: "codicon codicon-notebook" }),
         /* @__PURE__ */ u4("span", { children: "No items yet" })
-      ] }) : items.value.map((item) => /* @__PURE__ */ u4("div", { className: `scratchpad-panel__item${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`, children: [
-        /* @__PURE__ */ u4(
-          "input",
-          {
-            type: "checkbox",
-            checked: item.selected,
-            onChange: () => toggleSelect(item.id),
-            className: "scratchpad-panel__checkbox"
-          }
-        ),
-        editingId.value === item.id ? /* @__PURE__ */ u4("div", { className: "scratchpad-panel__edit-row", children: [
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              className: "scratchpad-panel__edit-input",
-              type: "text",
-              value: editTitle.value,
-              placeholder: "Title...",
-              onInput: (e5) => editTitle.value = e5.target.value,
-              onKeyDown: (e5) => {
-                if (e5.key === "Escape") cancelEdit();
-              },
-              autoFocus: true
-            }
-          ),
-          /* @__PURE__ */ u4(
-            "textarea",
-            {
-              className: "scratchpad-panel__edit-textarea",
-              value: editContent.value,
-              placeholder: "Content...",
-              onInput: (e5) => editContent.value = e5.target.value,
-              rows: 3
-            }
-          ),
-          /* @__PURE__ */ u4("div", { className: "scratchpad-panel__edit-actions", children: [
-            /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn", onClick: saveEdit, title: "Save", children: "\u2713" }),
-            /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn", onClick: cancelEdit, title: "Cancel", children: "\u2715" })
-          ] })
-        ] }) : /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-body", onDblClick: () => startEdit(item), children: [
-          /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-header", children: [
-            /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-title", children: item.title }),
-            item.sentAt && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__sent-badge", title: `Sent ${new Date(item.sentAt).toLocaleString()}`, children: "\u2713 sent" })
-          ] }),
-          item.content && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-content", children: item.content.length > 150 ? item.content.slice(0, 150) + "\u2026" : item.content })
-        ] }),
-        /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn scratchpad-panel__delete-btn", onClick: () => deleteItem(item.id), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
-      ] }, item.id)) }),
-      items.value.length > 0 && /* @__PURE__ */ u4("div", { className: "scratchpad-panel__actions", children: [
-        /* @__PURE__ */ u4(
-          "button",
-          {
-            type: "button",
-            className: "scratchpad-panel__action-btn scratchpad-panel__action-btn--send",
-            onClick: sendToChat,
-            disabled: selectedCount === 0,
-            children: [
-              "Send to chat (",
-              selectedCount,
-              ")"
-            ]
-          }
-        ),
-        /* @__PURE__ */ u4(
-          "button",
-          {
-            type: "button",
-            className: "scratchpad-panel__action-btn",
-            onClick: clearSelected,
-            disabled: selectedCount === 0,
-            children: "Clear selection"
-          }
-        )
-      ] })
+      ] }) : items.value.map((item) => /* @__PURE__ */ u4(
+        "div",
+        {
+          className: `scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`,
+          onClick: () => selectItem(item),
+          children: [
+            /* @__PURE__ */ u4(
+              "input",
+              {
+                type: "checkbox",
+                checked: item.selected,
+                onChange: (e5) => toggleCheck(item.id, e5),
+                className: "scratchpad-panel__checkbox"
+              }
+            ),
+            /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-body", children: [
+              /* @__PURE__ */ u4("div", { className: "scratchpad-panel__item-header", children: [
+                /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-title", children: item.title }),
+                item.sentAt && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__sent-badge", title: `Sent ${new Date(item.sentAt).toLocaleString()}`, children: "\u2713" })
+              ] }),
+              item.content && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-content", children: item.content.length > 80 ? item.content.slice(0, 80) + "\u2026" : item.content })
+            ] }),
+            /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn scratchpad-panel__delete-btn", onClick: (e5) => deleteItem(item.id, e5), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
+          ]
+        },
+        item.id
+      )) }),
+      items.value.length > 0 && /* @__PURE__ */ u4("div", { className: "scratchpad-panel__actions", children: /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          className: "scratchpad-panel__action-btn scratchpad-panel__action-btn--send",
+          onClick: sendToChat,
+          disabled: selectedCount.value === 0,
+          children: [
+            "Send (",
+            selectedCount.value,
+            ")"
+          ]
+        }
+      ) })
     ] });
   }
 

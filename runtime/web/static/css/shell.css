@@ -3430,3 +3430,28 @@ body {
   display: flex;
   gap: 4px;
 }
+
+.scratchpad-panel__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex: 1;
+  min-height: 0;
+}
+.scratchpad-panel__editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.scratchpad-panel__editor-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.scratchpad-panel__item--active {
+  background: rgba(0, 150, 255, 0.12);
+  border-left: 2px solid var(--accent);
+}
