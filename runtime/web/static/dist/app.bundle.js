@@ -9315,7 +9315,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }
   }
   function getSnippet(result) {
-    return result.text ?? result.content ?? "";
+    const r4 = result;
+    const data = r4.data;
+    const text2 = result.text ?? result.content ?? data?.content ?? "";
+    return typeof text2 === "string" ? text2.slice(0, 300) : "";
   }
   function getTimestamp(result) {
     return result.created_at ?? result.timestamp ?? "";
@@ -9396,7 +9399,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           },
           children: [
             /* @__PURE__ */ u4("div", { className: "search-panel__item-header", children: [
-              /* @__PURE__ */ u4("span", { className: "search-panel__item-type", children: r4.type === "user" ? "You" : "Agent" }),
+              /* @__PURE__ */ u4("span", { className: "search-panel__item-type", children: r4.data?.type === "user_message" ? "You" : "Agent" }),
               getTimestamp(r4) && /* @__PURE__ */ u4("span", { className: "search-panel__item-time", children: formatTime(getTimestamp(r4)) })
             ] }),
             /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) })
@@ -11115,24 +11118,45 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => window.removeEventListener("piclaw:new-message", handler);
     }, [scrollToBottom]);
     y2(() => {
-      const scrollTo = (id, attempt = 0) => {
-        if (!listRef.current) return;
-        const el = listRef.current.querySelector(`[data-message-id="${id}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.style.outline = "2px solid var(--accent)";
-          el.style.borderRadius = "4px";
-          setTimeout(() => {
-            el.style.outline = "";
-            el.style.borderRadius = "";
-          }, 2500);
-        } else if (attempt < 3) {
-          setTimeout(() => scrollTo(id, attempt + 1), 300);
-        }
+      const highlight = (el) => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.style.outline = "2px solid var(--accent)";
+        el.style.borderRadius = "4px";
+        setTimeout(() => {
+          el.style.outline = "";
+          el.style.borderRadius = "";
+        }, 2500);
       };
-      const handler = (e5) => {
+      const handler = async (e5) => {
         const id = e5.detail?.id;
-        if (id) scrollTo(id);
+        if (!id || !listRef.current) return;
+        let el = listRef.current.querySelector(`[data-message-id="${id}"]`);
+        if (el) {
+          highlight(el);
+          return;
+        }
+        try {
+          const res = await fetch(buildChatUrl("/timeline", { around_row: String(id), limit: "50" }), { credentials: "include" });
+          if (res.ok) {
+            const data = await res.json();
+            const posts = data.posts ?? [];
+            if (posts.length) {
+              setMessages(posts.map((p6) => ({
+                id: p6.id,
+                type: p6.data?.type === "user_message" ? "user" : "agent",
+                content: p6.data?.content ?? "",
+                content_blocks: p6.data?.content_blocks,
+                created_at: p6.timestamp ?? "",
+                data: p6.data
+              })));
+              setTimeout(() => {
+                el = listRef.current?.querySelector(`[data-message-id="${id}"]`);
+                if (el) highlight(el);
+              }, 100);
+            }
+          }
+        } catch {
+        }
       };
       window.addEventListener("piclaw:scroll-to-message", handler);
       return () => window.removeEventListener("piclaw:scroll-to-message", handler);

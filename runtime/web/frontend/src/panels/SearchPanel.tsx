@@ -32,7 +32,9 @@ function formatTime(ts: string | undefined): string {
 }
 
 function getSnippet(result: SearchResult): string {
-  const text = result.text ?? result.content ?? (result as unknown as Record<string, unknown>).data && ((result as unknown as Record<string, unknown>).data as Record<string, unknown>)?.content;
+  const r = result as unknown as Record<string, unknown>;
+  const data = r.data as Record<string, unknown> | undefined;
+  const text = result.text ?? result.content ?? (data?.content as string) ?? "";
   return typeof text === "string" ? text.slice(0, 300) : "";
 }
 
