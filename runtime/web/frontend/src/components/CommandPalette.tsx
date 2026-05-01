@@ -6,7 +6,6 @@ import { getMessageUrl } from "../api/chat-jid";
 interface CommandPaletteProps {
   visible: boolean;
   onClose: () => void;
-  onCommand?: (cmd: string) => void;
 }
 
 interface BackendCommand {
@@ -94,7 +93,7 @@ function sendCommand(command: string) {
   }).catch((err) => console.warn("[CommandPalette] send failed:", err));
 }
 
-export function CommandPalette({ visible, onClose, onCommand }: CommandPaletteProps) {
+export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
@@ -217,7 +216,6 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
     if (!param || param.type === "bare") {
       // Execute immediately
       sendCommand(name);
-      if (onCommand) onCommand(name);
       onClose();
       return;
     }
@@ -259,7 +257,6 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
         if (selectedOption != null) {
           const fullCommand = `${selectedCommand} ${selectedOption}`;
           sendCommand(fullCommand);
-          if (onCommand) onCommand(fullCommand);
           onClose();
         }
       } else {
@@ -268,7 +265,6 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
         if (trimmed) {
           const fullCommand = `${selectedCommand} ${trimmed}`;
           sendCommand(fullCommand);
-          if (onCommand) onCommand(fullCommand);
           onClose();
         }
       }
@@ -438,7 +434,6 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
                   onClick={() => {
                     const fullCommand = `${selectedCommand} ${option}`;
                     sendCommand(fullCommand);
-                    if (onCommand) onCommand(fullCommand);
                     onClose();
                   }}
                 >

@@ -5708,7 +5708,7 @@ For tests, pass a Ghostty instance directly:
       body: JSON.stringify({ content: command })
     }).catch((err) => console.warn("[CommandPalette] send failed:", err));
   }
-  function CommandPalette({ visible, onClose, onCommand }) {
+  function CommandPalette({ visible, onClose }) {
     const [query, setQuery] = d2("");
     const [selectedIndex, setSelectedIndex] = d2(0);
     const [backendCommands, setBackendCommands] = d2([]);
@@ -5799,7 +5799,6 @@ For tests, pass a Ghostty instance directly:
       const param = COMMAND_PARAMS[name];
       if (!param || param.type === "bare") {
         sendCommand(name);
-        if (onCommand) onCommand(name);
         onClose();
         return;
       }
@@ -5836,7 +5835,6 @@ For tests, pass a Ghostty instance directly:
           if (selectedOption != null) {
             const fullCommand = `${selectedCommand} ${selectedOption}`;
             sendCommand(fullCommand);
-            if (onCommand) onCommand(fullCommand);
             onClose();
           }
         } else {
@@ -5844,7 +5842,6 @@ For tests, pass a Ghostty instance directly:
           if (trimmed) {
             const fullCommand = `${selectedCommand} ${trimmed}`;
             sendCommand(fullCommand);
-            if (onCommand) onCommand(fullCommand);
             onClose();
           }
         }
@@ -5991,7 +5988,6 @@ For tests, pass a Ghostty instance directly:
                 onClick: () => {
                   const fullCommand = `${selectedCommand} ${option}`;
                   sendCommand(fullCommand);
-                  if (onCommand) onCommand(fullCommand);
                   onClose();
                 },
                 children: /* @__PURE__ */ u4("span", { className: "command-palette__row-content", children: /* @__PURE__ */ u4("span", { className: "command-palette__label", children: option }) })
