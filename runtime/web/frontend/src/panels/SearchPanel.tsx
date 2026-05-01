@@ -132,8 +132,7 @@ export function SearchPanel() {
             className="search-panel__item"
             data-message-id={r.id}
             onClick={() => {
-              // TODO: scroll chat to this message when message list is implemented
-              console.log("[search] navigate to message:", r.id);
+              window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } }));
             }}
           >
             <span className="search-panel__item-text">{getSnippet(r)}</span>
