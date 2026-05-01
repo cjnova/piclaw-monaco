@@ -72,16 +72,16 @@ const COMMAND_PARAMS: Record<string, CommandParam> = {
   "/abort-retry": { type: "bare" },
 };
 
-const CATEGORY_BADGE_COLORS: Record<string, string> = {
-  navigation: "#89b4fa",
-  terminal: "#a6e3a1",
-  session: "#f9e2af",
-  theme: "#cba6f7",
-  general: "#94e2d5",
-  core: "#f38ba8",
-  extension: "#fab387",
-  skill: "#a6e3a1",
-  template: "#89dceb",
+const CATEGORY_BADGE_CLASS: Record<string, string> = {
+  navigation: "command-palette__badge--navigation",
+  terminal: "command-palette__badge--terminal",
+  session: "command-palette__badge--session",
+  theme: "command-palette__badge--theme",
+  general: "command-palette__badge--general",
+  core: "command-palette__badge--core",
+  extension: "command-palette__badge--extension",
+  skill: "command-palette__badge--skill",
+  template: "command-palette__badge--template",
 };
 
 function sendCommand(command: string) {
@@ -172,7 +172,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
       }));
 
     return [...localCmds, ...backendCmds];
-  }, [backendCommands, visible]);
+  }, [backendCommands]);
 
   // Filter by query (for both steps)
   const results = useMemo(() => {
@@ -436,7 +436,6 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
                   role="option"
                   aria-selected={index === selectedIndex}
                   className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                  style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
                     const fullCommand = `${selectedCommand} ${option}`;
@@ -450,7 +449,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
                 </li>
               ))
               : (results as MergedCommand[]).map((command, index) => {
-                const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
+                const badgeClass = CATEGORY_BADGE_CLASS[command.category] ?? "command-palette__badge--default";
                 return (
                   <li
                     key={command.id}
@@ -458,7 +457,6 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
                     role="option"
                     aria-selected={index === selectedIndex}
                     className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                    style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       if (command.handler) {
@@ -481,12 +479,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
                     </span>
                     <span className="command-palette__row-meta">
                       <span
-                        className="command-palette__badge"
-                        style={{
-                          background: `${badgeColor}22`,
-                          color: badgeColor,
-                          border: `1px solid ${badgeColor}44`,
-                        }}
+                        className={`command-palette__badge ${badgeClass}`}
                       >
                         {command.category}
                       </span>

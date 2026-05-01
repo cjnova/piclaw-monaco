@@ -1,5 +1,5 @@
 import { useSignal, useComputed } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
 import { safeGetItem, safeSetItem, safeParseJSON } from "../utils/storage";
 
@@ -111,6 +111,12 @@ export function ScratchpadPanel() {
   };
 
   const listHeight = useSignal(Number(safeGetItem("piclaw-scratchpad-split")) || 50); // percentage
+  const listSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!listSectionRef.current) return;
+    listSectionRef.current.style.height = `${listHeight.value}%`;
+  }, [listHeight.value]);
 
   const onDragStart = (e: MouseEvent) => {
     e.preventDefault();
@@ -137,7 +143,7 @@ export function ScratchpadPanel() {
   return (
     <div className="scratchpad-panel">
       {/* Upper pane: items list */}
-      <div className="scratchpad-panel__section" style={{ height: `${listHeight.value}%`, flex: 'none' }}>
+      <div className="scratchpad-panel__section scratchpad-panel__section--top" ref={listSectionRef}>
         <div className="scratchpad-panel__section-header">
           <span className="scratchpad-panel__section-label">Items</span>
           <span className="scratchpad-panel__section-count">{items.value.length}</span>

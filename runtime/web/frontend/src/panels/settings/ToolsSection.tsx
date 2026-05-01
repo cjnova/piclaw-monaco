@@ -27,7 +27,7 @@ export function ToolsSection({ data }: { data: SettingsData }) {
     : toolsets;
 
   return (
-    <section className="settings-panel__section" style={{ maxWidth: "720px" }}>
+    <section className="settings-panel__section settings-panel__section--narrow">
       <h2 className="settings-panel__section-title">Tools</h2>
 
       <div className="settings-panel__tools-filter-row">
@@ -79,7 +79,7 @@ export function ToolsSection({ data }: { data: SettingsData }) {
         );
       })}
 
-      <p className="settings-panel__description" style={{ marginTop: "16px" }}>
+      <p className="settings-panel__description settings-panel__description--spaced">
         Tool activation is managed by the agent runtime. Group checkboxes collapse/expand; individual tools use <code>activate_tools</code>.
       </p>
     </section>

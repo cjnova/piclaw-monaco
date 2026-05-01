@@ -5,10 +5,10 @@ interface IconProps {
 }
 
 export function Icon({ name, size = 16, className = "" }: IconProps) {
+  const sizeClass = size === 24 ? "icon--size-24" : "icon--size-16";
   return (
     <i
-      className={`codicon codicon-${name} ${className}`}
-      style={{ fontSize: `${size}px` }}
+      className={`codicon codicon-${name} ${sizeClass} ${className}`.trim()}
     />
   );
 }
