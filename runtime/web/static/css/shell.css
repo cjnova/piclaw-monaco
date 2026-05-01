@@ -3007,7 +3007,7 @@ body {
 
 .settings-panel__model-filter {
   width: 100%;
-  max-width: 400px;
+  max-width: none;
   margin-bottom: 12px;
   padding: 8px 12px;
   font-size: 13px;
@@ -3025,6 +3025,8 @@ body {
 .settings-panel__model-table {
   margin-top: 0;
   border: none;
+  width: 100%;
+  table-layout: auto;
 }
 .settings-panel__model-table th,
 .settings-panel__model-table td {
@@ -3044,7 +3046,7 @@ body {
 
 .settings-panel__thinking-slider {
   padding: 8px 0 16px;
-  max-width: 500px;
+  max-width: none;
 }
 .settings-panel__thinking-range {
   width: 100%;
