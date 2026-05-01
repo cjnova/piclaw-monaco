@@ -2914,3 +2914,22 @@ body {
   font-size: 13px;
   color: var(--text);
 }
+
+.settings-panel__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.settings-panel__table th,
+.settings-panel__table td {
+  padding: 6px 12px;
+  text-align: left;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.settings-panel__table th {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-weight: 600;
+}

@@ -10172,39 +10172,60 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const watchdogTimeout = useSignal(data.progressWatchdogTimeoutSec ?? 0);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Compaction" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__card", children: [
-        /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Compaction Timeouts" }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Timeout (sec)" }),
-          /* @__PURE__ */ u4(NumberStepper, { value: timeoutSec, min: 1, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("compactionTimeoutSec", v6) })
-        ] }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff base (min)" }),
-          /* @__PURE__ */ u4(NumberStepper, { value: backoffBase, min: 1, max: 1440, step: 5, onSave: (v6) => onSaveCompaction("compactionBackoffBaseMin", v6) })
-        ] }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Backoff max (min)" }),
-          /* @__PURE__ */ u4(NumberStepper, { value: backoffMax, min: 1, max: 10080, step: 10, onSave: (v6) => onSaveCompaction("compactionBackoffMaxMin", v6) })
-        ] }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
-          /* @__PURE__ */ u4(
-            "input",
-            {
-              id: "progressWatchdogEnabled",
-              type: "checkbox",
-              checked: data.progressWatchdogEnabled ?? false,
-              onChange: (e5) => onSaveCompaction(
-                "progressWatchdogEnabled",
-                e5.target.checked
-              )
-            }
-          ),
-          /* @__PURE__ */ u4("label", { htmlFor: "progressWatchdogEnabled", className: "settings-panel__label", children: "Progress watchdog enabled" })
-        ] }),
-        /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-          /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
-          /* @__PURE__ */ u4(NumberStepper, { value: watchdogTimeout, min: 0, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("progressWatchdogTimeoutSec", v6) })
-        ] })
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Automatic compaction" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Compaction timeout (sec)" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: timeoutSec, min: 1, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("compactionTimeoutSec", v6) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Abort a stuck pre-prompt/manual compaction instead of hanging forever." })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Failure backoff base (min)" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: backoffBase, min: 1, max: 1440, step: 5, onSave: (v6) => onSaveCompaction("compactionBackoffBaseMin", v6) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "First suppression window after a compaction failure." })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Failure backoff max (min)" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: backoffMax, min: 1, max: 10080, step: 10, onSave: (v6) => onSaveCompaction("compactionBackoffMaxMin", v6) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Upper bound for exponential suppression after repeated failures." })
+      ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Stall watchdog" }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field settings-panel__checkbox-row", children: [
+        /* @__PURE__ */ u4(
+          "input",
+          {
+            id: "progressWatchdogEnabled",
+            type: "checkbox",
+            checked: data.progressWatchdogEnabled ?? false,
+            onChange: (e5) => onSaveCompaction(
+              "progressWatchdogEnabled",
+              e5.target.checked
+            )
+          }
+        ),
+        /* @__PURE__ */ u4("label", { htmlFor: "progressWatchdogEnabled", className: "settings-panel__label", children: "Enable watchdog" }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "Disabled by default. When enabled, a helper process terminates the runtime if an active phase stops heartbeating." })
+      ] }),
+      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
+        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Watchdog timeout (sec)" }),
+        /* @__PURE__ */ u4(NumberStepper, { value: watchdogTimeout, min: 0, max: 3600, step: 10, onSave: (v6) => onSaveCompaction("progressWatchdogTimeoutSec", v6) }),
+        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "How long an active phase can go without a heartbeat before the watchdog kills the runtime." })
+      ] }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Active compaction suppressions" }),
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: (data.compactionBackoffs ?? []).length === 0 ? "No chats are currently under compaction backoff." : (data.compactionBackoffs ?? []).join(", ") }),
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Live watchdog phases" }),
+      (data.progressWatchdogPhases ?? []).length === 0 ? /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "No active watchdog phases." }) : /* @__PURE__ */ u4("table", { className: "settings-panel__table", children: [
+        /* @__PURE__ */ u4("thead", { children: /* @__PURE__ */ u4("tr", { children: [
+          /* @__PURE__ */ u4("th", { children: "Chat" }),
+          /* @__PURE__ */ u4("th", { children: "Phase" }),
+          /* @__PURE__ */ u4("th", { children: "Started" }),
+          /* @__PURE__ */ u4("th", { children: "Last heartbeat" })
+        ] }) }),
+        /* @__PURE__ */ u4("tbody", { children: (data.progressWatchdogPhases ?? []).map((phase, i6) => /* @__PURE__ */ u4("tr", { children: [
+          /* @__PURE__ */ u4("td", { children: phase.chat ?? "\u2014" }),
+          /* @__PURE__ */ u4("td", { children: phase.phase ?? "\u2014" }),
+          /* @__PURE__ */ u4("td", { children: phase.started ?? "\u2014" }),
+          /* @__PURE__ */ u4("td", { children: phase.lastHeartbeat ?? "\u2014" })
+        ] }, i6)) })
       ] })
     ] });
   }
