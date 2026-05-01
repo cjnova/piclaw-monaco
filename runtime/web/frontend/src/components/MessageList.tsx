@@ -1,4 +1,4 @@
-import { getMessageUrl, buildChatUrl } from "../api/chat-jid";
+import { buildChatUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { marked } from "marked";
 import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
@@ -29,6 +29,14 @@ interface TimelineResponse {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+function getMessageSelector(id: number): string {
+  const raw = String(id);
+  const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+    ? CSS.escape(raw)
+    : raw.replace(/["\\]/g, "\\$&");
+  return `[data-message-id="${escaped}"]`;
+}
 
 function relativeTime(isoDate: string): string {
   const delta = Date.now() - new Date(isoDate).getTime();
@@ -204,15 +212,48 @@ function MessageItem({ interaction }: MessageItemProps) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 
+type ConnectionState = "loading" | "connected" | "stale" | "auth" | "error";
+
+function normalizeInteraction(p: Record<string, unknown>): Interaction {
+  return {
+    id: p.id as number,
+    type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
+    content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
+    content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
+    created_at: (p.created_at ?? p.timestamp ?? "") as string,
+    data: p.data as Record<string, unknown> | undefined,
+  };
+}
+
+function mergeInteractions(existing: Interaction[], incoming: Interaction[]): Interaction[] {
+  const merged = new Map<number, Interaction>();
+  for (const interaction of existing) {
+    merged.set(interaction.id, interaction);
+  }
+  for (const interaction of incoming) {
+    merged.set(interaction.id, interaction);
+  }
+  return [...merged.values()].sort((a, b) => {
+    const at = new Date(a.created_at).getTime();
+    const bt = new Date(b.created_at).getTime();
+    if (at !== bt) return at - bt;
+    return a.id - b.id;
+  });
+}
+
 export function MessageList() {
   const [messages, setMessages] = useState<Interaction[]>([]);
   const [draft, setDraft] = useState<string>("");
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [connected, setConnected] = useState<boolean | null>(null);
+  const [connectionState, setConnectionState] = useState<ConnectionState>("loading");
+  const [timelineReady, setTimelineReady] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const timelineReadyRef = useRef(false);
   const userScrolledRef = useRef(false);
 
   const scrollToBottom = useCallback((force = false) => {
@@ -224,42 +265,51 @@ export function MessageList() {
     }
   }, []);
 
-  // Initial fetch
-  useEffect(() => {
-    async function fetchTimeline() {
-      try {
-        const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
-          credentials: "include",
-        });
-        if (res.status === 401) {
-          setConnected(false);
-          return;
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const raw = data.posts ?? [];
-        const parsed: Interaction[] = raw.map((p: Record<string, unknown>) => ({
-          id: p.id as number,
-          type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
-          content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
-          content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
-          created_at: (p.created_at ?? p.timestamp ?? "") as string,
-          data: p.data as Record<string, unknown> | undefined,
-        }));
-        setMessages(parsed);
-        setHasMore(data.has_more ?? false);
-        setConnected(true);
-        // Scroll to bottom after first load
-        setTimeout(() => scrollToBottom(true), 50);
-      } catch {
-        setConnected(false);
-      }
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
     }
-    fetchTimeline();
-  }, [scrollToBottom]);
+  }, []);
 
-  // SSE stream
-  useEffect(() => {
+  const refreshTimeline = useCallback(async (replace = false) => {
+    try {
+      const res = await fetch(buildChatUrl("/timeline", { limit: "50" }), {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        setConnectionState("auth");
+        return false;
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const raw = data.posts ?? [];
+      const parsed: Interaction[] = raw.map((p: Record<string, unknown>) => normalizeInteraction(p));
+      setMessages((prev) => (replace ? parsed : mergeInteractions(prev, parsed)));
+      setHasMore(data.has_more ?? false);
+      if (!timelineReadyRef.current) {
+        timelineReadyRef.current = true;
+        setTimelineReady(true);
+      }
+      return true;
+    } catch (err) {
+      console.warn("[chat] failed to load timeline", err);
+      setConnectionState((current) => (current === "auth" ? current : "error"));
+      return false;
+    }
+  }, []);
+
+  function stopSse() {
+    clearReconnectTimer();
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+  }
+
+  const connectSse = useCallback(() => {
+    if (!timelineReadyRef.current) return;
+    stopSse();
     const es = new EventSource(buildChatUrl("/sse/stream"));
     sseRef.current = es;
 
@@ -275,11 +325,9 @@ export function MessageList() {
           data: raw.data,
         };
         setMessages((prev) => {
-          // Avoid duplicates
           if (prev.some((m) => m.id === interaction.id)) return prev;
-          return [...prev, interaction];
+          return mergeInteractions(prev, [interaction]);
         });
-        // Clear draft when a new agent post arrives
         if (interaction.type === "agent") {
           setDraft("");
         }
@@ -327,11 +375,10 @@ export function MessageList() {
         };
         setMessages((prev) => {
           if (prev.some((m) => m.id === interaction.id)) return prev;
-          return [...prev, interaction];
+          return mergeInteractions(prev, [interaction]);
         });
         setDraft("");
         scrollToBottom(true);
-        // Signal that agent turn is complete (clears compaction badge, etc.)
         window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
       } catch {
         setDraft("");
@@ -348,34 +395,48 @@ export function MessageList() {
     });
 
     es.onopen = () => {
-      setConnected(true);
+      clearReconnectTimer();
+      reconnectAttemptsRef.current = 0;
+      setConnectionState("connected");
       window.dispatchEvent(new Event("piclaw:sse-connected"));
-      // Re-fetch timeline on reconnect (server may have restarted)
-      fetch(buildChatUrl("/timeline", { limit: "50" }), { credentials: "include" })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (!data) return;
-          const raw = data.posts ?? [];
-          const parsed = raw.map((p: Record<string, unknown>) => ({
-            id: p.id as number,
-            type: (p.type ?? ((p.data as Record<string, unknown>)?.type === "user_message" ? "user" : "agent")) as "user" | "agent",
-            content: (p.content ?? (p.data as Record<string, unknown>)?.content ?? "") as string,
-            content_blocks: (p.content_blocks ?? (p.data as Record<string, unknown>)?.content_blocks) as ContentBlock[] | undefined,
-            created_at: (p.created_at ?? p.timestamp ?? "") as string,
-            data: p.data as Record<string, unknown> | undefined,
-          }));
-          setMessages(parsed);
-          scrollToBottom(true);
-        })
-        .catch(() => {});
+      void refreshTimeline(false);
     };
-    es.onerror = () => { setConnected(false); window.dispatchEvent(new Event("piclaw:sse-disconnected")); };
 
-    return () => {
-      es.close();
-      sseRef.current = null;
+    es.onerror = () => {
+      setConnectionState((current) => (current === "auth" ? current : "stale"));
+      window.dispatchEvent(new Event("piclaw:sse-disconnected"));
+      if (!timelineReadyRef.current) return;
+      if (reconnectTimerRef.current) return;
+      const attempt = reconnectAttemptsRef.current;
+      reconnectAttemptsRef.current += 1;
+      const delay = Math.min(15000, 1000 * (2 ** attempt));
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        connectSse();
+      }, delay);
     };
-  }, [scrollToBottom]);
+  }, [clearReconnectTimer, refreshTimeline, scrollToBottom]);
+
+  // Initial fetch
+  useEffect(() => {
+    let active = true;
+    void refreshTimeline(true).then((ok) => {
+      if (!active) return;
+      if (ok) setTimelineReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [refreshTimeline]);
+
+  useEffect(() => {
+    if (!timelineReady) return;
+    timelineReadyRef.current = true;
+    connectSse();
+    return () => {
+      stopSse();
+    };
+  }, [connectSse, timelineReady]);
 
   // Listen for optimistic user messages from compose box
   useEffect(() => {
@@ -406,10 +467,7 @@ export function MessageList() {
     const handler = async (e: Event) => {
       const id = (e as CustomEvent).detail?.id;
       if (!id || !listRef.current) return;
-      // Try to find in DOM first
-      let el = listRef.current.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
-      if (el) { highlight(el); return; }
-      // Not in DOM — load messages around this ID
+      let el = listRef.current.querySelector(getMessageSelector(id)) as HTMLElement;      if (el) { highlight(el); return; }
       try {
         const res = await fetch(buildChatUrl("/timeline", { around_row: String(id), limit: "50" }), { credentials: "include" });
         if (res.ok) {
@@ -424,10 +482,8 @@ export function MessageList() {
               created_at: p.timestamp as string ?? "",
               data: p.data as Record<string, unknown>,
             })));
-            // Wait for render, then scroll
             setTimeout(() => {
-              el = listRef.current?.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
-              if (el) highlight(el);
+              el = listRef.current?.querySelector(getMessageSelector(id)) as HTMLElement;              if (el) highlight(el);
             }, 100);
           }
         }
@@ -465,7 +521,6 @@ export function MessageList() {
         const prevScrollHeight = el?.scrollHeight ?? 0;
         setMessages((prev) => [...data.posts, ...prev]);
         setHasMore(data.has_more ?? false);
-        // Restore scroll position
         requestAnimationFrame(() => {
           if (el) {
             el.scrollTop = el.scrollHeight - prevScrollHeight;
@@ -477,18 +532,44 @@ export function MessageList() {
     }
   };
 
-  if (connected === false) {
-    return (
-      <div className="message-list message-list--disconnected">
-        <div className="message-list__status-banner">
-          ⚠️ Not connected — unable to load messages
-        </div>
-      </div>
-    );
-  }
+  const retryConnection = useCallback(async () => {
+    clearReconnectTimer();
+    reconnectAttemptsRef.current = 0;
+    const ok = await refreshTimeline(true);
+    if (!ok) return;
+    timelineReadyRef.current = true;
+    setTimelineReady(true);
+    connectSse();
+  }, [clearReconnectTimer, connectSse, refreshTimeline]);
+
+  const connectionBanner = (() => {
+    switch (connectionState) {
+      case "loading":
+        return "Loading messages…";
+      case "auth":
+        return "Not connected — sign in to load messages";
+      case "stale":
+        return "Connection interrupted — retrying…";
+      case "error":
+        return "Connection lost — retrying…";
+      default:
+        return null;
+    }
+  })();
 
   return (
     <div className="message-list" ref={listRef}>
+      {connectionBanner && (
+        <div className="message-list__status-banner message-list__status-banner--stale">
+          <span>{connectionBanner}</span>
+          {(connectionState === "auth" || connectionState === "stale" || connectionState === "error") && (
+            <button type="button" className="message-list__status-retry" onClick={retryConnection}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
+
       {hasMore && (
         <div className="message-list__load-more">
           <button
@@ -502,7 +583,7 @@ export function MessageList() {
         </div>
       )}
 
-      {messages.length === 0 && connected === true && (
+      {messages.length === 0 && connectionState === "connected" && (
         <div className="message-list__empty">
           <p>No messages yet. Say hello! 👋</p>
         </div>

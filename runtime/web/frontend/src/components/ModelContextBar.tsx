@@ -64,16 +64,18 @@ function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: num
   const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
 
   return (
-    <span
+    <button
+      type="button"
       className="context-ring"
       onClick={onClick}
       title={`Context: ${tokensK}/${totalK} (${p.toFixed(0)}%) \u2014 click to compact`}
+      aria-label={`Compact conversation context, currently ${tokensK} of ${totalK} tokens used`}
     >
       <svg width="12" height="12" viewBox="0 0 12 12">
         <circle cx="6" cy="6" r="5" fill={color} opacity="0.9" />
       </svg>
       <span className="context-ring__label">{tokensK}/{totalK}</span>
-    </span>
+    </button>
   );
 }
 
@@ -101,7 +103,7 @@ export function ModelContextBar() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch("/agent/status");
+      const res = await fetch("/agent/status", { credentials: "same-origin" });
       if (res.ok) {
         agentStatus.value = await res.json() as AgentStatus;
         error.value = false;
@@ -110,7 +112,7 @@ export function ModelContextBar() {
         error.value = true;
       }
       // Also fetch current model (status.data is null when idle)
-      const modelsRes = await fetch("/agent/models");
+      const modelsRes = await fetch("/agent/models", { credentials: "same-origin" });
       if (modelsRes.ok) {
         const info = await modelsRes.json() as ModelInfo;
         if (info.current) currentModel.value = info.current;
@@ -150,7 +152,7 @@ export function ModelContextBar() {
 
   const fetchContext = async () => {
     try {
-      const res = await fetch("/agent/context");
+      const res = await fetch("/agent/context", { credentials: "same-origin" });
       if (res.ok) {
         agentContext.value = await res.json() as AgentContext;
       }
@@ -275,7 +277,7 @@ export function ModelContextBar() {
     if (!models.value.length) models.value = FALLBACK_MODELS;
 
     try {
-      const res = await fetch("/agent/models");
+      const res = await fetch("/agent/models", { credentials: "same-origin" });
       if (res.ok) {
         const info = await res.json() as ModelInfo;
         const entries: ModelEntry[] = info.model_options?.length
@@ -365,31 +367,19 @@ export function ModelContextBar() {
             const isCurrent = entry.id === activeModel;
             const ctxK = entry.context_window ? (entry.context_window >= 1000000 ? `${(entry.context_window / 1000000).toFixed(1)}M` : `${(entry.context_window / 1000).toFixed(0)}k`) : "";
             return (
-              <div
+              <button
                 key={entry.id}
-                className="model-picker__item"
+                type="button"
+                className={`model-picker__item ${isCurrent ? "is-current" : ""}`}
                 onClick={() => handleSelectModel(entry.id)}
-                style={{
-                  color: isCurrent ? "#cba6f7" : "#cdd6f4",
-                  background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = isCurrent
-                    ? "rgba(203,166,247,0.18)"
-                    : "rgba(255,255,255,0.07)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = isCurrent
-                    ? "rgba(203,166,247,0.1)"
-                    : "transparent";
-                }}
+                aria-pressed={isCurrent}
               >
                 <span className="model-picker__item__check">
                   {isCurrent ? "✓" : ""}
                 </span>
                 <span className="model-picker__item__name">{entry.id}</span>
                 {ctxK && <span className="model-picker__item__ctx">{ctxK}</span>}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -403,28 +393,36 @@ export function ModelContextBar() {
       )}
 
       {/* The badge itself */}
-      <span
+      <button
+        type="button"
         className="model-badge"
         onClick={handleBadgeClick}
         title={`${modelName}${thinkingLevel ? ` • ${thinkingLevel}` : ""} — click to switch model`}
+        aria-haspopup="menu"
+        aria-expanded={showPicker.value}
+        aria-label={`Switch model, currently ${modelName}`}
       >
         <span className="model-badge__name-wrapper">
           <span className="model-badge__provider">{modelName.includes("/") ? modelName.split("/")[0] + "/" : ""}</span>
           <span className="model-badge__name">{modelName.split("/").pop() || modelName}</span>
         </span>
-      </span>
+      </button>
       {thinkingLevel && (
           <span
             data-model-picker
             className="thinking-badge-wrapper"
           >
-            <span
+            <button
+              type="button"
               className="thinking-badge"
               onClick={handleThinkingClick}
               title="Click to change thinking level"
+              aria-haspopup="menu"
+              aria-expanded={showThinkingPicker.value}
+              aria-label={`Change thinking level, currently ${thinkingLevel}`}
             >
               {thinkingLevel}
-            </span>
+            </button>
             {showThinkingPicker.value && (
               <div
                 data-model-picker
@@ -433,20 +431,16 @@ export function ModelContextBar() {
                 {(thinkingLevels.value.length ? thinkingLevels.value : FALLBACK_THINKING_LEVELS).map((level) => {
                   const isActive = level === thinkingLevel;
                   return (
-                    <div
+                    <button
                       key={level}
-                      className="thinking-picker__item"
+                      type="button"
+                      className={`thinking-picker__item ${isActive ? "is-active" : ""}`}
                       onClick={(ev) => { ev.stopPropagation(); handleSelectThinking(level); }}
-                      style={{
-                        color: isActive ? "#a6e3a1" : "#cdd6f4",
-                        background: isActive ? "rgba(166,227,161,0.1)" : "transparent",
-                      }}
-                      onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)"; }}
-                      onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent"; }}
+                      aria-pressed={isActive}
                     >
                       <span className="thinking-picker__item__check">{isActive ? "✓" : ""}</span>
                       <span>{level}</span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

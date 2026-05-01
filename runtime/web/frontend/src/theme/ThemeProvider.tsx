@@ -3,7 +3,7 @@ import type { ComponentChildren } from "preact";
 import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { DARK_THEME, LIGHT_THEME, getSystemTheme, type Theme } from "./theme";
 
-export const ThemeContext = createContext<Theme>(DARK_THEME);
+const ThemeContext = createContext<Theme>(DARK_THEME);
 
 export interface ThemeControl {
   mode: "dark" | "light";
@@ -77,11 +77,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     </ThemeControlContext.Provider>
   );
 }
-
-export function useTheme() {
-  return useContext(ThemeContext);
-}
-
 export function useThemeControl() {
   return useContext(ThemeControlContext);
 }

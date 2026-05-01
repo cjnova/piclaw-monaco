@@ -1,5 +1,7 @@
-import { useSignal, useComputed } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { getMessageUrl } from "../api/chat-jid";
+import { readLocalStorageValue, removeLocalStorageValue, writeLocalStorageValue } from "../utils/storage";
 
 interface ScratchItem {
   id: string;
@@ -16,17 +18,27 @@ export function ScratchpadPanel() {
   const editorTitle = useSignal("");
   const editorContent = useSignal("");
   const isNew = useSignal(true); // true = creating new, false = editing existing
+  const loadError = useSignal<string | null>(null);
+  const sendError = useSignal<string | null>(null);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("piclaw-scratchpad-items");
+      const stored = readLocalStorageValue("piclaw-scratchpad-items");
       if (stored) items.value = JSON.parse(stored);
-    } catch {}
+    } catch (err) {
+      console.error("[scratchpad] failed to parse saved items", err);
+      loadError.value = "Recovered a corrupted saved scratchpad cache; started fresh.";
+      try {
+        removeLocalStorageValue("piclaw-scratchpad-items");
+      } catch (removeErr) {
+        console.warn("[scratchpad] failed to clear corrupted saved items", removeErr);
+      }
+    }
   }, []);
 
   const persist = (updated: ScratchItem[]) => {
     items.value = updated;
-    localStorage.setItem("piclaw-scratchpad-items", JSON.stringify(updated));
+    writeLocalStorageValue("piclaw-scratchpad-items", JSON.stringify(updated));
   };
 
   const resetEditor = () => {
@@ -74,37 +86,37 @@ export function ScratchpadPanel() {
     resetEditor();
   };
 
-  const toggleCheck = (id: string, e: Event) => {
-    e.stopPropagation();
-    persist(items.value.map(n => n.id === id ? { ...n, selected: !n.selected } : n));
-  };
-
   const deleteItem = (id: string, e: Event) => {
     e.stopPropagation();
     persist(items.value.filter(n => n.id !== id));
     if (activeId.value === id) resetEditor();
   };
 
-  const selectedCount = useComputed(() => items.value.filter(n => n.selected).length);
-
   const sendItemToChat = async (id: string, e: Event) => {
     e.stopPropagation();
     const item = items.value.find(n => n.id === id);
     if (!item) return;
     const content = item.content || item.title;
+    sendError.value = null;
     try {
-      await fetch("/agent/web:default/message", {
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ content }),
       });
+      if (!res.ok) {
+        const details = (await res.text()).trim();
+        throw new Error(details || res.statusText || `HTTP ${res.status}`);
+      }
       const now = new Date().toISOString();
       persist(items.value.map(n => n.id === id ? { ...n, sentAt: now } : n));
-    } catch {}
+    } catch (err) {
+      sendError.value = `Failed to send item to chat: ${err instanceof Error ? err.message : String(err)}`;
+    }
   };
 
-  const listHeight = useSignal(Number(localStorage.getItem("piclaw-scratchpad-split")) || 50); // percentage
+  const listHeight = useSignal(Number(readLocalStorageValue("piclaw-scratchpad-split")) || 50); // percentage
 
   const onDragStart = (e: MouseEvent) => {
     e.preventDefault();
@@ -120,7 +132,7 @@ export function ScratchpadPanel() {
       document.body.style.cursor = "";
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      localStorage.setItem("piclaw-scratchpad-split", String(listHeight.value));
+      writeLocalStorageValue("piclaw-scratchpad-split", String(listHeight.value));
     };
     document.body.style.userSelect = "none";
     document.body.style.cursor = "row-resize";
@@ -130,6 +142,9 @@ export function ScratchpadPanel() {
 
   return (
     <div className="scratchpad-panel">
+      {loadError.value && <div className="scratchpad-panel__error" role="status" aria-live="polite">{loadError.value}</div>}
+      {sendError.value && <div className="scratchpad-panel__error" role="status" aria-live="polite">{sendError.value}</div>}
+
       {/* Upper pane: items list */}
       <div className="scratchpad-panel__section" style={{ height: `${listHeight.value}%`, flex: 'none' }}>
         <div className="scratchpad-panel__section-header">
@@ -151,6 +166,15 @@ export function ScratchpadPanel() {
                 key={item.id}
                 className={`scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}
                 onClick={() => selectItem(item)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    selectItem(item);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Select scratchpad item ${item.title}`}
               >
                 <div className="scratchpad-panel__item-body">
                   <div className="scratchpad-panel__item-header">

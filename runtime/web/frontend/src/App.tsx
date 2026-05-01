@@ -1,6 +1,6 @@
-import { getChatJid } from "./api/chat-jid";
 import { isSafeExtensionUrl } from "./utils/isSafeExtensionUrl";
 import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
+import type { JSX } from "preact";
 import { useSignal } from "@preact/signals";
 import type { ConnectionStatus } from "./api/types";
 import { ActivityBar } from "./components/ActivityBar";
@@ -12,40 +12,42 @@ import { CommandPalette } from "./components/CommandPalette";
 import { PanelRouter, ChatPanel, SettingsPanel } from "./panels";
 import { commandRegistry } from "./services";
 import { ThemeProvider, useThemeControl } from "./theme/ThemeProvider";
+import { sanitizeMarkdownHtml } from "./utils/markdown";
+import { readLocalStorageValue, writeLocalStorageValue } from "./utils/storage";
 
 function AppContent() {
   const themeControl = useThemeControl();
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
-  const activePanel = useSignal(localStorage.getItem("piclaw-active-panel") || "explorer");
-  const previousPanel = useSignal(localStorage.getItem("piclaw-previous-panel") || "explorer");
+  const activePanel = useSignal(readLocalStorageValue("piclaw-active-panel") || "explorer");
+  const previousPanel = useSignal(readLocalStorageValue("piclaw-previous-panel") || "explorer");
   const paletteVisible = useSignal(false);
-  const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
-  const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
+  const terminalVisible = useSignal(readLocalStorageValue("piclaw-terminal-visible") === "true");
+  const terminalHeight = useSignal(Number(readLocalStorageValue("piclaw-terminal-height")) || 200);
   const terminalMaximized = useSignal(false);
-  const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
-  const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
+  const sidebarCollapsed = useSignal(readLocalStorageValue("piclaw-sidebar-collapsed") === "true");
+  const sidebarWidth = useSignal(Number(readLocalStorageValue("piclaw-sidebar-width")) || 250);
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
   const extensionPageHtml = useSignal<string | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
-    localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
+    writeLocalStorageValue("piclaw-sidebar-width", String(sidebarWidth.value));
   }, [sidebarWidth.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-active-panel", activePanel.value);
+    writeLocalStorageValue("piclaw-active-panel", activePanel.value);
   }, [activePanel.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-previous-panel", previousPanel.value);
+    writeLocalStorageValue("piclaw-previous-panel", previousPanel.value);
   }, [previousPanel.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
+    writeLocalStorageValue("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
   }, [sidebarCollapsed.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-terminal-visible", String(terminalVisible.value));
+    writeLocalStorageValue("piclaw-terminal-visible", String(terminalVisible.value));
   }, [terminalVisible.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value));
+    writeLocalStorageValue("piclaw-terminal-height", String(terminalHeight.value));
   }, [terminalHeight.value]);
 
   // Connection status — derive from MessageList's SSE (via custom event)
@@ -173,6 +175,109 @@ function AppContent() {
     extensionPageHtml.value = null;
   }, [extensionPageUrl, extensionPageName, extensionPageHtml]);
 
+  const adjustSidebarWidth = useCallback((delta: number) => {
+    sidebarWidth.value = Math.max(150, Math.min(Math.round(window.innerWidth * 0.5), sidebarWidth.value + delta));
+  }, [sidebarWidth]);
+
+  const startSidebarResize = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidth.value;
+    const onMove = (ev: MouseEvent) => {
+      sidebarWidth.value = Math.max(150, Math.min(Math.round(window.innerWidth * 0.5), startW + (ev.clientX - startX)));
+    };
+    const onUp = () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [sidebarWidth]);
+
+  const handleSidebarResizeKeyDown = useCallback((e: JSX.TargetedKeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 50 : 20;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      adjustSidebarWidth(-step);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      adjustSidebarWidth(step);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      sidebarWidth.value = 150;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      sidebarWidth.value = Math.round(window.innerWidth * 0.5);
+    }
+  }, [adjustSidebarWidth, sidebarWidth]);
+
+  const adjustTerminalHeight = useCallback((delta: number) => {
+    terminalHeight.value = Math.max(100, Math.min(window.innerHeight * 0.8, terminalHeight.value + delta));
+  }, [terminalHeight]);
+
+  const startTerminalResize = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    termDragRef.current = { startY: e.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
+    terminalMaximized.value = false;
+    const onMove = (ev: MouseEvent) => {
+      if (!termDragRef.current) return;
+      terminalHeight.value = Math.max(100, Math.min(window.innerHeight * 0.8, termDragRef.current.startH + (termDragRef.current.startY - ev.clientY)));
+    };
+    const onUp = () => {
+      termDragRef.current = null;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "row-resize";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [terminalHeight, terminalMaximized]);
+
+  const handleTerminalResizeKeyDown = useCallback((e: JSX.TargetedKeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 50 : 20;
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      adjustTerminalHeight(step);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      adjustTerminalHeight(-step);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      terminalHeight.value = 100;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      terminalHeight.value = Math.round(window.innerHeight * 0.8);
+    }
+  }, [adjustTerminalHeight, terminalHeight]);
+
+  const toggleTerminalMaximized = useCallback(() => {
+    terminalMaximized.value = !terminalMaximized.value;
+  }, [terminalMaximized]);
+
+  const openTerminalInNewTab = useCallback(() => {
+    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+  }, []);
+
+  const popOutTerminal = useCallback(() => {
+    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+  }, []);
+
+  const closeTerminal = useCallback(() => {
+    terminalVisible.value = false;
+    terminalMaximized.value = false;
+  }, [terminalVisible, terminalMaximized]);
+
+  const openTerminal = useCallback(() => {
+    terminalVisible.value = true;
+  }, [terminalVisible]);
+
   useEffect(() => {
     const onOpenPage = (e: Event) => {
       const detail = (e as CustomEvent<{ url?: string; name: string; html?: string; mode?: string; sourceUrl?: string }>).detail;
@@ -193,28 +298,11 @@ function AppContent() {
   }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
 
   const connected = connectionStatus.value === "connected";
+  const sanitizedExtensionPageHtml = useMemo(() => {
+    if (!extensionPageHtml.value || extensionPageHtml.value === "__pdf__") return null;
+    return sanitizeMarkdownHtml(extensionPageHtml.value);
+  }, [extensionPageHtml.value]);
   const PANEL_NAMES: Record<string, string> = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings" };
-
-  const onTermDragStart = useCallback((e: MouseEvent) => {
-    e.preventDefault();
-    termDragRef.current = { startY: e.clientY, startH: terminalMaximized.value ? window.innerHeight * 0.7 : terminalHeight.value };
-    terminalMaximized.value = false;
-    const onMove = (ev: MouseEvent) => {
-      if (!termDragRef.current) return;
-      terminalHeight.value = Math.max(100, Math.min(window.innerHeight * 0.8, termDragRef.current.startH + (termDragRef.current.startY - ev.clientY)));
-    };
-    const onUp = () => {
-      termDragRef.current = null;
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "row-resize";
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }, [terminalHeight, terminalMaximized]);
 
   const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
   const isSettingsActive = activePanel.value === "settings";
@@ -241,24 +329,12 @@ function AppContent() {
           {!sidebarCollapsed.value && !isSettingsActive && (
             <div
               className="app-layout__resize-handle"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                const startX = e.clientX;
-                const startW = sidebarWidth.value;
-                const onMove = (ev: MouseEvent) => {
-                  sidebarWidth.value = Math.max(150, Math.min(Math.round(window.innerWidth * 0.5), startW + (ev.clientX - startX)));
-                };
-                const onUp = () => {
-                  document.body.style.userSelect = "";
-                  document.body.style.cursor = "";
-                  document.removeEventListener("mousemove", onMove);
-                  document.removeEventListener("mouseup", onUp);
-                };
-                document.body.style.userSelect = "none";
-                document.body.style.cursor = "col-resize";
-                document.addEventListener("mousemove", onMove);
-                document.addEventListener("mouseup", onUp);
-              }}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              tabIndex={0}
+              onMouseDown={startSidebarResize}
+              onKeyDown={handleSidebarResizeKeyDown}
             />
           )}
           <div className="app-layout__panel">
@@ -290,17 +366,17 @@ function AppContent() {
                       <a href={extensionPageUrl.value!} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>Open PDF in new tab</a>
                     </div>
                   </object>
-                ) : extensionPageHtml.value ? (
+                ) : sanitizedExtensionPageHtml ? (
                   <div
                     className="workspace__preview-markdown extension-frame__markdown"
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
-                    dangerouslySetInnerHTML={{ __html: extensionPageHtml.value }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized on App consumption via sanitizeMarkdownHtml()
+                    dangerouslySetInnerHTML={{ __html: sanitizedExtensionPageHtml }}
                   />
                 ) : (
                   <iframe
                     className="extension-frame__iframe"
                     src={extensionPageUrl.value!}
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                    sandbox="allow-scripts allow-forms allow-popups"
                     title={extensionPageName.value ?? "Extension Page"}
                   />
                 )}
@@ -316,39 +392,52 @@ function AppContent() {
           <div className="app-layout__terminal" style={{ height: tH }}>
             <div
               className="app-layout__term-drag-handle"
-              onMouseDown={onTermDragStart}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize terminal panel"
+              tabIndex={0}
+              onMouseDown={startTerminalResize}
+              onKeyDown={handleTerminalResizeKeyDown}
             />
             <div className="terminal__header">
               <span className="terminal__title">Terminal</span>
               <div className="terminal__actions">
-                <span
+                <button
+                  type="button"
                   className="terminal__btn"
-                  onClick={() => { terminalMaximized.value = !terminalMaximized.value; }}
+                  onClick={toggleTerminalMaximized}
                   title={terminalMaximized.value ? "Restore" : "Maximize"}
+                  aria-label={terminalMaximized.value ? "Restore terminal" : "Maximize terminal"}
                 >
                   <i className={terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full"} />
-                </span>
-                <span
+                </button>
+                <button
+                  type="button"
                   className="terminal__btn"
-                  onClick={() => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); }}
+                  onClick={openTerminalInNewTab}
                   title="Open in new tab"
+                  aria-label="Open terminal in new tab"
                 >
                   <i className="codicon codicon-link-external" />
-                </span>
-                <span
+                </button>
+                <button
+                  type="button"
                   className="terminal__btn"
-                  onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); }}
+                  onClick={popOutTerminal}
                   title="Pop out to window"
+                  aria-label="Pop out terminal to new window"
                 >
                   <i className="codicon codicon-multiple-windows" />
-                </span>
-                <span
+                </button>
+                <button
+                  type="button"
                   className="terminal__btn"
-                  onClick={() => { terminalVisible.value = false; terminalMaximized.value = false; }}
+                  onClick={closeTerminal}
                   title="Close (Ctrl+`)"
+                  aria-label="Close terminal"
                 >
                   &#x2715;
-                </span>
+                </button>
               </div>
             </div>
             <TerminalComponent />
@@ -367,13 +456,15 @@ function AppContent() {
           <span className="status-bar__right">
             <SystemStats />
             {!terminalVisible.value && (
-              <span
+              <button
+                type="button"
                 className="status-bar__terminal-btn"
-                onClick={() => { terminalVisible.value = true; }}
+                onClick={openTerminal}
                 title="Open Terminal (Ctrl+`)"
+                aria-label="Open terminal"
               >
                 Terminal
-              </span>
+              </button>
             )}
           </span>
         </div>

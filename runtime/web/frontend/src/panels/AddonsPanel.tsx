@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
 interface AddonSkill {
   name: string;
@@ -31,6 +31,19 @@ export function AddonsPanel() {
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [filter, setFilter] = useState<string>("");
   const [actionState, setActionState] = useState<Record<string, "installing" | "uninstalling">>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const actionMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashActionMessage = useCallback((message: string) => {
+    if (actionMessageTimerRef.current) {
+      clearTimeout(actionMessageTimerRef.current);
+    }
+    setActionMessage(message);
+    actionMessageTimerRef.current = setTimeout(() => {
+      setActionMessage(null);
+      actionMessageTimerRef.current = null;
+    }, 3000);
+  }, []);
 
   const loadAddons = useCallback(async () => {
     setStatus("loading");
@@ -65,8 +78,9 @@ export function AddonsPanel() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await loadAddons();
-    } catch {
-      // ignore, just refresh
+    } catch (err) {
+      console.warn("[addons] failed to install", slug, err);
+      flashActionMessage(`Failed to install ${slug}.`);
     } finally {
       setActionState((prev) => {
         const next = { ...prev };
@@ -74,7 +88,7 @@ export function AddonsPanel() {
         return next;
       });
     }
-  }, [loadAddons]);
+  }, [flashActionMessage, loadAddons]);
 
   const handleUninstall = useCallback(async (slug: string) => {
     setActionState((prev) => ({ ...prev, [slug]: "uninstalling" }));
@@ -87,8 +101,9 @@ export function AddonsPanel() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await loadAddons();
-    } catch {
-      // ignore, just refresh
+    } catch (err) {
+      console.warn("[addons] failed to uninstall", slug, err);
+      flashActionMessage(`Failed to remove ${slug}.`);
     } finally {
       setActionState((prev) => {
         const next = { ...prev };
@@ -96,7 +111,7 @@ export function AddonsPanel() {
         return next;
       });
     }
-  }, [loadAddons]);
+  }, [flashActionMessage, loadAddons]);
 
   const filteredAddons = addons.filter((addon) => {
     if (!filter) return true;
@@ -140,6 +155,11 @@ export function AddonsPanel() {
           onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
         />
       </div>
+      {actionMessage && (
+        <div className="addons-panel__message addons-panel__message--error" role="status" aria-live="polite">
+          {actionMessage}
+        </div>
+      )}
       {source && (
         <div className="addons-panel__source">Catalog from {source}</div>
       )}

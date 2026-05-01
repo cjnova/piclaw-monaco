@@ -1,5 +1,7 @@
 import { useEffect } from "preact/hooks";
 import { useSignal, type Signal } from "@preact/signals";
+import { getMessageUrl } from "../api/chat-jid";
+import { readLocalStorageValue, writeLocalStorageValue } from "../utils/storage";
 
 /* ── Number Stepper Component ── */
 function NumberStepper({ value, min, max, step, onSave }: {
@@ -102,7 +104,7 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
 ];
 
 export function SettingsPanel() {
-  const activeCategory = useSignal<Category>((localStorage.getItem("piclaw-settings-category") as Category) || "general");
+  const activeCategory = useSignal<Category>((readLocalStorageValue("piclaw-settings-category") as Category) || "general");
   const settings = useSignal<SettingsData | null>(null);
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
@@ -214,7 +216,7 @@ export function SettingsPanel() {
           <button
             key={cat.id}
             className={`settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`}
-            onClick={() => { activeCategory.value = cat.id; localStorage.setItem("piclaw-settings-category", cat.id); }}
+            onClick={() => { activeCategory.value = cat.id; writeLocalStorageValue("piclaw-settings-category", cat.id); }}
           >
             <i className={`codicon ${cat.icon}`} />
             <span>{cat.label}</span>
@@ -582,8 +584,8 @@ function WorkspaceSection({
   const ws = data.workspaceSettings ?? {};
   const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
   const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5000);
-  const refreshInterval = useSignal(Number(localStorage.getItem("piclaw-ws-refresh-interval")) || 60);
-  const folderPreviewDepth = useSignal(Number(localStorage.getItem("piclaw-ws-folder-preview-depth")) || 3);
+  const refreshInterval = useSignal(Number(readLocalStorageValue("piclaw-ws-refresh-interval")) || 60);
+  const folderPreviewDepth = useSignal(Number(readLocalStorageValue("piclaw-ws-folder-preview-depth")) || 3);
 
   return (
     <section className="settings-panel__section">
@@ -639,12 +641,12 @@ function WorkspaceSection({
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Refresh interval (seconds)</label>
-        <NumberStepper value={refreshInterval} min={5} max={600} step={5} onSave={(v) => localStorage.setItem("piclaw-ws-refresh-interval", String(v))} />
+        <NumberStepper value={refreshInterval} min={5} max={600} step={5} onSave={(v) => writeLocalStorageValue("piclaw-ws-refresh-interval", String(v))} />
       </div>
 
       <div className="settings-panel__field">
         <label className="settings-panel__label">Folder preview scan depth</label>
-        <NumberStepper value={folderPreviewDepth} min={0} max={20} onSave={(v) => localStorage.setItem("piclaw-ws-folder-preview-depth", String(v))} />
+        <NumberStepper value={folderPreviewDepth} min={0} max={20} onSave={(v) => writeLocalStorageValue("piclaw-ws-folder-preview-depth", String(v))} />
         <span className="settings-panel__description">set to 0 to disable folder size preview scans</span>
       </div>
 
@@ -673,7 +675,7 @@ function ModelsSection({ data }: { data: SettingsData }) {
 
   const sendCommand = async (cmd: string) => {
     try {
-      await fetch("/agent/web:default/message", {
+      await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -729,6 +731,15 @@ function ModelsSection({ data }: { data: SettingsData }) {
                 key={m.label}
                 className={m.label === current.value ? "settings-panel__model-table-row--active" : ""}
                 onClick={() => switchModel(m.label)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    switchModel(m.label);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-pressed={m.label === current.value}
                 style={{ cursor: "pointer" }}
               >
                 <td>
@@ -761,6 +772,15 @@ function ModelsSection({ data }: { data: SettingsData }) {
               key={l}
               className={`settings-panel__thinking-label${l === thinkingLevel.value ? " settings-panel__thinking-label--active" : ""}`}
               onClick={() => switchThinking(l)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  switchThinking(l);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={l === thinkingLevel.value}
             >
               {l.charAt(0).toUpperCase() + l.slice(1)}
             </span>
@@ -779,43 +799,68 @@ function KeychainSection() {
   const newName = useSignal("");
   const newSecret = useSignal("");
   const newType = useSignal("secret");
+  const keychainStatus = useSignal<string | null>(null);
 
-  const fetchEntries = () => {
-    fetch("/agent/keychain", { credentials: "same-origin" })
-      .then(r => r.json())
-      .then((d: any) => { entries.value = d.entries ?? []; })
-      .catch(() => {});
+  const fetchEntries = async () => {
+    const res = await fetch("/agent/keychain", { credentials: "same-origin" });
+    if (!res.ok) {
+      const details = (await res.text()).trim();
+      throw new Error(details || res.statusText || `HTTP ${res.status}`);
+    }
+    const d: any = await res.json();
+    entries.value = d.entries ?? [];
   };
 
-  useEffect(() => { fetchEntries(); }, []);
+  useEffect(() => {
+    fetchEntries().catch((err) => {
+      console.warn("[settings] failed to load keychain entries", err);
+      keychainStatus.value = `Failed to load keychain entries: ${err instanceof Error ? err.message : String(err)}`;
+    });
+  }, []);
 
   const addEntry = async () => {
     if (!newName.value.trim() || !newSecret.value.trim()) return;
     try {
-      await fetch("/agent/keychain", {
+      const res = await fetch("/agent/keychain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ name: newName.value.trim(), secret: newSecret.value, type: newType.value }),
       });
+      if (!res.ok) {
+        const details = (await res.text()).trim();
+        throw new Error(details || res.statusText || `HTTP ${res.status}`);
+      }
       newName.value = "";
       newSecret.value = "";
       showAdd.value = false;
-      fetchEntries();
-    } catch {}
+      keychainStatus.value = null;
+      await fetchEntries();
+    } catch (err) {
+      console.warn("[settings] failed to add keychain entry", err);
+      keychainStatus.value = `Failed to add keychain entry: ${err instanceof Error ? err.message : String(err)}`;
+    }
   };
 
   const deleteEntry = async (name: string) => {
     if (!confirm(`Delete keychain entry "${name}"?`)) return;
     try {
-      await fetch("/agent/keychain", {
+      const res = await fetch("/agent/keychain", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ name }),
       });
-      fetchEntries();
-    } catch {}
+      if (!res.ok) {
+        const details = (await res.text()).trim();
+        throw new Error(details || res.statusText || `HTTP ${res.status}`);
+      }
+      keychainStatus.value = null;
+      await fetchEntries();
+    } catch (err) {
+      console.warn("[settings] failed to delete keychain entry", name, err);
+      keychainStatus.value = `Failed to delete keychain entry "${name}": ${err instanceof Error ? err.message : String(err)}`;
+    }
   };
 
   const filtered = filter.value
@@ -838,6 +883,12 @@ function KeychainSection() {
           + Add entry
         </button>
       </div>
+
+      {keychainStatus.value && (
+        <div className="settings-panel__save-status settings-panel__save-status--error" role="status" aria-live="polite">
+          {keychainStatus.value}
+        </div>
+      )}
 
       <p className="settings-panel__description">
         {entries.value.length} entries, encrypted at rest.
@@ -953,7 +1004,19 @@ function ToolsSection({ data }: { data: SettingsData }) {
         const tools = ts.tools ?? [];
         return (
           <div key={ts.name} className="settings-panel__toolset">
-            <div className="settings-panel__toolset-header" onClick={() => toggleCollapse(ts.name)}>
+            <div
+              className="settings-panel__toolset-header"
+              onClick={() => toggleCollapse(ts.name)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleCollapse(ts.name);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-expanded={!isCollapsed}
+            >
               <span className="settings-panel__toolset-toggle">{isCollapsed ? "▶" : "▼"}</span>
               <input type="checkbox" checked={true} disabled className="settings-panel__toolset-checkbox" />
               <strong className="settings-panel__toolset-name">{ts.name}</strong>
@@ -994,7 +1057,7 @@ function ToolsSection({ data }: { data: SettingsData }) {
 function ProvidersSection({ providers }: { providers: Provider[] }) {
   const sendCommand = async (command: string) => {
     try {
-      await fetch("/agent/web:default/message", {
+      await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",

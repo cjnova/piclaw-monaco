@@ -5,9 +5,9 @@ interface StatsData {
   cpu_percent: number;
   ram_percent: number;
   swap_percent: number | null;
-  process_memory: {
-    rss_bytes: number;
-  };
+  process_memory?: {
+    rss_bytes?: number | null;
+  } | null;
 }
 
 function formatClock(date: Date): string {
@@ -22,13 +22,13 @@ function formatClock(date: Date): string {
 
 function StatsDisplay({ stats }: { stats: StatsData | null }) {
   if (!stats) return <span className="sys-stats">CPU -- RAM -- RSS -- SWP --</span>;
-  const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
+  const rssMb = stats.process_memory?.rss_bytes != null ? Math.round(stats.process_memory.rss_bytes / (1024 * 1024)) : null;
   const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
   return (
     <span className="sys-stats">
       <span className="sys-stats__label">CPU</span> {stats.cpu_percent}%
       <span className="sys-stats__label">RAM</span> {stats.ram_percent}%
-      <span className="sys-stats__label">RSS</span> {rssMb}M
+      <span className="sys-stats__label">RSS</span> {rssMb != null ? `${rssMb}M` : "--"}
       <span className="sys-stats__label">SWP</span> {swp}
     </span>
   );
@@ -63,7 +63,7 @@ export function SystemStats() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("/agent/system-metrics");
+        const res = await fetch("/agent/system-metrics", { credentials: "same-origin" });
         if (res.ok) {
           stats.value = await res.json() as StatsData;
         }

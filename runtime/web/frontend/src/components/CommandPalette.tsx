@@ -6,7 +6,6 @@ import { getMessageUrl } from "../api/chat-jid";
 interface CommandPaletteProps {
   visible: boolean;
   onClose: () => void;
-  onCommand?: (cmd: string) => void;
 }
 
 interface BackendCommand {
@@ -73,16 +72,16 @@ const COMMAND_PARAMS: Record<string, CommandParam> = {
   "/abort-retry": { type: "bare" },
 };
 
-const CATEGORY_BADGE_COLORS: Record<string, string> = {
-  navigation: "#89b4fa",
-  terminal: "#a6e3a1",
-  session: "#f9e2af",
-  theme: "#cba6f7",
-  general: "#94e2d5",
-  core: "#f38ba8",
-  extension: "#fab387",
-  skill: "#a6e3a1",
-  template: "#89dceb",
+const CATEGORY_BADGE_CLASSES: Record<string, string> = {
+  navigation: "command-palette__badge--navigation",
+  terminal: "command-palette__badge--terminal",
+  session: "command-palette__badge--session",
+  theme: "command-palette__badge--theme",
+  general: "command-palette__badge--general",
+  core: "command-palette__badge--core",
+  extension: "command-palette__badge--extension",
+  skill: "command-palette__badge--skill",
+  template: "command-palette__badge--template",
 };
 
 function sendCommand(command: string) {
@@ -94,18 +93,16 @@ function sendCommand(command: string) {
   }).catch((err) => console.warn("[CommandPalette] send failed:", err));
 }
 
-export function CommandPalette({ visible, onClose, onCommand }: CommandPaletteProps) {
+export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
-  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const [step, setStep] = useState<"command" | "parameter">("command");
   const [selectedCommand, setSelectedCommand] = useState<string>("");
   const [autoCompleteOptions, setAutoCompleteOptions] = useState<string[]>([]);
   const [paramPlaceholder, setParamPlaceholder] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset state when palette opens/closes
   useEffect(() => {
@@ -217,7 +214,7 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
     if (!param || param.type === "bare") {
       // Execute immediately
       sendCommand(name);
-      if (onCommand) onCommand(name);
+
       onClose();
       return;
     }
@@ -259,7 +256,7 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
         if (selectedOption != null) {
           const fullCommand = `${selectedCommand} ${selectedOption}`;
           sendCommand(fullCommand);
-          if (onCommand) onCommand(fullCommand);
+
           onClose();
         }
       } else {
@@ -268,7 +265,7 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
         if (trimmed) {
           const fullCommand = `${selectedCommand} ${trimmed}`;
           sendCommand(fullCommand);
-          if (onCommand) onCommand(fullCommand);
+
           onClose();
         }
       }
@@ -417,11 +414,6 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
           onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
-        {copiedLabel && (
-          <div className="command-palette__copied">
-            Copied to clipboard: <strong>{copiedLabel}</strong>
-          </div>
-        )}
         {isTextStep ? (
           <div className="command-palette__text-hint">
             Press <kbd>Enter</kbd> to send{query.trim() ? `: ${selectedCommand} ${query.trim()}` : ""}
@@ -433,12 +425,11 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
                 <li
                   key={option}
                   className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                  style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
                     const fullCommand = `${selectedCommand} ${option}`;
                     sendCommand(fullCommand);
-                    if (onCommand) onCommand(fullCommand);
+          
                     onClose();
                   }}
                 >
@@ -448,12 +439,10 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
                 </li>
               ))
               : (results as MergedCommand[]).map((command, index) => {
-                const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
                 return (
                   <li
                     key={command.id}
                     className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                    style={{ background: index === selectedIndex ? "var(--border)" : "transparent" }}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       if (command.handler) {
@@ -476,12 +465,7 @@ export function CommandPalette({ visible, onClose, onCommand }: CommandPalettePr
                     </span>
                     <span className="command-palette__row-meta">
                       <span
-                        className="command-palette__badge"
-                        style={{
-                          background: `${badgeColor}22`,
-                          color: badgeColor,
-                          border: `1px solid ${badgeColor}44`,
-                        }}
+                        className={`command-palette__badge ${CATEGORY_BADGE_CLASSES[command.category] ?? "command-palette__badge--default"}`}
                       >
                         {command.category}
                       </span>

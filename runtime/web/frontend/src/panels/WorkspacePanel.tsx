@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "preact/hooks";
+import { readLocalStorageValue, writeLocalStorageValue } from "../utils/storage";
 import { marked } from "marked";
 import { FileTree, type TreeNode } from "../components/FileTree";
 import {
@@ -773,7 +774,7 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
 // ─── WorkspacePanel ──────────────────────────────────────────────────────────
 
 export function WorkspacePanel() {
-  const [topHeight, setTopHeight] = useState(() => Number(localStorage.getItem("piclaw-workspace-split")) || 260);
+  const [topHeight, setTopHeight] = useState(() => Number(readLocalStorageValue("piclaw-workspace-split")) || 260);
   const containerRef = useRef<HTMLDivElement>(null);
   const heightRef = useRef(topHeight);
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
@@ -798,7 +799,7 @@ export function WorkspacePanel() {
       setTopHeight(next);
     };
     const onUp = () => {
-      localStorage.setItem("piclaw-workspace-split", String(heightRef.current));
+      writeLocalStorageValue("piclaw-workspace-split", String(heightRef.current));
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
       document.removeEventListener("mousemove", onMove);
