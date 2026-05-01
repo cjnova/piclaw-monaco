@@ -1,4 +1,3 @@
-import { getChatJid } from "./api/chat-jid";
 import { isSafeExtensionUrl } from "./utils/isSafeExtensionUrl";
 import { useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";

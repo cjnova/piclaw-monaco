@@ -78,10 +78,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   );
 }
 
-export function useTheme() {
-  return useContext(ThemeContext);
-}
-
 export function useThemeControl() {
   return useContext(ThemeControlContext);
 }
