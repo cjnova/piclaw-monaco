@@ -789,8 +789,12 @@ body {
 
 .thinking-badge {
   cursor: pointer;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.5);
-  padding-bottom: 1px;
+  color: #a6e3a1;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(166, 227, 161, 0.1);
+  font-size: 12px;
 }
 
 .thinking-picker {
