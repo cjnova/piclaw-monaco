@@ -9392,7 +9392,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           className: "search-panel__item",
           "data-message-id": r4.id,
           onClick: () => {
-            console.log("[search] navigate to message:", r4.id);
+            window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r4.id } }));
           },
           children: [
             /* @__PURE__ */ u4("span", { className: "search-panel__item-text", children: getSnippet(r4) }),
@@ -10894,6 +10894,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       "div",
       {
         className: `message-list__item ${isUser ? "message-list__item--user" : "message-list__item--agent"}`,
+        "data-message-id": interaction.id,
         children: [
           /* @__PURE__ */ u4(
             "div",
@@ -11110,6 +11111,24 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       window.addEventListener("piclaw:new-message", handler);
       return () => window.removeEventListener("piclaw:new-message", handler);
     }, [scrollToBottom]);
+    y2(() => {
+      const handler = (e5) => {
+        const id = e5.detail?.id;
+        if (!id || !listRef.current) return;
+        const el = listRef.current.querySelector(`[data-message-id="${id}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.style.outline = "2px solid var(--accent)";
+          el.style.borderRadius = "4px";
+          setTimeout(() => {
+            el.style.outline = "";
+            el.style.borderRadius = "";
+          }, 2e3);
+        }
+      };
+      window.addEventListener("piclaw:scroll-to-message", handler);
+      return () => window.removeEventListener("piclaw:scroll-to-message", handler);
+    }, []);
     y2(() => {
       const el = listRef.current;
       if (!el) return;

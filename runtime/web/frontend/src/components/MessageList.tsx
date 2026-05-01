@@ -147,6 +147,7 @@ function MessageItem({ interaction }: MessageItemProps) {
       className={`message-list__item ${
         isUser ? "message-list__item--user" : "message-list__item--agent"
       }`}
+      data-message-id={interaction.id}
     >
       <div
         className={`message-list__avatar-circle ${
@@ -391,6 +392,23 @@ export function MessageList() {
     window.addEventListener("piclaw:new-message", handler);
     return () => window.removeEventListener("piclaw:new-message", handler);
   }, [scrollToBottom]);
+
+  // Scroll to a specific message (triggered from search panel)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail?.id;
+      if (!id || !listRef.current) return;
+      const el = listRef.current.querySelector(`[data-message-id="${id}"]`) as HTMLElement;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.style.outline = "2px solid var(--accent)";
+        el.style.borderRadius = "4px";
+        setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 2000);
+      }
+    };
+    window.addEventListener("piclaw:scroll-to-message", handler);
+    return () => window.removeEventListener("piclaw:scroll-to-message", handler);
+  }, []);
 
   // Detect manual scroll
   useEffect(() => {
