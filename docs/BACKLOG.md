@@ -176,8 +176,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 
 | Task | Description | Status |
 |---|---|---|
-| localstorage-robustness | Guard quota/parse/blocked errors in localStorage (#112) | ⏳ |
-| sse-reconnection-races | Fix SSE error recovery + timeline load races (#113) | ⏳ |
+| localstorage-robustness | Guard quota/parse/blocked errors in localStorage (#112) | ✅ |
+| sse-reconnection-races | Fix SSE error recovery + timeline load races (#113) | ✅ |
 | theming-debt | Replace hardcoded colors with CSS variables in ModelContextBar (#111) | ⏳ |
 | minor-cleanup | Unused memo deps, inline DOM styling, duplicate CSS selectors (#114) | ⏳ |
 
