@@ -1,5 +1,6 @@
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { getMessageUrl } from "../api/chat-jid";
 
 interface ScratchItem {
   id: string;
@@ -93,7 +94,7 @@ export function ScratchpadPanel() {
     if (!item) return;
     const content = item.content || item.title;
     try {
-      await fetch("/agent/web:default/message", {
+      await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",

@@ -9636,10 +9636,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
 
   // runtime/web/frontend/src/panels/TasksPanel.tsx
-  function currentChatJid() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("chat_jid") ?? "web:default";
-  }
   function chatName(entry) {
     return entry.display_name ?? entry.name ?? entry.jid.split(":").pop() ?? entry.jid;
   }
@@ -9805,7 +9801,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
   function TasksPanel() {
     const [activeTab, setActiveTab] = d2("tasks");
-    const activeChatJid = currentChatJid();
+    const activeChatJid = getChatJid();
     return /* @__PURE__ */ u4("div", { className: "tasks-panel", children: [
       /* @__PURE__ */ u4("div", { className: "tasks-panel__tabs", role: "tablist", children: [
         /* @__PURE__ */ u4(
@@ -10317,7 +10313,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }, []);
     const sendCommand2 = async (cmd) => {
       try {
-        await fetch("/agent/web:default/message", {
+        await fetch(getMessageUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
@@ -10579,7 +10575,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function ProvidersSection({ providers }) {
     const sendCommand2 = async (command) => {
       try {
-        await fetch("/agent/web:default/message", {
+        await fetch(getMessageUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
@@ -10680,7 +10676,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       if (!item) return;
       const content = item.content || item.title;
       try {
-        await fetch("/agent/web:default/message", {
+        await fetch(getMessageUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
