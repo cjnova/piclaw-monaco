@@ -12,6 +12,7 @@ import {
 } from "./workspace-panel-helpers";
 import { formatBytes } from "../utils/formatBytes";
 import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
+import { safeGetItem, safeSetItem } from "../utils/storage";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -773,7 +774,7 @@ function FolderPreview({ node, onMutate }: FolderPreviewProps) {
 // ─── WorkspacePanel ──────────────────────────────────────────────────────────
 
 export function WorkspacePanel() {
-  const [topHeight, setTopHeight] = useState(() => Number(localStorage.getItem("piclaw-workspace-split")) || 260);
+  const [topHeight, setTopHeight] = useState(() => Number(safeGetItem("piclaw-workspace-split")) || 260);
   const containerRef = useRef<HTMLDivElement>(null);
   const heightRef = useRef(topHeight);
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
@@ -798,7 +799,7 @@ export function WorkspacePanel() {
       setTopHeight(next);
     };
     const onUp = () => {
-      localStorage.setItem("piclaw-workspace-split", String(heightRef.current));
+      safeSetItem("piclaw-workspace-split", String(heightRef.current));
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
       document.removeEventListener("mousemove", onMove);

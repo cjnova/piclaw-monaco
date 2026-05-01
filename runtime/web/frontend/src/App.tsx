@@ -11,40 +11,41 @@ import { CommandPalette } from "./components/CommandPalette";
 import { PanelRouter, ChatPanel, SettingsPanel } from "./panels";
 import { commandRegistry } from "./services";
 import { ThemeProvider, useThemeControl } from "./theme/ThemeProvider";
+import { safeGetItem, safeSetItem, safeRemoveItem } from "./utils/storage";
 
 function AppContent() {
   const themeControl = useThemeControl();
   const connectionStatus = useSignal<ConnectionStatus>("disconnected");
-  const activePanel = useSignal(localStorage.getItem("piclaw-active-panel") || "explorer");
-  const previousPanel = useSignal(localStorage.getItem("piclaw-previous-panel") || "explorer");
+  const activePanel = useSignal(safeGetItem("piclaw-active-panel") || "explorer");
+  const previousPanel = useSignal(safeGetItem("piclaw-previous-panel") || "explorer");
   const paletteVisible = useSignal(false);
-  const terminalVisible = useSignal(localStorage.getItem("piclaw-terminal-visible") === "true");
-  const terminalHeight = useSignal(Number(localStorage.getItem("piclaw-terminal-height")) || 200);
+  const terminalVisible = useSignal(safeGetItem("piclaw-terminal-visible") === "true");
+  const terminalHeight = useSignal(Number(safeGetItem("piclaw-terminal-height")) || 200);
   const terminalMaximized = useSignal(false);
-  const sidebarCollapsed = useSignal(localStorage.getItem("piclaw-sidebar-collapsed") === "true");
-  const sidebarWidth = useSignal(Number(localStorage.getItem("piclaw-sidebar-width")) || 250);
+  const sidebarCollapsed = useSignal(safeGetItem("piclaw-sidebar-collapsed") === "true");
+  const sidebarWidth = useSignal(Number(safeGetItem("piclaw-sidebar-width")) || 250);
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
   const extensionPageHtml = useSignal<string | null>(null);
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
-    localStorage.setItem("piclaw-sidebar-width", String(sidebarWidth.value));
+    safeSetItem("piclaw-sidebar-width", String(sidebarWidth.value));
   }, [sidebarWidth.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-active-panel", activePanel.value);
+    safeSetItem("piclaw-active-panel", activePanel.value);
   }, [activePanel.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-previous-panel", previousPanel.value);
+    safeSetItem("piclaw-previous-panel", previousPanel.value);
   }, [previousPanel.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
+    safeSetItem("piclaw-sidebar-collapsed", String(sidebarCollapsed.value));
   }, [sidebarCollapsed.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-terminal-visible", String(terminalVisible.value));
+    safeSetItem("piclaw-terminal-visible", String(terminalVisible.value));
   }, [terminalVisible.value]);
   useEffect(() => {
-    localStorage.setItem("piclaw-terminal-height", String(terminalHeight.value));
+    safeSetItem("piclaw-terminal-height", String(terminalHeight.value));
   }, [terminalHeight.value]);
 
   // Connection status — derive from MessageList's SSE (via custom event)
@@ -140,7 +141,7 @@ function AppContent() {
       { id: "session.reconnect", label: "Reconnect", category: "session" as const, handler: () => { window.dispatchEvent(new Event("piclaw:sse-reconnect")); } },
       // General
       { id: "general.commandPalette", label: "Open Command Palette", category: "general" as const, keybinding: "Ctrl+Shift+P", handler: () => { paletteVisible.value = !paletteVisible.value; } },
-      { id: "general.clearLocalStorage", label: "Clear Layout State", category: "general" as const, handler: () => { ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k) => localStorage.removeItem(k)); } },
+      { id: "general.clearLocalStorage", label: "Clear Layout State", category: "general" as const, handler: () => { ["piclaw-terminal-visible", "piclaw-terminal-height", "piclaw-sidebar-collapsed", "piclaw-sidebar-width"].forEach((k) => safeRemoveItem(k)); } },
     ];
     cmds.forEach((c) => commandRegistry.register(c));
     return () => cmds.forEach((c) => commandRegistry.unregister(c.id));
