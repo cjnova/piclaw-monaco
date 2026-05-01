@@ -105,17 +105,68 @@ export function ScratchpadPanel() {
 
   return (
     <div className="scratchpad-panel">
-      {/* Upper pane: editor */}
-      <div className="scratchpad-panel__editor">
-        <div className="scratchpad-panel__editor-header">
-          <span className="scratchpad-panel__editor-label">
+      {/* Upper pane: items list */}
+      <div className="scratchpad-panel__section">
+        <div className="scratchpad-panel__section-header">
+          <span className="scratchpad-panel__section-label">Items</span>
+          <span className="scratchpad-panel__section-count">{items.value.length}</span>
+          <button type="button" className="scratchpad-panel__icon-btn" onClick={newItem} title="New item">
+            <i className="codicon codicon-add" />
+          </button>
+        </div>
+        <div className="scratchpad-panel__list">
+          {items.value.length === 0 ? (
+            <div className="scratchpad-panel__empty">
+              <i className="codicon codicon-notebook" />
+              <span>No items yet</span>
+            </div>
+          ) : (
+            items.value.map(item => (
+              <div
+                key={item.id}
+                className={`scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}
+                onClick={() => selectItem(item)}
+              >
+                <input
+                  type="checkbox"
+                  checked={item.selected}
+                  onChange={(e) => toggleCheck(item.id, e)}
+                  className="scratchpad-panel__checkbox"
+                />
+                <div className="scratchpad-panel__item-body">
+                  <div className="scratchpad-panel__item-header">
+                    <span className="scratchpad-panel__item-title">{item.title}</span>
+                    {item.sentAt && <span className="scratchpad-panel__sent-badge" title={`Sent ${new Date(item.sentAt).toLocaleString()}`}>✓</span>}
+                  </div>
+                  {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 80 ? item.content.slice(0, 80) + "…" : item.content}</span>}
+                </div>
+                <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__delete-btn" onClick={(e) => deleteItem(item.id, e)} title="Delete">
+                  <i className="codicon codicon-trash" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+        {items.value.length > 0 && (
+          <div className="scratchpad-panel__actions">
+            <button
+              type="button"
+              className="scratchpad-panel__action-btn scratchpad-panel__action-btn--send"
+              onClick={sendToChat}
+              disabled={selectedCount.value === 0}
+            >
+              Send ({selectedCount.value})
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Lower pane: editor */}
+      <div className="scratchpad-panel__section scratchpad-panel__editor">
+        <div className="scratchpad-panel__section-header">
+          <span className="scratchpad-panel__section-label">
             {isNew.value ? "New item" : "Editing"}
           </span>
-          {!isNew.value && (
-            <button type="button" className="scratchpad-panel__icon-btn" onClick={newItem} title="New item">
-              <i className="codicon codicon-add" />
-            </button>
-          )}
         </div>
         <input
           className="scratchpad-panel__input"
@@ -142,55 +193,6 @@ export function ScratchpadPanel() {
           </button>
         )}
       </div>
-
-      {/* Lower pane: items list */}
-      <div className="scratchpad-panel__list">
-        {items.value.length === 0 ? (
-          <div className="scratchpad-panel__empty">
-            <i className="codicon codicon-notebook" />
-            <span>No items yet</span>
-          </div>
-        ) : (
-          items.value.map(item => (
-            <div
-              key={item.id}
-              className={`scratchpad-panel__item${activeId.value === item.id ? " scratchpad-panel__item--active" : ""}${item.selected ? " scratchpad-panel__item--selected" : ""}${item.sentAt ? " scratchpad-panel__item--sent" : ""}`}
-              onClick={() => selectItem(item)}
-            >
-              <input
-                type="checkbox"
-                checked={item.selected}
-                onChange={(e) => toggleCheck(item.id, e)}
-                className="scratchpad-panel__checkbox"
-              />
-              <div className="scratchpad-panel__item-body">
-                <div className="scratchpad-panel__item-header">
-                  <span className="scratchpad-panel__item-title">{item.title}</span>
-                  {item.sentAt && <span className="scratchpad-panel__sent-badge" title={`Sent ${new Date(item.sentAt).toLocaleString()}`}>✓</span>}
-                </div>
-                {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 80 ? item.content.slice(0, 80) + "…" : item.content}</span>}
-              </div>
-              <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__delete-btn" onClick={(e) => deleteItem(item.id, e)} title="Delete">
-                <i className="codicon codicon-trash" />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Bottom actions */}
-      {items.value.length > 0 && (
-        <div className="scratchpad-panel__actions">
-          <button
-            type="button"
-            className="scratchpad-panel__action-btn scratchpad-panel__action-btn--send"
-            onClick={sendToChat}
-            disabled={selectedCount.value === 0}
-          >
-            Send ({selectedCount.value})
-          </button>
-        </div>
-      )}
     </div>
   );
 }
