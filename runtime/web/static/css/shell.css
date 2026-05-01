@@ -1129,17 +1129,17 @@ body {
 .message-list__body {
   flex: 1;
   min-width: 0;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   padding: 10px 14px;
   border-radius: 2px;
 }
 
-/* Agent replies: distinct blue-tinted bubble */
+/* Agent replies: clearly distinct darker blue bubble */
 .message-list__item--agent .message-list__body {
   border-left: 3px solid var(--accent);
   padding-left: 12px;
   margin-left: 0;
-  background: rgba(80, 120, 220, 0.08);
+  background: rgba(60, 80, 180, 0.15);
   border-radius: 2px;
 }
 
