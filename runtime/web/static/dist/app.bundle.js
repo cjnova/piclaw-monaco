@@ -11240,53 +11240,57 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
               }
             }
           ),
-          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: isSettingsActive ? /* @__PURE__ */ u4(SettingsPanel, {}) : extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
-            /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
-              /* @__PURE__ */ u4(
-                "button",
+          /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: [
+            isSettingsActive && /* @__PURE__ */ u4(SettingsPanel, {}),
+            !isSettingsActive && (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value) ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
+              /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
+                /* @__PURE__ */ u4(
+                  "button",
+                  {
+                    type: "button",
+                    className: "extension-frame__back-btn",
+                    onClick: handleBackToChat,
+                    children: [
+                      /* @__PURE__ */ u4("i", { className: "codicon codicon-arrow-left" }),
+                      " ",
+                      "\u2190 Back to Chat"
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ u4("span", { className: "extension-frame__title", children: extensionPageName.value })
+              ] }),
+              extensionPageHtml.value === "__pdf__" ? /* @__PURE__ */ u4(
+                "object",
                 {
-                  type: "button",
-                  className: "extension-frame__back-btn",
-                  onClick: handleBackToChat,
-                  children: [
-                    /* @__PURE__ */ u4("i", { className: "codicon codicon-arrow-left" }),
-                    " ",
-                    "\u2190 Back to Chat"
-                  ]
+                  data: extensionPageUrl.value,
+                  type: "application/pdf",
+                  style: { width: "100%", flex: 1, border: "none" },
+                  "aria-label": extensionPageName.value ?? "PDF",
+                  children: /* @__PURE__ */ u4("div", { style: { padding: "24px", textAlign: "center", color: "var(--text-muted)" }, children: [
+                    /* @__PURE__ */ u4("p", { children: "PDF cannot be displayed." }),
+                    /* @__PURE__ */ u4("a", { href: extensionPageUrl.value, target: "_blank", rel: "noopener noreferrer", style: { color: "var(--accent)" }, children: "Open PDF in new tab" })
+                  ] })
                 }
-              ),
-              /* @__PURE__ */ u4("span", { className: "extension-frame__title", children: extensionPageName.value })
-            ] }),
-            extensionPageHtml.value === "__pdf__" ? /* @__PURE__ */ u4(
-              "object",
-              {
-                data: extensionPageUrl.value,
-                type: "application/pdf",
-                style: { width: "100%", flex: 1, border: "none" },
-                "aria-label": extensionPageName.value ?? "PDF",
-                children: /* @__PURE__ */ u4("div", { style: { padding: "24px", textAlign: "center", color: "var(--text-muted)" }, children: [
-                  /* @__PURE__ */ u4("p", { children: "PDF cannot be displayed." }),
-                  /* @__PURE__ */ u4("a", { href: extensionPageUrl.value, target: "_blank", rel: "noopener noreferrer", style: { color: "var(--accent)" }, children: "Open PDF in new tab" })
-                ] })
-              }
-            ) : extensionPageHtml.value ? /* @__PURE__ */ u4(
-              "div",
-              {
-                className: "workspace__preview-markdown extension-frame__markdown",
-                dangerouslySetInnerHTML: { __html: extensionPageHtml.value }
-              }
-            ) : /* @__PURE__ */ u4(
-              "iframe",
-              {
-                className: "extension-frame__iframe",
-                src: extensionPageUrl.value,
-                sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
-                title: extensionPageName.value ?? "Extension Page"
-              }
-            )
-          ] }) : /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
-            paletteVisible.value = true;
-          } }) })
+              ) : extensionPageHtml.value ? /* @__PURE__ */ u4(
+                "div",
+                {
+                  className: "workspace__preview-markdown extension-frame__markdown",
+                  dangerouslySetInnerHTML: { __html: extensionPageHtml.value }
+                }
+              ) : /* @__PURE__ */ u4(
+                "iframe",
+                {
+                  className: "extension-frame__iframe",
+                  src: extensionPageUrl.value,
+                  sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
+                  title: extensionPageName.value ?? "Extension Page"
+                }
+              )
+            ] }) : null,
+            /* @__PURE__ */ u4("div", { style: { display: isSettingsActive || (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value) ? "none" : "contents" }, children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
+              paletteVisible.value = true;
+            } }) })
+          ] })
         ] }),
         terminalVisible.value && /* @__PURE__ */ u4("div", { className: "app-layout__terminal", style: { height: tH }, children: [
           /* @__PURE__ */ u4(

@@ -258,9 +258,10 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            {isSettingsActive ? (
+            {isSettingsActive && (
               <SettingsPanel />
-            ) : (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value ? (
+            )}
+            {!isSettingsActive && ((extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value) ? (
               <div className="extension-frame">
                 <div className="extension-frame__header">
                   <button
@@ -300,9 +301,10 @@ function AppContent() {
                   />
                 )}
               </div>
-            ) : (
+            ) : null}
+            <div style={{ display: (isSettingsActive || ((extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value)) ? 'none' : 'contents' }}>
               <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
-            )}
+            </div>
           </div>
         </div>
 
