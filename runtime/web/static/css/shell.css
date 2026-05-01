@@ -2617,7 +2617,7 @@ body {
 
 .settings-panel__content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-.settings-panel__section { max-width: none; }
+.settings-panel__section { }
 
 .settings-panel__section-title { font-size: 13px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 
@@ -3014,7 +3014,6 @@ body {
 }
 
 .settings-panel__model-table-wrapper {
-  max-height: 400px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.15) transparent;
