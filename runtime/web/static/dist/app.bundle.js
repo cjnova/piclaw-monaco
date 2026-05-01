@@ -10672,10 +10672,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       if (activeId.value === id) resetEditor();
     };
     const selectedCount = useComputed(() => items.value.filter((n4) => n4.selected).length);
-    const sendToChat = async () => {
-      const active = items.value.find((n4) => n4.id === activeId.value);
-      if (!active) return;
-      const content = active.content || active.title;
+    const sendItemToChat = async (id, e5) => {
+      e5.stopPropagation();
+      const item = items.value.find((n4) => n4.id === id);
+      if (!item) return;
+      const content = item.content || item.title;
       try {
         await fetch("/agent/web:default/message", {
           method: "POST",
@@ -10684,7 +10685,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           body: JSON.stringify({ content })
         });
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        persist(items.value.map((n4) => n4.id === active.id ? { ...n4, sentAt: now } : n4));
+        persist(items.value.map((n4) => n4.id === id ? { ...n4, sentAt: now } : n4));
       } catch {
       }
     };
@@ -10715,7 +10716,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section-header", children: [
           /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-label", children: "Items" }),
           /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-count", children: items.value.length }),
-          /* @__PURE__ */ u4("button", { type: "button", className: `scratchpad-panel__icon-btn scratchpad-panel__send-icon${!activeId.value ? " scratchpad-panel__send-icon--disabled" : ""}`, onClick: sendToChat, disabled: !activeId.value, title: "Send active item to chat", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-play" }) }),
           /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn", onClick: newItem, title: "New item", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-add" }) })
         ] }),
         /* @__PURE__ */ u4("div", { className: "scratchpad-panel__list", children: items.value.length === 0 ? /* @__PURE__ */ u4("div", { className: "scratchpad-panel__empty", children: [
@@ -10734,6 +10734,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 ] }),
                 item.content && /* @__PURE__ */ u4("span", { className: "scratchpad-panel__item-content", children: item.content.length > 80 ? item.content.slice(0, 80) + "\u2026" : item.content })
               ] }),
+              /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn scratchpad-panel__play-btn", onClick: (e5) => sendItemToChat(item.id, e5), title: "Send to chat", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-play" }) }),
               /* @__PURE__ */ u4("button", { type: "button", className: "scratchpad-panel__icon-btn scratchpad-panel__delete-btn", onClick: (e5) => deleteItem(item.id, e5), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) })
             ]
           },

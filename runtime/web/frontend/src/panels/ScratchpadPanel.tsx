@@ -87,10 +87,11 @@ export function ScratchpadPanel() {
 
   const selectedCount = useComputed(() => items.value.filter(n => n.selected).length);
 
-  const sendToChat = async () => {
-    const active = items.value.find(n => n.id === activeId.value);
-    if (!active) return;
-    const content = active.content || active.title;
+  const sendItemToChat = async (id: string, e: Event) => {
+    e.stopPropagation();
+    const item = items.value.find(n => n.id === id);
+    if (!item) return;
+    const content = item.content || item.title;
     try {
       await fetch("/agent/web:default/message", {
         method: "POST",
@@ -99,7 +100,7 @@ export function ScratchpadPanel() {
         body: JSON.stringify({ content }),
       });
       const now = new Date().toISOString();
-      persist(items.value.map(n => n.id === active.id ? { ...n, sentAt: now } : n));
+      persist(items.value.map(n => n.id === id ? { ...n, sentAt: now } : n));
     } catch {}
   };
 
@@ -134,9 +135,6 @@ export function ScratchpadPanel() {
         <div className="scratchpad-panel__section-header">
           <span className="scratchpad-panel__section-label">Items</span>
           <span className="scratchpad-panel__section-count">{items.value.length}</span>
-          <button type="button" className={`scratchpad-panel__icon-btn scratchpad-panel__send-icon${!activeId.value ? " scratchpad-panel__send-icon--disabled" : ""}`} onClick={sendToChat} disabled={!activeId.value} title="Send active item to chat">
-            <i className="codicon codicon-play" />
-          </button>
           <button type="button" className="scratchpad-panel__icon-btn" onClick={newItem} title="New item">
             <i className="codicon codicon-add" />
           </button>
@@ -161,6 +159,9 @@ export function ScratchpadPanel() {
                   </div>
                   {item.content && <span className="scratchpad-panel__item-content">{item.content.length > 80 ? item.content.slice(0, 80) + "…" : item.content}</span>}
                 </div>
+                <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__play-btn" onClick={(e) => sendItemToChat(item.id, e)} title="Send to chat">
+                  <i className="codicon codicon-play" />
+                </button>
                 <button type="button" className="scratchpad-panel__icon-btn scratchpad-panel__delete-btn" onClick={(e) => deleteItem(item.id, e)} title="Delete">
                   <i className="codicon codicon-trash" />
                 </button>

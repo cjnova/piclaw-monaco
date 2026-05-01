@@ -3504,3 +3504,15 @@ body {
 .scratchpad-panel__send-icon--disabled {
   opacity: 0.3;
 }
+
+.scratchpad-panel__play-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: #4caf50;
+}
+.scratchpad-panel__play-btn:hover {
+  color: #66bb6a;
+}
+.scratchpad-panel__item:hover .scratchpad-panel__play-btn {
+  opacity: 1;
+}
