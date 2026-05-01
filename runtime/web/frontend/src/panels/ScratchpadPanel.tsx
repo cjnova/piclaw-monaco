@@ -117,7 +117,7 @@ export function ScratchpadPanel() {
           placeholder="Content..."
           value={newContent.value}
           onInput={(e) => (newContent.value = (e.target as HTMLTextAreaElement).value)}
-          rows={5}
+          rows={8}
         />
         <button type="button" className="scratchpad-panel__add-btn" onClick={addItem} disabled={!newTitle.value.trim()}>
           + Add
@@ -156,7 +156,7 @@ export function ScratchpadPanel() {
                     value={editContent.value}
                     placeholder="Content..."
                     onInput={(e) => (editContent.value = (e.target as HTMLTextAreaElement).value)}
-                    rows={5}
+                    rows={8}
                   />
                   <div className="scratchpad-panel__edit-actions">
                     <button type="button" className="scratchpad-panel__icon-btn" onClick={saveEdit} title="Save">✓</button>

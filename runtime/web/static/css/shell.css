@@ -3365,6 +3365,8 @@ body {
   font-family: inherit;
   outline: none;
   resize: vertical;
+  min-height: 120px;
+  flex: 1;
   min-height: 50px;
   box-sizing: border-box;
 }
