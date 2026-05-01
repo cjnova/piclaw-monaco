@@ -3072,6 +3072,7 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  max-width: 720px;
 }
 .settings-panel__section--models .settings-panel__model-table-wrapper {
   flex: 1;
