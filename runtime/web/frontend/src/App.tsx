@@ -54,11 +54,15 @@ function AppContent() {
     const onDisconnected = () => { connectionStatus.value = "disconnected"; };
     window.addEventListener("piclaw:sse-connected", onConnected);
     window.addEventListener("piclaw:sse-disconnected", onDisconnected);
+    // Probe: if SSE already open, the event already fired — check with a ping
+    fetch("/agent/models", { credentials: "same-origin" })
+      .then((r) => { if (r.ok) connectionStatus.value = "connected"; })
+      .catch(() => {});
     return () => {
       window.removeEventListener("piclaw:sse-connected", onConnected);
       window.removeEventListener("piclaw:sse-disconnected", onDisconnected);
     };
-  }, [connectionStatus]);
+  }, []);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {

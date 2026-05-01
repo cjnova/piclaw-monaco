@@ -11020,11 +11020,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       };
       window.addEventListener("piclaw:sse-connected", onConnected);
       window.addEventListener("piclaw:sse-disconnected", onDisconnected);
+      fetch("/agent/models", { credentials: "same-origin" }).then((r4) => {
+        if (r4.ok) connectionStatus.value = "connected";
+      }).catch(() => {
+      });
       return () => {
         window.removeEventListener("piclaw:sse-connected", onConnected);
         window.removeEventListener("piclaw:sse-disconnected", onDisconnected);
       };
-    }, [connectionStatus]);
+    }, []);
     y2(() => {
       const h5 = (e5) => {
         if (e5.ctrlKey && !e5.shiftKey && !e5.altKey && (e5.code === "Backquote" || e5.key === "`" || e5.key === "\xBA" || e5.key === "Dead")) {
