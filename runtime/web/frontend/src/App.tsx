@@ -272,7 +272,7 @@ function AppContent() {
     <div className="app-layout">
       <ActivityBar activePanel={activePanel.value} onPanelChange={handlePanelChange} />
 
-      <div className="app-layout__main">
+      <main className="app-layout__main">
         <div className="app-layout__content-area">
           <div
             className="app-layout__sidebar-wrapper"
@@ -458,7 +458,7 @@ function AppContent() {
             )}
           </span>
         </div>
-      </div>
+      </main>
 
       <CommandPalette visible={paletteVisible.value} onClose={() => { paletteVisible.value = false; }} />
     </div>

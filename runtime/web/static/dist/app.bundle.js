@@ -10470,7 +10470,7 @@ ${code}
     };
     return /* @__PURE__ */ u4("div", { className: "app-layout", children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
-      /* @__PURE__ */ u4("div", { className: "app-layout__main", children: [
+      /* @__PURE__ */ u4("main", { className: "app-layout__main", children: [
         /* @__PURE__ */ u4("div", { className: "app-layout__content-area", children: [
           /* @__PURE__ */ u4(
             "div",
