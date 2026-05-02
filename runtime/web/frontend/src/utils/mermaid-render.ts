@@ -4,6 +4,17 @@
  * Finds .mermaid-container[data-mermaid] elements and renders SVG.
  */
 
+/** Sanitize SVG output from mermaid renderer using DOMPurify vendor global. */
+function sanitizeSvg(svg: string): string {
+  const purify = (window as any).DOMPurify;
+  if (!purify) return svg; // fallback: accept as-is if DOMPurify not loaded
+  return purify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    ADD_TAGS: ["foreignObject"],
+    ADD_ATTR: ["dominant-baseline", "text-anchor", "transform", "clip-path", "marker-end", "marker-start"],
+  });
+}
+
 /** Decode base64 to UTF-8 string */
 function fromBase64(value: string): string {
   const binary = atob(String(value || ""));
@@ -135,7 +146,7 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
       const code = decodeEntitiesDeep(raw, 2);
       let svg = await bm.renderMermaid(code, { ...theme, transparent: true });
       svg = roundPolylineCorners(svg);
-      el.innerHTML = svg;
+      el.innerHTML = sanitizeSvg(svg);
       el.removeAttribute("data-mermaid");
     } catch (e: any) {
       console.error("[mermaid] Render error:", e);

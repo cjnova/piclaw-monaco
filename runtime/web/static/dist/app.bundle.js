@@ -9389,6 +9389,15 @@ ${code}
   }
 
   // runtime/web/frontend/src/utils/mermaid-render.ts
+  function sanitizeSvg(svg) {
+    const purify = window.DOMPurify;
+    if (!purify) return svg;
+    return purify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ADD_TAGS: ["foreignObject"],
+      ADD_ATTR: ["dominant-baseline", "text-anchor", "transform", "clip-path", "marker-end", "marker-start"]
+    });
+  }
   function fromBase64(value) {
     const binary = atob(String(value || ""));
     const bytes = new Uint8Array(binary.length);
@@ -9490,7 +9499,7 @@ ${code}
         const code = decodeEntitiesDeep2(raw, 2);
         let svg = await bm.renderMermaid(code, { ...theme, transparent: true });
         svg = roundPolylineCorners(svg);
-        el.innerHTML = svg;
+        el.innerHTML = sanitizeSvg(svg);
         el.removeAttribute("data-mermaid");
       } catch (e5) {
         console.error("[mermaid] Render error:", e5);
