@@ -8676,7 +8676,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
 
   // runtime/web/frontend/src/utils/sanitizeRenderedMarkdown.ts
   function sanitizeRenderedMarkdown(html2) {
-    return purify.sanitize(html2, { USE_PROFILES: { html: true } });
+    return purify.sanitize(html2, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ["class"]
+    });
   }
 
   // runtime/web/frontend/src/utils/storage.ts
@@ -10958,6 +10961,150 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     return /* @__PURE__ */ u4("div", { className: "panel-placeholder", children: text2 });
   }
 
+  // runtime/web/frontend/src/utils/code-highlighting.ts
+  function getCm() {
+    return window.cmHighlight ?? null;
+  }
+  function escapeHtml(value) {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  var _shellParser;
+  var _powerShellParser;
+  var _dockerFileParser;
+  var _rubyParser;
+  var _swiftParser;
+  var _tomlParser;
+  function getLegacyParser(cm, name) {
+    switch (name) {
+      case "shell":
+        return _shellParser ??= cm.StreamLanguage.define(cm.shell).parser;
+      case "powershell":
+        return _powerShellParser ??= cm.StreamLanguage.define(cm.powerShell).parser;
+      case "dockerfile":
+        return _dockerFileParser ??= cm.StreamLanguage.define(cm.dockerFile).parser;
+      case "ruby":
+        return _rubyParser ??= cm.StreamLanguage.define(cm.ruby).parser;
+      case "swift":
+        return _swiftParser ??= cm.StreamLanguage.define(cm.swift).parser;
+      case "toml":
+        return _tomlParser ??= cm.StreamLanguage.define(cm.toml).parser;
+      default:
+        return null;
+    }
+  }
+  function parserForCodeFenceLanguage(lang) {
+    const cm = getCm();
+    if (!cm) return null;
+    const raw = String(lang || "").trim().toLowerCase();
+    switch (raw) {
+      case "js":
+      case "javascript":
+        return cm.javascriptLanguage.parser;
+      case "ts":
+      case "typescript":
+        return cm.typescriptLanguage.parser;
+      case "jsx":
+        return cm.jsxLanguage.parser;
+      case "tsx":
+        return cm.tsxLanguage.parser;
+      case "py":
+      case "python":
+        return cm.pythonLanguage.parser;
+      case "json":
+        return cm.jsonLanguage.parser;
+      case "css":
+        return cm.cssLanguage.parser;
+      case "html":
+        return cm.htmlLanguage.parser;
+      case "xml":
+        return cm.xmlLanguage.parser;
+      case "yaml":
+      case "yml":
+        return cm.yamlLanguage.parser;
+      case "md":
+      case "markdown":
+        return cm.markdownLanguage.parser;
+      case "sql":
+        return cm.StandardSQL.language.parser;
+      case "go":
+        return cm.goLanguage.parser;
+      case "c":
+      case "cc":
+      case "cpp":
+      case "cxx":
+      case "c++":
+      case "h":
+      case "hh":
+      case "hpp":
+      case "hxx":
+        return cm.cppLanguage.parser;
+      case "rs":
+      case "rust":
+        return cm.rustLanguage.parser;
+      case "sh":
+      case "bash":
+      case "shell":
+      case "zsh":
+        return getLegacyParser(cm, "shell");
+      case "ps1":
+      case "powershell":
+        return getLegacyParser(cm, "powershell");
+      case "dockerfile":
+        return getLegacyParser(cm, "dockerfile");
+      case "rb":
+      case "ruby":
+        return getLegacyParser(cm, "ruby");
+      case "swift":
+        return getLegacyParser(cm, "swift");
+      case "toml":
+        return getLegacyParser(cm, "toml");
+      default:
+        return null;
+    }
+  }
+  function highlightCodeToHtml(code, lang) {
+    const parser = parserForCodeFenceLanguage(lang);
+    if (!parser) return escapeHtml(code);
+    const cm = getCm();
+    const tokens = [];
+    try {
+      const tree = parser.parse(code);
+      cm.highlightTree(tree, cm.classHighlighter, (from, to, cls) => {
+        if (!cls || from >= to) return;
+        tokens.push({ from, to, cls });
+      });
+    } catch {
+      return escapeHtml(code);
+    }
+    if (!tokens.length) return escapeHtml(code);
+    tokens.sort((a4, b6) => a4.from - b6.from || a4.to - b6.to);
+    let cursor = 0;
+    let html2 = "";
+    for (const token of tokens) {
+      if (token.from > cursor) html2 += escapeHtml(code.slice(cursor, token.from));
+      html2 += `<span class="${escapeHtml(token.cls)}">${escapeHtml(code.slice(token.from, token.to))}</span>`;
+      cursor = Math.max(cursor, token.to);
+    }
+    if (cursor < code.length) html2 += escapeHtml(code.slice(cursor));
+    return html2;
+  }
+  function decodeHtmlEntities(text2) {
+    return text2.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  }
+  function applySyntaxHighlighting(html2) {
+    if (!html2) return html2;
+    return html2.replace(
+      /<pre><code(?:\s+class="language-([A-Za-z0-9_+-]+)")?>([\s\S]*?)<\/code><\/pre>/g,
+      (_match, lang, code) => {
+        const normalizedLang = String(lang || "").trim().toLowerCase();
+        const decodedCode = decodeHtmlEntities(decodeHtmlEntities(code));
+        const highlighted = highlightCodeToHtml(decodedCode, normalizedLang);
+        const langClass = normalizedLang || "plaintext";
+        return `<pre><code class="hljs language-${langClass}">${highlighted}</code></pre>`;
+      }
+    );
+  }
+
   // runtime/web/frontend/src/components/MessageList.tsx
   function relativeTime(isoDate) {
     const delta = Date.now() - new Date(isoDate).getTime();
@@ -10972,7 +11119,8 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   }
   function renderMarkdown(content) {
     try {
-      const html2 = g4(content, { async: false });
+      let html2 = g4(content, { async: false });
+      html2 = applySyntaxHighlighting(html2);
       return sanitizeRenderedMarkdown(html2);
     } catch {
       return content;

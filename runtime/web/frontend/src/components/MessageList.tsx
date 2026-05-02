@@ -2,6 +2,7 @@ import { getMessageUrl, buildChatUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { marked } from "marked";
 import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
+import { applySyntaxHighlighting } from "../utils/code-highlighting";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,9 @@ function relativeTime(isoDate: string): string {
 
 function renderMarkdown(content: string): string {
   try {
-    const html = marked(content, { async: false }) as string;
+    let html = marked(content, { async: false }) as string;
+    // Apply syntax highlighting to fenced code blocks
+    html = applySyntaxHighlighting(html);
     return sanitizeRenderedMarkdown(html);
   } catch {
     return content;
