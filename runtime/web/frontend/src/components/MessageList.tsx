@@ -418,10 +418,9 @@ export function MessageList() {
   useEffect(() => {
     let lastHighlighted: HTMLElement | null = null;
     const highlight = (el: HTMLElement) => {
-      if (lastHighlighted) { lastHighlighted.style.outline = ""; lastHighlighted.style.borderRadius = ""; }
+      if (lastHighlighted) { lastHighlighted.classList.remove("message--highlighted"); }
       el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.style.outline = "2px solid var(--accent)";
-      el.style.borderRadius = "4px";
+      el.classList.add("message--highlighted");
       lastHighlighted = el;
     };
     const handler = async (e: Event) => {

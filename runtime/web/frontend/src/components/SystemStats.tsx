@@ -5,7 +5,7 @@ interface StatsData {
   cpu_percent: number;
   ram_percent: number;
   swap_percent: number | null;
-  process_memory: {
+  process_memory?: {
     rss_bytes: number;
   };
 }
@@ -22,7 +22,7 @@ function formatClock(date: Date): string {
 
 function StatsDisplay({ stats }: { stats: StatsData | null }) {
   if (!stats) return <span className="sys-stats">CPU -- RAM -- RSS -- SWP --</span>;
-  const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
+  const rssMb = Math.round((stats.process_memory?.rss_bytes ?? 0) / (1024 * 1024));
   const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
   return (
     <span className="sys-stats">

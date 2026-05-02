@@ -30,6 +30,8 @@ function AppContent() {
   const termDragRef = useRef<{ startY: number; startH: number } | null>(null);
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const statusFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusFlash = useSignal<{ message: string; type: "error" | "warning" | "success" | "info" } | null>(null);
 
   useEffect(() => {
     safeSetItem("piclaw-sidebar-width", String(sidebarWidth.value));
@@ -63,6 +65,24 @@ function AppContent() {
     return () => {
       window.removeEventListener("piclaw:sse-connected", onConnected);
       window.removeEventListener("piclaw:sse-disconnected", onDisconnected);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onStatusFlash = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string; type?: "error" | "warning" | "success" | "info" }>).detail;
+      if (!detail?.message) return;
+      statusFlash.value = { message: detail.message, type: detail.type ?? "info" };
+      if (statusFlashTimer.current) clearTimeout(statusFlashTimer.current);
+      statusFlashTimer.current = setTimeout(() => {
+        statusFlash.value = null;
+        statusFlashTimer.current = null;
+      }, 1400);
+    };
+    window.addEventListener("piclaw:status-flash", onStatusFlash);
+    return () => {
+      window.removeEventListener("piclaw:status-flash", onStatusFlash);
+      if (statusFlashTimer.current) clearTimeout(statusFlashTimer.current);
     };
   }, []);
 
@@ -227,7 +247,7 @@ function AppContent() {
     const isClosed = sidebarCollapsed.value || isSettingsActive;
     el.style.width = isClosed ? "0px" : `${sidebarWidth.value}px`;
     el.style.minWidth = isClosed ? "0px" : "150px";
-    el.style.maxWidth = isClosed ? "0px" : `${Math.round(window.innerWidth * 0.5)}px`;
+    el.style.maxWidth = isClosed ? "0px" : "50vw";
   }, [sidebarCollapsed.value, isSettingsActive, sidebarWidth.value]);
 
   useEffect(() => {
@@ -408,7 +428,7 @@ function AppContent() {
           </div>
         )}
 
-        <div className="app-layout__status-bar">
+        <div className={`app-layout__status-bar ${statusFlash.value ? `app-layout__status-bar--flash app-layout__status-bar--flash-${statusFlash.value.type}` : ""}`}>
           <span className="status-bar__conn">
             <span
               className={`status-bar__conn-dot ${connected ? "status-bar__conn-dot--connected" : "status-bar__conn-dot--disconnected"}`}
@@ -416,6 +436,11 @@ function AppContent() {
             <span className="status-bar__conn-text">{connected ? "Connected" : "Disconnected"}</span>
           </span>
           <ModelContextBar />
+          {statusFlash.value && (
+            <span className={`status-bar__flash status-bar__flash--${statusFlash.value.type}`} role="status" aria-live="polite">
+              {statusFlash.value.message}
+            </span>
+          )}
           <span className="status-bar__right">
             <SystemStats />
             {!terminalVisible.value && (

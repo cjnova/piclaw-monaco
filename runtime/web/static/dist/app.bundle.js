@@ -1082,11 +1082,11 @@
 
   // runtime/web/frontend/src/components/Icon.tsx
   function Icon({ name, size = 16, className = "" }) {
+    const sizeClass = size === 24 ? "icon--size-24" : "icon--size-16";
     return /* @__PURE__ */ u4(
       "i",
       {
-        className: `codicon codicon-${name} ${className}`,
-        style: { fontSize: `${size}px` }
+        className: `codicon codicon-${name} ${sizeClass} ${className}`.trim()
       }
     );
   }
@@ -5157,7 +5157,7 @@ For tests, pass a Ghostty instance directly:
   }
   function StatsDisplay({ stats }) {
     if (!stats) return /* @__PURE__ */ u4("span", { className: "sys-stats", children: "CPU -- RAM -- RSS -- SWP --" });
-    const rssMb = Math.round(stats.process_memory.rss_bytes / (1024 * 1024));
+    const rssMb = Math.round((stats.process_memory?.rss_bytes ?? 0) / (1024 * 1024));
     const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
     return /* @__PURE__ */ u4("span", { className: "sys-stats", children: [
       /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "CPU" }),
@@ -5244,7 +5244,7 @@ For tests, pass a Ghostty instance directly:
   var fmtTokens = (n4) => n4 >= 1e6 ? `${(n4 / 1e6).toFixed(1)}M` : `${(n4 / 1e3).toFixed(0)}k`;
   function ContextRing({ percent, tokens, contextWindow, onClick }) {
     const p6 = percent;
-    const color = p6 > 95 ? "#f38ba8" : p6 > 80 ? "#f9e2af" : "#a6e3a1";
+    const color = p6 > 95 ? "var(--error)" : p6 > 80 ? "var(--warning)" : "var(--success)";
     const tokensK = fmtTokens(tokens);
     const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
     return /* @__PURE__ */ u4(
@@ -5291,7 +5291,7 @@ For tests, pass a Ghostty instance directly:
     const sessionTokens = useSignal(0);
     const usageLabel = useSignal("");
     const providerUsage = useSignal(null);
-    const fetchStatus = async () => {
+    const fetchStatus = q2(async () => {
       try {
         const res = await fetch("/agent/status");
         if (res.ok) {
@@ -5333,8 +5333,8 @@ For tests, pass a Ghostty instance directly:
         console.warn("[ModelContextBar] status fetch failed:", err);
         error.value = true;
       }
-    };
-    const fetchContext = async () => {
+    }, []);
+    const fetchContext = q2(async () => {
       try {
         const res = await fetch("/agent/context");
         if (res.ok) {
@@ -5343,25 +5343,29 @@ For tests, pass a Ghostty instance directly:
       } catch (err) {
         console.warn("[ModelContextBar] context fetch failed:", err);
       }
-    };
+    }, []);
     y2(() => {
-      fetchStatus();
-      const interval = setInterval(fetchStatus, 5e3);
+      void fetchStatus();
+      const interval = setInterval(() => {
+        void fetchStatus();
+      }, 5e3);
       return () => clearInterval(interval);
-    }, [agentStatus, error]);
+    }, [fetchStatus]);
     y2(() => {
-      fetchContext();
-      const interval = setInterval(fetchContext, 1e4);
+      void fetchContext();
+      const interval = setInterval(() => {
+        void fetchContext();
+      }, 1e4);
       return () => clearInterval(interval);
-    }, [agentContext]);
+    }, [fetchContext]);
     y2(() => {
       const onConnect = () => {
-        fetchStatus();
-        fetchContext();
+        void fetchStatus();
+        void fetchContext();
       };
       window.addEventListener("piclaw:sse-connected", onConnect);
       return () => window.removeEventListener("piclaw:sse-connected", onConnect);
-    }, []);
+    }, [fetchStatus, fetchContext]);
     y2(() => {
       if (!isCompacting.value) return;
       const interval = setInterval(() => {
@@ -5380,13 +5384,15 @@ For tests, pass a Ghostty instance directly:
         if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {
           if (isCompacting.value) {
             isCompacting.value = false;
-            setTimeout(() => fetchContext(), 1e3);
+            setTimeout(() => {
+              void fetchContext();
+            }, 1e3);
           }
         }
       };
       window.addEventListener("piclaw:agent-status", onStatus);
       return () => window.removeEventListener("piclaw:agent-status", onStatus);
-    }, []);
+    }, [fetchContext]);
     y2(() => {
       if (!showPicker.value && !showThinkingPicker.value) return;
       const handleKeyDown = (e5) => {
@@ -5424,11 +5430,16 @@ For tests, pass a Ghostty instance directly:
         const data = await res.json().catch(() => null);
         if (data?.command) {
           isCompacting.value = false;
-          setTimeout(() => fetchContext(), 1e3);
+          setTimeout(() => {
+            void fetchContext();
+          }, 1e3);
         }
       } catch {
         isCompacting.value = false;
       }
+    };
+    const flashStatus = (message) => {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message, type: "error" } }));
     };
     const handleBadgeClick = async (e5) => {
       e5.stopPropagation();
@@ -5447,9 +5458,13 @@ For tests, pass a Ghostty instance directly:
           currentModel.value = info.current ?? modelName;
           if (info.thinking_level) currentThinkingLevel.value = info.thinking_level;
           thinkingLevels.value = info.available_thinking_levels?.length ? info.available_thinking_levels : FALLBACK_THINKING_LEVELS;
+        } else {
+          console.warn("[ModelContextBar] models fetch failed:", res.status);
+          flashStatus("Model fetch failed");
         }
       } catch (err) {
         console.warn("[ModelContextBar] models fetch failed:", err);
+        flashStatus("Model fetch failed");
       }
     };
     const handleSelectModel = async (id) => {
@@ -5465,9 +5480,11 @@ For tests, pass a Ghostty instance directly:
           showPicker.value = false;
         } else {
           console.warn("[ModelContextBar] model switch failed:", res.status);
+          flashStatus("Model switch failed");
         }
       } catch (err) {
         console.warn("[ModelContextBar] model switch error:", err);
+        flashStatus("Model switch failed");
       }
     };
     const handleThinkingClick = (e5) => {
@@ -5488,9 +5505,11 @@ For tests, pass a Ghostty instance directly:
           showThinkingPicker.value = false;
         } else {
           console.warn("[ModelContextBar] thinking switch failed:", res.status);
+          flashStatus("Thinking switch failed");
         }
       } catch (err) {
         console.warn("[ModelContextBar] thinking switch error:", err);
+        flashStatus("Thinking switch failed");
       }
     };
     const modelName = agentStatus.value?.data?.model ?? currentModel.value ?? "";
@@ -5520,7 +5539,7 @@ For tests, pass a Ghostty instance directly:
                 return /* @__PURE__ */ u4(
                   "div",
                   {
-                    className: "model-picker__item",
+                    className: `model-picker__item${isCurrent ? " model-picker__item--active" : ""}`,
                     role: "button",
                     tabIndex: 0,
                     onClick: () => handleSelectModel(entry.id),
@@ -5529,16 +5548,6 @@ For tests, pass a Ghostty instance directly:
                         e5.preventDefault();
                         handleSelectModel(entry.id);
                       }
-                    },
-                    style: {
-                      color: isCurrent ? "#cba6f7" : "#cdd6f4",
-                      background: isCurrent ? "rgba(203,166,247,0.1)" : "transparent"
-                    },
-                    onMouseEnter: (e5) => {
-                      e5.currentTarget.style.background = isCurrent ? "rgba(203,166,247,0.18)" : "rgba(255,255,255,0.07)";
-                    },
-                    onMouseLeave: (e5) => {
-                      e5.currentTarget.style.background = isCurrent ? "rgba(203,166,247,0.1)" : "transparent";
                     },
                     children: [
                       /* @__PURE__ */ u4("span", { className: "model-picker__item__check", children: isCurrent ? "\u2713" : "" }),
@@ -5609,7 +5618,7 @@ For tests, pass a Ghostty instance directly:
                       return /* @__PURE__ */ u4(
                         "div",
                         {
-                          className: "thinking-picker__item",
+                          className: `thinking-picker__item${isActive ? " thinking-picker__item--active" : ""}`,
                           role: "button",
                           tabIndex: 0,
                           onClick: (ev) => {
@@ -5622,16 +5631,6 @@ For tests, pass a Ghostty instance directly:
                               e5.stopPropagation();
                               handleSelectThinking(level);
                             }
-                          },
-                          style: {
-                            color: isActive ? "#a6e3a1" : "#cdd6f4",
-                            background: isActive ? "rgba(166,227,161,0.1)" : "transparent"
-                          },
-                          onMouseEnter: (ev) => {
-                            ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.18)" : "rgba(255,255,255,0.07)";
-                          },
-                          onMouseLeave: (ev) => {
-                            ev.currentTarget.style.background = isActive ? "rgba(166,227,161,0.1)" : "transparent";
                           },
                           children: [
                             /* @__PURE__ */ u4("span", { className: "thinking-picker__item__check", children: isActive ? "\u2713" : "" }),
@@ -5731,16 +5730,16 @@ For tests, pass a Ghostty instance directly:
     "/abort-bash": { type: "bare" },
     "/abort-retry": { type: "bare" }
   };
-  var CATEGORY_BADGE_COLORS = {
-    navigation: "#89b4fa",
-    terminal: "#a6e3a1",
-    session: "#f9e2af",
-    theme: "#cba6f7",
-    general: "#94e2d5",
-    core: "#f38ba8",
-    extension: "#fab387",
-    skill: "#a6e3a1",
-    template: "#89dceb"
+  var CATEGORY_BADGE_CLASS = {
+    navigation: "command-palette__badge--navigation",
+    terminal: "command-palette__badge--terminal",
+    session: "command-palette__badge--session",
+    theme: "command-palette__badge--theme",
+    general: "command-palette__badge--general",
+    core: "command-palette__badge--core",
+    extension: "command-palette__badge--extension",
+    skill: "command-palette__badge--skill",
+    template: "command-palette__badge--template"
   };
   function sendCommand(command) {
     fetch(getMessageUrl(), {
@@ -5811,7 +5810,7 @@ For tests, pass a Ghostty instance directly:
         isBackend: true
       }));
       return [...localCmds, ...backendCmds];
-    }, [backendCommands, visible]);
+    }, [backendCommands]);
     const results = T2(() => {
       if (step === "parameter" && autoCompleteOptions.length > 0) {
         const q6 = query.trim().toLowerCase();
@@ -5989,6 +5988,7 @@ For tests, pass a Ghostty instance directly:
     const isAutocompleteStep = isParameterStep && autoCompleteOptions.length > 0;
     const isTextStep = isParameterStep && autoCompleteOptions.length === 0;
     const inputPlaceholder = isAutocompleteStep ? `${selectedCommand} > Select option...` : isTextStep ? `${selectedCommand} > ${paramPlaceholder}` : "Type a command...";
+    const activeOptionId = !isTextStep && results.length > 0 ? `command-palette-option-${selectedIndex}` : void 0;
     return /* @__PURE__ */ u4("div", { className: "command-palette-backdrop", onClick: onClose, children: /* @__PURE__ */ u4(
       "div",
       {
@@ -6007,6 +6007,7 @@ For tests, pass a Ghostty instance directly:
               className: "command-palette__input",
               placeholder: inputPlaceholder,
               value: query,
+              "aria-activedescendant": activeOptionId,
               onInput: (event) => setQuery(event.target.value),
               onKeyDown: handleKeyDown
             }
@@ -6024,8 +6025,10 @@ For tests, pass a Ghostty instance directly:
             isAutocompleteStep ? results.map((option, index) => /* @__PURE__ */ u4(
               "li",
               {
+                id: `command-palette-option-${index}`,
+                role: "option",
+                "aria-selected": index === selectedIndex,
                 className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
-                style: { background: index === selectedIndex ? "var(--border)" : "transparent" },
                 onMouseDown: (event) => event.preventDefault(),
                 onClick: () => {
                   const fullCommand = `${selectedCommand} ${option}`;
@@ -6036,12 +6039,14 @@ For tests, pass a Ghostty instance directly:
               },
               option
             )) : results.map((command, index) => {
-              const badgeColor = CATEGORY_BADGE_COLORS[command.category] ?? "#9399b2";
+              const badgeClass = CATEGORY_BADGE_CLASS[command.category] ?? "command-palette__badge--default";
               return /* @__PURE__ */ u4(
                 "li",
                 {
+                  id: `command-palette-option-${index}`,
+                  role: "option",
+                  "aria-selected": index === selectedIndex,
                   className: `command-palette__row ${index === selectedIndex ? "is-active" : ""}`,
-                  style: { background: index === selectedIndex ? "var(--border)" : "transparent" },
                   onMouseDown: (event) => event.preventDefault(),
                   onClick: () => {
                     if (command.handler) {
@@ -6062,12 +6067,7 @@ For tests, pass a Ghostty instance directly:
                       /* @__PURE__ */ u4(
                         "span",
                         {
-                          className: "command-palette__badge",
-                          style: {
-                            background: `${badgeColor}22`,
-                            color: badgeColor,
-                            border: `1px solid ${badgeColor}44`
-                          },
+                          className: `command-palette__badge ${badgeClass}`,
                           children: command.category
                         }
                       ),
@@ -7333,7 +7333,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const data = await res.json();
     return data.root?.children ?? [];
   }
-  function TreeItem({ node, depth, selectedPath, onSelect }) {
+  function TreeItem({ node, selectedPath, onSelect }) {
     const isDir = node.type === "dir";
     const [expanded, setExpanded] = d2(false);
     const [children, setChildren] = d2(
@@ -7378,8 +7378,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             isDir ? "file-tree__item--dir" : "file-tree__item--file",
             isSelected ? "file-tree__item--selected" : ""
           ].filter(Boolean).join(" "),
-          style: { paddingLeft: `${depth * 16}px` },
+          role: "treeitem",
+          tabIndex: 0,
+          "aria-expanded": isDir ? expanded : void 0,
           onClick: toggle,
+          onKeyDown: (e5) => {
+            if (e5.key === "Enter" || e5.key === " ") {
+              e5.preventDefault();
+              void toggle();
+            }
+          },
           title: node.path,
           children: [
             /* @__PURE__ */ u4(
@@ -7394,55 +7402,33 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           ]
         }
       ),
-      loading && /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "file-tree__loading",
-          style: { paddingLeft: `${(depth + 1) * 16}px` },
-          children: "Loading\u2026"
-        }
-      ),
-      error && /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "file-tree__error",
-          style: { paddingLeft: `${(depth + 1) * 16}px` },
-          children: [
-            error === "auth" ? "Authenticate to browse files" : "Failed to load",
-            /* @__PURE__ */ u4(
-              "button",
-              {
-                className: "file-tree__retry",
-                onClick: (e5) => {
-                  e5.stopPropagation();
-                  setError(null);
-                  setChildren(null);
-                  setExpanded(false);
-                },
-                children: "Retry"
-              }
-            )
-          ]
-        }
-      ),
-      expanded && !loading && children && children.length > 0 && /* @__PURE__ */ u4("div", { children: children.map((child) => /* @__PURE__ */ u4(
+      loading && /* @__PURE__ */ u4("div", { className: "file-tree__loading file-tree__children-indent", children: "Loading\u2026" }),
+      error && /* @__PURE__ */ u4("div", { className: "file-tree__error file-tree__children-indent", children: [
+        error === "auth" ? "Authenticate to browse files" : "Failed to load",
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            className: "file-tree__retry",
+            onClick: (e5) => {
+              e5.stopPropagation();
+              setError(null);
+              setChildren(null);
+              setExpanded(false);
+            },
+            children: "Retry"
+          }
+        )
+      ] }),
+      expanded && !loading && children && children.length > 0 && /* @__PURE__ */ u4("div", { className: "file-tree__children", children: children.map((child) => /* @__PURE__ */ u4(
         TreeItem,
         {
           node: child,
-          depth: depth + 1,
           selectedPath,
           onSelect
         },
         child.path
       )) }),
-      expanded && !loading && children && children.length === 0 && /* @__PURE__ */ u4(
-        "div",
-        {
-          className: "file-tree__empty",
-          style: { paddingLeft: `${(depth + 1) * 16}px` },
-          children: "Empty folder"
-        }
-      )
+      expanded && !loading && children && children.length === 0 && /* @__PURE__ */ u4("div", { className: "file-tree__empty file-tree__children-indent", children: "Empty folder" })
     ] });
   }
   function getFileIcon(name) {
@@ -7503,22 +7489,21 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       [onFileSelect]
     );
     if (loading) {
-      return /* @__PURE__ */ u4("div", { className: "file-tree file-tree__loading", children: "Loading workspace\u2026" });
+      return /* @__PURE__ */ u4("div", { className: "file-tree file-tree__loading", role: "tree", children: "Loading workspace\u2026" });
     }
     if (error) {
-      return /* @__PURE__ */ u4("div", { className: "file-tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__error", children: [
+      return /* @__PURE__ */ u4("div", { className: "file-tree", role: "tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__error", children: [
         error === "auth" ? "Authenticate to browse files" : "Failed to load workspace",
         /* @__PURE__ */ u4("button", { className: "file-tree__retry", onClick: load, children: "Retry" })
       ] }) });
     }
     if (!rootChildren || rootChildren.length === 0) {
-      return /* @__PURE__ */ u4("div", { className: "file-tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__empty", children: "No files found" }) });
+      return /* @__PURE__ */ u4("div", { className: "file-tree", role: "tree", children: /* @__PURE__ */ u4("div", { className: "file-tree__empty", children: "No files found" }) });
     }
-    return /* @__PURE__ */ u4("div", { className: "file-tree", children: rootChildren.map((node) => /* @__PURE__ */ u4(
+    return /* @__PURE__ */ u4("div", { className: "file-tree", role: "tree", children: rootChildren.map((node) => /* @__PURE__ */ u4(
       TreeItem,
       {
         node,
-        depth: 0,
         selectedPath,
         onSelect: handleSelect
       },
@@ -8868,7 +8853,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         i6
       )),
       /* @__PURE__ */ u4("circle", { cx: SB_CX, cy: SB_CY, r: "35", fill: "rgba(20,20,30,0.88)" }),
-      /* @__PURE__ */ u4("foreignObject", { x: SB_CX - 35, y: SB_CY - 18, width: "70", height: "36", children: /* @__PURE__ */ u4("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" }, children: [
+      /* @__PURE__ */ u4("foreignObject", { x: SB_CX - 35, y: SB_CY - 18, width: "70", height: "36", children: /* @__PURE__ */ u4("div", { className: "workspace__sunburst-center", children: [
         /* @__PURE__ */ u4("span", { className: "workspace__sunburst-total", children: formatBytes(totalSize) }),
         /* @__PURE__ */ u4("span", { className: "workspace__sunburst-label", children: "TOTAL" })
       ] }) })
@@ -9181,7 +9166,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     }, [actionBusy, node.path, onMutate]);
     return /* @__PURE__ */ u4("div", { className: "workspace__preview-info", children: [
       /* @__PURE__ */ u4("div", { className: "workspace__preview-name workspace__preview-name--wrap", children: [
-        /* @__PURE__ */ u4("span", { className: "codicon codicon-folder-opened", style: { marginRight: "4px" } }),
+        /* @__PURE__ */ u4("span", { className: "codicon codicon-folder-opened workspace__folder-icon" }),
         node.name
       ] }),
       /* @__PURE__ */ u4("div", { className: "workspace__folder-actions", children: [
@@ -9259,13 +9244,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             const pct = total > 0 && child.size !== null ? (child.size / total * 100).toFixed(0) : null;
             const color = DOT_COLORS[i6 % DOT_COLORS.length];
             return /* @__PURE__ */ u4("div", { className: "workspace__folder-breakdown-item", children: [
-              /* @__PURE__ */ u4(
-                "span",
-                {
-                  className: "workspace__folder-breakdown-dot",
-                  style: { backgroundColor: color }
-                }
-              ),
+              /* @__PURE__ */ u4("svg", { className: "workspace__folder-breakdown-dot", viewBox: "0 0 8 8", "aria-hidden": "true", children: /* @__PURE__ */ u4("circle", { cx: "4", cy: "4", r: "4", fill: color }) }),
               /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-name", title: child.name, children: [
                 child.type === "dir" ? "\u{1F4C1} " : "",
                 child.name
@@ -9302,7 +9281,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             ] })
           ] }),
           /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-legend", children: chartSegments.map((segment) => /* @__PURE__ */ u4("div", { className: "workspace__folder-chart-legend-item", children: [
-            /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-dot", style: { backgroundColor: segment.color } }),
+            /* @__PURE__ */ u4("svg", { className: "workspace__folder-breakdown-dot", viewBox: "0 0 8 8", "aria-hidden": "true", children: /* @__PURE__ */ u4("circle", { cx: "4", cy: "4", r: "4", fill: segment.color }) }),
             /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-name", title: segment.label, children: segment.label }),
             /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-size", children: formatBytes(segment.size) }),
             /* @__PURE__ */ u4("span", { className: "workspace__folder-breakdown-pct", children: [
@@ -9317,9 +9296,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   function WorkspacePanel() {
     const [topHeight, setTopHeight] = d2(() => Number(safeGetItem("piclaw-workspace-split")) || 260);
     const containerRef = A2(null);
+    const topPaneRef = A2(null);
     const heightRef = A2(topHeight);
     const [selectedNode, setSelectedNode] = d2(null);
     const [treeVersion, setTreeVersion] = d2(0);
+    y2(() => {
+      if (topPaneRef.current) {
+        topPaneRef.current.style.height = `${topHeight}px`;
+      }
+    }, [topHeight]);
     const handleMutation = q2((payload) => {
       setTreeVersion((current) => current + 1);
       setSelectedNode(payload.nextNode);
@@ -9349,7 +9334,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       document.addEventListener("mouseup", onUp);
     }, []);
     return /* @__PURE__ */ u4("div", { ref: containerRef, className: "workspace", children: [
-      /* @__PURE__ */ u4("div", { className: "workspace__pane-top", style: { height: `${topHeight}px` }, children: [
+      /* @__PURE__ */ u4("div", { className: "workspace__pane-top", ref: topPaneRef, children: [
         /* @__PURE__ */ u4("div", { className: "workspace__section-header workspace__section-header--padded", children: "Files" }),
         /* @__PURE__ */ u4(FileTree, { onFileSelect: setSelectedNode }, treeVersion)
       ] }),
@@ -10354,7 +10339,6 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         /* @__PURE__ */ u4("tbody", { children: filtered.map((m6) => /* @__PURE__ */ u4(
           "tr",
           {
-            className: m6.label === current.value ? "settings-panel__model-table-row--active" : "",
             tabIndex: 0,
             onClick: () => switchModel(m6.label),
             onKeyDown: (e5) => {
@@ -10363,7 +10347,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 switchModel(m6.label);
               }
             },
-            style: { cursor: "pointer" },
+            className: `${m6.label === current.value ? "settings-panel__model-table-row--active" : ""} settings-panel__model-table-row`,
             children: [
               /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("input", { type: "radio", name: "model", checked: m6.label === current.value, readOnly: true }) }),
               /* @__PURE__ */ u4("td", { children: m6.name }),
@@ -10375,7 +10359,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           m6.label
         )) })
       ] }) }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", style: { marginTop: "24px" }, children: [
+      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title settings-panel__subsection-title--spaced", children: [
         "Thinking level: ",
         /* @__PURE__ */ u4("strong", { children: thinkingLevel.value })
       ] }),
@@ -10427,15 +10411,15 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       if (keychainErrorTimer.current) clearTimeout(keychainErrorTimer.current);
       keychainErrorTimer.current = setTimeout(() => keychainError.value = null, 3e3);
     };
-    const fetchEntries = () => {
+    const fetchEntries = q2(() => {
       fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
         entries2.value = d5.entries ?? [];
       }).catch(() => {
       });
-    };
+    }, []);
     y2(() => {
       fetchEntries();
-    }, []);
+    }, [fetchEntries]);
     const addEntry = async () => {
       if (!newName.value.trim() || !newSecret.value.trim()) return;
       try {
@@ -10480,7 +10464,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       }
     };
     const filtered = filter.value ? entries2.value.filter((e5) => e5.name.toLowerCase().includes(filter.value.toLowerCase())) : entries2.value;
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section settings-panel__section--narrow", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Keychain" }),
       keychainError.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status settings-panel__save-status--error", children: keychainError.value }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__keychain-header", children: [
@@ -10500,7 +10484,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         entries2.value.length,
         " entries, encrypted at rest."
       ] }),
-      showAdd.value && /* @__PURE__ */ u4("div", { className: "settings-panel__card", style: { marginBottom: "12px" }, children: [
+      showAdd.value && /* @__PURE__ */ u4("div", { className: "settings-panel__card settings-panel__card--spaced", children: [
         /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "New entry" }),
         /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
           /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Name" }),
@@ -10519,7 +10503,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             /* @__PURE__ */ u4("option", { value: "basic", children: "Basic" })
           ] })
         ] }),
-        /* @__PURE__ */ u4("div", { style: { display: "flex", gap: "8px", marginTop: "8px" }, children: [
+        /* @__PURE__ */ u4("div", { className: "settings-panel__actions-row", children: [
           /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: addEntry, children: "Save" }),
           /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => showAdd.value = false, children: "Cancel" })
         ] })
@@ -10532,10 +10516,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           /* @__PURE__ */ u4("th", { children: "Updated" }),
           /* @__PURE__ */ u4("th", {})
         ] }) }),
-        /* @__PURE__ */ u4("tbody", { children: filtered.length === 0 ? /* @__PURE__ */ u4("tr", { children: /* @__PURE__ */ u4("td", { colSpan: 5, style: { textAlign: "center", color: "var(--text-muted)" }, children: "No keychain entries." }) }) : filtered.map((e5) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("tbody", { children: filtered.length === 0 ? /* @__PURE__ */ u4("tr", { children: /* @__PURE__ */ u4("td", { colSpan: 5, className: "settings-panel__table-empty", children: "No keychain entries." }) }) : filtered.map((e5) => /* @__PURE__ */ u4("tr", { children: [
           /* @__PURE__ */ u4("td", { children: e5.name }),
           /* @__PURE__ */ u4("td", { children: e5.type ?? "\u2014" }),
-          /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { style: { fontSize: "11px", color: "var(--text-muted)" }, children: e5.envVar ?? "\u2014" }) }),
+          /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { className: "settings-panel__env-var", children: e5.envVar ?? "\u2014" }) }),
           /* @__PURE__ */ u4("td", { children: e5.updatedAt ? new Date(e5.updatedAt).toLocaleDateString() : "\u2014" }),
           /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn settings-panel__provider-btn--logout", onClick: () => deleteEntry(e5.name), title: "Delete", children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" }) }) })
         ] }, e5.name)) })
@@ -10562,7 +10546,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
         (t4) => t4.name.toLowerCase().includes(filter.value.toLowerCase()) || (t4.description ?? t4.summary ?? "").toLowerCase().includes(filter.value.toLowerCase())
       )
     })).filter((ts) => (ts.tools ?? []).length > 0) : toolsets;
-    return /* @__PURE__ */ u4("section", { className: "settings-panel__section", style: { maxWidth: "720px" }, children: [
+    return /* @__PURE__ */ u4("section", { className: "settings-panel__section settings-panel__section--narrow", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Tools" }),
       /* @__PURE__ */ u4("div", { className: "settings-panel__tools-filter-row", children: [
         /* @__PURE__ */ u4(
@@ -10609,7 +10593,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           ] }, t4.name)) })
         ] }, ts.name);
       }),
-      /* @__PURE__ */ u4("p", { className: "settings-panel__description", style: { marginTop: "16px" }, children: [
+      /* @__PURE__ */ u4("p", { className: "settings-panel__description settings-panel__description--spaced", children: [
         "Tool activation is managed by the agent runtime. Group checkboxes collapse/expand; individual tools use ",
         /* @__PURE__ */ u4("code", { children: "activate_tools" }),
         "."
@@ -10668,23 +10652,30 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
   ];
   function SettingsPanel() {
     const activeCategory = useSignal(safeGetItem("piclaw-settings-category") || "general");
-    const settings = useSignal(null);
+    const settings = useSignal({});
     const loading = useSignal(true);
     const error = useSignal(null);
     const saveStatus = useSignal(null);
     const saveTimer = A2(null);
     y2(() => {
-      fetch("/agent/settings-data", { credentials: "same-origin" }).then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      }).then((data) => {
-        settings.value = data;
-        loading.value = false;
-      }).catch((err) => {
-        error.value = `Failed to load settings: ${err instanceof Error ? err.message : String(err)}`;
-        settings.value = {};
-        loading.value = false;
-      });
+      void (async () => {
+        try {
+          const res = await fetch("/agent/settings-data", { credentials: "same-origin" });
+          if (!res.ok) throw new Error("Load failed");
+          const data = await res.json();
+          settings.value = data;
+        } catch (err) {
+          error.value = `Failed to load settings: ${err instanceof Error ? err.message : String(err)}`;
+          settings.value = {};
+        } finally {
+          loading.value = false;
+        }
+      })();
+    }, []);
+    y2(() => {
+      return () => {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+      };
     }, []);
     function showSaved(msg = "Saved \u2713") {
       saveStatus.value = msg;
@@ -10696,59 +10687,28 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => saveStatus.value = null, 3e3);
     }
-    function saveGeneral(field, value) {
-      fetch("/agent/settings/general", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value })
-      }).then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      }).then((body) => {
-        if (body.settings) {
-          settings.value = { ...settings.value ?? {}, ...body.settings };
-        }
-        showSaved();
-      }).catch(() => showError());
-    }
-    const saveWorkspace = async (field, value) => {
+    async function saveSetting(endpoint, field, value) {
       try {
-        const res = await fetch("/agent/settings/workspace", {
+        const res = await fetch(`/agent/settings/${endpoint}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ [field]: value })
         });
-        if (res.ok) {
-          showSaved("Saved");
-        } else {
-          showError("Save failed");
-        }
-      } catch {
-        showError("Save failed");
-      }
-    };
-    function saveCompaction(field, value) {
-      fetch("/agent/settings/compaction", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value })
-      }).then((res) => {
         if (!res.ok) throw new Error("Save failed");
-        return res.json();
-      }).then((body) => {
+        const body = await res.json();
         if (body.settings) {
-          settings.value = { ...settings.value ?? {}, ...body.settings };
+          settings.value = { ...settings.value, ...body.settings };
         }
         showSaved();
-      }).catch(() => showError());
+      } catch {
+        showError();
+      }
     }
     if (loading.value) {
       return /* @__PURE__ */ u4("div", { className: "settings-panel", children: /* @__PURE__ */ u4("div", { className: "settings-panel__loading", children: "Loading settings\u2026" }) });
     }
-    const s4 = settings.value ?? {};
+    const s4 = settings.value;
     return /* @__PURE__ */ u4("div", { className: "settings-panel", children: [
       /* @__PURE__ */ u4("nav", { className: "settings-panel__nav", children: CATEGORIES.map((cat) => /* @__PURE__ */ u4(
         "button",
@@ -10768,11 +10728,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       /* @__PURE__ */ u4("div", { className: "settings-panel__content", children: [
         error.value && /* @__PURE__ */ u4("div", { className: "settings-panel__error", children: error.value }),
         saveStatus.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status", children: saveStatus.value }),
-        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4, onSaveGeneral: saveGeneral }),
-        activeCategory.value === "sessions" && /* @__PURE__ */ u4(SessionsSection, { data: s4, onSaveGeneral: saveGeneral }),
-        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: saveGeneral }),
-        activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: saveCompaction }),
-        activeCategory.value === "workspace" && /* @__PURE__ */ u4(WorkspaceSection, { data: s4, onSaveWorkspace: saveWorkspace }),
+        activeCategory.value === "general" && /* @__PURE__ */ u4(GeneralSection, { data: s4, onSaveGeneral: (field, value) => saveSetting("general", field, value) }),
+        activeCategory.value === "sessions" && /* @__PURE__ */ u4(SessionsSection, { data: s4, onSaveGeneral: (field, value) => saveSetting("general", field, value) }),
+        activeCategory.value === "appearance" && /* @__PURE__ */ u4(AppearanceSection, { data: s4, onSaveGeneral: (field, value) => saveSetting("general", field, value) }),
+        activeCategory.value === "compaction" && /* @__PURE__ */ u4(CompactionSection, { data: s4, onSaveCompaction: (field, value) => saveSetting("compaction", field, value) }),
+        activeCategory.value === "workspace" && /* @__PURE__ */ u4(WorkspaceSection, { data: s4, onSaveWorkspace: (field, value) => saveSetting("workspace", field, value) }),
         activeCategory.value === "providers" && /* @__PURE__ */ u4(ProvidersSection, { providers: s4.providers ?? [] }),
         activeCategory.value === "models" && /* @__PURE__ */ u4(ModelsSection, { data: s4 }),
         activeCategory.value === "keychain" && /* @__PURE__ */ u4(KeychainSection, {}),
@@ -10866,6 +10826,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       }
     };
     const listHeight = useSignal(Number(safeGetItem("piclaw-scratchpad-split")) || 50);
+    const listSectionRef = A2(null);
+    y2(() => {
+      if (!listSectionRef.current) return;
+      listSectionRef.current.style.height = `${listHeight.value}%`;
+    }, [listHeight.value]);
     const onDragStart = (e5) => {
       e5.preventDefault();
       const panel = e5.target.closest(".scratchpad-panel");
@@ -10888,7 +10853,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       document.addEventListener("mouseup", onUp);
     };
     return /* @__PURE__ */ u4("div", { className: "scratchpad-panel", children: [
-      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section", style: { height: `${listHeight.value}%`, flex: "none" }, children: [
+      /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section scratchpad-panel__section--top", ref: listSectionRef, children: [
         /* @__PURE__ */ u4("div", { className: "scratchpad-panel__section-header", children: [
           /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-label", children: "Items" }),
           /* @__PURE__ */ u4("span", { className: "scratchpad-panel__section-count", children: items.value.length }),
@@ -11304,12 +11269,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       let lastHighlighted = null;
       const highlight = (el) => {
         if (lastHighlighted) {
-          lastHighlighted.style.outline = "";
-          lastHighlighted.style.borderRadius = "";
+          lastHighlighted.classList.remove("message--highlighted");
         }
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.style.outline = "2px solid var(--accent)";
-        el.style.borderRadius = "4px";
+        el.classList.add("message--highlighted");
         lastHighlighted = el;
       };
       const handler = async (e5) => {
@@ -11595,14 +11558,14 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       mediaQuery.addEventListener("change", onChange);
       return () => mediaQuery.removeEventListener("change", onChange);
     }, [manualOverride]);
-    const setMode = (newMode) => {
+    const setMode = q2((newMode) => {
       setManualOverride(true);
       setModeState(newMode);
-    };
-    const toggleMode = () => {
+    }, []);
+    const toggleMode = q2(() => {
       setManualOverride(true);
       setModeState((prev) => prev === "dark" ? "light" : "dark");
-    };
+    }, []);
     const theme = T2(() => mode === "dark" ? DARK_THEME : LIGHT_THEME, [mode]);
     y2(() => {
       const root2 = document.documentElement;
@@ -11621,7 +11584,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       root2.style.setProperty("--input-bg", theme.inputBg);
       root2.style.setProperty("--input-border", theme.inputBorder);
     }, [theme]);
-    const control = T2(() => ({ mode, setMode, toggleMode }), [mode]);
+    const control = T2(() => ({ mode, setMode, toggleMode }), [mode, setMode, toggleMode]);
     return /* @__PURE__ */ u4(ThemeControlContext.Provider, { value: control, children: /* @__PURE__ */ u4(ThemeContext.Provider, { value: theme, children }) });
   }
   function useThemeControl() {
@@ -11644,6 +11607,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
     const extensionPageName = useSignal(null);
     const extensionPageHtml = useSignal(null);
     const termDragRef = A2(null);
+    const sidebarWrapperRef = A2(null);
+    const terminalRef = A2(null);
+    const statusFlashTimer = A2(null);
+    const statusFlash = useSignal(null);
     y2(() => {
       safeSetItem("piclaw-sidebar-width", String(sidebarWidth.value));
     }, [sidebarWidth.value]);
@@ -11678,6 +11645,23 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       return () => {
         window.removeEventListener("piclaw:sse-connected", onConnected);
         window.removeEventListener("piclaw:sse-disconnected", onDisconnected);
+      };
+    }, []);
+    y2(() => {
+      const onStatusFlash = (e5) => {
+        const detail = e5.detail;
+        if (!detail?.message) return;
+        statusFlash.value = { message: detail.message, type: detail.type ?? "info" };
+        if (statusFlashTimer.current) clearTimeout(statusFlashTimer.current);
+        statusFlashTimer.current = setTimeout(() => {
+          statusFlash.value = null;
+          statusFlashTimer.current = null;
+        }, 1400);
+      };
+      window.addEventListener("piclaw:status-flash", onStatusFlash);
+      return () => {
+        window.removeEventListener("piclaw:status-flash", onStatusFlash);
+        if (statusFlashTimer.current) clearTimeout(statusFlashTimer.current);
       };
     }, []);
     y2(() => {
@@ -11843,7 +11827,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       };
       window.addEventListener("piclaw:open-page", onOpenPage);
       return () => window.removeEventListener("piclaw:open-page", onOpenPage);
-    }, [handlePageSelect, extensionPageUrl, extensionPageName, extensionPageHtml]);
+    }, [handlePageSelect]);
     const connected = connectionStatus.value === "connected";
     const PANEL_NAMES = { explorer: "Workspace", search: "Search", extensions: "Addons", agent: "Dashboards", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings" };
     const onTermDragStart = q2((e5) => {
@@ -11866,9 +11850,32 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }, [terminalHeight, terminalMaximized]);
-    const tH = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
     const isSettingsActive = activePanel.value === "settings";
-    const sbWidth = sidebarCollapsed.value || isSettingsActive ? 0 : sidebarWidth.value;
+    const isExtensionPageOpen = extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value;
+    y2(() => {
+      const el = sidebarWrapperRef.current;
+      if (!el) return;
+      const isClosed = sidebarCollapsed.value || isSettingsActive;
+      el.style.width = isClosed ? "0px" : `${sidebarWidth.value}px`;
+      el.style.minWidth = isClosed ? "0px" : "150px";
+      el.style.maxWidth = isClosed ? "0px" : "50vw";
+    }, [sidebarCollapsed.value, isSettingsActive, sidebarWidth.value]);
+    y2(() => {
+      const el = terminalRef.current;
+      if (!el) return;
+      el.style.height = terminalMaximized.value ? "calc(100vh - 60px)" : `${terminalHeight.value}px`;
+    }, [terminalMaximized.value, terminalHeight.value]);
+    const activateOnEnterOrSpace = (e5, handler) => {
+      if (e5.key === "Enter" || e5.key === " ") {
+        e5.preventDefault();
+        handler();
+      }
+    };
+    const resizeSidebarBy = (delta) => {
+      const min = 150;
+      const max = Math.round(window.innerWidth * 0.5);
+      sidebarWidth.value = Math.max(min, Math.min(max, sidebarWidth.value + delta));
+    };
     return /* @__PURE__ */ u4("div", { className: "app-layout", children: [
       /* @__PURE__ */ u4(ActivityBar, { activePanel: activePanel.value, onPanelChange: handlePanelChange }),
       /* @__PURE__ */ u4("div", { className: "app-layout__main", children: [
@@ -11877,11 +11884,7 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             "div",
             {
               className: "app-layout__sidebar-wrapper",
-              style: {
-                width: `${sbWidth}px`,
-                minWidth: sidebarCollapsed.value || isSettingsActive ? 0 : 150,
-                maxWidth: sidebarCollapsed.value || isSettingsActive ? 0 : Math.round(window.innerWidth * 0.5)
-              },
+              ref: sidebarWrapperRef,
               children: /* @__PURE__ */ u4(Sidebar, { title: PANEL_NAMES[activePanel.value] || activePanel.value, children: /* @__PURE__ */ u4(PanelRouter, { activePanel: activePanel.value, onPageSelect: handlePageSelect }) })
             }
           ),
@@ -11889,6 +11892,10 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
             "div",
             {
               className: "app-layout__resize-handle",
+              role: "separator",
+              "aria-orientation": "vertical",
+              tabIndex: 0,
+              "aria-label": "Resize sidebar",
               onMouseDown: (e5) => {
                 e5.preventDefault();
                 const startX = e5.clientX;
@@ -11906,12 +11913,21 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 document.body.style.cursor = "col-resize";
                 document.addEventListener("mousemove", onMove);
                 document.addEventListener("mouseup", onUp);
+              },
+              onKeyDown: (e5) => {
+                if (e5.key === "ArrowLeft") {
+                  e5.preventDefault();
+                  resizeSidebarBy(-20);
+                } else if (e5.key === "ArrowRight") {
+                  e5.preventDefault();
+                  resizeSidebarBy(20);
+                }
               }
             }
           ),
           /* @__PURE__ */ u4("div", { className: "app-layout__panel", children: [
             isSettingsActive && /* @__PURE__ */ u4(SettingsPanel, {}),
-            !isSettingsActive && (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value) ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
+            !isSettingsActive && isExtensionPageOpen ? /* @__PURE__ */ u4("div", { className: "extension-frame", children: [
               /* @__PURE__ */ u4("div", { className: "extension-frame__header", children: [
                 /* @__PURE__ */ u4(
                   "button",
@@ -11933,11 +11949,11 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 {
                   data: extensionPageUrl.value,
                   type: "application/pdf",
-                  style: { width: "100%", flex: 1, border: "none" },
+                  className: "extension-frame__pdf-object",
                   "aria-label": extensionPageName.value ?? "PDF",
-                  children: /* @__PURE__ */ u4("div", { style: { padding: "24px", textAlign: "center", color: "var(--text-muted)" }, children: [
+                  children: /* @__PURE__ */ u4("div", { className: "extension-frame__pdf-fallback", children: [
                     /* @__PURE__ */ u4("p", { children: "PDF cannot be displayed." }),
-                    /* @__PURE__ */ u4("a", { href: extensionPageUrl.value, target: "_blank", rel: "noopener noreferrer", style: { color: "var(--accent)" }, children: "Open PDF in new tab" })
+                    /* @__PURE__ */ u4("a", { href: extensionPageUrl.value, target: "_blank", rel: "noopener noreferrer", className: "extension-frame__pdf-link", children: "Open PDF in new tab" })
                   ] })
                 }
               ) : extensionPageHtml.value ? /* @__PURE__ */ u4(
@@ -11956,12 +11972,12 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 }
               )
             ] }) : null,
-            /* @__PURE__ */ u4("div", { style: { display: isSettingsActive || (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value) || extensionPageHtml.value) ? "none" : "contents" }, children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
+            /* @__PURE__ */ u4("div", { className: isSettingsActive || isExtensionPageOpen ? "app-layout__chat-wrapper app-layout__chat-wrapper--hidden" : "app-layout__chat-wrapper", children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
               paletteVisible.value = true;
             } }) })
           ] })
         ] }),
-        terminalVisible.value && /* @__PURE__ */ u4("div", { className: "app-layout__terminal", style: { height: tH }, children: [
+        terminalVisible.value && /* @__PURE__ */ u4("div", { className: "app-layout__terminal", ref: terminalRef, children: [
           /* @__PURE__ */ u4(
             "div",
             {
@@ -11976,10 +11992,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 "span",
                 {
                   className: "terminal__btn",
+                  role: "button",
+                  tabIndex: 0,
                   onClick: () => {
                     terminalMaximized.value = !terminalMaximized.value;
                   },
+                  onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
+                    terminalMaximized.value = !terminalMaximized.value;
+                  }),
                   title: terminalMaximized.value ? "Restore" : "Maximize",
+                  "aria-label": terminalMaximized.value ? "Restore" : "Maximize",
                   children: /* @__PURE__ */ u4("i", { className: terminalMaximized.value ? "codicon codicon-screen-normal" : "codicon codicon-screen-full" })
                 }
               ),
@@ -11987,10 +12009,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 "span",
                 {
                   className: "terminal__btn",
+                  role: "button",
+                  tabIndex: 0,
                   onClick: () => {
                     window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
                   },
+                  onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
+                    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+                  }),
                   title: "Open in new tab",
+                  "aria-label": "Open in new tab",
                   children: /* @__PURE__ */ u4("i", { className: "codicon codicon-link-external" })
                 }
               ),
@@ -11998,10 +12026,16 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 "span",
                 {
                   className: "terminal__btn",
+                  role: "button",
+                  tabIndex: 0,
                   onClick: () => {
                     window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
                   },
+                  onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
+                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+                  }),
                   title: "Pop out to window",
+                  "aria-label": "Pop out to window",
                   children: /* @__PURE__ */ u4("i", { className: "codicon codicon-multiple-windows" })
                 }
               ),
@@ -12009,11 +12043,18 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
                 "span",
                 {
                   className: "terminal__btn",
+                  role: "button",
+                  tabIndex: 0,
                   onClick: () => {
                     terminalVisible.value = false;
                     terminalMaximized.value = false;
                   },
+                  onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
+                    terminalVisible.value = false;
+                    terminalMaximized.value = false;
+                  }),
                   title: "Close (Ctrl+`)",
+                  "aria-label": "Close (Ctrl+`)",
                   children: "\u2715"
                 }
               )
@@ -12021,28 +12062,34 @@ Please report this to https://github.com/markedjs/marked.`, e5) {
           ] }),
           /* @__PURE__ */ u4(TerminalComponent, {})
         ] }),
-        /* @__PURE__ */ u4("div", { className: "app-layout__status-bar", children: [
+        /* @__PURE__ */ u4("div", { className: `app-layout__status-bar ${statusFlash.value ? `app-layout__status-bar--flash app-layout__status-bar--flash-${statusFlash.value.type}` : ""}`, children: [
           /* @__PURE__ */ u4("span", { className: "status-bar__conn", children: [
             /* @__PURE__ */ u4(
               "span",
               {
-                className: "status-bar__conn-dot",
-                style: { background: connected ? "var(--success)" : "var(--error)" }
+                className: `status-bar__conn-dot ${connected ? "status-bar__conn-dot--connected" : "status-bar__conn-dot--disconnected"}`
               }
             ),
             /* @__PURE__ */ u4("span", { className: "status-bar__conn-text", children: connected ? "Connected" : "Disconnected" })
           ] }),
           /* @__PURE__ */ u4(ModelContextBar, {}),
+          statusFlash.value && /* @__PURE__ */ u4("span", { className: `status-bar__flash status-bar__flash--${statusFlash.value.type}`, role: "status", "aria-live": "polite", children: statusFlash.value.message }),
           /* @__PURE__ */ u4("span", { className: "status-bar__right", children: [
             /* @__PURE__ */ u4(SystemStats, {}),
             !terminalVisible.value && /* @__PURE__ */ u4(
               "span",
               {
                 className: "status-bar__terminal-btn",
+                role: "button",
+                tabIndex: 0,
                 onClick: () => {
                   terminalVisible.value = true;
                 },
+                onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
+                  terminalVisible.value = true;
+                }),
                 title: "Open Terminal (Ctrl+`)",
+                "aria-label": "Open Terminal (Ctrl+`)",
                 children: "Terminal"
               }
             )
