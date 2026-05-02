@@ -6362,6 +6362,158 @@ For tests, pass a Ghostty instance directly:
     return segments;
   }
 
+  // runtime/web/frontend/src/utils/bicep-mode.ts
+  var KEYWORDS = /* @__PURE__ */ new Set([
+    "targetScope",
+    "resource",
+    "module",
+    "param",
+    "var",
+    "output",
+    "for",
+    "in",
+    "if",
+    "existing",
+    "import",
+    "as",
+    "type",
+    "metadata",
+    "assert",
+    "using",
+    "test",
+    "with",
+    "func",
+    "spread",
+    "true",
+    "false",
+    "null"
+  ]);
+  var TYPES = /* @__PURE__ */ new Set([
+    "string",
+    "int",
+    "bool",
+    "object",
+    "array"
+  ]);
+  var BUILTINS = /* @__PURE__ */ new Set([
+    "resourceGroup",
+    "subscription",
+    "tenant",
+    "managementGroup",
+    "concat",
+    "uniqueString",
+    "format",
+    "toLower",
+    "toUpper",
+    "contains",
+    "length",
+    "empty",
+    "first",
+    "last",
+    "split",
+    "join",
+    "replace",
+    "trim",
+    "startsWith",
+    "endsWith",
+    "indexOf",
+    "base64",
+    "uri",
+    "uriComponent",
+    "dataUri",
+    "environment",
+    "reference",
+    "listKeys",
+    "list",
+    "json",
+    "union",
+    "intersection",
+    "range",
+    "take",
+    "skip",
+    "min",
+    "max",
+    "padLeft",
+    "guid",
+    "dateTimeAdd",
+    "utcNow",
+    "loadTextContent",
+    "loadFileAsBase64",
+    "loadJsonContent",
+    "sys",
+    "az"
+  ]);
+  var bicepMode = {
+    startState() {
+      return { inBlockComment: false, inMultilineString: false };
+    },
+    token(stream, state) {
+      if (state.inBlockComment) {
+        if (stream.match(/.*?\*\//)) {
+          state.inBlockComment = false;
+        } else {
+          stream.skipToEnd();
+        }
+        return "comment";
+      }
+      if (state.inMultilineString) {
+        if (stream.match(/.*?'''/)) {
+          state.inMultilineString = false;
+        } else {
+          stream.skipToEnd();
+        }
+        return "string";
+      }
+      if (stream.eatSpace()) return null;
+      if (stream.match("//")) {
+        stream.skipToEnd();
+        return "comment";
+      }
+      if (stream.match("/*")) {
+        state.inBlockComment = true;
+        if (stream.match(/.*?\*\//)) {
+          state.inBlockComment = false;
+        } else {
+          stream.skipToEnd();
+        }
+        return "comment";
+      }
+      if (stream.match(/@[a-zA-Z_]\w*/)) {
+        return "meta";
+      }
+      if (stream.match("'''")) {
+        state.inMultilineString = true;
+        if (stream.match(/.*?'''/)) {
+          state.inMultilineString = false;
+        } else {
+          stream.skipToEnd();
+        }
+        return "string";
+      }
+      if (stream.match(/'(?:[^'\\]|\\.)*'/)) {
+        return "string";
+      }
+      if (stream.match(/\d+/)) {
+        return "number";
+      }
+      if (stream.match(/[a-zA-Z_]\w*/)) {
+        const word = stream.current();
+        if (KEYWORDS.has(word)) return "keyword";
+        if (TYPES.has(word)) return "typeName";
+        if (BUILTINS.has(word)) return "variableName2";
+        return "variableName";
+      }
+      if (stream.match(/[=!<>]=?|&&|\|\||[+\-*/%?:!.]/)) {
+        return "operator";
+      }
+      if (stream.match(/[{}()\[\],;]/)) {
+        return "punctuation";
+      }
+      stream.next();
+      return null;
+    }
+  };
+
   // runtime/web/frontend/src/utils/code-highlighting.ts
   function getCm() {
     return window.cmHighlight ?? null;
@@ -6409,6 +6561,7 @@ For tests, pass a Ghostty instance directly:
     swift: "Swift",
     toml: "TOML",
     dockerfile: "Dockerfile",
+    bicep: "Bicep",
     xml: "XML",
     plaintext: "Text",
     text: "Text"
@@ -6424,6 +6577,7 @@ For tests, pass a Ghostty instance directly:
   var _rubyParser;
   var _swiftParser;
   var _tomlParser;
+  var _bicepParser;
   function getLegacyParser(cm, name) {
     switch (name) {
       case "shell":
@@ -6438,6 +6592,8 @@ For tests, pass a Ghostty instance directly:
         return _swiftParser ??= cm.StreamLanguage.define(cm.swift).parser;
       case "toml":
         return _tomlParser ??= cm.StreamLanguage.define(cm.toml).parser;
+      case "bicep":
+        return _bicepParser ??= cm.StreamLanguage.define(bicepMode).parser;
       default:
         return null;
     }
@@ -6508,6 +6664,8 @@ For tests, pass a Ghostty instance directly:
         return getLegacyParser(cm, "swift");
       case "toml":
         return getLegacyParser(cm, "toml");
+      case "bicep":
+        return getLegacyParser(cm, "bicep");
       default:
         return null;
     }
