@@ -1,8 +1,6 @@
 import { getMessageUrl, buildChatUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
-import { marked } from "marked";
-import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
-import { applySyntaxHighlighting } from "../utils/code-highlighting";
+import { renderMarkdown, renderThinkingMarkdown } from "../utils/markdown-pipeline";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -41,17 +39,6 @@ function relativeTime(isoDate: string): string {
   if (hr < 24) return `${hr}h ago`;
   const days = Math.floor(hr / 24);
   return `${days}d ago`;
-}
-
-function renderMarkdown(content: string): string {
-  try {
-    let html = marked(content, { async: false }) as string;
-    // Apply syntax highlighting to fenced code blocks
-    html = applySyntaxHighlighting(html);
-    return sanitizeRenderedMarkdown(html);
-  } catch {
-    return content;
-  }
 }
 
 function getBlockKey(block: ContentBlock, index: number): string {
@@ -222,7 +209,7 @@ function MessageItem({ interaction }: MessageItemProps) {
         {interaction.content && (
           <div
             className="message-list__content"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
             dangerouslySetInnerHTML={
               isUser
                 ? undefined
@@ -539,8 +526,8 @@ export function MessageList() {
             </div>
             <div
               className="message-list__content"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(draft) }}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
+              dangerouslySetInnerHTML={{ __html: renderThinkingMarkdown(draft) }}
             />
           </div>
         </div>

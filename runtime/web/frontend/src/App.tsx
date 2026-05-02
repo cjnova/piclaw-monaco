@@ -350,7 +350,7 @@ function AppContent() {
                 ) : extensionPageHtml.value ? (
                   <div
                     className="workspace__preview-markdown extension-frame__markdown"
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
                     dangerouslySetInnerHTML={{ __html: extensionPageHtml.value }}
                   />
                 ) : (
