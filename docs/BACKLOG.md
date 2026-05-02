@@ -1,6 +1,6 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-04-29 (post-review)
+Updated: 2026-05-02 (post-review)
 
 ## Vision
 
@@ -169,8 +169,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | Task | Description | Status |
 |---|---|---|
 | fix-silent-errors | Add user-facing error feedback across all panels (#107) | ✅ |
-| accessibility-keyboard-aria | Add keyboard nav + ARIA roles to interactive elements (#108) | ⏳ |
-| settings-panel-refactor | Split SettingsPanel.tsx into section modules, fix timer leak + types (#110) | ⏳ |
+| accessibility-keyboard-aria | Add keyboard nav + ARIA roles to interactive elements (#108) | ✅ |
+| settings-panel-refactor | Split SettingsPanel.tsx into section modules, fix timer leak + types (#110) | ✅ |
 
 **Wave 3 (after Wave 2):**
 
@@ -193,13 +193,13 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | wire-fleet-batch-to-command-palette | Expose fleet_batch tool via UI | ⏳ |
 | wire-terminal-profile-selector | Terminal profile selection (Shell, Pi TUI) | ⏳ |
 | leverage-tool-lifecycle-events-in-chat | Show tool_aborted, richer tool events in chat | ⏳ |
-| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering (#146) | ⏳ |
-|   ↳ 146-A-vendor-bundles | KaTeX, beautiful-mermaid, CodeMirror highlight vendor bundles (#153) | ⏳ |
-|   ↳ 146-B-syntax-highlighting | CodeMirror/Lezer syntax highlighting for code blocks (#154) | ⏳ |
-|     ↳ bicep-highlighting | Bicep language syntax highlighting — refinement of #154 (#160) | ⏳ |
-|   ↳ 146-C-markdown-pipeline | Full markdown rendering pipeline (#155) | ⏳ |
-|   ↳ 146-D-code-block-ux | Code block copy button + language label (#156) | ⏳ |
-|   ↳ 146-E-post-render-hooks | Mermaid SVG rendering + theme awareness (#157) | ⏳ |
+| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering (#146) | ✅ |
+|   ↳ 146-A-vendor-bundles | KaTeX, beautiful-mermaid, CodeMirror highlight vendor bundles (#153) | ✅ |
+|   ↳ 146-B-syntax-highlighting | CodeMirror/Lezer syntax highlighting for code blocks (#154) | ✅ |
+|     ↳ bicep-highlighting | Bicep language syntax highlighting — refinement of #154 (#160) | ✅ |
+|   ↳ 146-C-markdown-pipeline | Full markdown rendering pipeline (#155) | ✅ |
+|   ↳ 146-D-code-block-ux | Code block copy button + language label (#156) | ✅ |
+|   ↳ 146-E-post-render-hooks | Mermaid SVG rendering + theme awareness (#157) | ✅ |
 | 017-task-streaming-handler | Real-time agent streaming improvements | ⏳ |
 | 018-task-adaptive-cards-renderer | Adaptive cards in chat | ⏳ |
 | 019-task-widget-iframe-host | Dashboard widgets in chat | ⏳ |
