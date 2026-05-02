@@ -49,87 +49,12 @@ const ALLOWED_HTML_TAGS = new Set([
   "input",
 ]);
 
-const SAFE_TAGS = new Set([
-  "a",
-  "abbr",
-  "blockquote",
-  "br",
-  "code",
-  "del",
-  "div",
-  "em",
-  "hr",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "i",
-  "img",
-  "input",
-  "ins",
-  "kbd",
-  "li",
-  "mark",
-  "ol",
-  "p",
-  "pre",
-  "ruby",
-  "rt",
-  "rp",
-  "s",
-  "small",
-  "span",
-  "strong",
-  "sub",
-  "sup",
-  "table",
-  "tbody",
-  "td",
-  "th",
-  "thead",
-  "tr",
-  "u",
-  "ul",
-  // KaTeX/MathML tags
-  "math",
-  "semantics",
-  "mrow",
-  "mi",
-  "mn",
-  "mo",
-  "mtext",
-  "mspace",
-  "msup",
-  "msub",
-  "msubsup",
-  "mfrac",
-  "msqrt",
-  "mroot",
-  "mtable",
-  "mtr",
-  "mtd",
-  "annotation",
-]);
-
-const GLOBAL_ALLOWED_ATTRS = new Set([
-  "class",
-  "title",
-  "role",
-  "aria-hidden",
-  "aria-label",
-  "aria-expanded",
-  "aria-live",
-  "data-mermaid",
-  "data-hashtag",
-]);
-
-const TAG_ALLOWED_ATTRS = {
-  a: new Set(["href", "target", "rel"]),
-  img: new Set(["src", "alt", "title"]),
-  input: new Set(["type", "checked", "disabled"]),
-};
+// KaTeX/MathML tags to allow through DOMPurify
+const KATEX_TAGS = [
+  "math", "semantics", "mrow", "mi", "mn", "mo", "mtext", "mspace",
+  "msup", "msub", "msubsup", "mfrac", "msqrt", "mroot",
+  "mtable", "mtr", "mtd", "annotation",
+];
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:", ""]);
 
@@ -149,18 +74,21 @@ function escapeHtmlAttr(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// ── Stage 5: Sanitization ──────────────────────────────────────────────────
+// ── Stage 5: Sanitization (DOMPurify — battle-tested) ──────────────────────
 
-export function isSanitizedHtmlAttributeAllowed(tagName: string, attrName: string): boolean {
-  const normalizedTag = String(tagName || "").toLowerCase();
-  const normalizedAttr = String(attrName || "").toLowerCase();
-  if (!normalizedAttr || normalizedAttr.startsWith("on")) return false;
-  if (normalizedAttr.startsWith("data-") || normalizedAttr.startsWith("aria-")) {
-    return true;
-  }
-  const allowedAttrs = TAG_ALLOWED_ATTRS[normalizedTag] || new Set();
-  return allowedAttrs.has(normalizedAttr) || GLOBAL_ALLOWED_ATTRS.has(normalizedAttr);
+/** Get DOMPurify from the deferred vendor global. */
+function getDOMPurify(): { sanitize: (html: string, config?: any) => string } | null {
+  return (window as any).DOMPurify ?? null;
 }
+
+/** DOMPurify configuration: allow KaTeX/MathML, data attributes, classes. */
+const DOMPURIFY_CONFIG = {
+  USE_PROFILES: { html: true },
+  ADD_TAGS: KATEX_TAGS,
+  ADD_ATTR: ["class", "data-mermaid", "data-hashtag", "target", "rel"],
+  ALLOW_DATA_ATTR: true,
+  ADD_URI_SAFE_ATTR: ["data-mermaid"],
+};
 
 export function sanitizeUrl(url: string, options: { allowDataImage?: boolean } = {}): string | null {
   if (!url) return null;
@@ -187,71 +115,18 @@ export function sanitizeUrl(url: string, options: { allowDataImage?: boolean } =
   }
 }
 
-function sanitizeHtml(html: string, options: { sanitize?: boolean; rewriteImageSrc?: (src: string) => string } = {}): string {
+function sanitizeHtml(html: string, options: { sanitize?: boolean } = {}): string {
   if (!html) return "";
   if (options?.sanitize === false) return html;
+
+  const purify = getDOMPurify();
+  if (purify) {
+    return purify.sanitize(html, DOMPURIFY_CONFIG);
+  }
+
+  // Fallback: strip all tags if DOMPurify not loaded yet
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const nodes: Element[] = [];
-  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    nodes.push(node as Element);
-  }
-
-  for (const el of nodes) {
-    const tag = el.tagName.toLowerCase();
-    if (!SAFE_TAGS.has(tag)) {
-      const parent = el.parentNode;
-      if (!parent) continue;
-      while (el.firstChild) {
-        parent.insertBefore(el.firstChild, el);
-      }
-      parent.removeChild(el);
-      continue;
-    }
-
-    for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase();
-      const value = attr.value;
-      if (name.startsWith("on")) {
-        el.removeAttribute(attr.name);
-        continue;
-      }
-      if (isSanitizedHtmlAttributeAllowed(tag, name)) {
-        if (name === "href") {
-          const safe = sanitizeUrl(value);
-          if (!safe) {
-            el.removeAttribute(attr.name);
-          } else {
-            el.setAttribute(attr.name, safe);
-            if (tag === "a") {
-              if (!el.getAttribute("rel")) {
-                el.setAttribute("rel", "noopener noreferrer");
-              }
-              if (/^https?:\/\//i.test(safe)) {
-                el.setAttribute("target", "_blank");
-              }
-            }
-          }
-        } else if (name === "src") {
-          const rewritten =
-            tag === "img" && typeof options.rewriteImageSrc === "function"
-              ? options.rewriteImageSrc(value)
-              : value;
-          const safe = sanitizeUrl(rewritten, { allowDataImage: tag === "img" });
-          if (!safe) {
-            el.removeAttribute(attr.name);
-          } else {
-            el.setAttribute(attr.name, safe);
-          }
-        }
-        continue;
-      }
-      el.removeAttribute(attr.name);
-    }
-  }
-
-  return doc.body.innerHTML;
+  return doc.body.textContent || "";
 }
 
 // ── Stage 2: Entity handling ───────────────────────────────────────────────
@@ -601,7 +476,7 @@ export function prepareMarkdownSource(text: string): { safeHtml: string; mermaid
 
 // ── Main exports ───────────────────────────────────────────────────────────
 
-export function renderMarkdown(text: string, options: { sanitize?: boolean; rewriteImageSrc?: (src: string) => string } = {}): string {
+export function renderMarkdown(text: string, options: { sanitize?: boolean } = {}): string {
   if (!text) return "";
 
   const { safeHtml, mermaidBlocks } = prepareMarkdownSource(text);

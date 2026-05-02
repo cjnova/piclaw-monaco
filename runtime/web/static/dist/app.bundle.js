@@ -6536,50 +6536,7 @@ For tests, pass a Ghostty instance directly:
     "span",
     "input"
   ]);
-  var SAFE_TAGS = /* @__PURE__ */ new Set([
-    "a",
-    "abbr",
-    "blockquote",
-    "br",
-    "code",
-    "del",
-    "div",
-    "em",
-    "hr",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "i",
-    "img",
-    "input",
-    "ins",
-    "kbd",
-    "li",
-    "mark",
-    "ol",
-    "p",
-    "pre",
-    "ruby",
-    "rt",
-    "rp",
-    "s",
-    "small",
-    "span",
-    "strong",
-    "sub",
-    "sup",
-    "table",
-    "tbody",
-    "td",
-    "th",
-    "thead",
-    "tr",
-    "u",
-    "ul",
-    // KaTeX/MathML tags
+  var KATEX_TAGS = [
     "math",
     "semantics",
     "mrow",
@@ -6598,24 +6555,7 @@ For tests, pass a Ghostty instance directly:
     "mtr",
     "mtd",
     "annotation"
-  ]);
-  var GLOBAL_ALLOWED_ATTRS = /* @__PURE__ */ new Set([
-    "class",
-    "title",
-    "role",
-    "aria-hidden",
-    "aria-label",
-    "aria-expanded",
-    "aria-live",
-    "data-mermaid",
-    "data-hashtag"
-  ]);
-  var TAG_ALLOWED_ATTRS = {
-    a: /* @__PURE__ */ new Set(["href", "target", "rel"]),
-    img: /* @__PURE__ */ new Set(["src", "alt", "title"]),
-    input: /* @__PURE__ */ new Set(["type", "checked", "disabled"])
-  };
-  var SAFE_PROTOCOLS = /* @__PURE__ */ new Set(["http:", "https:", "mailto:", ""]);
+  ];
   var RESTORABLE_HTML_ATTRS = {
     span: /* @__PURE__ */ new Set(["title", "class", "lang", "dir"]),
     input: /* @__PURE__ */ new Set(["type", "checked", "disabled"])
@@ -6623,95 +6563,25 @@ For tests, pass a Ghostty instance directly:
   function escapeHtmlAttr(value) {
     return String(value || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#39;");
   }
-  function isSanitizedHtmlAttributeAllowed(tagName, attrName) {
-    const normalizedTag = String(tagName || "").toLowerCase();
-    const normalizedAttr = String(attrName || "").toLowerCase();
-    if (!normalizedAttr || normalizedAttr.startsWith("on")) return false;
-    if (normalizedAttr.startsWith("data-") || normalizedAttr.startsWith("aria-")) {
-      return true;
-    }
-    const allowedAttrs = TAG_ALLOWED_ATTRS[normalizedTag] || /* @__PURE__ */ new Set();
-    return allowedAttrs.has(normalizedAttr) || GLOBAL_ALLOWED_ATTRS.has(normalizedAttr);
+  function getDOMPurify() {
+    return window.DOMPurify ?? null;
   }
-  function sanitizeUrl(url, options = {}) {
-    if (!url) return null;
-    const raw = String(url).trim();
-    if (!raw) return null;
-    if (raw.startsWith("#") || raw.startsWith("/")) return raw;
-    if (raw.startsWith("data:")) {
-      if (options.allowDataImage && /^data:image\//i.test(raw)) {
-        return raw;
-      }
-      return null;
-    }
-    if (raw.startsWith("blob:")) return raw;
-    try {
-      const parsed = new URL(raw, typeof window !== "undefined" ? window.location.origin : "http://localhost");
-      if (!SAFE_PROTOCOLS.has(parsed.protocol)) return null;
-      return parsed.href;
-    } catch {
-      return null;
-    }
-  }
+  var DOMPURIFY_CONFIG = {
+    USE_PROFILES: { html: true },
+    ADD_TAGS: KATEX_TAGS,
+    ADD_ATTR: ["class", "data-mermaid", "data-hashtag", "target", "rel"],
+    ALLOW_DATA_ATTR: true,
+    ADD_URI_SAFE_ATTR: ["data-mermaid"]
+  };
   function sanitizeHtml(html, options = {}) {
     if (!html) return "";
     if (options?.sanitize === false) return html;
+    const purify = getDOMPurify();
+    if (purify) {
+      return purify.sanitize(html, DOMPURIFY_CONFIG);
+    }
     const doc = new DOMParser().parseFromString(html, "text/html");
-    const nodes = [];
-    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
-    let node;
-    while (node = walker.nextNode()) {
-      nodes.push(node);
-    }
-    for (const el of nodes) {
-      const tag = el.tagName.toLowerCase();
-      if (!SAFE_TAGS.has(tag)) {
-        const parent = el.parentNode;
-        if (!parent) continue;
-        while (el.firstChild) {
-          parent.insertBefore(el.firstChild, el);
-        }
-        parent.removeChild(el);
-        continue;
-      }
-      for (const attr of Array.from(el.attributes)) {
-        const name = attr.name.toLowerCase();
-        const value = attr.value;
-        if (name.startsWith("on")) {
-          el.removeAttribute(attr.name);
-          continue;
-        }
-        if (isSanitizedHtmlAttributeAllowed(tag, name)) {
-          if (name === "href") {
-            const safe = sanitizeUrl(value);
-            if (!safe) {
-              el.removeAttribute(attr.name);
-            } else {
-              el.setAttribute(attr.name, safe);
-              if (tag === "a") {
-                if (!el.getAttribute("rel")) {
-                  el.setAttribute("rel", "noopener noreferrer");
-                }
-                if (/^https?:\/\//i.test(safe)) {
-                  el.setAttribute("target", "_blank");
-                }
-              }
-            }
-          } else if (name === "src") {
-            const rewritten = tag === "img" && typeof options.rewriteImageSrc === "function" ? options.rewriteImageSrc(value) : value;
-            const safe = sanitizeUrl(rewritten, { allowDataImage: tag === "img" });
-            if (!safe) {
-              el.removeAttribute(attr.name);
-            } else {
-              el.setAttribute(attr.name, safe);
-            }
-          }
-          continue;
-        }
-        el.removeAttribute(attr.name);
-      }
-    }
-    return doc.body.innerHTML;
+    return doc.body.textContent || "";
   }
   function decodeEntities(text) {
     if (!text) return text;
