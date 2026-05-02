@@ -1,3 +1,8 @@
+/**
+ * @deprecated — replaced by `markdown-pipeline.ts` (feat #155).
+ * This parse5-based sanitizer is no longer used anywhere in the codebase.
+ * Use `renderMarkdown()` / `renderThinkingMarkdown()` from `./markdown-pipeline` instead.
+ */
 import { marked } from "marked";
 import { parseFragment, serialize } from "parse5";
 

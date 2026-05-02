@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from "preact/hooks";
-import { marked } from "marked";
 import { FileTree, type TreeNode } from "../components/FileTree";
 import {
   buildFolderChartSegments,
@@ -11,7 +10,7 @@ import {
   type WorkspaceFilePayload,
 } from "./workspace-panel-helpers";
 import { formatBytes } from "../utils/formatBytes";
-import { sanitizeRenderedMarkdown } from "../utils/sanitizeRenderedMarkdown";
+import { renderMarkdown } from "../utils/markdown-pipeline";
 import { safeGetItem, safeSetItem } from "../utils/storage";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -335,7 +334,7 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
         const res = await fetch(`/workspace/file?path=${encoded}`, { credentials: 'same-origin' });
         const data = await res.json() as { content?: string; text?: string };
         const text = data.content ?? data.text ?? '';
-        const html = sanitizeRenderedMarkdown(marked(text, { async: false }) as string);
+        const html = renderMarkdown(text);
         window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { html, name, mode: 'markdown' } }));
       } catch {
         // fallback: nothing
@@ -469,9 +468,9 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
         {status === "done" && kind === "markdown" && content !== null && (
           <div
             className="workspace__preview-markdown"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by sanitizeRenderedMarkdown()
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
             dangerouslySetInnerHTML={{
-              __html: sanitizeRenderedMarkdown(marked(content, { async: false }) as string),
+              __html: renderMarkdown(content),
             }}
           />
         )}

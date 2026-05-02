@@ -3695,3 +3695,45 @@ body {
 .tok-deleted { color: var(--syn-deleted); }
 .tok-inserted { color: var(--syn-inserted); }
 .tok-local { color: var(--syn-local); }
+
+/* ── Markdown pipeline additions (#155) ────────────────────────────────── */
+
+/* Mermaid containers */
+.mermaid-container {
+  margin: 8px 0;
+  text-align: center;
+}
+.mermaid-loading {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px;
+}
+.mermaid-error {
+  color: var(--error);
+  font-size: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--error);
+  border-radius: 4px;
+}
+
+/* Math rendering */
+.math-error {
+  color: var(--error);
+  font-size: 12px;
+  cursor: help;
+}
+
+/* Hashtag links */
+a.hashtag {
+  color: var(--accent);
+  text-decoration: none;
+}
+a.hashtag:hover {
+  text-decoration: underline;
+}
+
+/* Frontmatter code block */
+pre.frontmatter-block {
+  border-left: 3px solid var(--accent);
+  opacity: 0.8;
+}

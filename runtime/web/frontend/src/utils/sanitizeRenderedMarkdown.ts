@@ -1,16 +1,16 @@
 /**
- * Sanitise an HTML string produced by a markdown renderer before injecting it
- * into the DOM via `dangerouslySetInnerHTML`.
+ * @deprecated — replaced by `markdown-pipeline.ts` (feat #155).
+ * Sanitization is now built into `renderMarkdown()` / `renderThinkingMarkdown()`.
+ * This file is kept for reference only and is no longer imported anywhere.
  *
- * Uses DOMPurify (battle-tested, 10+ years, used by Google / Mozilla) to
- * remove XSS vectors including event-handler attributes, `javascript:` URLs,
- * SVG/MathML namespace escapes, and mutation-XSS tricks.
+ * Use `renderMarkdown(text)` from `./markdown-pipeline` instead.
  */
 import DOMPurify from "dompurify";
 
+/** @deprecated Use renderMarkdown() from markdown-pipeline instead. */
 export function sanitizeRenderedMarkdown(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
-    ADD_ATTR: ['class'],
+    ADD_ATTR: ["class"],
   });
 }
