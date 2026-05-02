@@ -132,12 +132,16 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           </div>
         </>
       ) : isSafeExtensionUrl(activeTab.value) ? (
-        <iframe
-          className="chat-tabs__iframe"
-          src={activeTab.value}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-          title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
-        />
+        <>
+          {/* Security: allow-same-origin required for extension API access. allow-scripts required for interactivity. Popups restricted. See #168. */}
+          <iframe
+            className="chat-tabs__iframe"
+            src={activeTab.value}
+            sandbox="allow-same-origin allow-scripts allow-forms"
+            {...({ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" } as any)}
+            title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
+          />
+        </>
       ) : (
         <div className="chat-tabs__blocked">Blocked: unsafe extension URL</div>
       )}
