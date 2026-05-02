@@ -196,6 +196,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering (#146) | ⏳ |
 |   ↳ 146-A-vendor-bundles | KaTeX, beautiful-mermaid, CodeMirror highlight vendor bundles (#153) | ⏳ |
 |   ↳ 146-B-syntax-highlighting | CodeMirror/Lezer syntax highlighting for code blocks (#154) | ⏳ |
+|     ↳ bicep-highlighting | Bicep language syntax highlighting — refinement of #154 (#160) | ⏳ |
 |   ↳ 146-C-markdown-pipeline | Full markdown rendering pipeline (#155) | ⏳ |
 |   ↳ 146-D-code-block-ux | Code block copy button + language label (#156) | ⏳ |
 |   ↳ 146-E-post-render-hooks | Mermaid SVG rendering + theme awareness (#157) | ⏳ |
