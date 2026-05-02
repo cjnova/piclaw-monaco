@@ -5,7 +5,7 @@
   --bg-status: #181825;
   --border: #313244;
   --text: #cdd6f4;
-  --text-muted: #6c7086;
+  --text-muted: #9399b2;
   --text-soft: #a6adc8;
   --accent: #89b4fa;
   --success: #a6e3a1;
@@ -22,7 +22,7 @@
   --syn-operator: #89dceb;
   --syn-number: #fab387;
   --syn-string: #a6e3a1;
-  --syn-comment: #6c7086;
+  --syn-comment: #9399b2;
   --syn-variable: #cdd6f4;
   --syn-variable2: #f38ba8;
   --syn-definition: #89b4fa;
@@ -67,7 +67,7 @@
     --syn-operator: #179299;
     --syn-number: #fe640b;
     --syn-string: #40a02b;
-    --syn-comment: #9ca0b0;
+    --syn-comment: #6c6f85;
     --syn-variable: #4c4f69;
     --syn-variable2: #d20f39;
     --syn-definition: #1e66f5;
