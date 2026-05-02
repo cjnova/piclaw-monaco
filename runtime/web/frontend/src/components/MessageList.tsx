@@ -1,6 +1,7 @@
 import { getMessageUrl, buildChatUrl } from "../api/chat-jid";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { renderMarkdown, renderThinkingMarkdown } from "../utils/markdown-pipeline";
+import { renderMermaidDiagrams } from "../utils/mermaid-render";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -476,6 +477,36 @@ export function MessageList() {
 
     container.addEventListener('click', handler as unknown as EventListener);
     return () => container.removeEventListener('click', handler as unknown as EventListener);
+  }, []);
+
+  // Post-render: mermaid diagrams
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+
+    // Render any pending mermaid blocks
+    const render = () => {
+      if (container.querySelector(".mermaid-container[data-mermaid]")) {
+        renderMermaidDiagrams(container).catch(() => {});
+      }
+    };
+
+    // Run on initial load and after DOM updates
+    render();
+
+    // Observe DOM changes (new messages added)
+    let debounceTimer = 0;
+    const observer = new MutationObserver(() => {
+      // Debounce slightly to batch rapid updates
+      clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(render, 100);
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(debounceTimer);
+    };
   }, []);
 
   // Detect manual scroll
