@@ -3737,3 +3737,68 @@ pre.frontmatter-block {
   border-left: 3px solid var(--accent);
   opacity: 0.8;
 }
+
+/* ── Code Block Container ─────────────────────────────── */
+.code-block {
+  position: relative;
+  margin: 6px 0;
+}
+
+.code-block__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--bg-terminal);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-size: 11px;
+}
+
+.code-block__lang {
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+}
+
+.code-block__copy {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.code-block:hover .code-block__copy,
+.code-block__copy:focus-visible {
+  opacity: 1;
+}
+
+.code-block__copy:hover {
+  background: var(--hover-overlay, rgba(255,255,255,0.07));
+  color: var(--text);
+}
+
+.code-block__copy[data-copy-state="copied"] {
+  opacity: 1;
+  color: var(--success);
+}
+
+.code-block__copy[data-copy-state="copied"] .codicon-copy::before {
+  content: "\eab2"; /* codicon-check */
+}
+
+/* Adjust pre inside code-block (remove top border-radius since header has it) */
+.code-block pre {
+  margin: 0;
+  border-radius: 0 0 6px 6px;
+  border-top: none;
+}

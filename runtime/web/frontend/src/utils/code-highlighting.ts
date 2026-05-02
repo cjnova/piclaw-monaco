@@ -181,7 +181,20 @@ export function applySyntaxHighlighting(html: string): string {
       const decodedCode = decodeHtmlEntities(decodeHtmlEntities(code));
       const highlighted = highlightCodeToHtml(decodedCode, normalizedLang);
       const langClass = normalizedLang || "plaintext";
-      return `<pre><code class="hljs language-${langClass}">${highlighted}</code></pre>`;
+      const humanLabel = normalizeCodeLanguageLabel(langClass);
+      // UTF-8 safe base64 encode the raw code for the copy button
+      const encodedCode = btoa(unescape(encodeURIComponent(decodedCode)));
+      return [
+        `<div class="code-block">`,
+        `<div class="code-block__header">`,
+        `<span class="code-block__lang">${escapeHtml(humanLabel)}</span>`,
+        `<button class="code-block__copy" aria-label="Copy code" data-code="${encodedCode}">`,
+        `<i class="codicon codicon-copy"></i>`,
+        `</button>`,
+        `</div>`,
+        `<pre><code class="hljs language-${langClass}">${highlighted}</code></pre>`,
+        `</div>`,
+      ].join("");
     }
   );
 }

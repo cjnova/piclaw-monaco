@@ -440,6 +440,44 @@ export function MessageList() {
     return () => window.removeEventListener("piclaw:scroll-to-message", handler);
   }, []);
 
+  // Copy button delegated handler
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+
+    const handler = async (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement).closest('.code-block__copy') as HTMLElement;
+      if (!btn) return;
+
+      const encoded = btn.dataset.code;
+      if (!encoded) return;
+
+      // Decode base64 → UTF-8
+      const code = decodeURIComponent(escape(atob(encoded)));
+
+      try {
+        await navigator.clipboard.writeText(code);
+        btn.dataset.copyState = 'copied';
+        setTimeout(() => { btn.dataset.copyState = ''; }, 2000);
+      } catch {
+        // execCommand fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btn.dataset.copyState = 'copied';
+        setTimeout(() => { btn.dataset.copyState = ''; }, 2000);
+      }
+    };
+
+    container.addEventListener('click', handler as unknown as EventListener);
+    return () => container.removeEventListener('click', handler as unknown as EventListener);
+  }, []);
+
   // Detect manual scroll
   useEffect(() => {
     const el = listRef.current;
