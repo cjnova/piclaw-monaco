@@ -10075,15 +10075,16 @@ ${code}
             }
           )
         ] })
-      ] }) : isSafeExtensionUrl(activeTab.value) ? /* @__PURE__ */ u4(
+      ] }) : isSafeExtensionUrl(activeTab.value) ? /* @__PURE__ */ u4(S, { children: /* @__PURE__ */ u4(
         "iframe",
         {
           className: "chat-tabs__iframe",
           src: activeTab.value,
-          sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
+          sandbox: "allow-same-origin allow-scripts allow-forms",
+          ...{ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" },
           title: extractDisplayName(pages.find((p6) => p6.prefix === activeTab.value)?.extensionPath ?? "")
         }
-      ) : /* @__PURE__ */ u4("div", { className: "chat-tabs__blocked", children: "Blocked: unsafe extension URL" })
+      ) }) : /* @__PURE__ */ u4("div", { className: "chat-tabs__blocked", children: "Blocked: unsafe extension URL" })
     ] });
   }
 
@@ -10554,15 +10555,16 @@ ${code}
                   className: "workspace__preview-markdown extension-frame__markdown",
                   dangerouslySetInnerHTML: { __html: extensionPageHtml.value }
                 }
-              ) : /* @__PURE__ */ u4(
+              ) : /* @__PURE__ */ u4(S, { children: /* @__PURE__ */ u4(
                 "iframe",
                 {
                   className: "extension-frame__iframe",
                   src: extensionPageUrl.value,
-                  sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
+                  sandbox: "allow-same-origin allow-scripts allow-forms",
+                  ...{ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" },
                   title: extensionPageName.value ?? "Extension Page"
                 }
-              )
+              ) })
             ] }) : null,
             /* @__PURE__ */ u4("div", { className: isSettingsActive || isExtensionPageOpen ? "app-layout__chat-wrapper app-layout__chat-wrapper--hidden" : "app-layout__chat-wrapper", children: /* @__PURE__ */ u4(ChatPanel, { onOpenPalette: () => {
               paletteVisible.value = true;

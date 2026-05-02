@@ -354,12 +354,16 @@ function AppContent() {
                     dangerouslySetInnerHTML={{ __html: extensionPageHtml.value }}
                   />
                 ) : (
-                  <iframe
-                    className="extension-frame__iframe"
-                    src={extensionPageUrl.value!}
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                    title={extensionPageName.value ?? "Extension Page"}
-                  />
+                  <>
+                    {/* Security: allow-same-origin required for extension API access. allow-scripts required for interactivity. Popups restricted. See #168. */}
+                    <iframe
+                      className="extension-frame__iframe"
+                      src={extensionPageUrl.value!}
+                      sandbox="allow-same-origin allow-scripts allow-forms"
+                      {...({ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" } as any)}
+                      title={extensionPageName.value ?? "Extension Page"}
+                    />
+                  </>
                 )}
               </div>
             ) : null}
