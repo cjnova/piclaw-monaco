@@ -193,7 +193,12 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | wire-fleet-batch-to-command-palette | Expose fleet_batch tool via UI | ⏳ |
 | wire-terminal-profile-selector | Terminal profile selection (Shell, Pi TUI) | ⏳ |
 | leverage-tool-lifecycle-events-in-chat | Show tool_aborted, richer tool events in chat | ⏳ |
-| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering | ⏳ |
+| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering (#146) | ⏳ |
+|   ↳ 146-A-vendor-bundles | KaTeX, beautiful-mermaid, CodeMirror highlight vendor bundles (#153) | ⏳ |
+|   ↳ 146-B-syntax-highlighting | CodeMirror/Lezer syntax highlighting for code blocks (#154) | ⏳ |
+|   ↳ 146-C-markdown-pipeline | Full markdown rendering pipeline (#155) | ⏳ |
+|   ↳ 146-D-code-block-ux | Code block copy button + language label (#156) | ⏳ |
+|   ↳ 146-E-post-render-hooks | Mermaid SVG rendering + theme awareness (#157) | ⏳ |
 | 017-task-streaming-handler | Real-time agent streaming improvements | ⏳ |
 | 018-task-adaptive-cards-renderer | Adaptive cards in chat | ⏳ |
 | 019-task-widget-iframe-host | Dashboard widgets in chat | ⏳ |
