@@ -17,6 +17,29 @@
   --input-border: #45475a;
   --bg-elevated: #2a2a3d;
   --overlay: rgba(0, 0, 0, 0.5);
+  /* Syntax highlighting (Catppuccin Mocha) */
+  --syn-keyword: #cba6f7;
+  --syn-operator: #89dceb;
+  --syn-number: #fab387;
+  --syn-string: #a6e3a1;
+  --syn-comment: #6c7086;
+  --syn-variable: #cdd6f4;
+  --syn-variable2: #f38ba8;
+  --syn-definition: #89b4fa;
+  --syn-type: #f9e2af;
+  --syn-property: #89b4fa;
+  --syn-label: #f9e2af;
+  --syn-namespace: #cba6f7;
+  --syn-macro: #fab387;
+  --syn-atom: #fab387;
+  --syn-punctuation: #bac2de;
+  --syn-meta: #f5c2e7;
+  --syn-link: #89b4fa;
+  --syn-heading: #89b4fa;
+  --syn-invalid: #f38ba8;
+  --syn-deleted: #f38ba8;
+  --syn-inserted: #a6e3a1;
+  --syn-local: #fab387;
 }
 
 @media (prefers-color-scheme: light) {
@@ -39,6 +62,29 @@
     --input-border: #d4d4d4;
     --bg-elevated: #ebebeb;
     --overlay: rgba(31, 41, 55, 0.22);
+    /* Syntax highlighting (Catppuccin Latte) */
+    --syn-keyword: #8839ef;
+    --syn-operator: #179299;
+    --syn-number: #fe640b;
+    --syn-string: #40a02b;
+    --syn-comment: #9ca0b0;
+    --syn-variable: #4c4f69;
+    --syn-variable2: #d20f39;
+    --syn-definition: #1e66f5;
+    --syn-type: #df8e1d;
+    --syn-property: #1e66f5;
+    --syn-label: #df8e1d;
+    --syn-namespace: #8839ef;
+    --syn-macro: #fe640b;
+    --syn-atom: #fe640b;
+    --syn-punctuation: #5c5f77;
+    --syn-meta: #ea76cb;
+    --syn-link: #1e66f5;
+    --syn-heading: #1e66f5;
+    --syn-invalid: #d20f39;
+    --syn-deleted: #d20f39;
+    --syn-inserted: #40a02b;
+    --syn-local: #fe640b;
   }
 }
 
@@ -3622,3 +3668,30 @@ body {
   font-weight: 600;
   color: var(--accent);
 }
+
+/* ── Syntax Highlighting (CodeMirror/Lezer tokens) ──────────── */
+.tok-keyword { color: var(--syn-keyword); }
+.tok-operator { color: var(--syn-operator); }
+.tok-number { color: var(--syn-number); }
+.tok-string, .tok-string2 { color: var(--syn-string); }
+.tok-comment { color: var(--syn-comment); font-style: italic; }
+.tok-variableName { color: var(--syn-variable); }
+.tok-variableName2 { color: var(--syn-variable2); }
+.tok-definition { color: var(--syn-definition); }
+.tok-typeName { color: var(--syn-type); }
+.tok-className { color: var(--syn-type); }
+.tok-propertyName { color: var(--syn-property); }
+.tok-labelName { color: var(--syn-label); }
+.tok-namespace { color: var(--syn-namespace); }
+.tok-macroName { color: var(--syn-macro); }
+.tok-atom, .tok-bool { color: var(--syn-atom); }
+.tok-punctuation { color: var(--syn-punctuation); }
+.tok-meta { color: var(--syn-meta); }
+.tok-link, .tok-url { color: var(--syn-link); text-decoration: underline; }
+.tok-heading { color: var(--syn-heading); font-weight: bold; }
+.tok-strong { font-weight: bold; }
+.tok-emphasis { font-style: italic; }
+.tok-invalid { color: var(--syn-invalid); text-decoration: wavy underline; }
+.tok-deleted { color: var(--syn-deleted); }
+.tok-inserted { color: var(--syn-inserted); }
+.tok-local { color: var(--syn-local); }
