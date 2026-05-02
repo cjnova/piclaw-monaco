@@ -2,6 +2,7 @@
  * Syntax highlighting using CodeMirror/Lezer parsers via window.cmHighlight global.
  * Deferred-loaded — returns plain escaped HTML if global not available yet.
  */
+import { bicepMode } from "./bicep-mode";
 
 interface CmHighlight {
   classHighlighter: any;
@@ -69,6 +70,7 @@ const LANGUAGE_LABEL_ALIASES: Record<string, string> = {
   swift: "Swift",
   toml: "TOML",
   dockerfile: "Dockerfile",
+  bicep: "Bicep",
   xml: "XML",
   plaintext: "Text", text: "Text",
 };
@@ -86,6 +88,7 @@ let _dockerFileParser: any;
 let _rubyParser: any;
 let _swiftParser: any;
 let _tomlParser: any;
+let _bicepParser: any;
 
 function getLegacyParser(cm: CmHighlight, name: string): any {
   switch (name) {
@@ -95,6 +98,7 @@ function getLegacyParser(cm: CmHighlight, name: string): any {
     case "ruby": return _rubyParser ??= cm.StreamLanguage.define(cm.ruby).parser;
     case "swift": return _swiftParser ??= cm.StreamLanguage.define(cm.swift).parser;
     case "toml": return _tomlParser ??= cm.StreamLanguage.define(cm.toml).parser;
+    case "bicep": return _bicepParser ??= cm.StreamLanguage.define(bicepMode).parser;
     default: return null;
   }
 }
@@ -127,6 +131,7 @@ export function parserForCodeFenceLanguage(lang: string): { parse: (input: strin
     case "rb": case "ruby": return getLegacyParser(cm, "ruby");
     case "swift": return getLegacyParser(cm, "swift");
     case "toml": return getLegacyParser(cm, "toml");
+    case "bicep": return getLegacyParser(cm, "bicep");
     default: return null;
   }
 }
