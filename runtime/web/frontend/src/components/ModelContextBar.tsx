@@ -274,6 +274,10 @@ export function ModelContextBar() {
     }
   };
 
+  const flashStatus = (message: string) => {
+    window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message, type: "error" } }));
+  };
+
   const handleBadgeClick = async (e: Event) => {
     e.stopPropagation();
     if (showPicker.value) {
@@ -298,9 +302,13 @@ export function ModelContextBar() {
         thinkingLevels.value = info.available_thinking_levels?.length
           ? info.available_thinking_levels
           : FALLBACK_THINKING_LEVELS;
+      } else {
+        console.warn("[ModelContextBar] models fetch failed:", res.status);
+        flashStatus("Model fetch failed");
       }
     } catch (err) {
       console.warn("[ModelContextBar] models fetch failed:", err);
+      flashStatus("Model fetch failed");
     }
   };
 
@@ -317,9 +325,11 @@ export function ModelContextBar() {
         showPicker.value = false;
       } else {
         console.warn("[ModelContextBar] model switch failed:", res.status);
+        flashStatus("Model switch failed");
       }
     } catch (err) {
       console.warn("[ModelContextBar] model switch error:", err);
+      flashStatus("Model switch failed");
     }
   };
 
@@ -342,9 +352,11 @@ export function ModelContextBar() {
         showThinkingPicker.value = false;
       } else {
         console.warn("[ModelContextBar] thinking switch failed:", res.status);
+        flashStatus("Thinking switch failed");
       }
     } catch (err) {
       console.warn("[ModelContextBar] thinking switch error:", err);
+      flashStatus("Thinking switch failed");
     }
   };
 
