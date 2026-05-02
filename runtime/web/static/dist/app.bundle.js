@@ -9230,6 +9230,122 @@ ${code}
     return /* @__PURE__ */ u4("div", { className: "panel-placeholder", children: text });
   }
 
+  // runtime/web/frontend/src/utils/mermaid-render.ts
+  function fromBase64(value) {
+    const binary = atob(String(value || ""));
+    const bytes = new Uint8Array(binary.length);
+    for (let i6 = 0; i6 < binary.length; i6++) {
+      bytes[i6] = binary.charCodeAt(i6);
+    }
+    return new TextDecoder().decode(bytes);
+  }
+  function decodeEntitiesDeep2(text, maxDepth = 2) {
+    if (!text) return text;
+    let current = text;
+    for (let i6 = 0; i6 < maxDepth; i6++) {
+      const safe = current.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const doc = new DOMParser().parseFromString(safe, "text/html");
+      const next = doc.documentElement.textContent || "";
+      if (next === current) break;
+      current = next;
+    }
+    return current;
+  }
+  function roundPolylineCorners(svgString, radius = 6) {
+    return svgString.replace(
+      /<polyline\b([^>]*)\bpoints="([^"]+)"([^>]*)\/?\s*>/g,
+      (_match, before, pointsStr, after) => {
+        const pts = pointsStr.trim().split(/\s+/).map((p6) => {
+          const [x5, y6] = p6.split(",").map(Number);
+          return { x: x5, y: y6 };
+        });
+        if (pts.length < 3) {
+          return `<polyline${before}points="${pointsStr}"${after}/>`;
+        }
+        const parts = [`M ${pts[0].x},${pts[0].y}`];
+        for (let i6 = 1; i6 < pts.length - 1; i6++) {
+          const prev = pts[i6 - 1];
+          const curr = pts[i6];
+          const next = pts[i6 + 1];
+          const dxIn = curr.x - prev.x;
+          const dyIn = curr.y - prev.y;
+          const dxOut = next.x - curr.x;
+          const dyOut = next.y - curr.y;
+          const lenIn = Math.sqrt(dxIn * dxIn + dyIn * dyIn);
+          const lenOut = Math.sqrt(dxOut * dxOut + dyOut * dyOut);
+          const r4 = Math.min(radius, lenIn / 2, lenOut / 2);
+          if (r4 < 0.5) {
+            parts.push(`L ${curr.x},${curr.y}`);
+            continue;
+          }
+          const ax = curr.x - dxIn / lenIn * r4;
+          const ay = curr.y - dyIn / lenIn * r4;
+          const bx = curr.x + dxOut / lenOut * r4;
+          const by = curr.y + dyOut / lenOut * r4;
+          const cross = dxIn * dyOut - dyIn * dxOut;
+          const sweep = cross > 0 ? 1 : 0;
+          parts.push(`L ${ax},${ay}`);
+          parts.push(`A ${r4},${r4} 0 0 ${sweep} ${bx},${by}`);
+        }
+        parts.push(`L ${pts[pts.length - 1].x},${pts[pts.length - 1].y}`);
+        return `<path${before}d="${parts.join(" ")}"${after}/>`;
+      }
+    );
+  }
+  function isDarkMode() {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false;
+  }
+  var loadPromise = null;
+  function ensureMermaidLoaded() {
+    if (window.beautifulMermaid) return Promise.resolve();
+    if (loadPromise) return loadPromise;
+    loadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "/static/js/vendor/beautiful-mermaid.js";
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load mermaid vendor bundle"));
+      document.head.appendChild(script);
+    });
+    return loadPromise;
+  }
+  async function renderMermaidDiagrams(container) {
+    const pending = container.querySelectorAll(".mermaid-container[data-mermaid]");
+    if (!pending.length) return;
+    try {
+      await ensureMermaidLoaded();
+    } catch (e5) {
+      console.warn("[mermaid] Failed to load vendor bundle:", e5);
+      for (const el of pending) {
+        el.innerHTML = '<pre class="mermaid-error">Mermaid library failed to load</pre>';
+        el.removeAttribute("data-mermaid");
+      }
+      return;
+    }
+    const bm = window.beautifulMermaid;
+    if (!bm?.renderMermaid) return;
+    const dark = isDarkMode();
+    const theme = dark ? bm.THEMES["tokyo-night"] : bm.THEMES["github-light"];
+    for (const el of pending) {
+      try {
+        const encoded = el.dataset.mermaid;
+        const raw = fromBase64(encoded || "");
+        const code = decodeEntitiesDeep2(raw, 2);
+        let svg = await bm.renderMermaid(code, { ...theme, transparent: true });
+        svg = roundPolylineCorners(svg);
+        el.innerHTML = svg;
+        el.removeAttribute("data-mermaid");
+      } catch (e5) {
+        console.error("[mermaid] Render error:", e5);
+        const pre = document.createElement("pre");
+        pre.className = "mermaid-error";
+        pre.textContent = `Diagram error: ${e5.message || e5}`;
+        el.innerHTML = "";
+        el.appendChild(pre);
+        el.removeAttribute("data-mermaid");
+      }
+    }
+  }
+
   // runtime/web/frontend/src/components/MessageList.tsx
   function relativeTime(isoDate) {
     const delta = Date.now() - new Date(isoDate).getTime();
@@ -9598,6 +9714,27 @@ ${code}
       };
       container.addEventListener("click", handler);
       return () => container.removeEventListener("click", handler);
+    }, []);
+    y2(() => {
+      const container = listRef.current;
+      if (!container) return;
+      const render = () => {
+        if (container.querySelector(".mermaid-container[data-mermaid]")) {
+          renderMermaidDiagrams(container).catch(() => {
+          });
+        }
+      };
+      render();
+      let debounceTimer = 0;
+      const observer = new MutationObserver(() => {
+        clearTimeout(debounceTimer);
+        debounceTimer = window.setTimeout(render, 100);
+      });
+      observer.observe(container, { childList: true, subtree: true });
+      return () => {
+        observer.disconnect();
+        clearTimeout(debounceTimer);
+      };
     }, []);
     y2(() => {
       const el = listRef.current;

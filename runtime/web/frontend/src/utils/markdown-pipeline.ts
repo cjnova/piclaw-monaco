@@ -517,12 +517,4 @@ export function renderThinkingMarkdown(text: string): string {
   return html;
 }
 
-/**
- * Stub for mermaid diagram rendering — full implementation in #157.
- * Finds `.mermaid-container[data-mermaid]` elements and renders them.
- */
-export async function renderMermaidDiagrams(container: Element): Promise<void> {
-  const beautifulMermaid = (window as any).beautifulMermaid;
-  if (!beautifulMermaid) return;
-  // Full implementation deferred to #157
-}
+// renderMermaidDiagrams stub removed — full implementation in utils/mermaid-render.ts (#157)
