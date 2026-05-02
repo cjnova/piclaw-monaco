@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';" />
   <title>PiClaw Monaco</title>
   <link rel="stylesheet" href="/static/css/fonts.css" />
   <link rel="stylesheet" href="/static/css/codicons.css" />
   <link rel="stylesheet" href="/static/css/shell.css" />
-  <!-- KaTeX math rendering CSS (non-blocking) -->
-  <link rel="stylesheet" href="/static/css/katex.min.css" media="print" onload="this.media='all'" />
-  <noscript><link rel="stylesheet" href="/static/css/katex.min.css" /></noscript>
+  <link rel="stylesheet" href="/static/css/katex.min.css" />
   <style>
     html,
     body {
