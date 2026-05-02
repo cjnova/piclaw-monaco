@@ -11,8 +11,12 @@
  *   5. Sanitization    (DOMParser-based, allows KaTeX/MathML tags)
  */
 
-import { marked } from "marked";
 import { applySyntaxHighlighting } from "./code-highlighting";
+
+/** Get the marked library from the deferred vendor global. */
+function getMarked(): { parse: (src: string, options?: any) => string } | null {
+  return (window as any).marked ?? null;
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -602,7 +606,10 @@ export function renderMarkdown(text: string, options: { sanitize?: boolean; rewr
 
   const { safeHtml, mermaidBlocks } = prepareMarkdownSource(text);
 
-  let html = marked.parse(safeHtml, { headerIds: false, mangle: false }) as string;
+  const m = getMarked();
+  let html = m
+    ? m.parse(safeHtml, { headerIds: false, mangle: false }) as string
+    : safeHtml.replace(/\n/g, "<br>");
 
   html = decodeCodeEntities(html);
   html = decodeTextEntities(html);
@@ -624,7 +631,10 @@ export function renderThinkingMarkdown(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   const safeHtml = restoreAllowedHtmlTags(escaped);
-  let html = marked.parse(safeHtml, { headerIds: false, mangle: false }) as string;
+  const m = getMarked();
+  let html = m
+    ? m.parse(safeHtml, { headerIds: false, mangle: false }) as string
+    : safeHtml.replace(/\n/g, "<br>");
   html = decodeCodeEntities(html);
   html = decodeTextEntities(html);
   // Skip math rendering to avoid $ false positives in shell output
