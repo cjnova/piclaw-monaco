@@ -6369,6 +6369,55 @@ For tests, pass a Ghostty instance directly:
   function escapeHtml(value) {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+  var LANGUAGE_LABEL_ALIASES = {
+    js: "JavaScript",
+    javascript: "JavaScript",
+    ts: "TypeScript",
+    typescript: "TypeScript",
+    jsx: "JSX",
+    tsx: "TSX",
+    py: "Python",
+    python: "Python",
+    sh: "Shell",
+    shell: "Shell",
+    bash: "Bash",
+    zsh: "Zsh",
+    ps1: "PowerShell",
+    powershell: "PowerShell",
+    md: "Markdown",
+    markdown: "Markdown",
+    yml: "YAML",
+    yaml: "YAML",
+    json: "JSON",
+    html: "HTML",
+    css: "CSS",
+    sql: "SQL",
+    go: "Go",
+    c: "C",
+    cc: "C++",
+    cpp: "C++",
+    "c++": "C++",
+    cxx: "C++",
+    h: "C/C++",
+    hh: "C++",
+    hpp: "C++",
+    hxx: "C++",
+    rust: "Rust",
+    rs: "Rust",
+    ruby: "Ruby",
+    rb: "Ruby",
+    swift: "Swift",
+    toml: "TOML",
+    dockerfile: "Dockerfile",
+    xml: "XML",
+    plaintext: "Text",
+    text: "Text"
+  };
+  function normalizeCodeLanguageLabel(lang) {
+    const raw = String(lang || "").trim().toLowerCase();
+    if (!raw) return "Text";
+    return LANGUAGE_LABEL_ALIASES[raw] || String(lang || "").trim();
+  }
   var _shellParser;
   var _powerShellParser;
   var _dockerFileParser;
@@ -6501,7 +6550,19 @@ For tests, pass a Ghostty instance directly:
         const decodedCode = decodeHtmlEntities(decodeHtmlEntities(code));
         const highlighted = highlightCodeToHtml(decodedCode, normalizedLang);
         const langClass = normalizedLang || "plaintext";
-        return `<pre><code class="hljs language-${langClass}">${highlighted}</code></pre>`;
+        const humanLabel = normalizeCodeLanguageLabel(langClass);
+        const encodedCode = btoa(unescape(encodeURIComponent(decodedCode)));
+        return [
+          `<div class="code-block">`,
+          `<div class="code-block__header">`,
+          `<span class="code-block__lang">${escapeHtml(humanLabel)}</span>`,
+          `<button class="code-block__copy" aria-label="Copy code" data-code="${encodedCode}">`,
+          `<i class="codicon codicon-copy"></i>`,
+          `</button>`,
+          `</div>`,
+          `<pre><code class="hljs language-${langClass}">${highlighted}</code></pre>`,
+          `</div>`
+        ].join("");
       }
     );
   }
@@ -9504,6 +9565,39 @@ ${code}
       };
       window.addEventListener("piclaw:scroll-to-message", handler);
       return () => window.removeEventListener("piclaw:scroll-to-message", handler);
+    }, []);
+    y2(() => {
+      const container = listRef.current;
+      if (!container) return;
+      const handler = async (e5) => {
+        const btn = e5.target.closest(".code-block__copy");
+        if (!btn) return;
+        const encoded = btn.dataset.code;
+        if (!encoded) return;
+        const code = decodeURIComponent(escape(atob(encoded)));
+        try {
+          await navigator.clipboard.writeText(code);
+          btn.dataset.copyState = "copied";
+          setTimeout(() => {
+            btn.dataset.copyState = "";
+          }, 2e3);
+        } catch {
+          const textarea = document.createElement("textarea");
+          textarea.value = code;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+          btn.dataset.copyState = "copied";
+          setTimeout(() => {
+            btn.dataset.copyState = "";
+          }, 2e3);
+        }
+      };
+      container.addEventListener("click", handler);
+      return () => container.removeEventListener("click", handler);
     }, []);
     y2(() => {
       const el = listRef.current;
