@@ -1031,6 +1031,31 @@ body {
   align-self: flex-end;
 }
 
+.chat__send-btn--sending {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.chat__send-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: rgba(243, 139, 168, 0.15);
+  color: var(--error);
+  font-size: 12px;
+  border-top: 1px solid var(--error);
+}
+
+.chat__send-error-dismiss {
+  background: none;
+  border: none;
+  color: var(--error);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
 /* ===== Chat Tabs ===== */
 .chat-tabs {
   display: flex;

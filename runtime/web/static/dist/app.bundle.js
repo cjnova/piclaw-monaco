@@ -10051,11 +10051,14 @@ ${code}
     const textareaRef = A2(null);
     const activeTab = useSignal("chat");
     const extensionPages = useSignal([]);
+    const isSending = useSignal(false);
+    const sendError = useSignal(null);
     y2(() => {
       fetch("/api/extension-routes", { credentials: "include" }).then((res) => res.json()).then((routes) => {
         const pages2 = routes.filter((r4) => r4.prefix.endsWith("-page"));
         extensionPages.value = pages2;
-      }).catch(() => {
+      }).catch((err) => {
+        console.warn("[chat] extension route discovery failed:", err);
       });
     }, []);
     const handleInput = (e5) => {
@@ -10073,28 +10076,38 @@ ${code}
     };
     const sendMessage = async () => {
       const el = textareaRef.current;
-      if (!el) return;
+      if (!el || isSending.value) return;
       const content = el.value.trim();
       if (!content) return;
+      isSending.value = true;
+      sendError.value = null;
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15e3);
         const res = await fetch(getMessageUrl(), {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content })
+          body: JSON.stringify({ content }),
+          signal: controller.signal
         });
+        clearTimeout(timeout);
         if (!res.ok) {
-          console.warn("[chat] send failed:", res.status);
+          sendError.value = `Send failed (HTTP ${res.status}). Try again.`;
+          isSending.value = false;
           return;
         }
         el.value = "";
         el.style.height = "auto";
+        sendError.value = null;
         const data = await res.json();
         if (data?.user_message) {
           window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
         }
       } catch (err) {
-        console.warn("[chat] send failed:", err);
+        sendError.value = err?.name === "AbortError" ? "Send timed out. Try again." : "Failed to send. Check connection.";
+      } finally {
+        isSending.value = false;
       }
     };
     const pages = extensionPages.value;
@@ -10148,11 +10161,17 @@ ${code}
             "button",
             {
               type: "button",
-              className: "chat__send-btn",
+              className: `chat__send-btn${isSending.value ? " chat__send-btn--sending" : ""}`,
               onClick: sendMessage,
-              children: "Send"
+              disabled: isSending.value,
+              "aria-label": isSending.value ? "Sending..." : "Send message",
+              children: isSending.value ? "Sending..." : "Send"
             }
           )
+        ] }),
+        sendError.value && /* @__PURE__ */ u4("div", { className: "chat__send-error", children: [
+          sendError.value,
+          /* @__PURE__ */ u4("button", { type: "button", className: "chat__send-error-dismiss", onClick: () => sendError.value = null, children: "\u2715" })
         ] })
       ] }) : isSafeExtensionUrl(activeTab.value) ? /* @__PURE__ */ u4(S, { children: /* @__PURE__ */ u4(
         "iframe",
