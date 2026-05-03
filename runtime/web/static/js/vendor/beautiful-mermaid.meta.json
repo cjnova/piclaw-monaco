@@ -19,12 +19,12 @@
     {
       "package_path": null,
       "output_file": "web/static/js/vendor/beautiful-mermaid.js",
-      "sha256": "ec99e2a802f3e6b5aa5e9168c08878403fa96e0f7c5336270d08a35ef4928c1f",
+      "sha256": "15defe220bd327448bbc788b7fd17af96d025face366d34ddc77372847461f52",
       "size_bytes": 1575471
     }
   ],
   "metadata_file": "web/static/js/vendor/beautiful-mermaid.meta.json",
-  "sha256": "ec99e2a802f3e6b5aa5e9168c08878403fa96e0f7c5336270d08a35ef4928c1f",
+  "sha256": "15defe220bd327448bbc788b7fd17af96d025face366d34ddc77372847461f52",
   "size_bytes": 1575471,
   "build_command": [
     "bun",

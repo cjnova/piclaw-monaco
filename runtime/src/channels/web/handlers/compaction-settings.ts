@@ -16,6 +16,8 @@ export interface CompactionSettingsData {
   compactionTimeoutSec: number;
   compactionBackoffBaseMin: number;
   compactionBackoffMaxMin: number;
+  compactionThresholdPercent: number;
+  compactionBackoffDecayFactor: number;
   progressWatchdogEnabled: boolean;
   progressWatchdogTimeoutSec: number;
   compactionBackoffs: Array<{
@@ -38,6 +40,8 @@ export interface CompactionSettingsInput {
   compactionTimeoutSec?: unknown;
   compactionBackoffBaseMin?: unknown;
   compactionBackoffMaxMin?: unknown;
+  compactionThresholdPercent?: unknown;
+  compactionBackoffDecayFactor?: unknown;
   progressWatchdogEnabled?: unknown;
   progressWatchdogTimeoutSec?: unknown;
 }
@@ -60,6 +64,8 @@ export function getCompactionSettingsData(): CompactionSettingsData {
     compactionTimeoutSec: Math.max(1, Math.round(config.timeoutMs / 1000)),
     compactionBackoffBaseMin: Math.max(1, Math.round(config.backoffBaseMs / 60_000)),
     compactionBackoffMaxMin: Math.max(1, Math.round(config.backoffMaxMs / 60_000)),
+    compactionThresholdPercent: config.thresholdPercent,
+    compactionBackoffDecayFactor: config.backoffDecayFactor,
     progressWatchdogEnabled: config.progressWatchdogEnabled,
     progressWatchdogTimeoutSec: Math.max(0, Math.round(config.progressWatchdogTimeoutMs / 1000)),
     compactionBackoffs: getAllChatCompactionBackoffs()
@@ -94,6 +100,8 @@ export async function saveCompactionSettings(input: CompactionSettingsInput): Pr
     backoffMaxMs?: number;
     progressWatchdogEnabled?: boolean;
     progressWatchdogTimeoutMs?: number;
+    thresholdPercent?: number;
+    backoffDecayFactor?: number;
   } = {};
 
   const nextTimeoutSec = normalizeOptionalInt(input.compactionTimeoutSec, 1, 3600);
@@ -119,6 +127,18 @@ export async function saveCompactionSettings(input: CompactionSettingsInput): Pr
   const nextProgressWatchdogTimeoutSec = normalizeOptionalInt(input.progressWatchdogTimeoutSec, 0, 3600);
   if (nextProgressWatchdogTimeoutSec !== undefined) {
     patch.progressWatchdogTimeoutMs = nextProgressWatchdogTimeoutSec * 1000;
+  }
+
+  const nextThreshold = normalizeOptionalInt(input.compactionThresholdPercent, 10, 95);
+  if (nextThreshold !== undefined) {
+    patch.thresholdPercent = nextThreshold;
+  }
+
+  const nextDecay = typeof input.compactionBackoffDecayFactor === "number"
+    ? Math.min(1, Math.max(0.1, input.compactionBackoffDecayFactor))
+    : undefined;
+  if (nextDecay !== undefined) {
+    patch.backoffDecayFactor = nextDecay;
   }
 
   if (Object.keys(patch).length > 0) {

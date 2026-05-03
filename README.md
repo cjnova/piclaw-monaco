@@ -108,6 +108,16 @@ Experimental. Linux/macOS/Windows. See [docs/install-from-repo.md](docs/install-
 
 On Windows, PiClaw remains a secondary / not-officially-supported target. Shell-like child processes now run attached there (`detached=false`) so stdout/stderr remain capturable; Unix-like hosts still use detached process groups for cleaner tree termination on abort/shutdown.
 
+### Experimental desktop shell
+
+PiClaw also has an optional Electrobun desktop wrapper around the existing local web UI:
+
+```bash
+bun run build:desktop
+```
+
+The desktop shell starts Piclaw on `127.0.0.1` using an available port starting at `18080`, opens a native window, and stores its default workspace under the platform application-data directory. Set `PICLAW_DESKTOP_URL` to wrap an already-running Piclaw web server instead of starting one.
+
 ### Build from source
 
 See [docs/development.md](docs/development.md).

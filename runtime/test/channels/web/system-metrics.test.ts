@@ -1,5 +1,24 @@
 import { expect, test } from "bun:test";
-import { handleSystemMetricsRequest, parseLinuxSwapMeminfo, SystemMetricsSampler } from "../../../src/channels/web/agent/system-metrics.js";
+import { handleSystemMetricsRequest, parseLinuxRamMeminfo, parseLinuxSwapMeminfo, SystemMetricsSampler } from "../../../src/channels/web/agent/system-metrics.js";
+
+test("parseLinuxRamMeminfo uses MemAvailable instead of MemFree for usage", () => {
+  expect(parseLinuxRamMeminfo([
+    "MemTotal:        7864320 kB",
+    "MemFree:         3879731 kB",
+    "MemAvailable:    6396313 kB",
+    "Buffers:          123456 kB",
+    "Cached:          2500000 kB",
+    "SReclaimable:      400000 kB",
+    "Shmem:             100000 kB",
+  ].join("\n"))).toEqual({
+    totalBytes: 7864320 * 1024,
+    usedBytes: (7864320 - 6396313) * 1024,
+    percent: 18.7,
+    bufferCacheBytes: (123456 + 2500000 + 400000 - 100000) * 1024,
+  });
+
+  expect(parseLinuxRamMeminfo("MemTotal:       16384256 kB\nMemFree:         1024000 kB")).toBeNull();
+});
 
 test("parseLinuxSwapMeminfo parses swap totals and usage from /proc/meminfo text", () => {
   expect(parseLinuxSwapMeminfo([
@@ -30,10 +49,13 @@ test("SystemMetricsSampler returns bounded CPU/RAM payloads with rolling series"
     expect(sample.process_memory.heap_used_bytes).toBeGreaterThanOrEqual(0);
     expect(sample.process_memory.external_bytes).toBeGreaterThanOrEqual(0);
     expect(sample.process_memory.array_buffers_bytes).toBeGreaterThanOrEqual(0);
+    expect(sample.buffer_cache_bytes === null || sample.buffer_cache_bytes >= 0).toBe(true);
+    expect(Array.isArray(sample.buffer_cache_series_bytes)).toBe(true);
     expect(Array.isArray(sample.process_rss_series_bytes)).toBe(true);
     expect(Array.isArray(sample.process_heap_used_series_bytes)).toBe(true);
     expect(sample.process_rss_series_bytes.length).toBeLessThanOrEqual(3);
     expect(sample.process_heap_used_series_bytes.length).toBeLessThanOrEqual(3);
+    expect(sample.buffer_cache_series_bytes.length).toBeLessThanOrEqual(3);
     expect(sample.runtime_memory).toBeNull();
     expect(sample.cpu_percent).toBeGreaterThanOrEqual(0);
     expect(sample.cpu_percent).toBeLessThanOrEqual(100);
@@ -56,6 +78,9 @@ test("SystemMetricsSampler returns bounded CPU/RAM payloads with rolling series"
 
   expect(fourth.cpu_series.length).toBe(3);
   expect(fourth.ram_series.length).toBe(3);
+  if (fourth.buffer_cache_bytes !== null) {
+    expect(fourth.buffer_cache_series_bytes.length).toBe(3);
+  }
   expect(fourth.process_rss_series_bytes.length).toBe(3);
   expect(fourth.process_heap_used_series_bytes.length).toBe(3);
 });

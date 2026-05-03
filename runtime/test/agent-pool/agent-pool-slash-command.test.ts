@@ -8,7 +8,7 @@
 import { expect, test } from "bun:test";
 import "../helpers.js";
 
-import { executeSlashCommand } from "../../src/agent-pool/slash-command.js";
+import { executeSlashCommand, isSlashCommandInvocation } from "../../src/agent-pool/slash-command.js";
 
 class SlashSession {
   listeners: Array<(event: any) => void> = [];
@@ -69,6 +69,14 @@ class SlashSession {
     this.aborted = true;
   }
 }
+
+test("isSlashCommandInvocation only accepts command-shaped leading slash tokens", () => {
+  expect(isSlashCommandInvocation("/skill:demo")).toBe(true);
+  expect(isSlashCommandInvocation("/ext hello")).toBe(true);
+  expect(isSlashCommandInvocation("Please run /skill:demo")).toBe(false);
+  expect(isSlashCommandInvocation("/workspace/piclaw is the repo")).toBe(false);
+  expect(isSlashCommandInvocation("/agent/keychain dispatch path")).toBe(false);
+});
 
 test("executeSlashCommand runs known extension command outside prompt turn handling", async () => {
   const session = new SlashSession();

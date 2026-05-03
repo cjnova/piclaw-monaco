@@ -1310,15 +1310,7 @@ describe("smart-compaction", () => {
         });
       });
 
-      const messages: any[] = [
-        userMsg("Configure the nginx proxy reverse settings properly."),  // nginx, proxy, reverse, settings, configure, properly
-        assistantToolCallMsg([{ id: "tc-1", name: "read", args: { path: "/nginx.conf" } }]),
-        toolResultMsg("tc-1", "read", "nginx conf"),
-        userMsg("Verify the nginx upstream health check timeout values."),  // nginx, upstream, health, check, timeout, values, verify
-        // shared: "nginx" → 1/11 = 0.09... wait, that IS below 0.12
-        // Let me use messages that share 2 tokens to be above 0.12
-      ];
-      // Actually let's just pad and test — the exact boundary matters
+      // Pad and test; the exact boundary matters.
       // Use messages with moderate overlap: 2 shared out of ~10 = 0.2
       const messages2: any[] = [
         userMsg("Implement the database migration scripts and schema validation logic."),

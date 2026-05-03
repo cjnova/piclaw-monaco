@@ -50,9 +50,13 @@ describe("web http shell dispatch", () => {
 
   test("dispatches avatar routes and favicon/apple fallback", async () => {
     const fallback = async (_req: Request, relPath: string) => new Response(`fallback:${relPath}`);
+    const avatarRequests: string[] = [];
 
     const channel = {
-      handleAvatar: async (_kind: string) => new Response("not-found", { status: 404 }),
+      handleAvatar: async (_kind: string, req: Request) => {
+        avatarRequests.push(req.url);
+        return new Response("not-found", { status: 404 });
+      },
       serveStatic: (_rel: string) => new Response("unused"),
       handleManifest: () => new Response("unused"),
       serveDocsStatic: (_rel: string) => new Response("unused"),
@@ -64,6 +68,12 @@ describe("web http shell dispatch", () => {
 
     const appleFlags = buildRouteFlags({ isAppleIcon: true });
     expect(await (await handleShellRoutes(channel, new Request("https://e/apple-touch-icon.png", { method: "GET" }), "/apple-touch-icon.png", appleFlags, fallback))?.text()).toBe("fallback:apple-touch-icon.png");
+    expect(avatarRequests.at(-1)).toContain("format=png");
+    expect(avatarRequests.at(-1)).toContain("size=180");
+
+    expect(await (await handleShellRoutes(channel, new Request("https://e/apple-touch-icon-152x152.png", { method: "GET" }), "/apple-touch-icon-152x152.png", appleFlags, fallback))?.text()).toBe("fallback:apple-touch-icon-152x152.png");
+    expect(avatarRequests.at(-1)).toContain("format=png");
+    expect(avatarRequests.at(-1)).toContain("size=152");
 
     const avatarFlags = buildRouteFlags({ isAvatar: true });
     expect(await (await handleShellRoutes(channel, new Request("https://e/avatar/agent", { method: "GET" }), "/avatar/agent", avatarFlags, fallback))?.status).toBe(404);

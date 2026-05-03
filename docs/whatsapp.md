@@ -7,27 +7,36 @@ store, and session state as the web UI.
 ## Prerequisites
 
 - A WhatsApp account you can scan a QR code or request a pairing code from
-- `WHATSAPP_PHONE` set to your international number (no `+` or spaces)
+- `PICLAW_WHATSAPP_ENABLED=1` (or `WHATSAPP_ENABLED=1`) to explicitly opt in
+- `WHATSAPP_PHONE`/`PICLAW_WHATSAPP_PHONE` set to your international number (no `+` or spaces)
 - Piclaw accessible with persistent storage (the Baileys session is stored in
   `/workspace/.piclaw/data/sessions/`)
 
 ## Enabling
 
-Set your phone number as an environment variable or in config:
+Set explicit enablement plus your phone number as environment variables:
 
 ```bash
+PICLAW_WHATSAPP_ENABLED=1
 PICLAW_WHATSAPP_PHONE=1234567890
 ```
 
 Or in `/workspace/.piclaw/config.json`:
 
 ```json
-{ "whatsappPhone": "1234567890" }
+{
+  "whatsapp": {
+    "enabled": true,
+    "phoneNumber": "1234567890"
+  }
+}
 ```
 
-If `WHATSAPP_PHONE` is not set, Piclaw skips all WhatsApp connection attempts.
-A no-op stub is used internally so the web UI and other channels work normally
-without reconnect noise.
+A legacy top-level `whatsappPhone` value is still read, but it no longer enables
+WhatsApp by itself. If `PICLAW_WHATSAPP_ENABLED`/`WHATSAPP_ENABLED` is not set
+(or config `whatsapp.enabled` is not `true`), Piclaw skips all WhatsApp
+connection attempts. A no-op stub is used internally so the web UI and other
+channels work normally without reconnect noise.
 
 ## Pairing
 
@@ -92,7 +101,9 @@ Then restart Piclaw and pair again.
 
 ## Disabling
 
-Simply unset or leave `WHATSAPP_PHONE` empty. The channel is never loaded.
+Leave `PICLAW_WHATSAPP_ENABLED`/`WHATSAPP_ENABLED` unset or set it to `0`/`false`.
+The Baileys-backed channel module is lazy-loaded only after explicit enablement,
+so default web-first installs do not pay the WhatsApp startup/import cost.
 
 ## See also
 

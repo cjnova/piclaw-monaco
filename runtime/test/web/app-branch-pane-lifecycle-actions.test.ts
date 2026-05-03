@@ -40,7 +40,7 @@ test('handleBranchPickerChangeAction delegates branch navigation with chat-only 
   expect(calls[0]).toContain('chat_jid=web%3Achild');
 });
 
-test('renameCurrentBranchAction falls back to window.location.href when baseHref is blank', async () => {
+test('renameCurrentBranchAction renames the session without navigating when returned JID differs', async () => {
   const originalWindow = (globalThis as any).window;
   (globalThis as any).window = { location: { href: 'https://example.test/?chat_jid=web%3Abranch' } };
 
@@ -75,9 +75,8 @@ test('renameCurrentBranchAction falls back to window.location.href when baseHref
     (globalThis as any).window = originalWindow;
   }
 
-  expect(navigateCalls).toHaveLength(1);
-  expect(navigateCalls[0]).toBe('https://example.test/?chat_jid=web%3Anext&chat_only=1');
-  expect(toasts).toContainEqual(['Branch renamed', '@next', 'info', 3500]);
+  expect(navigateCalls).toEqual([]);
+  expect(toasts).toContainEqual(['Session renamed', '@next', 'info', 3500]);
 });
 
 test('runBranchLoaderModeEffect launches loader and cancellation flag flips on cleanup', () => {

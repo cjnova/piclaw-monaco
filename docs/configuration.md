@@ -663,19 +663,27 @@ PICLAW_KEYCHAIN_KEY="your-master-key" \
 
 See [whatsapp.md](whatsapp.md) for full details.
 
-WhatsApp is optional. If `WHATSAPP_PHONE` is not set or empty, piclaw does not attempt to connect — no QR prompt, no reconnect logs. A no‑op stub is used internally so all other channels work normally.
+WhatsApp is optional and disabled by default. Piclaw does not attempt to connect — no QR prompt, no reconnect logs — unless explicit enablement is set. A no-op stub is used internally so all other channels work normally.
 
-If QR pairing fails (headless/server environments), provide a phone number to request a pairing code:
+If QR pairing fails (headless/server environments), explicitly enable WhatsApp and provide a phone number to request a pairing code:
 
 ```bash
-WHATSAPP_PHONE=1234567890
+PICLAW_WHATSAPP_ENABLED=1
+PICLAW_WHATSAPP_PHONE=1234567890
 ```
 
 Or in `.piclaw/config.json`:
 
 ```json
-{ "whatsappPhone": "1234567890" }
+{
+  "whatsapp": {
+    "enabled": true,
+    "phoneNumber": "1234567890"
+  }
+}
 ```
+
+Legacy top-level `whatsappPhone`/`WHATSAPP_PHONE` values are still read, but they no longer enable the channel by themselves.
 
 ## Pushover notifications
 

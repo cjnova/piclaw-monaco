@@ -28,7 +28,7 @@ for the full reference.
 | Library | Global | Use for |
 |---|---|---|
 | `beautiful-mermaid` | `beautifulMermaid` | Diagrams (flowcharts, sequence, ER, etc.) |
-| ECharts 5.6 | `echarts` | Charts (bar, line, pie, heatmap, treemap, …) |
+| ECharts 6.0 | `echarts` | Charts (bar, line, pie, heatmap, treemap, …) |
 | D3 7.9 | `d3` | Custom SVG, force layouts |
 | KaTeX | `katex` | Math typesetting |
 | IBM Plex Sans | CSS `@font-face` | Body font (OFL 1.1) |

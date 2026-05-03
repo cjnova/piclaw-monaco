@@ -10,7 +10,7 @@ import type { AgentSessionRuntime } from "@mariozechner/pi-coding-agent";
 import { ensureSessionDir } from "../../src/agent-pool/session.js";
 import { getAttachmentRegistry } from "../../src/agent-pool/attachments.js";
 import { AgentTurnCoordinator } from "../../src/agent-pool/turn-coordinator.js";
-import { runAgentPrompt } from "../../src/agent-pool/run-agent-orchestrator.js";
+import { createToolExecutionWatchdogHeartbeatController, runAgentPrompt } from "../../src/agent-pool/run-agent-orchestrator.js";
 import { getToolUseMessageBudget, setToolUseMessageBudget } from "../../src/core/config.js";
 import { setEnv } from "../helpers.js";
 
@@ -52,6 +52,31 @@ afterEach(() => {
     if (!logsDir) continue;
     rmSync(logsDir, { recursive: true, force: true });
   }
+});
+
+test("tool-execution watchdog heartbeat controller keeps pulsing while tools remain active", async () => {
+  const beats: Array<Record<string, unknown> | undefined> = [];
+  const controller = createToolExecutionWatchdogHeartbeatController("web:test", {
+    heartbeat: (_chatJid, _phase, metadata) => {
+      beats.push(metadata);
+    },
+    getIntervalMs: () => 10,
+  });
+
+  controller.handleEvent({ type: "tool_execution_start", toolCallId: "tool-1", toolName: "bash" });
+  await Bun.sleep(35);
+  controller.handleEvent({ type: "tool_execution_end", toolCallId: "tool-1", toolName: "bash" });
+  const beatCountAfterEnd = beats.length;
+  await Bun.sleep(25);
+  controller.stop();
+
+  expect(beatCountAfterEnd).toBeGreaterThan(0);
+  expect(beats[0]).toMatchObject({
+    eventType: "tool_execution_watchdog_heartbeat",
+    activeToolCount: 1,
+    activeToolNames: ["bash"],
+  });
+  expect(beats).toHaveLength(beatCountAfterEnd);
 });
 
 function createAssistantMessage(text: string) {
@@ -659,6 +684,156 @@ test("runAgentPrompt clears compaction backoff after a successful compaction", a
     expect(result.status).toBe("success");
     expect(session.calls).toEqual(["compact", "prompt"]);
     expect(db.getChatCompactionBackoff(chatJid)).toBeNull();
+  } finally {
+    restoreEnv();
+  }
+});
+
+test("runAgentPrompt schedules idle auto-compaction after a successful turn when enabled", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_IDLE_AUTO_COMPACTION_DELAY_MS: "5",
+  });
+  const chatJid = `web:idle-compact-${Date.now()}`;
+
+  class StubSession {
+    calls: string[] = [];
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-idle",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.calls.push("prompt");
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "ok" } });
+      }
+    }
+    async compact() {
+      this.calls.push("compact");
+    }
+    async abort() {}
+  }
+
+  const session = new StubSession();
+  const events: Array<{ type: string; reason?: string }> = [];
+
+  try {
+    const result = await runAgentPrompt("test", chatJid, {
+      timeoutMs: 0,
+      skipPrePromptCompaction: true,
+      scheduleIdleAutoCompaction: true,
+      onEvent: (event) => {
+        if (event.type === "compaction_start" || event.type === "compaction_end") {
+          events.push({ type: String(event.type), reason: typeof (event as any).reason === "string" ? (event as any).reason : undefined });
+        }
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("success");
+    expect(session.calls).toEqual(["prompt"]);
+
+    await Bun.sleep(30);
+
+    expect(session.calls).toEqual(["prompt", "compact"]);
+    expect(events).toEqual([
+      { type: "compaction_start", reason: "idle" },
+      { type: "compaction_end", reason: "idle" },
+    ]);
+  } finally {
+    restoreEnv();
+  }
+});
+
+test("runAgentPrompt cancels an older idle auto-compaction when a new turn starts", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_IDLE_AUTO_COMPACTION_DELAY_MS: "40",
+  });
+  const chatJid = `web:idle-cancel-${Date.now()}`;
+
+  class StubSession {
+    promptCalls = 0;
+    compactCalls = 0;
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = {
+      getLeafId: () => "leaf-idle-cancel",
+      buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
+    };
+    settingsManager = {
+      getCompactionSettings: () => ({ ...DEFAULT_COMPACTION_SETTINGS, enabled: true, reserveTokens: 10 }),
+    };
+    model = { contextWindow: 20, provider: "test", id: "model" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.promptCalls += 1;
+      for (const listener of this.listeners) {
+        listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: `ok-${this.promptCalls}` } });
+      }
+    }
+    async compact() {
+      this.compactCalls += 1;
+    }
+    async abort() {}
+  }
+
+  const session = new StubSession();
+  const options = {
+    getOrCreateRuntime: async () => createRuntime(session) as any,
+    turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+    clearAttachments: () => {},
+    takeAttachments: () => [],
+    logsDir: createTestLogsDir(),
+    setActiveForkBaseLeaf: () => {},
+    clearActiveForkBaseLeaf: () => {},
+  };
+
+  try {
+    const first = await runAgentPrompt("test", chatJid, {
+      timeoutMs: 0,
+      skipPrePromptCompaction: true,
+      scheduleIdleAutoCompaction: true,
+    }, options);
+    const second = await runAgentPrompt("test", chatJid, {
+      timeoutMs: 0,
+      skipPrePromptCompaction: true,
+      scheduleIdleAutoCompaction: true,
+    }, options);
+
+    expect(first.status).toBe("success");
+    expect(second.status).toBe("success");
+
+    await Bun.sleep(80);
+
+    expect(session.promptCalls).toBe(2);
+    expect(session.compactCalls).toBe(1);
   } finally {
     restoreEnv();
   }
@@ -1602,6 +1777,79 @@ test("runAgentPrompt ignores commentary-only aborted output", async () => {
   expect(result.status).toBe("error");
   expect(result.error).toContain("Prompt completed without emitting an assistant reply before finalization");
   expect(result.attachments).toBeUndefined();
+});
+
+test("runAgentPrompt treats terminal UI tool completion without final prose as informational", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",
+    PICLAW_TURN_AUTO_RECOVERY_MAX_ATTEMPTS: "2",
+    PICLAW_TURN_AUTO_RECOVERY_TOTAL_BUDGET_MS: "30000",
+  });
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-terminal-tool" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    promptCalls = 0;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.promptCalls += 1;
+      for (const listener of this.listeners) {
+        listener({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            stopReason: "toolUse",
+            content: [{ type: "toolCall", id: "tool-widget", name: "send_dashboard_widget", arguments: { html: "<div>ok</div>" } }],
+          },
+        });
+        listener({ type: "tool_execution_start", toolCallId: "tool-widget", toolName: "send_dashboard_widget", args: { html: "<div>ok</div>" } });
+        listener({ type: "tool_execution_end", toolCallId: "tool-widget", toolName: "send_dashboard_widget", isError: false });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const recoveryEvents: Array<{ type: string }> = [];
+    const turnCoordinator = new AgentTurnCoordinator({
+      takeAttachments: () => [],
+      touchSession: () => {},
+      recordMessageUsage: () => {},
+    });
+
+    const result = await runAgentPrompt("show widget", "web:default", {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "recovery_start" || event.type === "recovery_end") {
+          recoveryEvents.push({ type: String(event.type) });
+        }
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session, { maxRetries: 5, baseDelayMs: 1, maxDelayMs: 60000 }) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("tool_complete");
+    expect(result.error).toBeUndefined();
+    expect(session.promptCalls).toBe(1);
+    expect(recoveryEvents).toEqual([]);
+  } finally {
+    restoreEnv();
+  }
 });
 
 test("runAgentPrompt retries when provider stops after a read-only tool call without a final reply", async () => {

@@ -323,7 +323,7 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
   return {
     recover: true,
     classifier: "unknown",
-    strategy: "retry",
-    reason: "Unknown mid-turn failure; defaulting to one bounded retry path.",
+    strategy: input.snapshot.sawCompactionIntent ? "compact_then_retry" : "compact_then_retry",
+    reason: "Unknown mid-turn failure; compacting context before retrying.",
   };
 }

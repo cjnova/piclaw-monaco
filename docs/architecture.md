@@ -10,12 +10,12 @@ This document outlines the main components, how they fit together, and where the
 flowchart TB
   subgraph Clients[Clients]
     WEBUI[Web UI\nBrowser]
-    WA[WhatsApp\nBaileys]
+    WA[WhatsApp\nBaileys\noptional opt-in]
   end
 
   subgraph Channels[Ingress and delivery]
     WEBCH[WebChannel\nHTTP + SSE + WebSocket routes]
-    WACH[WhatsAppChannel]
+    WACH[WhatsAppChannel\nlazy optional]
   end
 
   subgraph Core[Runtime core]
@@ -188,6 +188,8 @@ In addition to the inline factories, piclaw ships **packaged runtime extensions*
 | `browser/cdp-browser/` | Always loaded | Cross-platform Chromium CDP browser control tool (`cdp_browser`) |
 | `platform/windows/win-ui/` | Always loaded (runtime no-op off Windows) | Windows desktop automation via bun:ffi + IAccessible (`win_*` tools) |
 | `viewers/office-viewer/` | Always loaded | Lightweight JS Office document viewer with extension route |
+
+WhatsApp is now an opt-in runtime channel rather than an assumed core subsystem. The default web-first runtime uses a no-op WhatsApp boundary; the Baileys-backed channel module is lazy-loaded only when `PICLAW_WHATSAPP_ENABLED=1`/`WHATSAPP_ENABLED=1` (or `whatsapp.enabled: true` in config) and a phone number are configured.
 
 These packaged runtime extensions use relative imports into `runtime/src/...` where needed. Piclaw also loads selected bundled Pi-package extensions from `node_modules/` (currently `pi-mcp-adapter`). A `node_modules` symlink next to the `extensions/` directory is created automatically at startup so jiti can resolve deep package imports for both the local packaged extension tree and bundled npm/Pi-package extensions. `runtime/src/extensions/` remains a separate built-in factory surface and should not be confused with the filesystem-backed packaged extension tree.
 

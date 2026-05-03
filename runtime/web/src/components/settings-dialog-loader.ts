@@ -45,7 +45,7 @@ export function SettingsDialogLoader() {
     if (!Content) {
         return html`
             <div class="settings-dialog-backdrop" onClick=${() => setOpen(false)}>
-                <div class="settings-dialog settings-dialog-loading-shell">
+                <div class="settings-dialog settings-dialog-loading-shell" data-testid="settings-dialog">
                     <div class="settings-loading-shell-body">
                         <span class="settings-spinner"></span>
                         <span>Loading settings…</span>

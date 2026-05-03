@@ -153,6 +153,7 @@ test("plain import covers config module init branches with isolated argv and env
       totpWindow: 4,
       sessionTtl: 60,
       internalSecret: "config-secret",
+      widgetToken: "",
       passkeyMode: "passkey-only",
       terminalEnabled: true,
       notificationDebugLabels: false,
@@ -164,7 +165,13 @@ test("plain import covers config module init branches with isolated argv and env
       workspaceUploadLimitMb: 256,
     });
     expect(snapshot["same:getWebRuntimeConfig:WEB_RUNTIME_CONFIG"]).toBe(true);
-    expect(snapshot.SESSION_STORAGE_CONFIG).toEqual({ maxSizeMb: 64, maxSizeBytes: 64 * 1024 * 1024, maxLines: 8000, autoRotate: true });
+    expect(snapshot.SESSION_STORAGE_CONFIG).toEqual({
+      maxSizeMb: 64,
+      maxSizeBytes: 64 * 1024 * 1024,
+      maxLines: 8000,
+      maxCompactionsBeforeRotation: 3,
+      autoRotate: true,
+    });
     expect(snapshot["same:getSessionStorageConfig:SESSION_STORAGE_CONFIG"]).toBe(true);
     expect(snapshot.AGENT_RUNTIME_CONFIG).toEqual({ timeoutMs: 120000, backgroundTimeoutMs: 45000 });
     expect(snapshot["same:getAgentRuntimeConfig:AGENT_RUNTIME_CONFIG"]).toBe(true);
@@ -180,7 +187,7 @@ test("plain import covers config module init branches with isolated argv and env
     expect(snapshot["same:getToolActivationConfig:TOOL_ACTIVATION_CONFIG"]).toBe(true);
     expect(snapshot.PUSHOVER_CONFIG).toEqual({ appToken: "push-app", userKey: "push-user", device: "push-device", priority: 1, sound: "magic" });
     expect(snapshot["same:getPushoverConfig:PUSHOVER_CONFIG"]).toBe(true);
-    expect(snapshot.WHATSAPP_CONFIG).toEqual({ phoneNumber: "+15557650000" });
+    expect(snapshot.WHATSAPP_CONFIG).toEqual({ enabled: false, phoneNumber: "+15557650000" });
     expect(snapshot["same:getWhatsAppConfig:WHATSAPP_CONFIG"]).toBe(true);
 
     expect(stderr).toContain("Deprecated environment variable is set");

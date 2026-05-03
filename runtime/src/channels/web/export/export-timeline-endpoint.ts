@@ -9,6 +9,7 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { marked } from "marked";
 import { getWebRuntimeConfig } from "../../../core/config.js";
+import { getDb } from "../../../db.js";
 import { isInternalSecretRequestAuthorized } from "../auth/internal-secret.js";
 import { jsonResponse } from "../http/http-utils.js";
 
@@ -101,7 +102,6 @@ function queryExportMessages(
   chatJid: string,
   opts: { fromTs?: string | null; toTs?: string | null; fromRow?: string | null; toRow?: string | null; lastN?: string | null },
 ): ExportMessage[] {
-  const { getDb } = require("../../../db.js");
   const db = getDb();
 
   const where: string[] = ["chat_jid = ?"];
@@ -191,12 +191,43 @@ function esc(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x([0-9a-f]+);/gi, (_match, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(parseInt(dec, 10)));
+}
+
+function isSafeExportUrl(raw: string): boolean {
+  const value = Array.from(decodeHtmlAttribute(raw || "").trim())
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code > 0x1f && code !== 0x7f && !/\s/u.test(ch);
+    })
+    .join("");
+  if (!value) return false;
+  try {
+    const url = new URL(value, "https://export.local/");
+    return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeMarkdownHtml(html: string): string {
+  return html.replace(/\s(href|src)=("([^"]*)"|'([^']*)')/gi, (match, attr, _quoted, doubleValue, singleValue) => {
+    const value = doubleValue ?? singleValue ?? "";
+    return isSafeExportUrl(value) ? match : ` data-removed-${String(attr).toLowerCase()}="unsafe-url"`;
+  });
+}
+
 function renderMarkdown(content: string): string {
   const safe = (content || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  return String(marked.parse(safe, { async: false, gfm: true, breaks: true }));
+  return sanitizeMarkdownHtml(String(marked.parse(safe, { async: false, gfm: true, breaks: true })));
 }
 
 function formatTime(ts: string): string {
@@ -261,7 +292,6 @@ function buildExportHtml(opts: {
   const fg = isDark ? "#e7e9ea" : "#0f1419";
   const muted = isDark ? "#8b98a5" : "#536471";
   const border = isDark ? "#2f3336" : "#d7dce0";
-  const card = isDark ? "#0f1113" : "#ffffff";
   const subtle = isDark ? "#16181c" : "#f7f9fa";
   const accent = "#1d9bf0";
 

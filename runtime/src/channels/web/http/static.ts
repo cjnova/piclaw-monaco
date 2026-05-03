@@ -13,8 +13,13 @@ import { readFileSync, statSync } from "fs";
 import { createLogger, debugSuppressedError } from "../../../utils/logger.js";
 import { WEB_RUNTIME_CONFIG } from "../../../core/config.js";
 
-const STATIC_DIR = resolve(import.meta.dir, "..", "..", "..", "..", "web", "static");
-const DOCS_DIR = resolve(import.meta.dir, "..", "..", "..", "..", "docs");
+const RUNTIME_DIR = resolve(import.meta.dir, "..", "..", "..", "..");
+const STATIC_DIR = resolve(
+  process.env.PICLAW_WEB_STATIC_DIR || resolve(RUNTIME_DIR, "web", "static")
+);
+const DOCS_DIR = resolve(
+  process.env.PICLAW_RUNTIME_DOCS_DIR || resolve(RUNTIME_DIR, "docs")
+);
 const log = createLogger("web.static");
 
 const MIME_TYPES: Record<string, string> = {

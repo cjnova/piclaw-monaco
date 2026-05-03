@@ -232,6 +232,167 @@ test("chat branch registry can list archived branches and restore with collision
   expect(db.getChatBranchByAgentName(restored.agent_name)?.chat_jid).toBe(archived.chat_jid);
 });
 
+test("mergeChatBranchIntoParent moves child chat state into its parent", () => {
+  const rootChatJid = `web:test-merge-root-${Date.now()}`;
+  const branchChatJid = `${rootChatJid}:branch:merge`;
+  const now = new Date().toISOString();
+  const later = new Date(Date.now() + 1000).toISOString();
+
+  db.storeChatMetadata(rootChatJid, now, "Root");
+  db.storeChatMetadata(branchChatJid, later, "Branch");
+  const root = db.getChatBranchByChatJid(rootChatJid);
+  db.ensureChatBranch({
+    chat_jid: branchChatJid,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: root?.branch_id ?? null,
+    agent_name: "merge-child",
+  });
+
+  const parentRowId = db.storeMessage(makeMessage(rootChatJid, "parent message", now));
+  const childRowId = db.storeMessage(makeMessage(branchChatJid, "child message", later));
+  const mediaId = db.createMedia("merge.txt", "text/plain", new TextEncoder().encode("merge"), null, null);
+  db.attachMediaToMessage(childRowId, [mediaId]);
+  db.setChatCursor(rootChatJid, now);
+  db.setChatCursor(branchChatJid, later);
+  db.storeTokenUsage({
+    chat_jid: branchChatJid,
+    run_at: later,
+    input_tokens: 1,
+    output_tokens: 2,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
+    total_tokens: 3,
+    cost_input: 0,
+    cost_output: 0,
+    cost_cache_read: 0,
+    cost_cache_write: 0,
+    cost_total: 0,
+    model: "test-model",
+    provider: "test-provider",
+    api: "responses",
+    turns: 1,
+    source: "test",
+    source_ref: "merge",
+  });
+  db.createTask({
+    id: `merge-task-${Date.now()}`,
+    chat_jid: branchChatJid,
+    prompt: "merge task",
+    model: null,
+    task_kind: "agent",
+    command: null,
+    cwd: null,
+    timeout_sec: null,
+    schedule_type: "once",
+    schedule_value: later,
+    next_run: later,
+    status: "active",
+    created_at: now,
+  });
+  db.upsertSshConfig({
+    chat_jid: branchChatJid,
+    ssh_target: "merge-host",
+    ssh_port: 22,
+    private_key_keychain: "ssh/merge",
+    known_hosts_keychain: null,
+    strict_host_key_checking: true,
+  });
+  db.getDb().prepare(
+    `INSERT INTO extension_kv (extension_id, scope, scope_key, key, value, created_at, updated_at) VALUES (?, 'chat', ?, ?, ?, ?, ?)`
+  ).run("merge-ext", branchChatJid, "config", JSON.stringify({ ok: true }), now, now);
+
+  const result = db.mergeChatBranchIntoParent(branchChatJid);
+  expect(result.source.chat_jid).toBe(branchChatJid);
+  expect(result.parent.chat_jid).toBe(rootChatJid);
+  expect(result.counts.messages).toBe(1);
+  expect(result.counts.token_usage).toBe(1);
+  expect(result.counts.scheduled_tasks).toBe(1);
+
+  expect(db.getChatBranchByChatJid(branchChatJid)).toBeNull();
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM chats WHERE jid = ?").get(branchChatJid)).toEqual({ count: 0 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(branchChatJid)).toEqual({ count: 0 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(rootChatJid)).toEqual({ count: 2 });
+  expect(db.getMessageByRowId(rootChatJid, parentRowId)?.data.content).toBe("parent message");
+  expect(db.getMessageByRowId(rootChatJid, childRowId)?.data.media_ids).toEqual([mediaId]);
+  expect(db.getChatCursor(rootChatJid)).toBe(later);
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM token_usage WHERE chat_jid = ?").get(rootChatJid)).toEqual({ count: 1 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM scheduled_tasks WHERE chat_jid = ?").get(rootChatJid)).toEqual({ count: 1 });
+  expect(db.getSshConfig(rootChatJid)?.ssh_target).toBe("merge-host");
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM extension_kv WHERE scope = 'chat' AND scope_key = ?").get(rootChatJid)).toEqual({ count: 1 });
+});
+
+test("mergeChatBranchIntoParent materializes queued followups instead of carrying queue state", () => {
+  const rootChatJid = `web:test-merge-queue-root-${Date.now()}`;
+  const branchChatJid = `${rootChatJid}:branch:queued`;
+  const now = new Date().toISOString();
+  const later = new Date(Date.now() + 1000).toISOString();
+
+  db.storeChatMetadata(rootChatJid, now, "Root");
+  db.storeChatMetadata(branchChatJid, later, "Branch");
+  const root = db.getChatBranchByChatJid(rootChatJid);
+  db.ensureChatBranch({
+    chat_jid: branchChatJid,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: root?.branch_id ?? null,
+    agent_name: "queued-child",
+  });
+
+  const alreadyStoredRowId = db.storeMessage(makeMessage(branchChatJid, "already queued", now));
+  db.setDeferredQueuedFollowups(branchChatJid, [
+    {
+      rowId: alreadyStoredRowId,
+      queuedContent: "already queued",
+      threadId: alreadyStoredRowId,
+      queuedAt: now,
+    },
+    {
+      rowId: 0,
+      queuedContent: "deferred queued",
+      threadId: null,
+      queuedAt: later,
+      contentBlocks: [{ type: "text", text: "deferred queued" }],
+    },
+  ]);
+
+  const result = db.mergeChatBranchIntoParent(branchChatJid);
+
+  expect(result.counts.messages).toBe(2);
+  expect(db.getDeferredQueuedFollowups(rootChatJid)).toEqual([]);
+  expect(db.getDeferredQueuedFollowups(branchChatJid)).toEqual([]);
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM chat_cursors WHERE chat_jid = ? AND queued_followups_json IS NOT NULL").get(rootChatJid)).toEqual({ count: 0 });
+  expect(db.getChatCursor(rootChatJid)).toBe(later);
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ? AND content = ?").get(rootChatJid, "already queued")).toEqual({ count: 1 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ? AND content = ?").get(rootChatJid, "deferred queued")).toEqual({ count: 1 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(branchChatJid)).toEqual({ count: 0 });
+});
+
+test("mergeChatBranchIntoParent rejects roots and branches with children", () => {
+  const rootChatJid = `web:test-merge-guard-${Date.now()}`;
+  const branchChatJid = `${rootChatJid}:branch:middle`;
+  const childChatJid = `${branchChatJid}:branch:leaf`;
+  const now = new Date().toISOString();
+
+  db.storeChatMetadata(rootChatJid, now, "Root");
+  db.storeChatMetadata(branchChatJid, now, "Middle");
+  db.storeChatMetadata(childChatJid, now, "Leaf");
+  const root = db.getChatBranchByChatJid(rootChatJid);
+  const middle = db.ensureChatBranch({
+    chat_jid: branchChatJid,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: root?.branch_id ?? null,
+    agent_name: "middle",
+  });
+  db.ensureChatBranch({
+    chat_jid: childChatJid,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: middle.branch_id,
+    agent_name: "leaf",
+  });
+
+  expect(() => db.mergeChatBranchIntoParent(rootChatJid)).toThrow(/root chat session/);
+  expect(() => db.mergeChatBranchIntoParent(branchChatJid)).toThrow(/child branches/);
+});
+
 test("permanentDeleteArchivedBranch removes archived branch state without deleting shared media", () => {
   const rootChatJid = `web:test-purge-${Date.now()}`;
   const branchChatJid = `${rootChatJid}:branch:archived`;

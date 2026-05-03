@@ -8,7 +8,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, chmodSync } from "fs";
 import { join, resolve } from "path";
 import { createHash, generateKeyPairSync, createPrivateKey, createPublicKey, sign, verify } from "crypto";
-import { DATA_DIR, getRemoteInteropConfig } from "../core/config.js";
+import { getRemoteInteropConfig } from "../core/config.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
 
 const log = createLogger("remote.identity");

@@ -23,12 +23,9 @@ node_modules/
 coverage/
 .bun/
 
-# Workspace persistent state (never delete)
-workspace/.piclaw/store/
-workspace/.piclaw/data/
-
 # Pack artifacts
 **/piclaw-*.tgz
+build/
 
 # Session/test artifacts
 *.jsonl
@@ -43,3 +40,4 @@ runtime/artifacts/web-control-plane-fuzz/
 
 # TypeScript validation build output (not packaged)
 runtime/generated/dist/
+runtime/generated/github-collate/

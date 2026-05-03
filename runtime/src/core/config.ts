@@ -20,6 +20,7 @@
  * update identity settings at runtime without a restart.
  */
 
+import { randomBytes } from "node:crypto";
 import { resolve } from "path";
 import { existsSync } from "fs";
 import { readEnvFile } from "./env.js";
@@ -80,6 +81,7 @@ const envConfig = readEnvFile([
   "PICLAW_WEB_TOTP_WINDOW",
   "PICLAW_WEB_SESSION_TTL",
   "PICLAW_WEB_INTERNAL_SECRET",
+  "PICLAW_WEB_WIDGET_TOKEN",
   "PICLAW_WEB_PASSKEY_MODE",
   "PICLAW_WEB_TERMINAL_ENABLED",
   "PICLAW_WEB_COMPOSE_UPLOAD_LIMIT_MB",
@@ -196,6 +198,10 @@ const toolsConfig =
   piclawConfig.tools && typeof piclawConfig.tools === "object"
     ? (piclawConfig.tools as Record<string, unknown>)
     : piclawConfig;
+const whatsappConfig =
+  piclawConfig.whatsapp && typeof piclawConfig.whatsapp === "object"
+    ? (piclawConfig.whatsapp as Record<string, unknown>)
+    : piclawConfig;
 const compactionConfig =
   piclawConfig.compaction && typeof piclawConfig.compaction === "object"
     ? (piclawConfig.compaction as Record<string, unknown>)
@@ -217,7 +223,12 @@ const configUserKey = pickString(pushoverConfig, ["userKey", "user_key", "PUSHOV
 const configDevice = pickString(pushoverConfig, ["device", "PUSHOVER_DEVICE"]);
 const configSound = pickString(pushoverConfig, ["sound", "PUSHOVER_SOUND"]);
 const configPriority = pickNumber(pushoverConfig, ["priority", "PUSHOVER_PRIORITY"]);
-const configWhatsappPhone = pickString(piclawConfig, ["whatsappPhone", "whatsapp_phone", "WHATSAPP_PHONE"]);
+const configWhatsappPhone =
+  pickString(whatsappConfig, ["phoneNumber", "phone_number", "whatsappPhone", "whatsapp_phone", "WHATSAPP_PHONE", "PICLAW_WHATSAPP_PHONE"]) ||
+  pickString(piclawConfig, ["whatsappPhone", "whatsapp_phone", "WHATSAPP_PHONE", "PICLAW_WHATSAPP_PHONE"]);
+const configWhatsappEnabled =
+  pickBoolean(whatsappConfig, ["enabled", "whatsappEnabled", "whatsapp_enabled", "WHATSAPP_ENABLED", "PICLAW_WHATSAPP_ENABLED"]) ??
+  pickBoolean(piclawConfig, ["whatsappEnabled", "whatsapp_enabled", "WHATSAPP_ENABLED", "PICLAW_WHATSAPP_ENABLED"]);
 const configAssistantName = pickString(assistantConfig, [
   "assistantName",
   "assistant_name",
@@ -284,6 +295,13 @@ const configWebInternalSecret = pickString(webConfig, [
   "web_internal_secret",
   "PICLAW_WEB_INTERNAL_SECRET",
   "PICLAW_INTERNAL_SECRET",
+]);
+const configWebWidgetToken = pickString(webConfig, [
+  "widgetToken",
+  "widget_token",
+  "webWidgetToken",
+  "web_widget_token",
+  "PICLAW_WEB_WIDGET_TOKEN",
 ]);
 const configWebPasskeyMode = pickString(webConfig, [
   "passkeyMode",
@@ -515,6 +533,7 @@ export interface WebRuntimeConfig {
   totpWindow: number;
   sessionTtl: number;
   internalSecret: string;
+  widgetToken: string;
   passkeyMode: string;
   terminalEnabled: boolean;
   composeUploadLimitMb: number;
@@ -591,6 +610,11 @@ export const WEB_RUNTIME_CONFIG: WebRuntimeConfig = Object.seal({
     envConfig.PICLAW_INTERNAL_SECRET ||
     envConfig.PICLAW_WEB_INTERNAL_SECRET ||
     configWebInternalSecret ||
+    "",
+  widgetToken:
+    process.env.PICLAW_WEB_WIDGET_TOKEN ||
+    envConfig.PICLAW_WEB_WIDGET_TOKEN ||
+    configWebWidgetToken ||
     "",
   passkeyMode: (
     process.env.PICLAW_WEB_PASSKEY_MODE ||
@@ -719,6 +743,55 @@ export function setWebWorkspaceUploadLimitMb(limitMb: number): number {
   });
 }
 
+export function generateWebWidgetToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function setWebWidgetToken(token: string): string {
+  const next = String(token || "").trim();
+  const config = readJsonConfig(getConfigPath());
+  const web =
+    config.web && typeof config.web === "object"
+      ? { ...(config.web as Record<string, unknown>) }
+      : {};
+  const widgetTokenKeys = [
+    "widgetToken",
+    "widget_token",
+    "webWidgetToken",
+    "web_widget_token",
+    "PICLAW_WEB_WIDGET_TOKEN",
+  ];
+
+  for (const key of widgetTokenKeys) {
+    delete web[key];
+    delete config[key];
+  }
+
+  if (next) {
+    web.widgetToken = next;
+  }
+  config.web = web;
+  writeJsonConfig(getConfigPath(), config);
+
+  WEB_RUNTIME_CONFIG.widgetToken = next;
+  if (next) {
+    process.env.PICLAW_WEB_WIDGET_TOKEN = next;
+  } else {
+    delete process.env.PICLAW_WEB_WIDGET_TOKEN;
+  }
+  return WEB_RUNTIME_CONFIG.widgetToken;
+}
+
+export function getOrCreateWebWidgetToken(): string {
+  const existing = WEB_RUNTIME_CONFIG.widgetToken.trim();
+  if (existing) return existing;
+  return setWebWidgetToken(generateWebWidgetToken());
+}
+
+export function rotateWebWidgetToken(): string {
+  return setWebWidgetToken(generateWebWidgetToken());
+}
+
 // ---------------------------------------------------------------------------
 // Remote interop configuration (cross-instance IPC).
 // ---------------------------------------------------------------------------
@@ -823,6 +896,8 @@ const PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS = [
 ];
 const configProgressWatchdogEnabled = pickBoolean(compactionConfig, PROGRESS_WATCHDOG_ENABLED_CONFIG_KEYS);
 const configProgressWatchdogTimeoutMs = pickNumber(compactionConfig, PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS);
+const configCompactionThresholdPercent = pickNumber(compactionConfig, ["thresholdPercent", "threshold_percent", "PICLAW_COMPACTION_THRESHOLD_PERCENT"]);
+const configCompactionBackoffDecayFactor = pickNumber(compactionConfig, ["backoffDecayFactor", "backoff_decay_factor", "PICLAW_COMPACTION_BACKOFF_DECAY_FACTOR"]);
 const hasExplicitConfigProgressWatchdogTimeout = hasDefinedConfigValue(compactionConfig, PROGRESS_WATCHDOG_TIMEOUT_CONFIG_KEYS);
 const envProgressWatchdogEnabled = pickBoolean({
   PICLAW_PROGRESS_WATCHDOG_ENABLED: process.env.PICLAW_PROGRESS_WATCHDOG_ENABLED ?? envConfig.PICLAW_PROGRESS_WATCHDOG_ENABLED,
@@ -859,6 +934,7 @@ export interface SessionStorageConfig {
   maxSizeMb: number;
   maxSizeBytes: number;
   maxLines: number;
+  maxCompactionsBeforeRotation: number;
   autoRotate: boolean;
 }
 
@@ -868,6 +944,10 @@ export interface CompactionRuntimeConfig {
   backoffMaxMs: number;
   progressWatchdogEnabled: boolean;
   progressWatchdogTimeoutMs: number;
+  /** Context utilization % at which auto-compaction triggers (0-100). Default 75. */
+  thresholdPercent: number;
+  /** Multiplier applied to backoff duration after a successful compaction (0-1). Default 0.5. */
+  backoffDecayFactor: number;
 }
 
 const sessionMaxSizeMb =
@@ -885,6 +965,7 @@ export let SESSION_STORAGE_CONFIG = Object.freeze<SessionStorageConfig>({
   maxSizeMb: sessionMaxSizeMb,
   maxSizeBytes: sessionMaxSizeMb * 1024 * 1024,
   maxLines: sessionMaxLines,
+  maxCompactionsBeforeRotation: 3,
   autoRotate:
     pickBoolean({ PICLAW_SESSION_AUTO_ROTATE: process.env.PICLAW_SESSION_AUTO_ROTATE ?? envConfig.PICLAW_SESSION_AUTO_ROTATE }, [
       "PICLAW_SESSION_AUTO_ROTATE",
@@ -897,13 +978,19 @@ export function getSessionStorageConfig(): Readonly<SessionStorageConfig> {
 }
 
 /** Persist and apply session storage settings so new turns use them immediately. */
-export function setSessionStorageConfig(patch: { maxSizeMb?: number; autoRotate?: boolean }): Readonly<SessionStorageConfig> {
+export function setSessionStorageConfig(patch: { maxSizeMb?: number; maxLines?: number; maxCompactionsBeforeRotation?: number; autoRotate?: boolean }): Readonly<SessionStorageConfig> {
   const nextMaxSizeMb = Number.isFinite(patch.maxSizeMb)
     ? Math.min(256, Math.max(1, Math.round(Number(patch.maxSizeMb))))
     : SESSION_STORAGE_CONFIG.maxSizeMb;
   const nextAutoRotate = typeof patch.autoRotate === "boolean"
     ? patch.autoRotate
     : SESSION_STORAGE_CONFIG.autoRotate;
+  const nextMaxLines = Number.isFinite(patch.maxLines)
+    ? Math.min(50000, Math.max(100, Math.round(Number(patch.maxLines))))
+    : SESSION_STORAGE_CONFIG.maxLines;
+  const nextMaxCompactions = Number.isFinite(patch.maxCompactionsBeforeRotation)
+    ? Math.min(20, Math.max(1, Math.round(Number(patch.maxCompactionsBeforeRotation))))
+    : SESSION_STORAGE_CONFIG.maxCompactionsBeforeRotation;
 
   const config = readJsonConfig(getConfigPath());
   const clearRootKeys = [
@@ -919,15 +1006,20 @@ export function setSessionStorageConfig(patch: { maxSizeMb?: number; autoRotate?
   }
   config.sessionMaxSizeMb = nextMaxSizeMb;
   config.sessionAutoRotate = nextAutoRotate;
+  config.sessionMaxLines = nextMaxLines;
+  config.sessionMaxCompactions = nextMaxCompactions;
   writeJsonConfig(getConfigPath(), config);
 
   process.env.PICLAW_SESSION_MAX_SIZE_MB = String(nextMaxSizeMb);
   process.env.PICLAW_SESSION_AUTO_ROTATE = nextAutoRotate ? "1" : "0";
+  process.env.PICLAW_SESSION_MAX_LINES = String(nextMaxLines);
 
   SESSION_STORAGE_CONFIG = Object.freeze<SessionStorageConfig>({
     ...SESSION_STORAGE_CONFIG,
     maxSizeMb: nextMaxSizeMb,
     maxSizeBytes: nextMaxSizeMb * 1024 * 1024,
+    maxLines: nextMaxLines,
+    maxCompactionsBeforeRotation: nextMaxCompactions,
     autoRotate: nextAutoRotate,
   });
   return SESSION_STORAGE_CONFIG;
@@ -941,6 +1033,23 @@ export let TOOL_USE_MESSAGE_BUDGET =
   }, ["PICLAW_TURN_MAX_TOOL_USE_MESSAGES"]) ?? configTurnMaxToolUseMessages ?? 64;
 
 /** Return the current tool-use budget for a single turn. */
+/** Max tool result chars before auto-externalization. Default 5000. */
+export let TOOL_OUTPUT_STORE_THRESHOLD =
+  pickNumber({ PICLAW_TOOL_OUTPUT_STORE_BYTES: process.env.PICLAW_TOOL_OUTPUT_STORE_BYTES }, [
+    "PICLAW_TOOL_OUTPUT_STORE_BYTES",
+  ]) ?? 5000;
+
+export function getToolOutputStoreThreshold(): number {
+  return TOOL_OUTPUT_STORE_THRESHOLD;
+}
+
+export function setToolOutputStoreThreshold(value: number): number {
+  const next = Math.min(100000, Math.max(500, Math.round(value)));
+  TOOL_OUTPUT_STORE_THRESHOLD = next;
+  process.env.PICLAW_TOOL_OUTPUT_STORE_BYTES = String(next);
+  return next;
+}
+
 export function getToolUseMessageBudget(): number {
   return TOOL_USE_MESSAGE_BUDGET;
 }
@@ -996,6 +1105,10 @@ let COMPACTION_RUNTIME_CONFIG: CompactionRuntimeConfig = Object.seal({
   progressWatchdogTimeoutMs: Number.isFinite(configProgressWatchdogTimeoutMs)
     ? Math.max(0, Math.round(Number(configProgressWatchdogTimeoutMs)))
     : DEFAULT_PROGRESS_WATCHDOG_TIMEOUT_MS,
+  thresholdPercent: typeof configCompactionThresholdPercent === "number" && configCompactionThresholdPercent > 0 && configCompactionThresholdPercent <= 100
+    ? configCompactionThresholdPercent : 75,
+  backoffDecayFactor: typeof configCompactionBackoffDecayFactor === "number" && configCompactionBackoffDecayFactor > 0 && configCompactionBackoffDecayFactor <= 1
+    ? configCompactionBackoffDecayFactor : 0.5,
 });
 
 function parseOptionalBooleanFlag(value: unknown, fallback: boolean): boolean {
@@ -1034,6 +1147,8 @@ export function getCompactionRuntimeConfig(): Readonly<CompactionRuntimeConfig> 
       process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
       COMPACTION_RUNTIME_CONFIG.progressWatchdogTimeoutMs,
     ),
+    thresholdPercent: COMPACTION_RUNTIME_CONFIG.thresholdPercent,
+    backoffDecayFactor: COMPACTION_RUNTIME_CONFIG.backoffDecayFactor,
   });
 }
 
@@ -1043,6 +1158,8 @@ export function setCompactionRuntimeConfig(patch: {
   backoffMaxMs?: number;
   progressWatchdogEnabled?: boolean;
   progressWatchdogTimeoutMs?: number;
+  thresholdPercent?: number;
+  backoffDecayFactor?: number;
 }): Readonly<CompactionRuntimeConfig> {
   const current = getCompactionRuntimeConfig();
   const next: CompactionRuntimeConfig = {
@@ -1055,6 +1172,12 @@ export function setCompactionRuntimeConfig(patch: {
     progressWatchdogTimeoutMs: patch.progressWatchdogTimeoutMs === undefined
       ? current.progressWatchdogTimeoutMs
       : parseOptionalNonNegativeDurationMs(patch.progressWatchdogTimeoutMs, current.progressWatchdogTimeoutMs),
+    thresholdPercent: typeof patch.thresholdPercent === "number" && patch.thresholdPercent > 0 && patch.thresholdPercent <= 100
+      ? patch.thresholdPercent
+      : current.thresholdPercent,
+    backoffDecayFactor: typeof patch.backoffDecayFactor === "number" && patch.backoffDecayFactor > 0 && patch.backoffDecayFactor <= 1
+      ? patch.backoffDecayFactor
+      : current.backoffDecayFactor,
   };
 
   if (next.backoffMaxMs < next.backoffBaseMs) {
@@ -1082,6 +1205,12 @@ export function setCompactionRuntimeConfig(patch: {
     "progressWatchdogTimeoutMs",
     "progress_watchdog_timeout_ms",
     "watchdogTimeoutMs",
+    "thresholdPercent",
+    "threshold_percent",
+    "PICLAW_COMPACTION_THRESHOLD_PERCENT",
+    "backoffDecayFactor",
+    "backoff_decay_factor",
+    "PICLAW_COMPACTION_BACKOFF_DECAY_FACTOR",
     "PICLAW_COMPACTION_TIMEOUT_MS",
     "PICLAW_COMPACTION_BACKOFF_BASE_MS",
     "PICLAW_COMPACTION_BACKOFF_MAX_MS",
@@ -1097,6 +1226,8 @@ export function setCompactionRuntimeConfig(patch: {
   compaction.backoffMaxMs = next.backoffMaxMs;
   compaction.progressWatchdogEnabled = next.progressWatchdogEnabled;
   compaction.progressWatchdogTimeoutMs = next.progressWatchdogTimeoutMs;
+  compaction.thresholdPercent = next.thresholdPercent;
+  compaction.backoffDecayFactor = next.backoffDecayFactor;
   config.compaction = compaction;
   writeJsonConfig(getConfigPath(), config);
 
@@ -1390,11 +1521,19 @@ export function getToolOutputConfig(): Readonly<ToolOutputConfig> {
 
 /** Typed WhatsApp channel settings grouped for startup/channel wiring. */
 export interface WhatsAppConfig {
+  /** Explicit opt-in. Defaults to false even when a legacy phone number is present. */
+  enabled: boolean;
   phoneNumber: string;
 }
 
+const envWhatsappEnabled = pickBoolean({
+  PICLAW_WHATSAPP_ENABLED: process.env.PICLAW_WHATSAPP_ENABLED ?? envConfig.PICLAW_WHATSAPP_ENABLED,
+  WHATSAPP_ENABLED: process.env.WHATSAPP_ENABLED ?? envConfig.WHATSAPP_ENABLED,
+}, ["PICLAW_WHATSAPP_ENABLED", "WHATSAPP_ENABLED"]);
+
 /** Grouped WhatsApp channel settings. */
 export const WHATSAPP_CONFIG = Object.freeze<WhatsAppConfig>({
+  enabled: envWhatsappEnabled ?? configWhatsappEnabled ?? false,
   phoneNumber:
     process.env.WHATSAPP_PHONE ||
     envConfig.WHATSAPP_PHONE ||

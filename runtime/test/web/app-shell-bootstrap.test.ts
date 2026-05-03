@@ -1,63 +1,29 @@
-import { expect, test } from 'bun:test';
+import { afterEach, expect, test } from 'bun:test';
 
-import { configureMarked, installBrowserNoiseFilters, resolveAppApiSurface } from '../../web/src/ui/app-shell-bootstrap.js';
+import { paneRegistry } from '../../web/src/panes/pane-registry.js';
+import { registerAppPaneExtensions } from '../../web/src/ui/app-shell-bootstrap.js';
 
-test('configureMarked sets markdown defaults when marked instance is present', () => {
-  let captured: Record<string, unknown> | null = null;
-  configureMarked({
-    setOptions: (options) => {
-      captured = options;
-    },
-  });
+const registeredByTest = new Set<string>();
+let previousKanbanExtension: any = null;
 
-  expect(captured).toEqual({
-    breaks: true,
-    gfm: true,
-  });
+afterEach(() => {
+  for (const id of registeredByTest) paneRegistry.unregister(id);
+  registeredByTest.clear();
+  if (previousKanbanExtension) {
+    paneRegistry.register(previousKanbanExtension);
+    previousKanbanExtension = null;
+  }
 });
 
-test('installBrowserNoiseFilters suppresses ResizeObserver loop browser noise', () => {
-  const listeners: Array<{ type: string; capture: boolean; handler: (event: any) => void }> = [];
-  const runtimeWindow = {
-    addEventListener: (type: string, handler: (event: any) => void, capture?: boolean) => {
-      listeners.push({ type, capture: Boolean(capture), handler });
-    },
-  } as any;
+test('registerAppPaneExtensions does not register the built-in kanban pane by default', () => {
+  previousKanbanExtension = paneRegistry.get('kanban-editor') || null;
+  if (previousKanbanExtension) paneRegistry.unregister('kanban-editor');
 
-  installBrowserNoiseFilters(runtimeWindow);
-  expect(listeners).toHaveLength(1);
-  expect(listeners[0]).toMatchObject({ type: 'error', capture: true });
+  registerAppPaneExtensions();
 
-  let prevented = false;
-  let stopped = false;
-  listeners[0].handler({
-    message: 'ResizeObserver loop completed with undelivered notifications.',
-    preventDefault: () => { prevented = true; },
-    stopImmediatePropagation: () => { stopped = true; },
-  });
+  for (const ext of paneRegistry.list()) registeredByTest.add(ext.id);
 
-  expect(prevented).toBe(true);
-  expect(stopped).toBe(true);
-});
-
-test('resolveAppApiSurface applies optional fallbacks', async () => {
-  const surface = resolveAppApiSurface({
-    searchPosts: () => 'search',
-    deletePost: () => 'delete',
-    getAgents: () => 'agents',
-    getAgentThought: () => 'thought',
-    setAgentThoughtVisibility: () => 'set-thought',
-    getAgentStatus: () => 'status',
-    getWorkspaceFile: () => 'workspace',
-    getThread: () => 'thread',
-    getTimeline: () => 'timeline',
-    sendAgentMessage: () => 'send',
-    forkChatBranch: () => 'fork',
-  });
-
-  expect(typeof surface.getAgentContext).toBe('function');
-  expect(typeof surface.getAutoresearchStatus).toBe('function');
-  expect(typeof surface.getActiveChatAgents).toBe('function');
-  await expect(surface.getAgentQueueState()).resolves.toEqual({ count: 0 });
-  await expect(surface.stopAutoresearch()).resolves.toEqual({ status: 'ok' });
+  expect(paneRegistry.get('editor')).toBeTruthy();
+  expect(paneRegistry.get('mindmap-editor')).toBeTruthy();
+  expect(paneRegistry.get('kanban-editor')).toBeUndefined();
 });

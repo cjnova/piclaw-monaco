@@ -16,6 +16,7 @@ interface AssistantUsageMessage {
   usage?: unknown;
   timestamp?: unknown;
   model?: unknown;
+  responseModel?: unknown;
   provider?: unknown;
   api?: unknown;
 }
@@ -84,6 +85,7 @@ export function recordMessageUsage(chatJid: string, message: unknown): void {
     cost_cache_write: costCacheWrite,
     cost_total: costTotal,
     model: asStringOrNull(msg.model),
+    response_model: asStringOrNull(msg.responseModel),
     provider: asStringOrNull(msg.provider),
     api: asStringOrNull(msg.api),
     turns: 1,

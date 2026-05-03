@@ -18,6 +18,7 @@ export {
   renameChatBranchIdentity,
   renameChatJid,
   archiveChatBranch,
+  mergeChatBranchIntoParent,
   previewPermanentDeleteArchivedBranch,
   permanentDeleteArchivedBranch,
   restoreChatBranchIdentity,
@@ -134,6 +135,7 @@ export {
   getTokenUsageTotals,
   getTokenUsageByProvider,
   getTokenUsageByModel,
+  getLatestTokenUsageModel,
 } from "./db/token-usage.js";
 export {
   createWebauthnEnrollment,
@@ -154,6 +156,7 @@ export {
   deleteExpiredWebSessions,
   deleteAllWebSessions,
 } from "./db/web-sessions.js";
+export type { MergeChatBranchIntoParentResult } from "./db/chat-branches.js";
 export type {
   ChatBranchRecord,
   InteractionRow,

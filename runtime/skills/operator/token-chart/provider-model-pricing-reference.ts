@@ -22,7 +22,7 @@ interface ProviderModelPricingRule extends ProviderModelPricingReference {
 
 // Tag this reference snapshot with the commit date that introduced it so future
 // updates can track pricing provenance without guessing.
-export const PROVIDER_MODEL_PRICING_REFERENCE_TAG = "2026-04-27";
+export const PROVIDER_MODEL_PRICING_REFERENCE_TAG = "2026-05-02";
 
 const PRIMARY_SOURCE = "exports/ai-provider-pricing-2026-04.docx";
 const GPT4O_FALLBACK_SOURCE = "projects/openviktor/apps/bot/src/agent/pricing.ts";
@@ -91,6 +91,17 @@ const PRICING_RULES: ProviderModelPricingRule[] = [
     cacheReadPerMTok: 0.25,
     cacheWritePerMTok: 2.5,
     notes: "Cache write estimated at standard input rate; note only publishes cached-input read discount.",
+  },
+  {
+    id: "gpt-5.5",
+    models: ["gpt-5.5"],
+    canonicalModel: "GPT-5.5",
+    basis: `OpenAI Codex pricing page + ${PRIMARY_SOURCE}`,
+    inputPerMTok: 5,
+    outputPerMTok: 30,
+    cacheReadPerMTok: 0.5,
+    cacheWritePerMTok: 5,
+    notes: "Estimated as 2x GPT-5.4 rates, matching the Codex credits ratio shown for GPT-5.5 vs GPT-5.4.",
   },
   {
     id: "gpt-5.4-pro",
@@ -190,6 +201,17 @@ const PRICING_RULES: ProviderModelPricingRule[] = [
     cacheReadPerMTok: 0,
     cacheWritePerMTok: 0,
     notes: "Azure Foundry usage estimated from Mistral Large direct pricing in the pricing note.",
+  },
+  {
+    id: "gpt-oss-120b",
+    models: ["gpt-oss-120b"],
+    canonicalModel: "GPT-OSS 120B",
+    basis: "OpenRouter GPT-OSS 120B pricing reference, used as a proxy for Cerebras rows",
+    inputPerMTok: 0.039,
+    outputPerMTok: 0.1,
+    cacheReadPerMTok: 0,
+    cacheWritePerMTok: 0,
+    notes: "Cerebras-specific pricing should replace this proxy if direct account pricing differs; current local rows have zero tokens.",
   },
 ];
 

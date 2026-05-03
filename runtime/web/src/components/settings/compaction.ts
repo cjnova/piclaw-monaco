@@ -10,6 +10,8 @@ function normalizeCompactionSettings(data = {}) {
         compactionTimeoutSec: data.compactionTimeoutSec ?? 180,
         compactionBackoffBaseMin: data.compactionBackoffBaseMin ?? 15,
         compactionBackoffMaxMin: data.compactionBackoffMaxMin ?? 360,
+        compactionThresholdPercent: data.compactionThresholdPercent ?? 75,
+        compactionBackoffDecayFactor: data.compactionBackoffDecayFactor ?? 0.5,
         progressWatchdogEnabled: Boolean(data.progressWatchdogEnabled ?? false),
         progressWatchdogTimeoutSec: data.progressWatchdogTimeoutSec ?? 120,
         compactionBackoffs: Array.isArray(data.compactionBackoffs) ? data.compactionBackoffs : [],
@@ -29,6 +31,8 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
     const [compactionTimeoutSec, setCompactionTimeoutSec] = useState(180);
     const [compactionBackoffBaseMin, setCompactionBackoffBaseMin] = useState(15);
     const [compactionBackoffMaxMin, setCompactionBackoffMaxMin] = useState(360);
+    const [compactionThresholdPercent, setCompactionThresholdPercent] = useState(75);
+    const [compactionBackoffDecayFactor, setCompactionBackoffDecayFactor] = useState(0.5);
     const [progressWatchdogEnabled, setProgressWatchdogEnabled] = useState(false);
     const [progressWatchdogTimeoutSec, setProgressWatchdogTimeoutSec] = useState(120);
     const [compactionBackoffs, setCompactionBackoffs] = useState([]);
@@ -48,6 +52,8 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
         setCompactionTimeoutSec(next.compactionTimeoutSec);
         setCompactionBackoffBaseMin(next.compactionBackoffBaseMin);
         setCompactionBackoffMaxMin(next.compactionBackoffMaxMin);
+        setCompactionThresholdPercent(next.compactionThresholdPercent);
+        setCompactionBackoffDecayFactor(next.compactionBackoffDecayFactor);
         setProgressWatchdogEnabled(next.progressWatchdogEnabled);
         setProgressWatchdogTimeoutSec(next.progressWatchdogTimeoutSec);
         setCompactionBackoffs(next.compactionBackoffs);
@@ -56,6 +62,8 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
             compactionTimeoutSec: next.compactionTimeoutSec,
             compactionBackoffBaseMin: next.compactionBackoffBaseMin,
             compactionBackoffMaxMin: next.compactionBackoffMaxMin,
+            compactionThresholdPercent: next.compactionThresholdPercent,
+            compactionBackoffDecayFactor: next.compactionBackoffDecayFactor,
             progressWatchdogEnabled: next.progressWatchdogEnabled,
             progressWatchdogTimeoutSec: next.progressWatchdogTimeoutSec,
         });
@@ -69,9 +77,11 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
         compactionTimeoutSec,
         compactionBackoffBaseMin,
         compactionBackoffMaxMin,
+        compactionThresholdPercent,
+        compactionBackoffDecayFactor,
         progressWatchdogEnabled,
         progressWatchdogTimeoutSec,
-    }), [compactionTimeoutSec, compactionBackoffBaseMin, compactionBackoffMaxMin, progressWatchdogEnabled, progressWatchdogTimeoutSec]);
+    }), [compactionTimeoutSec, compactionBackoffBaseMin, compactionBackoffMaxMin, compactionThresholdPercent, compactionBackoffDecayFactor, progressWatchdogEnabled, progressWatchdogTimeoutSec]);
 
     useEffect(() => {
         if (currentSnapshot === savedSnapshotRef.current) return;
@@ -144,6 +154,19 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
 
             <h3>Automatic compaction</h3>
             <div class="settings-row">
+                <label>Compaction threshold (%)</label>
+                <${NumberStepper}
+                    label="compaction threshold"
+                    value=${compactionThresholdPercent}
+                    min=${10}
+                    max=${95}
+                    fallback=${75}
+                    width="80px"
+                    onChange=${setCompactionThresholdPercent}
+                />
+                <span class="settings-hint" style="margin:0">auto-compact when context exceeds this % of window</span>
+            </div>
+            <div class="settings-row">
                 <label>Compaction timeout (sec)</label>
                 <${NumberStepper}
                     label="compaction timeout"
@@ -181,6 +204,20 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
                     onChange=${setCompactionBackoffMaxMin}
                 />
                 <span class="settings-hint" style="margin:0">Upper bound for exponential suppression after repeated failures.</span>
+            </div>
+
+            <div class="settings-row">
+                <label>Backoff decay factor</label>
+                <${NumberStepper}
+                    label="backoff decay factor"
+                    value=${Math.round(compactionBackoffDecayFactor * 100)}
+                    min=${10}
+                    max=${100}
+                    fallback=${50}
+                    width="80px"
+                    onChange=${v => setCompactionBackoffDecayFactor(v / 100)}
+                />
+                <span class="settings-hint" style="margin:0">% — halves backoff after each successful compaction</span>
             </div>
 
             <h3 style="margin-top:20px">Stall watchdog</h3>

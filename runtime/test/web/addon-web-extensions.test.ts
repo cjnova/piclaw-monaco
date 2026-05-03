@@ -4,6 +4,7 @@ import { getAttachmentPreviewKind, getAttachmentPreviewLabel } from '../../web/s
 import { paneRegistry } from '../../web/src/panes/index.js';
 import {
   buildAddonAttachmentPreviewFrameUrl,
+  createAddonWebApi,
   getAddonAttachmentPreviewNote,
   registerAddonAttachmentPreview,
   registerAddonPane,
@@ -16,6 +17,22 @@ import { getRegisteredSettingsPanes } from '../../web/src/components/settings/pa
 
 afterEach(() => {
   resetAddonWebRegistriesForTests();
+});
+
+test('addon web API exposes the current chat jid to add-on settings panes', () => {
+  const runtimeWindow = {
+    __piclawCurrentChatJid: 'web:branch-123',
+    location: { href: 'http://localhost/?chat_jid=web%3Adefault' },
+  } as any;
+  const api = createAddonWebApi(runtimeWindow);
+  expect(api.getCurrentChatJid()).toBe('web:branch-123');
+
+  runtimeWindow.__piclawCurrentChatJid = '';
+  runtimeWindow.location.href = 'http://localhost/?chat_jid=web%3Abranch-456';
+  expect(api.getCurrentChatJid()).toBe('web:branch-456');
+
+  runtimeWindow.location.href = 'http://localhost/';
+  expect(api.getCurrentChatJid()).toBe('web:default');
 });
 
 test('addon web registries support workspace panes, settings panes, standalone URLs, and attachment previews', () => {

@@ -50,7 +50,7 @@ function installSimpleHtmlDomParser() {
         return {
           body,
           documentElement: { textContent },
-          createTreeWalker: (_root: unknown, whatToShow: number) => ({
+          createTreeWalker: (_root: unknown, _whatToShow: number) => ({
             nextNode: () => null,
           }),
         } as any;

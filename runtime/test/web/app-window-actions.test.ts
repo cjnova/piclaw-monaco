@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 
 import {
+  createRootSessionFromCompose,
   createSessionFromCompose,
   popOutChat,
   popOutPane,
@@ -44,6 +45,33 @@ test('createSessionFromCompose navigates immediately to the branch-loader route'
   expect(toasts).toEqual([]);
   expect(navigateCalls[0]).toContain('branch_loader=1');
   expect(navigateCalls[0]).toContain('branch_source_chat_jid=web%3Aroot');
+});
+
+test('createRootSessionFromCompose creates and navigates to an independent root', async () => {
+  const toasts: Array<[string, string, string, number]> = [];
+  const navigateCalls: string[] = [];
+  const refreshes: string[] = [];
+
+  const created = await createRootSessionFromCompose({
+    rootName: 'Ops Room',
+    chatOnlyMode: true,
+    createRootChatSession: async (agentName: string) => {
+      expect(agentName).toBe('Ops Room');
+      return { branch: { chat_jid: 'web:ops-room', agent_name: 'ops-room' } };
+    },
+    refreshActiveChatAgents: async () => { refreshes.push('active'); },
+    refreshCurrentChatBranches: async () => { refreshes.push('branches'); },
+    showIntentToast: (title: string, message: string, kind: string, timeout: number) => {
+      toasts.push([title, message, kind, timeout]);
+    },
+    navigate: (url: string) => navigateCalls.push(url),
+    baseHref: 'https://example.test/?chat_jid=web%3Adefault',
+  });
+
+  expect(created).toBe(true);
+  expect(refreshes.sort()).toEqual(['active', 'branches']);
+  expect(toasts).toContainEqual(['Root session created', 'Switched to @ops-room.', 'info', 2500]);
+  expect(navigateCalls[0]).toBe('https://example.test/?chat_jid=web%3Aops-room&chat_only=1');
 });
 
 test('popOutPane transfers pane state and closes the source tab after navigation', async () => {

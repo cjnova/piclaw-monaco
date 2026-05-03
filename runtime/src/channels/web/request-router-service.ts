@@ -34,6 +34,7 @@ import { handleContentPrimaryRoutes, handleContentSecondaryRoutes } from "./http
 import { handleMediaRoutes } from "./http/dispatch-media.js";
 import { handleShellRoutes } from "./http/dispatch-shell.js";
 import { handleWorkspaceRoutes } from "./http/dispatch-workspace.js";
+import { handleWidgetStateRoutes } from "./state-api.js";
 import "./http/editor-vendor-route.js";
 import "./http/csv-viewer-route.js";
 import "./http/image-viewer-route.js";
@@ -46,7 +47,9 @@ import { getRouteFlags } from "./http/route-flags.js";
 import { withSecurityHeaders } from "./http/security.js";
 import { appendServerTiming, measureAsync } from "./http/server-timing.js";
 
-const STATIC_DIR = resolve(import.meta.dir, "..", "..", "..", "..", "web", "static");
+const STATIC_DIR = resolve(
+  process.env.PICLAW_WEB_STATIC_DIR || resolve(import.meta.dir, "..", "..", "..", "web", "static")
+);
 const STATIC_MIME_TYPES: Record<string, string> = {
   ".png": "image/png",
   ".ico": "image/x-icon",
@@ -123,6 +126,11 @@ export class RequestRouterService {
           headers: { "Content-Type": "application/json" },
         });
       }
+    }
+
+    const widgetStateResponse = await handleWidgetStateRoutes(this.channel, req, pathname);
+    if (widgetStateResponse) {
+      return widgetStateResponse;
     }
 
     const flags = getRouteFlags(req, pathname);

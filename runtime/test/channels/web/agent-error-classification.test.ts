@@ -6,6 +6,7 @@
 
 // Import the non-exported functions by re-exporting via a dynamic wrapper
 import { describe, expect, test } from "bun:test";
+import { formatProviderError, parseProviderError } from "../../../src/channels/web/handlers/provider-error-format.js";
 
 // We test through the module's internal functions by importing the file
 // and accessing the exported formatUserVisibleError indirectly.
@@ -75,5 +76,24 @@ describe("provider error classification", () => {
     expect(rateLimitPatterns.test(normalError)).toBe(false);
     expect(sessionCorruptionPatterns.test(normalError)).toBe(false);
     expect(modelConfigPatterns.test(normalError)).toBe(false);
+  });
+
+  test("parses Codex JSON server error envelopes for display", () => {
+    const errorText = 'Codex error: {"type":"error","error":{"type":"server_error","code":"server_error","message":"An error occurred while processing your request. You can retry your request, or contact us through our help center at help.openai.com if the error persists. Please include the request ID 7b101289-798a-4b84-bec4-fef42cc49469 in your message.","param":null},"sequence_number":4}';
+
+    const parsed = parseProviderError(errorText);
+    expect(parsed?.provider).toBe("Codex");
+    expect(parsed?.type).toBe("server_error");
+    expect(parsed?.code).toBe("server_error");
+    expect(parsed?.requestId).toBe("7b101289-798a-4b84-bec4-fef42cc49469");
+    expect(parsed?.sequenceNumber).toBe(4);
+
+    const formatted = formatProviderError(errorText);
+    expect(formatted?.category).toBe("server");
+    expect(formatted?.title).toBe("Codex server error");
+    expect(formatted?.label).toBe("provider");
+    expect(formatted?.severity).toBe("warning");
+    expect(formatted?.detail).toContain("request id: 7b101289-798a-4b84-bec4-fef42cc49469");
+    expect(formatted?.detail).toContain("sequence: 4");
   });
 });

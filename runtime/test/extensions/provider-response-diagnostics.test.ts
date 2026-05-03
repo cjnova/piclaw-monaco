@@ -2,10 +2,12 @@ import { test, expect } from "bun:test";
 
 import { providerResponseDiagnostics, extractDiagnosticHeaders } from "../../src/extensions/provider-response-diagnostics.js";
 
+type FakeProviderResponseHandler = (payload: unknown) => unknown | Promise<unknown>;
+
 function createFakeApi() {
-  const handlers: Array<{ event: string; handler: Function }> = [];
+  const handlers: Array<{ event: string; handler: FakeProviderResponseHandler }> = [];
   return {
-    on: (event: string, handler: Function) => {
+    on: (event: string, handler: FakeProviderResponseHandler) => {
       handlers.push({ event, handler });
     },
     handlers,

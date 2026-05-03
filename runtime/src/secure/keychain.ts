@@ -51,14 +51,24 @@ export interface KeychainEntry {
   type: KeychainEntryType;
   secret: string;
   username?: string | null;
+  /** UI-only note for humans; not exposed through agent keychain list output. */
+  userNote?: string | null;
+  /** Agent-readable note safe to expose in keychain list metadata. */
+  agentNote?: string | null;
 }
 
 /** Metadata-only view of a keychain entry (no secret), used by listKeychainEntries(). */
 export interface KeychainEntryMetadata {
   name: string;
   type: KeychainEntryType;
+  agentNote: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** UI metadata view that includes the user-readable note. */
+export interface KeychainEntryUiMetadata extends KeychainEntryMetadata {
+  userNote: string;
 }
 
 interface KeychainRow {
@@ -167,6 +177,8 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
     throw new Error("Keychain entry secret is required.");
   }
   const payload = await encryptPayload(entry.name, entry.secret, entry.username ?? null);
+  const hasUserNote = entry.userNote !== undefined;
+  const hasAgentNote = entry.agentNote !== undefined;
   const db = getDb();
   db.prepare(
     `INSERT INTO keychain_entries (
@@ -176,8 +188,10 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
         nonce,
         salt,
         kdf,
-        kdf_iterations
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        kdf_iterations,
+        user_note,
+        agent_note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(name) DO UPDATE SET
         type = excluded.type,
         ciphertext = excluded.ciphertext,
@@ -185,6 +199,8 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
         salt = excluded.salt,
         kdf = excluded.kdf,
         kdf_iterations = excluded.kdf_iterations,
+        user_note = CASE WHEN ? THEN excluded.user_note ELSE keychain_entries.user_note END,
+        agent_note = CASE WHEN ? THEN excluded.agent_note ELSE keychain_entries.agent_note END,
         updated_at = CURRENT_TIMESTAMP`
   ).run(
     entry.name,
@@ -193,7 +209,11 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
     Buffer.from(payload.nonce),
     Buffer.from(payload.salt),
     payload.kdf,
-    payload.kdfIterations
+    payload.kdfIterations,
+    String(entry.userNote ?? ""),
+    String(entry.agentNote ?? ""),
+    hasUserNote ? 1 : 0,
+    hasAgentNote ? 1 : 0,
   );
 }
 
@@ -235,12 +255,38 @@ export function listKeychainEntries(): KeychainEntryMetadata[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT name, type, created_at as createdAt, updated_at as updatedAt
+      `SELECT name, type, agent_note as agentNote, created_at as createdAt, updated_at as updatedAt
        FROM keychain_entries
        ORDER BY name`
     )
     .all() as KeychainEntryMetadata[];
   return rows;
+}
+
+/** Metadata-only view for the web UI, including user-readable notes. */
+export function listKeychainEntriesForUi(): KeychainEntryUiMetadata[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT name, type, user_note as userNote, agent_note as agentNote, created_at as createdAt, updated_at as updatedAt
+       FROM keychain_entries
+       ORDER BY name`
+    )
+    .all() as KeychainEntryUiMetadata[];
+  return rows;
+}
+
+/** Update non-secret notes for an existing keychain entry. */
+export function updateKeychainEntryNotes(name: string, notes: { userNote?: string | null; agentNote?: string | null }): boolean {
+  const userNote = typeof notes.userNote === "string" ? notes.userNote : "";
+  const agentNote = typeof notes.agentNote === "string" ? notes.agentNote : "";
+  const db = getDb();
+  const result = db.prepare(
+    `UPDATE keychain_entries
+     SET user_note = ?, agent_note = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE name = ?`
+  ).run(userNote, agentNote, name);
+  return result.changes > 0;
 }
 
 /**
@@ -258,7 +304,7 @@ export async function listAllKeychainEntries(): Promise<KeychainEntryMetadata[]>
   const merged = [...internal];
   for (const ext of external) {
     if (!internalNames.has(ext.name)) {
-      merged.push({ name: ext.name, type: ext.type, createdAt: null as any, updatedAt: null as any });
+      merged.push({ name: ext.name, type: ext.type, agentNote: "", createdAt: null as any, updatedAt: null as any });
     }
   }
   return merged;

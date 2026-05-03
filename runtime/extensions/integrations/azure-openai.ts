@@ -20,7 +20,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import OpenAI from "openai";
 import {
   AssistantMessageEventStream,
-  supportsXhigh,
+  getSupportedThinkingLevels,
   type AssistantMessage,
   type Model,
   type ToolCall,
@@ -1359,7 +1359,7 @@ function streamAzureOpenAIResponses(model: any, context: any, options: any) {
 // Responses wrapper above. Keep policy in streamAzureOpenAIResponses, not here.
 function streamSimpleAzureOpenAIResponses(model: any, context: any, options: any) {
   const base = buildBaseOptions(model, options, options?.apiKey);
-  const reasoningEffort = supportsXhigh(model) ? options?.reasoning : clampReasoning(options?.reasoning);
+  const reasoningEffort = getSupportedThinkingLevels(model).includes("xhigh") ? options?.reasoning : clampReasoning(options?.reasoning);
 
   return streamAzureOpenAIResponses(model, context, {
     ...base,

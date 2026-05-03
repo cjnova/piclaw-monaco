@@ -13,6 +13,11 @@ import type { RouteFlags } from "./route-flags.js";
  */
 export type ServeStaticAsset = (req: Request, relPath: string) => Promise<Response>;
 
+function appleTouchIconSize(pathname: string): string {
+  const match = pathname.match(/apple-touch-icon-(\d+)(?:x\d+)?\.png$/i);
+  return match?.[1] || "180";
+}
+
 /**
  * Dispatch shell/static/avatar routes and return null when no shell path matches.
  * @param channel Web channel contract exposing shell/static handlers.
@@ -45,13 +50,18 @@ export async function handleShellRoutes(
     faviconUrl.searchParams.set('format', 'png');
     const pngReq = new Request(faviconUrl.toString(), req);
     const avatarResp = await channel.handleAvatar("agent", pngReq);
-    if (avatarResp.status === 200) return avatarResp;
+    if (avatarResp.status === 200 && (avatarResp.headers.get("Content-Type") || "").toLowerCase().includes("image/png")) return avatarResp;
     return await serveStaticAsset(req, "favicon.ico");
   }
 
   if (flags.isAppleIcon) {
-    const avatarResp = await channel.handleAvatar("agent", req);
-    if (avatarResp.status === 200) return avatarResp;
+    // Apple touch icons need raster PNGs; the cached avatar is normally WebP.
+    const iconUrl = new URL(req.url);
+    iconUrl.searchParams.set("format", "png");
+    iconUrl.searchParams.set("size", appleTouchIconSize(pathname));
+    const pngReq = new Request(iconUrl.toString(), req);
+    const avatarResp = await channel.handleAvatar("agent", pngReq);
+    if (avatarResp.status === 200 && (avatarResp.headers.get("Content-Type") || "").toLowerCase().includes("image/png")) return avatarResp;
     return await serveStaticAsset(req, pathname.slice(1));
   }
 
@@ -103,7 +113,7 @@ export async function handleShellRoutes(
 
   if (req.method === "GET" && (pathname === "/export/timeline" || pathname === "/internal/export/timeline")) {
     const { handleExportTimeline } = await import("../export/export-timeline-endpoint.js");
-    const runtimeDir = new URL("../../../../", import.meta.url).pathname.replace(/\/$/, "");
+    const runtimeDir = process.env.PICLAW_RUNTIME_ROOT || new URL("../../../../", import.meta.url).pathname.replace(/\/$/, "");
     return handleExportTimeline(req, { runtimeDir });
   }
 

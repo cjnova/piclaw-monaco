@@ -41,6 +41,7 @@ const ROUTING_SAMPLES: Record<string, string> = {
   "/fork": "/fork entry-1",
   "/clone": "/clone",
   "/forks": "/forks",
+  "/rollup": "/rollup web:default:research-2",
   "/tree": "/tree",
   "/label": "/label entry-1 checkpoint",
   "/labels": "/labels",

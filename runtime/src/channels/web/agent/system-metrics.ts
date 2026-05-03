@@ -6,6 +6,9 @@ import fs from "node:fs";
 import os from "node:os";
 
 import type { AgentPoolMemoryInstrumentationSnapshot } from "../../../agent-pool.js";
+import { createLogger, debugSuppressedError } from "../../../utils/logger.js";
+
+const log = createLogger("web-system-metrics");
 
 export interface ProcessMemorySnapshot {
   rss_bytes: number;
@@ -51,6 +54,8 @@ export interface SystemMetricsSnapshot {
   cpu_series: number[];
   ram_series: number[];
   swap_series: number[];
+  buffer_cache_bytes: number | null;
+  buffer_cache_series_bytes: number[];
   process_rss_series_bytes: number[];
   process_heap_used_series_bytes: number[];
   swap_total_bytes: number;
@@ -70,6 +75,13 @@ type CpuTotals = {
   idle: number;
   total: number;
 };
+
+interface MemoryUsageSnapshot {
+  totalBytes: number;
+  usedBytes: number;
+  percent: number;
+  bufferCacheBytes: number | null;
+}
 
 interface SwapUsageSnapshot {
   totalBytes: number;
@@ -116,19 +128,30 @@ function pushSample(series: number[], value: number, maxSamples: number): number
   return next.length > maxSamples ? next.slice(next.length - maxSamples) : next;
 }
 
+export function parseLinuxRamMeminfo(text: string): MemoryUsageSnapshot | null {
+  const normalized = typeof text === "string" ? text : "";
+  const totalBytes = parseKbLine(normalized, "MemTotal");
+  const availableBytes = parseKbLine(normalized, "MemAvailable");
+  if (!totalBytes || availableBytes === null || totalBytes <= 0) return null;
+
+  const buffersBytes = parseKbLine(normalized, "Buffers") ?? 0;
+  const cachedBytes = parseKbLine(normalized, "Cached") ?? 0;
+  const sreclaimableBytes = parseKbLine(normalized, "SReclaimable") ?? 0;
+  const shmemBytes = parseKbLine(normalized, "Shmem") ?? 0;
+  const bufferCacheBytes = Math.max(0, buffersBytes + cachedBytes + sreclaimableBytes - shmemBytes);
+
+  const usedBytes = Math.max(0, totalBytes - Math.min(availableBytes, totalBytes));
+  const percent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+  return { totalBytes, usedBytes, percent: roundPercent(percent), bufferCacheBytes };
+}
+
 export function parseLinuxSwapMeminfo(text: string): SwapUsageSnapshot | null {
   const normalized = typeof text === "string" ? text : "";
-  const totalMatch = normalized.match(/^SwapTotal:\s+(\d+)\s+kB$/m);
-  const freeMatch = normalized.match(/^SwapFree:\s+(\d+)\s+kB$/m);
-  if (!totalMatch || !freeMatch) return null;
+  const totalBytes = parseKbLine(normalized, "SwapTotal");
+  const freeBytes = parseKbLine(normalized, "SwapFree");
+  if (!totalBytes || freeBytes === null || totalBytes <= 0) return null;
 
-  const totalKb = Number(totalMatch[1]);
-  const freeKb = Number(freeMatch[1]);
-  if (!Number.isFinite(totalKb) || !Number.isFinite(freeKb) || totalKb <= 0) return null;
-
-  const totalBytes = totalKb * 1024;
-  const freeBytes = Math.max(0, freeKb * 1024);
-  const usedBytes = Math.max(0, totalBytes - freeBytes);
+  const usedBytes = Math.max(0, totalBytes - Math.min(freeBytes, totalBytes));
   const percent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
   return { totalBytes, usedBytes, percent: roundPercent(percent) };
 }
@@ -145,6 +168,24 @@ function parseIntLine(text: string, label: string): number | null {
   if (!match) return null;
   const value = Number(match[1]);
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function readRamUsage(): MemoryUsageSnapshot {
+  if (process.platform === "linux") {
+    try {
+      const meminfo = fs.readFileSync("/proc/meminfo", "utf8");
+      const usage = parseLinuxRamMeminfo(meminfo);
+      if (usage) return usage;
+    } catch (error) {
+      debugSuppressedError(log, "Failed to read /proc/meminfo; falling back to os memory counters.", error, {});
+    }
+  }
+
+  const totalBytes = os.totalmem();
+  const freeBytes = os.freemem();
+  const usedBytes = Math.max(0, totalBytes - freeBytes);
+  const percent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+  return { totalBytes, usedBytes, percent: roundPercent(percent), bufferCacheBytes: null };
 }
 
 function readSwapUsage(): SwapUsageSnapshot | null {
@@ -253,6 +294,7 @@ export class SystemMetricsSampler {
   private cpuSeries: number[] = [];
   private ramSeries: number[] = [];
   private swapSeries: number[] = [];
+  private bufferCacheSeriesBytes: number[] = [];
   private processRssSeriesBytes: number[] = [];
   private processHeapUsedSeriesBytes: number[] = [];
 
@@ -271,18 +313,17 @@ export class SystemMetricsSampler {
     }
     this.lastCpuTotals = currentCpuTotals;
 
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = Math.max(0, totalMem - freeMem);
-    const ramPercent = totalMem > 0 ? (usedMem / totalMem) * 100 : 0;
-
+    const ramUsage = readRamUsage();
     const swapUsage = readSwapUsage();
     const cpuValue = roundPercent(cpuPercent);
-    const ramValue = roundPercent(ramPercent);
+    const ramValue = ramUsage.percent;
     const swapValue = swapUsage ? roundPercent(swapUsage.percent) : null;
     this.cpuSeries = pushSample(this.cpuSeries, cpuValue, this.maxSamples);
     this.ramSeries = pushSample(this.ramSeries, ramValue, this.maxSamples);
     this.swapSeries = swapValue === null ? [] : pushSample(this.swapSeries, swapValue, this.maxSamples);
+    this.bufferCacheSeriesBytes = ramUsage.bufferCacheBytes === null
+      ? []
+      : pushSample(this.bufferCacheSeriesBytes, ramUsage.bufferCacheBytes, this.maxSamples);
 
     const processMemoryUsage = process.memoryUsage();
     const procStatus = readProcStatus();
@@ -298,6 +339,8 @@ export class SystemMetricsSampler {
       cpu_series: [...this.cpuSeries],
       ram_series: [...this.ramSeries],
       swap_series: [...this.swapSeries],
+      buffer_cache_bytes: ramUsage.bufferCacheBytes,
+      buffer_cache_series_bytes: [...this.bufferCacheSeriesBytes],
       process_rss_series_bytes: [...this.processRssSeriesBytes],
       process_heap_used_series_bytes: [...this.processHeapUsedSeriesBytes],
       swap_total_bytes: swapUsage?.totalBytes ?? 0,

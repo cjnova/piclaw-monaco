@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import { applyEnvironmentOverrides } from "../environment-overrides.js";
 
 const ENV_TOOL_SCHEMA = Type.Object({
   action: Type.Union([
@@ -186,6 +187,7 @@ function buildResult(text: string, details: EnvToolDetails): AgentToolResult<Env
 export const envTools: ExtensionFactory = (pi: ExtensionAPI) => {
   const initial = loadManagedEnv();
   applyEnvDiff({}, initial);
+  try { applyEnvironmentOverrides(); } catch { /* KV-backed environment overrides require runtime DB init. */ }
 
   pi.on("before_agent_start", async (event) => ({
     systemPrompt: `${event.systemPrompt}\n\n${ENV_TOOL_HINT}`,
@@ -294,6 +296,7 @@ export const envTools: ExtensionFactory = (pi: ExtensionAPI) => {
         const next = { ...current, [name]: resolved.value };
         persistManagedEnv(next);
         applyEnvDiff(current, next);
+        try { applyEnvironmentOverrides(); } catch { /* KV-backed environment overrides require runtime DB init. */ }
         const copiedSuffix = resolved.copiedFromEnv ? ` (copied from $${resolved.copiedFromEnv})` : "";
         return buildResult(`Stored ${name} in the managed workspace environment${copiedSuffix}.`, {
           ok: true,
@@ -309,6 +312,7 @@ export const envTools: ExtensionFactory = (pi: ExtensionAPI) => {
       if (!name) {
         persistManagedEnv({});
         applyEnvDiff(current, {});
+        try { applyEnvironmentOverrides(); } catch { /* KV-backed environment overrides require runtime DB init. */ }
         return buildResult(Object.keys(current).length > 0 ? "Cleared all managed workspace environment variables." : "No managed workspace environment variables existed.", {
           ok: true,
           action: "clear",
@@ -334,6 +338,7 @@ export const envTools: ExtensionFactory = (pi: ExtensionAPI) => {
       delete next[name];
       persistManagedEnv(next);
       applyEnvDiff(current, next);
+      try { applyEnvironmentOverrides(); } catch { /* KV-backed environment overrides require runtime DB init. */ }
       return buildResult(`Cleared ${name} from the managed workspace environment.`, {
         ok: true,
         action: "clear",

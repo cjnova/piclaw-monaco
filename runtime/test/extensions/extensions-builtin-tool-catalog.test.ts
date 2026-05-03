@@ -19,7 +19,6 @@ import { createBuiltinExtensionFactories } from "../../src/extensions/index.js";
 import {
   TOOLSETS,
   getDefaultActiveToolNames,
-  getEffectiveDefaultActiveToolNames,
 } from "../../src/extensions/tool-activation.js";
 
 /**

@@ -26,6 +26,7 @@ export interface AgentEventEmitter {
   generatedWidgetFinal: (payload: Record<string, unknown>) => void;
   generatedWidgetClose: (payload: Record<string, unknown>) => void;
   generatedWidgetError: (payload: Record<string, unknown>) => void;
+  modelChanged: (payload: Record<string, unknown>) => void;
 }
 
 /** Create an AgentEventEmitter that broadcasts via the given SSE hub. */
@@ -45,6 +46,7 @@ export function createAgentEventEmitter(
     generatedWidgetFinal: (payload) => channel.broadcastEvent("generated_widget_final", withAgentProfile(payload)),
     generatedWidgetClose: (payload) => channel.broadcastEvent("generated_widget_close", withAgentProfile(payload)),
     generatedWidgetError: (payload) => channel.broadcastEvent("generated_widget_error", withAgentProfile(payload)),
+    modelChanged: (payload) => channel.broadcastEvent("model_changed", withAgentProfile(payload)),
   };
 }
 
@@ -70,6 +72,14 @@ function readWidgetString(...values: unknown[]): string | null {
 
 function readWidgetNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function modelLabelFromEventModel(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as { provider?: unknown; id?: unknown };
+  const provider = readWidgetString(record.provider);
+  const id = readWidgetString(record.id);
+  return provider && id ? `${provider}/${id}` : null;
 }
 
 function truncateErrorDetail(msg: string, maxLen = 120): string {
@@ -205,6 +215,34 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
   };
 
   return (event: AgentSessionEvent) => {
+    const eventType = (event as { type?: string }).type;
+
+    if (eventType === "thinking_level_changed" || eventType === "thinking_level_select") {
+      const record = event as { level?: unknown; previousLevel?: unknown; previous_level?: unknown };
+      const level = readWidgetString(record.level);
+      if (level) {
+        options.emitter.modelChanged({
+          ...base,
+          thinking_level: level,
+          thinking_level_label: level,
+          previous_thinking_level: readWidgetString(record.previousLevel, record.previous_level),
+        });
+      }
+    }
+
+    if (eventType === "model_select") {
+      const record = event as { model?: unknown; previousModel?: unknown; source?: unknown };
+      const model = modelLabelFromEventModel(record.model);
+      if (model) {
+        options.emitter.modelChanged({
+          ...base,
+          model,
+          previous_model: modelLabelFromEventModel(record.previousModel),
+          source: readWidgetString(record.source),
+        });
+      }
+    }
+
     if (event.type === "message_update") {
       const messageEvent = event.assistantMessageEvent;
       if (messageEvent.type === "thinking_start") {
@@ -515,14 +553,16 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
       const reason = (event as { reason?: string }).reason;
       const title = reason === "overflow"
         ? "Compacting context"
-        : reason === "threshold"
+        : reason === "threshold" || reason === "idle"
           ? "Smart compaction"
           : "Compacting context";
       const detail = reason === "overflow"
         ? "Recovering from context pressure so the turn can continue."
         : reason === "threshold"
           ? "Shrinking recent context before continuing the turn."
-          : undefined;
+          : reason === "idle"
+            ? "Tidying context a few seconds after the turn finished."
+            : undefined;
       options.emitter.status({
         ...base,
         type: "intent",

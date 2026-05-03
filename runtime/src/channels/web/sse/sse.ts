@@ -8,8 +8,8 @@
  */
 
 import { createLogger } from "../../../utils/logger.js";
-import { getUiThemeConfig } from "../../../core/config.js";
 import { getAppAssetVersion } from "../http/static.js";
+import { getServerUiState } from "../ui-state.js";
 
 const log = createLogger("web.sse");
 const encoder = new TextEncoder();
@@ -101,7 +101,7 @@ export function handleSse(channel: SseClientContainer, req?: Request): Response 
       }, 30000);
       clientRef = { controller, heartbeat, chatJid };
       channel.clients.add(clientRef);
-      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ app_asset_version: getAppAssetVersion(), ui_theme: getUiThemeConfig(), ...(chatJid ? { chat_jid: chatJid } : {}) })}\n\n`));
+      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ app_asset_version: getAppAssetVersion(), ...getServerUiState(), ...(chatJid ? { chat_jid: chatJid } : {}) })}\n\n`));
     },
     cancel: () => {
       if (clientRef) {

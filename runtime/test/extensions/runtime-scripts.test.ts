@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, test } from "bun:test";
 import "../helpers.js";
 import { createFakeExtensionApi } from "./fake-extension-api.js";
-import { importFresh, withTempWorkspaceEnv } from "../helpers.js";
+import { importFresh, setEnv, withTempWorkspaceEnv } from "../helpers.js";
 
 describe("runtime-scripts extension", () => {
   test("parses SCRIPT_JDOC JSON blocks from source", async () => {
@@ -39,6 +39,34 @@ console.log("ok");\n`;
     expect(entries.some((entry) => entry.displayPath.endsWith("runtime/skills/operator/token-chart/token-chart.ts"))).toBe(true);
     expect(entries.some((entry) => entry.displayPath.endsWith("runtime/skills/builtin/remote-peer/peer.ts"))).toBe(true);
     expect(entries.some((entry) => entry.displayPath.includes("runtime/scripts/check-stale-dist.ts"))).toBe(false);
+  });
+
+  test("loads packaged script catalogs from an overridden runtime root", async () => {
+    await withTempWorkspaceEnv("piclaw-list-scripts-packaged-root-", {}, async (workspace) => {
+      const runtimeRoot = path.join(workspace.base, "packaged-runtime");
+      const skillDir = path.join(runtimeRoot, "skills", "desktop-demo");
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.mkdirSync(path.join(runtimeRoot, "extensions"), { recursive: true });
+      fs.mkdirSync(path.join(runtimeRoot, "vendor"), { recursive: true });
+      fs.writeFileSync(path.join(skillDir, "desktop-demo.ts"), `#!/usr/bin/env bun\n/**\n * SCRIPT_JDOC:\n * {\n *   "summary": "Run the packaged desktop demo.",\n *   "aliases": ["desktop demo"],\n *   "domains": ["desktop"],\n *   "verbs": ["run"],\n *   "nouns": ["demo"],\n *   "keywords": ["desktop demo"],\n *   "examples": ["run desktop demo"],\n *   "kind": "read-only",\n *   "weight": "lightweight",\n *   "role": "entrypoint"\n * }\n */\nconsole.log("desktop");\n`, "utf8");
+
+      const restoreEnv = setEnv({
+        PICLAW_RUNTIME_ROOT: runtimeRoot,
+        PICLAW_PACKAGE_ROOT: runtimeRoot,
+      });
+      try {
+        const { loadScriptCatalogEntries } = await importFresh<typeof import("../../src/extensions/runtime-scripts.js")>(
+          "../src/extensions/runtime-scripts.js"
+        );
+        const entries = loadScriptCatalogEntries({ scope: "packaged", role: "all" });
+        expect(entries).toHaveLength(1);
+        expect(entries[0].absolutePath).toBe(path.join(skillDir, "desktop-demo.ts"));
+        expect(entries[0].displayPath).toEndWith("skills/desktop-demo/desktop-demo.ts");
+        expect(entries[0].summary).toBe("Run the packaged desktop demo.");
+      } finally {
+        restoreEnv();
+      }
+    });
   });
 
   test("registers list_scripts and supports query + intent", async () => {

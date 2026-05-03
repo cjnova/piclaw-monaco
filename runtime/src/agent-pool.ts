@@ -34,6 +34,7 @@ import {
 
 import { type AgentControlCommand, type AgentControlResult } from "./agent-control/index.js";
 import { SESSIONS_DIR, WORKSPACE_DIR } from "./core/config.js";
+import { getChatChannel, getChatJid } from "./core/chat-context.js";
 import { createTrackedBashOperations } from "./tools/tracked-bash.js";
 import { type ActiveChatAgent } from "./agent-pool/branch-manager.js";
 import {
@@ -50,6 +51,7 @@ import { createAgentPoolServices, type AgentPoolServices } from "./agent-pool/se
 import { type AgentSessionManagerInstrumentationSnapshot, type PoolEntry } from "./agent-pool/session-manager.js";
 import {
   type ChatBranchRecord,
+  type MergeChatBranchIntoParentResult,
   type SshConfig,
   type SshConfigApplyTiming,
   type SshConfigClearResult,
@@ -92,6 +94,8 @@ export interface AgentPoolRecoveryInstrumentationSnapshot {
 }
 
 interface RuntimeInteropBridge {
+  getChatJid?: (defaultValue?: string) => string;
+  getChatChannel?: (defaultValue?: string) => string;
   getExtensionKvStore?: () => {
     get<T = unknown>(extensionId: string, key: string, scope?: string, scopeKey?: string): T | null;
     set(extensionId: string, key: string, value: unknown, scope?: string, scopeKey?: string): void;
@@ -261,6 +265,8 @@ export class AgentPool {
       clear: extensionKvClear,
     });
     const runtimeInterop = ((globalThis as { __piclawRuntimeInterop?: RuntimeInteropBridge }).__piclawRuntimeInterop ||= {});
+    runtimeInterop.getChatJid = getChatJid;
+    runtimeInterop.getChatChannel = getChatChannel;
     runtimeInterop.getExtensionKvStore = () => ({
       get: extensionKvGet,
       set: extensionKvSet,
@@ -328,6 +334,28 @@ export class AgentPool {
   }
 
   async applyControlCommand(chatJid: string, command: AgentControlCommand): Promise<AgentControlResult> {
+    if (command.type === "rollup") {
+      try {
+        const result = await this.mergeChatBranchIntoParent(chatJid);
+        const counts = result.counts;
+        return {
+          status: "success",
+          message: [
+            `Rolled up ${result.source.chat_jid} into parent ${result.parent.chat_jid}.`,
+            `Moved: ${counts.messages} message(s), ${counts.token_usage} token-usage row(s), ${counts.scheduled_tasks} scheduled task(s).`,
+            "Note: Pi JSONL session files were not merged.",
+          ].join("\n"),
+          rolled_up_to: result.parent.chat_jid,
+          source_chat_jid: result.source.chat_jid,
+        };
+      } catch (error) {
+        return {
+          status: "error",
+          message: error instanceof Error ? error.message : String(error || "Failed to roll up branch."),
+        };
+      }
+    }
+
     return this.runtimeFacade.applyControlCommand(chatJid, command);
   }
 
@@ -486,6 +514,10 @@ export class AgentPool {
     return this.branchManager.pruneChatBranch(chatJid);
   }
 
+  async mergeChatBranchIntoParent(chatJid: string): Promise<MergeChatBranchIntoParentResult> {
+    return this.branchManager.mergeChatBranchIntoParent(chatJid);
+  }
+
   async renameChatJid(
     oldJid: string,
     newJid: string,
@@ -511,6 +543,10 @@ export class AgentPool {
     options: { agentName?: string | null } = {},
   ): Promise<ChatBranchRecord> {
     return this.branchManager.createForkedChatBranch(sourceChatJid, options);
+  }
+
+  async createRootChatSession(agentName: string): Promise<ChatBranchRecord> {
+    return this.branchManager.createRootChatSession(agentName);
   }
 
   listActiveChats(): ActiveChatAgent[] {

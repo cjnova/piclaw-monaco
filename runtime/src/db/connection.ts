@@ -22,6 +22,7 @@ import path from "path";
 
 import { STORE_DIR, WORKSPACE_DIR } from "../core/config.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
+import { recompressExistingMedia } from "./media-recompress.js";
 
 const log = createLogger("db.connection");
 
@@ -461,6 +462,7 @@ function createSchema(database: Database): void {
       cost_cache_write REAL DEFAULT 0,
       cost_total REAL DEFAULT 0,
       model TEXT,
+      response_model TEXT,
       provider TEXT,
       api TEXT,
       turns INTEGER DEFAULT 0
@@ -479,6 +481,8 @@ function createSchema(database: Database): void {
       salt BLOB NOT NULL,
       kdf TEXT NOT NULL,
       kdf_iterations INTEGER NOT NULL,
+      user_note TEXT NOT NULL DEFAULT '',
+      agent_note TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -591,6 +595,37 @@ function ensureFts(database: Database): void {
  * Ensure the `model` column exists on `scheduled_tasks` (added in a later
  * version to allow per-task model overrides).
  */
+function ensureKeychainNoteColumns(database: Database): void {
+  const columns = database.prepare("PRAGMA table_info(keychain_entries)").all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((col) => col.name));
+  const ensureColumn = (name: string) => {
+    if (existing.has(name)) return;
+    try {
+      database.exec(`ALTER TABLE keychain_entries ADD COLUMN ${name} TEXT NOT NULL DEFAULT ''`);
+    } catch (err) {
+      debugSuppressedError(log, "Keychain-note column migration raced an already-updated schema state.", err, {
+        operation: "db.ensure_keychain_note_columns.add_column",
+        name,
+      });
+    }
+  };
+  ensureColumn("user_note");
+  ensureColumn("agent_note");
+}
+
+function ensureTokenUsageColumns(database: Database): void {
+  const columns = database.prepare("PRAGMA table_info(token_usage)").all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((col) => col.name));
+  if (existing.has("response_model")) return;
+  try {
+    database.exec("ALTER TABLE token_usage ADD COLUMN response_model TEXT");
+  } catch (err) {
+    debugSuppressedError(log, "Token-usage response_model migration raced an already-updated schema state.", err, {
+      operation: "db.ensure_token_usage_columns.add_response_model",
+    });
+  }
+}
+
 function ensureScheduledTaskColumns(database: Database): void {
   const columns = database.prepare("PRAGMA table_info(scheduled_tasks)").all() as Array<{ name: string }>;
   const existing = new Set(columns.map((col) => col.name));
@@ -829,6 +864,8 @@ export function initDatabase(): void {
   createSchema(db);
   ensureChatBranchConstraints(db);
   ensureMessageColumns(db);
+  ensureKeychainNoteColumns(db);
+  ensureTokenUsageColumns(db);
   ensureScheduledTaskColumns(db);
   ensureWebSessionColumns(db);
   ensureFts(db);
@@ -871,7 +908,6 @@ function ensureMediaCompression(database: Database): void {
   if (version >= 2) return;
 
   try {
-    const { recompressExistingMedia } = require("./media-recompress.js");
     const result = recompressExistingMedia();
     if (result.compressed > 0) {
       log.info("Media compression migration completed", {

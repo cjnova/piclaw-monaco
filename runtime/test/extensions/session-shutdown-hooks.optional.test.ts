@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import path from "node:path";
 import "../helpers.js";
 import { createFakeExtensionApi } from "./fake-extension-api.js";
 import {

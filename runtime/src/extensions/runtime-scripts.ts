@@ -200,10 +200,12 @@ function fallbackSummary(absolutePath: string, collection: ScriptCollection, rol
 }
 
 function getPackageRoot(): string {
+  if (process.env.PICLAW_PACKAGE_ROOT) return path.resolve(process.env.PICLAW_PACKAGE_ROOT);
   return path.resolve(import.meta.dir, "../../..");
 }
 
 function getRuntimeRoot(): string {
+  if (process.env.PICLAW_RUNTIME_ROOT) return path.resolve(process.env.PICLAW_RUNTIME_ROOT);
   return path.resolve(import.meta.dir, "../..");
 }
 

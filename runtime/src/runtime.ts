@@ -4,7 +4,7 @@
  * This is the top-level orchestrator that wires together all subsystems:
  *   - Initialises the database (db/connection.ts).
  *   - Creates the AgentPool, AgentQueue, and RuntimeState.
- *   - Starts the WhatsApp channel (if configured), web channel, Pushover, IPC.
+ *   - Starts the web channel, optional Pushover, optional opt-in WhatsApp, and IPC.
  *   - Runs the main message-polling loop and task scheduler.
  *   - Handles graceful shutdown (SIGINT/SIGTERM).
  *

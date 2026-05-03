@@ -578,6 +578,11 @@ export function installWebChannelPrototype(
       writable: true,
       value: withHttpSurface(async (service, req: Request) => await service.handleAgentBranchFork(req)),
     },
+    handleAgentRootSessionCreate: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request) => await service.handleAgentRootSessionCreate(req)),
+    },
     handleAgentBranchRename: {
       configurable: true,
       writable: true,
@@ -587,6 +592,11 @@ export function installWebChannelPrototype(
       configurable: true,
       writable: true,
       value: withHttpSurface(async (service, req: Request) => await service.handleAgentRenameJid(req)),
+    },
+    handleAgentBranchMergeParent: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request) => await service.handleAgentBranchMergeParent(req)),
     },
     handleAgentBranchPrune: {
       configurable: true,

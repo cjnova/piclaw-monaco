@@ -529,6 +529,7 @@ export const COMMAND_PARSERS: Record<string, CommandParser> = {
   "/new-session": parseNewSession,
   "/switch-session": parseSwitchSession,
   "/session-rotate": parseSessionRotate,
+  "/rollup": simple("rollup"),
   "/fork": parseFork,
   "/clone": parseClone,
   "/forks": simple("forks"),

@@ -80,6 +80,37 @@ test("stores, updates, lists, and deletes entries across supported types", async
   });
 });
 
+test("stores user-only and agent-readable notes separately from secrets", async () => {
+  await withKeychainContext(async ({ keychain }) => {
+    await keychain.setKeychainEntry({
+      name: "notes/service",
+      type: "secret",
+      secret: "hidden-secret",
+      userNote: "Human-only deployment note",
+      agentNote: "Use via $NOTES_SERVICE only",
+    });
+
+    const list = keychain.listKeychainEntries();
+    expect(list.find((entry) => entry.name === "notes/service")?.agentNote).toBe("Use via $NOTES_SERVICE only");
+    expect("userNote" in (list.find((entry) => entry.name === "notes/service") || {})).toBe(false);
+
+    const uiList = keychain.listKeychainEntriesForUi();
+    expect(uiList.find((entry) => entry.name === "notes/service")?.userNote).toBe("Human-only deployment note");
+
+    await keychain.setKeychainEntry({
+      name: "notes/service",
+      type: "secret",
+      secret: "rotated-secret",
+    });
+    expect(keychain.listKeychainEntriesForUi().find((entry) => entry.name === "notes/service")?.userNote).toBe("Human-only deployment note");
+
+    expect(keychain.updateKeychainEntryNotes("notes/service", { userNote: "Updated user", agentNote: "Updated agent" })).toBe(true);
+    const updated = keychain.listKeychainEntriesForUi().find((entry) => entry.name === "notes/service");
+    expect(updated?.userNote).toBe("Updated user");
+    expect(updated?.agentNote).toBe("Updated agent");
+  });
+});
+
 test("reads key material from PICLAW_KEYCHAIN_KEY_FILE when no env key is set", async () => {
   await withTempWorkspaceEnv(
     "piclaw-keychain-file-",

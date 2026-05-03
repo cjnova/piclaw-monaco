@@ -24,8 +24,12 @@ export function KeychainSection({ filter = '' }) {
     const [addName, setAddName] = useState('');
     const [addSecret, setAddSecret] = useState('');
     const [addUsername, setAddUsername] = useState('');
+    const [addUserNote, setAddUserNote] = useState('');
+    const [addAgentNote, setAddAgentNote] = useState('');
     const [addType, setAddType] = useState('secret');
     const [saving, setSaving] = useState(false);
+    const [noteDrafts, setNoteDrafts] = useState({});
+    const [savingNote, setSavingNote] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
     // Reveal state: { name, phase: 'password'|'totp'|'revealed'|'error', masterPassword?, totpCode?, secret?, username?, error? }
     const [revealState, setRevealState] = useState(null);
@@ -62,16 +66,23 @@ export function KeychainSection({ filter = '' }) {
             const resp = await fetch('/agent/keychain', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, secret, type: addType, username: addUsername.trim() || undefined }),
+                body: JSON.stringify({
+                    name,
+                    secret,
+                    type: addType,
+                    username: addUsername.trim() || undefined,
+                    userNote: addUserNote,
+                    agentNote: addAgentNote,
+                }),
             });
             const data = await resp.json();
             if (data?.ok) {
-                setAddName(''); setAddSecret(''); setAddUsername(''); setAddType('secret'); setShowAdd(false);
+                setAddName(''); setAddSecret(''); setAddUsername(''); setAddUserNote(''); setAddAgentNote(''); setAddType('secret'); setShowAdd(false);
                 await fetchEntries();
             } else { setError(data?.error || 'Failed to add entry.'); }
         } catch { setError('Failed to add entry.'); }
         finally { setSaving(false); }
-    }, [addName, addSecret, addUsername, addType, fetchEntries]);
+    }, [addName, addSecret, addUsername, addUserNote, addAgentNote, addType, fetchEntries]);
 
     const handleDelete = useCallback(async (name) => {
         try {
@@ -88,6 +99,42 @@ export function KeychainSection({ filter = '' }) {
             } else { setError(data?.error || 'Failed to delete entry.'); }
         } catch { setError('Failed to delete entry.'); }
     }, [fetchEntries]);
+
+    const handleSaveNotes = useCallback(async (entry) => {
+        const name = entry?.name;
+        if (!name) return;
+        const draft = noteDrafts[name] || {};
+        const userNote = Object.prototype.hasOwnProperty.call(draft, 'userNote') ? draft.userNote : (entry.userNote || '');
+        const agentNote = Object.prototype.hasOwnProperty.call(draft, 'agentNote') ? draft.agentNote : (entry.agentNote || '');
+        setSavingNote(name);
+        try {
+            const resp = await fetch('/agent/keychain/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, userNote, agentNote }),
+            });
+            const data = await resp.json();
+            if (data?.ok) {
+                setNoteDrafts(prev => {
+                    const next = { ...(prev || {}) };
+                    delete next[name];
+                    return next;
+                });
+                await fetchEntries();
+            } else { setError(data?.error || 'Failed to save notes.'); }
+        } catch { setError('Failed to save notes.'); }
+        finally { setSavingNote(null); }
+    }, [noteDrafts, fetchEntries]);
+
+    const setNoteDraft = useCallback((name, field, value) => {
+        setNoteDrafts(prev => ({
+            ...(prev || {}),
+            [name]: {
+                ...((prev || {})[name] || {}),
+                [field]: value,
+            },
+        }));
+    }, []);
 
     const doReveal = useCallback(async (name, masterPassword, totpCode) => {
         try {
@@ -157,7 +204,9 @@ export function KeychainSection({ filter = '' }) {
         return entries.filter(e =>
             e.name.toLowerCase().includes(lf) ||
             (e.type || '').toLowerCase().includes(lf) ||
-            (e.envVar || '').toLowerCase().includes(lf)
+            (e.envVar || '').toLowerCase().includes(lf) ||
+            (e.userNote || '').toLowerCase().includes(lf) ||
+            (e.agentNote || '').toLowerCase().includes(lf)
         );
     }, [entries, lf]);
 
@@ -210,6 +259,14 @@ export function KeychainSection({ filter = '' }) {
                             ${saving ? 'Saving…' : 'Save'}
                         </button>
                     </div>
+                    <div class="settings-keychain-add-row" style="align-items:stretch">
+                        <textarea placeholder="User note (visible in this UI only)"
+                            value=${addUserNote} onInput=${e => setAddUserNote(e.target.value)}
+                            class="settings-keychain-input" rows="2" style="resize:vertical; min-height:56px"></textarea>
+                        <textarea placeholder="Agent note (safe to expose to agents)"
+                            value=${addAgentNote} onInput=${e => setAddAgentNote(e.target.value)}
+                            class="settings-keychain-input" rows="2" style="resize:vertical; min-height:56px"></textarea>
+                    </div>
                 </div>
             `}
 
@@ -236,6 +293,11 @@ export function KeychainSection({ filter = '' }) {
                             const isPasswordPrompt = rs?.phase === 'password';
                             const isTotpPrompt = rs?.phase === 'totp';
                             const isError = rs?.phase === 'error';
+                            const draft = noteDrafts[e.name] || {};
+                            const userNote = Object.prototype.hasOwnProperty.call(draft, 'userNote') ? draft.userNote : (e.userNote || '');
+                            const agentNote = Object.prototype.hasOwnProperty.call(draft, 'agentNote') ? draft.agentNote : (e.agentNote || '');
+                            const notesDirty = userNote !== (e.userNote || '') || agentNote !== (e.agentNote || '');
+                            const notesSaving = savingNote === e.name;
                             return html`
                             <tr class="settings-keychain-row" key=${e.name}>
                                 <td class="settings-keychain-name">${e.name}</td>
@@ -260,6 +322,27 @@ export function KeychainSection({ filter = '' }) {
                                         `
                                         : html`<button class="settings-keychain-delete-btn" onClick=${() => setConfirmDelete(e.name)} title="Delete">🗑</button>`
                                     }
+                                </td>
+                            </tr>
+                            <tr class="settings-keychain-notes-row" key=${e.name + '-notes'}>
+                                <td colspan="5">
+                                    <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:start; padding:8px 0 10px 0;">
+                                        <label style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+                                            <span class="settings-hint" style="margin:0">User note</span>
+                                            <textarea class="settings-keychain-input" rows="2" style="resize:vertical; min-height:52px; width:100%;" placeholder="Human/UI note only"
+                                                value=${userNote}
+                                                onInput=${ev => setNoteDraft(e.name, 'userNote', ev.target.value)}></textarea>
+                                        </label>
+                                        <label style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+                                            <span class="settings-hint" style="margin:0">Agent-readable note</span>
+                                            <textarea class="settings-keychain-input" rows="2" style="resize:vertical; min-height:52px; width:100%;" placeholder="Safe guidance for agents"
+                                                value=${agentNote}
+                                                onInput=${ev => setNoteDraft(e.name, 'agentNote', ev.target.value)}></textarea>
+                                        </label>
+                                        <button class="settings-keychain-save-btn" style="margin-top:20px" disabled=${!notesDirty || notesSaving} onClick=${() => handleSaveNotes(e)}>
+                                            ${notesSaving ? 'Saving…' : 'Save notes'}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             ${isPasswordPrompt && html`

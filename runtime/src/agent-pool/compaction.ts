@@ -18,6 +18,10 @@ export interface CompactionLifecycleOptions {
   onWarn?: (message: string, details: Record<string, unknown>) => void;
 }
 
+const DEFAULT_IDLE_AUTO_COMPACTION_DELAY_MS = 5_000;
+const idleAutoCompactionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+type AutoCompactionReason = "threshold" | "idle";
 
 function estimateMessageTokens(message: any): number {
   if (!message || typeof message !== "object") return 0;
@@ -69,8 +73,18 @@ export function estimateContextTokensFromSession(session: AgentSession): number 
 
 /** Fallback context window when the model does not report one.
  *  Conservative enough to trigger compaction before most models overflow. */
+// ── Per-session compaction counter for auto-rotation ──
+const compactionSuccessCounters = new Map<string, number>();
+
+export function getCompactionSuccessCount(chatJid: string): number {
+  return compactionSuccessCounters.get(chatJid) ?? 0;
+}
+
+export function resetCompactionSuccessCount(chatJid: string): void {
+  compactionSuccessCounters.delete(chatJid);
+}
+
 export const DEFAULT_FALLBACK_CONTEXT_WINDOW = 128_000;
-const DEFAULT_COMPACTION_TIMEOUT_MS = 180_000;
 
 export function getModelContextWindow(session: AgentSession): number | null {
   const model = session.model as (AgentSession["model"] & { contextLength?: number }) | undefined;
@@ -85,9 +99,13 @@ export function getModelContextWindow(session: AgentSession): number | null {
   return contextWindow;
 }
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
+function parseNonNegativeInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(String(value || "").trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function getIdleAutoCompactionDelayMs(): number {
+  return parseNonNegativeInt(process.env.PICLAW_IDLE_AUTO_COMPACTION_DELAY_MS, DEFAULT_IDLE_AUTO_COMPACTION_DELAY_MS);
 }
 
 function getCompactionBackoffBaseMs(): number {
@@ -219,23 +237,29 @@ export async function runCompactionWithTimeout<T>(
   };
 }
 
-export async function maybeAutoCompactSessionBeforePrompt(
-  session: AgentSession,
-  chatJid: string,
-  options: Pick<CompactionLifecycleOptions, "onInfo" | "onWarn">,
-  onEvent?: (event: AgentSessionEvent) => void,
-): Promise<void> {
-  if (session.isStreaming || session.isCompacting || session.isRetrying) return;
+function getAutoCompactionContext(session: AgentSession, chatJid: string, options: Pick<CompactionLifecycleOptions, "onWarn">, reason: AutoCompactionReason): {
+  contextTokens: number;
+  contextWindow: number;
+  reserveTokens: number;
+} | null {
+  if (session.isStreaming || session.isCompacting || session.isRetrying) return null;
   const reportedContextWindow = getModelContextWindow(session);
   const contextWindow = reportedContextWindow ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
   if (!reportedContextWindow) {
-    options.onWarn?.("Model does not report contextWindow; using fallback for pre-prompt compaction", {
-      operation: "maybe_auto_compact_session_before_prompt.fallback_context_window",
-      chatJid,
-      fallbackContextWindow: DEFAULT_FALLBACK_CONTEXT_WINDOW,
-      modelId: (session.model as any)?.id ?? null,
-      provider: (session.model as any)?.provider ?? null,
-    });
+    options.onWarn?.(
+      reason === "idle"
+        ? "Model does not report contextWindow; using fallback for idle compaction"
+        : "Model does not report contextWindow; using fallback for pre-prompt compaction",
+      {
+        operation: reason === "idle"
+          ? "schedule_idle_auto_compaction.fallback_context_window"
+          : "maybe_auto_compact_session_before_prompt.fallback_context_window",
+        chatJid,
+        fallbackContextWindow: DEFAULT_FALLBACK_CONTEXT_WINDOW,
+        modelId: (session.model as any)?.id ?? null,
+        provider: (session.model as any)?.provider ?? null,
+      },
+    );
   }
 
   const settingsManager = (session as AgentSession & {
@@ -244,31 +268,48 @@ export async function maybeAutoCompactSessionBeforePrompt(
   const settings = typeof settingsManager?.getCompactionSettings === "function"
     ? settingsManager.getCompactionSettings()
     : null;
-  // Piclaw manages compaction at safe pre-prompt boundaries regardless of
-  // upstream auto-compaction being disabled. Only bail when there is no
-  // settings object at all (no model / no session).
-  if (!settings) return;
+  if (!settings) return null;
+
+  const contextTokens = estimateContextTokensFromSession(session);
+  const compactionConfig = getCompactionRuntimeConfig();
+  const thresholdTokens = Math.floor(contextWindow * (compactionConfig.thresholdPercent / 100));
+  const reserveTokens = contextWindow - thresholdTokens;
+  if (contextTokens <= thresholdTokens) return null;
+
+  return { contextTokens, contextWindow, reserveTokens };
+}
+
+async function maybeAutoCompactSession(
+  session: AgentSession,
+  chatJid: string,
+  options: Pick<CompactionLifecycleOptions, "onInfo" | "onWarn">,
+  onEvent: ((event: AgentSessionEvent) => void) | undefined,
+  reason: AutoCompactionReason,
+): Promise<void> {
+  const context = getAutoCompactionContext(session, chatJid, options, reason);
+  if (!context) return;
 
   try {
-    const contextTokens = estimateContextTokensFromSession(session);
-    // Inline threshold check — bypasses upstream settings.enabled flag since
-    // piclaw disables upstream auto-compaction and owns the compaction schedule.
-    const reserveTokens = settings.reserveTokens ?? 16384;
-    if (contextTokens <= contextWindow - reserveTokens) return;
-
     const activeBackoff = getActiveCompactionBackoff(chatJid);
     if (activeBackoff) {
       const detail = formatCompactionBackoffDetail(activeBackoff);
-      options.onWarn?.("Pre-prompt auto-compaction suppressed for chat after recent failures", {
-        operation: "maybe_auto_compact_session_before_prompt.backoff",
-        chatJid,
-        contextTokens,
-        contextWindow,
-        reserveTokens: settings.reserveTokens ?? null,
-        failureCount: activeBackoff.failureCount,
-        backoffUntil: activeBackoff.backoffUntil,
-        lastErrorMessage: activeBackoff.lastErrorMessage,
-      });
+      options.onWarn?.(
+        reason === "idle"
+          ? "Idle auto-compaction suppressed for chat after recent failures"
+          : "Pre-prompt auto-compaction suppressed for chat after recent failures",
+        {
+          operation: reason === "idle"
+            ? "schedule_idle_auto_compaction.backoff"
+            : "maybe_auto_compact_session_before_prompt.backoff",
+          chatJid,
+          contextTokens: context.contextTokens,
+          contextWindow: context.contextWindow,
+          reserveTokens: context.reserveTokens,
+          failureCount: activeBackoff.failureCount,
+          backoffUntil: activeBackoff.backoffUntil,
+          lastErrorMessage: activeBackoff.lastErrorMessage,
+        },
+      );
       onEvent?.({
         type: "compaction_suppressed",
         reason: "backoff",
@@ -280,18 +321,22 @@ export async function maybeAutoCompactSessionBeforePrompt(
       return;
     }
 
-    options.onInfo?.("Auto-compacting session before prompt", {
-      operation: "maybe_auto_compact_session_before_prompt",
-      chatJid,
-      contextTokens,
-      contextWindow,
-      reserveTokens: settings.reserveTokens ?? null,
-    });
+    options.onInfo?.(
+      reason === "idle"
+        ? "Auto-compacting idle session after turn"
+        : "Auto-compacting session before prompt",
+      {
+        operation: reason === "idle"
+          ? "schedule_idle_auto_compaction"
+          : "maybe_auto_compact_session_before_prompt",
+        chatJid,
+        contextTokens: context.contextTokens,
+        contextWindow: context.contextWindow,
+        reserveTokens: context.reserveTokens,
+      },
+    );
 
-    // Upstream 0.67.6 removed compaction_start/end events from the manual
-    // compact() path. Emit them locally so the web UI still shows the
-    // "Compacting context" status pill during what can be a 30-60s operation.
-    onEvent?.({ type: "compaction_start", reason: "threshold" } as AgentSessionEvent);
+    onEvent?.({ type: "compaction_start", reason } as AgentSessionEvent);
     const compactionResult = await runCompactionWithTimeout(
       session,
       chatJid,
@@ -303,34 +348,90 @@ export async function maybeAutoCompactSessionBeforePrompt(
       const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
       onEvent?.({
         type: "compaction_end",
-        reason: "threshold",
+        reason,
         result: undefined,
         aborted,
         willRetry: false,
-        errorMessage: aborted ? undefined : `Pre-prompt compaction failed: ${compactionResult.errorMessage}`,
+        errorMessage: aborted
+          ? undefined
+          : `${reason === "idle" ? "Idle compaction failed" : "Pre-prompt compaction failed"}: ${compactionResult.errorMessage}`,
       } as AgentSessionEvent);
-      options.onWarn?.("Pre-prompt auto-compaction entered backoff for this chat", {
-        operation: "maybe_auto_compact_session_before_prompt.backoff_recorded",
-        chatJid,
-        failureCount: failureState.failureCount,
-        backoffUntil: failureState.backoffUntil,
-        lastErrorMessage: failureState.lastErrorMessage,
-      });
+      options.onWarn?.(
+        reason === "idle"
+          ? "Idle auto-compaction entered backoff for this chat"
+          : "Pre-prompt auto-compaction entered backoff for this chat",
+        {
+          operation: reason === "idle"
+            ? "schedule_idle_auto_compaction.backoff_recorded"
+            : "maybe_auto_compact_session_before_prompt.backoff_recorded",
+          chatJid,
+          failureCount: failureState.failureCount,
+          backoffUntil: failureState.backoffUntil,
+          lastErrorMessage: failureState.lastErrorMessage,
+        },
+      );
       throw new Error(compactionResult.errorMessage);
     }
     clearCompactionFailureBackoff(chatJid);
+    // Increment per-session compaction success counter
+    const prevCount = compactionSuccessCounters.get(chatJid) ?? 0;
+    compactionSuccessCounters.set(chatJid, prevCount + 1);
+    options.onInfo?.("Compaction success count incremented", {
+      operation: reason === "idle" ? "schedule_idle_auto_compaction.counter" : "maybe_auto_compact_session_before_prompt.counter",
+      chatJid,
+      compactionCount: prevCount + 1,
+    });
     onEvent?.({
       type: "compaction_end",
-      reason: "threshold",
+      reason,
       result: undefined,
       aborted: false,
       willRetry: false,
     } as AgentSessionEvent);
   } catch (error) {
-    options.onWarn?.("Pre-prompt auto-compaction skipped", {
-      operation: "maybe_auto_compact_session_before_prompt",
-      chatJid,
-      error,
-    });
+    options.onWarn?.(
+      reason === "idle" ? "Idle auto-compaction skipped" : "Pre-prompt auto-compaction skipped",
+      {
+        operation: reason === "idle"
+          ? "schedule_idle_auto_compaction"
+          : "maybe_auto_compact_session_before_prompt",
+        chatJid,
+        error,
+      },
+    );
   }
+}
+
+export function cancelScheduledIdleAutoCompaction(chatJid: string): void {
+  const pending = idleAutoCompactionTimers.get(chatJid);
+  if (!pending) return;
+  clearTimeout(pending);
+  idleAutoCompactionTimers.delete(chatJid);
+}
+
+export function scheduleIdleAutoCompaction(
+  session: AgentSession,
+  chatJid: string,
+  options: Pick<CompactionLifecycleOptions, "onInfo" | "onWarn">,
+  onEvent?: (event: AgentSessionEvent) => void,
+): void {
+  cancelScheduledIdleAutoCompaction(chatJid);
+  if (!getAutoCompactionContext(session, chatJid, options, "idle")) return;
+
+  const delayMs = getIdleAutoCompactionDelayMs();
+  const timer = setTimeout(() => {
+    idleAutoCompactionTimers.delete(chatJid);
+    void maybeAutoCompactSession(session, chatJid, options, onEvent, "idle");
+  }, delayMs);
+  idleAutoCompactionTimers.set(chatJid, timer);
+}
+
+export async function maybeAutoCompactSessionBeforePrompt(
+  session: AgentSession,
+  chatJid: string,
+  options: Pick<CompactionLifecycleOptions, "onInfo" | "onWarn">,
+  onEvent?: (event: AgentSessionEvent) => void,
+): Promise<void> {
+  cancelScheduledIdleAutoCompaction(chatJid);
+  await maybeAutoCompactSession(session, chatJid, options, onEvent, "threshold");
 }

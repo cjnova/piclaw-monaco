@@ -27,6 +27,18 @@ describe("web agent streaming", () => {
         options.onEvent?.(makeEvent("message_update", {
           assistantMessageEvent: { type: "thinking_end", content: "Thinking..." },
         }));
+        options.onEvent?.(makeEvent("thinking_level_changed", {
+          level: "high",
+        }));
+        options.onEvent?.(makeEvent("thinking_level_select", {
+          level: "medium",
+          previousLevel: "high",
+        }));
+        options.onEvent?.(makeEvent("model_select", {
+          model: { provider: "openai", id: "gpt-5" },
+          previousModel: { provider: "anthropic", id: "claude-sonnet-4-5" },
+          source: "set",
+        }));
         options.onEvent?.(makeEvent("message_update", {
           assistantMessageEvent: {
             type: "toolcall_end",
@@ -83,6 +95,15 @@ describe("web agent streaming", () => {
       expect(eventTypes).not.toContain("agent_draft_delta");
       expect(eventTypes).not.toContain("agent_thought_delta");
       expect(eventTypes).toContain("agent_response");
+      expect(eventTypes).toContain("model_changed");
+
+      const thinkingEvents = events.filter((event) => event.type === "model_changed" && event.data?.thinking_level);
+      expect(thinkingEvents.map((event) => event.data?.thinking_level)).toEqual(["high", "medium"]);
+      expect(thinkingEvents[1]?.data?.previous_thinking_level).toBe("high");
+
+      const modelEvent = events.find((event) => event.type === "model_changed" && event.data?.model === "openai/gpt-5");
+      expect(modelEvent?.data?.previous_model).toBe("anthropic/claude-sonnet-4-5");
+      expect(modelEvent?.data?.source).toBe("set");
 
       const toolStatus = events.find(
         (event) => event.type === "agent_status" && event.data?.type === "tool_status"

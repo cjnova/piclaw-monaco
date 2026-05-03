@@ -63,9 +63,15 @@ test('applyMetersCollapsed persists state and dispatches a collapsed-change even
   ]);
 });
 
-test('buildCompactMetersSummary uses fat bullet separators and includes swap when present', () => {
-  expect(buildCompactMetersSummary({ cpu_percent: 18, ram_percent: 62, swap_percent: 7, swap_total_bytes: 1024 })).toBe('CPU 18% • RAM 62% • SWP 7%');
-  expect(buildCompactMetersSummary({ cpu_percent: 18, ram_percent: 62, swap_percent: null, swap_total_bytes: 0 })).toBe('CPU 18% • RAM 62%');
+test('buildCompactMetersSummary uses fat bullet separators and includes Linux buffer/cache when present', () => {
+  expect(buildCompactMetersSummary({
+    cpu_percent: 18,
+    ram_percent: 62,
+    buffer_cache_bytes: 512 * 1024 * 1024,
+    swap_percent: 7,
+    swap_total_bytes: 1024,
+  })).toBe('CPU 18% • RAM 62% • BUF 512M • SWP 7%');
+  expect(buildCompactMetersSummary({ cpu_percent: 18, ram_percent: 62, buffer_cache_bytes: null, swap_percent: null, swap_total_bytes: 0 })).toBe('CPU 18% • RAM 62%');
 });
 
 test('buildSparklinePath supports dynamically scaled byte series and flat lines', () => {
@@ -115,4 +121,15 @@ test('toggleMetersCollapsed flips the stored collapsed state', () => {
   expect(readStoredMetersCollapsed(false)).toBe(true);
   expect(toggleMetersCollapsed()).toBe(false);
   expect(readStoredMetersCollapsed(false)).toBe(false);
+});
+
+test('applyMetersFromEvent applies server-persisted enabled and collapsed state', async () => {
+  const win = makeWindow();
+  globalThis.window = win;
+  const { applyMetersFromEvent } = await import('../../web/src/ui/meters.ts');
+
+  applyMetersFromEvent({ enabled: true, collapsed: true });
+
+  expect(readStoredMetersEnabled(false)).toBe(true);
+  expect(readStoredMetersCollapsed(false)).toBe(true);
 });

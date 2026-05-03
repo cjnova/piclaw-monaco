@@ -30,7 +30,7 @@ export function resolveToolStatusHints(context: ToolStatusHintContext): ToolStat
   const seen = new Set<string>();
 
   for (const provider of providers.values()) {
-    let candidate: ToolStatusHint[] | ToolStatusHint | null | undefined = null;
+    let candidate: ToolStatusHint[] | ToolStatusHint | null | undefined;
     try {
       candidate = provider.buildHints(context);
     } catch {

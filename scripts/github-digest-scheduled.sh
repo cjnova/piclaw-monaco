@@ -8,6 +8,8 @@
 # - maintains a rolling YAML history of per-repo issue/PR/star metrics
 # - posts the Markdown digest when open issues/PRs exist or when stars changed
 #
+# The digest snapshot is written outside the repo by default:
+#   /workspace/generated/github-collate/latest-open-all-repos.{json,md}
 # The history file is written as:
 #   /workspace/notes/reference/github-repo-metrics-history.yml
 
@@ -15,7 +17,7 @@ set -euo pipefail
 
 ROOT_DIR="/workspace/piclaw"
 COLLATE_SCRIPT="$ROOT_DIR/scripts/github-collate-issues-prs.ts"
-OUTPUT_DIR="$ROOT_DIR/runtime/generated/github-collate"
+OUTPUT_DIR="${PICLAW_GITHUB_COLLATE_OUTPUT_DIR:-/workspace/generated/github-collate}"
 NOTES_DIR="/workspace/notes/reference"
 LATEST_JSON="$OUTPUT_DIR/latest-open-all-repos.json"
 LATEST_MD="$OUTPUT_DIR/latest-open-all-repos.md"

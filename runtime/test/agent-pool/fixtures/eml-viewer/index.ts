@@ -11,14 +11,6 @@ const ROUTE_PREFIX = "/eml-viewer";
 const EXT_DIR = typeof import.meta !== "undefined" && import.meta.dir ? import.meta.dir : process.cwd();
 const HTML_CONTENT_TYPE = "text/html; charset=utf-8";
 
-function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;");
-}
-
 function buildViewerHtml(): string {
   return String.raw`<!doctype html>
 <html lang="en">

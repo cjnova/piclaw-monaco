@@ -5,6 +5,7 @@
 #   build-web      – Build web bundles into static/dist/ (+ sourcemaps).
 #   build-ts       – Type-check TypeScript (tsc --noEmit). No generated/dist/ output.
 #   build-piclaw   – Full build: build-web (vendor + bundles) + build-ts.
+#   build-desktop  – Build the optional Electrobun desktop shell.
 #   pack           – Pack piclaw into a .tgz (depends on build-piclaw).
 #   local-install  – Pack and install globally (no restart).
 #   lint/test      – Run ESLint and bun test suite.
@@ -38,7 +39,7 @@ GLOBAL_LOCK := $(BUN_ROOT)/install/global/bun.lock
 PI_AGENT_VERSION ?= $(shell jq -r '.dependencies["@mariozechner/pi-coding-agent"] // "0.58.3"' package.json)
 WEB_BUILD_TEST_TIMEOUT_MS ?= 20000
 
-.PHONY: help up down enter build build-piclaw build-web build-ts vendor update-mermaid-vendor pack \
+.PHONY: help up down enter build build-piclaw build-web build-ts build-desktop vendor update-mermaid-vendor pack \
         local-install restart lint test test-coverage ci-fast ci-integration publish-smoke \
         dual-tag tag-ghcr sync-version bump-minor bump-patch push
 
@@ -115,6 +116,9 @@ build-ts: ## Type-check TypeScript / validate emit (generated/dist is cleaned up
 # artifacts only need runtime/web/static/dist/ bundles plus packaged sources.
 
 build-piclaw: build-web build-ts ## Full build: vendor + web + ts
+
+build-desktop: ## Build the optional Electrobun desktop shell for the current platform
+	bun run build:desktop
 
 # ── Pack & install ───────────────────────────────────────────────────
 
