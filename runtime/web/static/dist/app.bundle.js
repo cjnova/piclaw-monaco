@@ -5293,7 +5293,7 @@ For tests, pass a Ghostty instance directly:
     const providerUsage = useSignal(null);
     const fetchStatus = q2(async () => {
       try {
-        const res = await fetch("/agent/status");
+        const res = await fetch("/agent/status?chat_jid=" + encodeURIComponent(getChatJid()));
         if (res.ok) {
           agentStatus.value = await res.json();
           error.value = false;
@@ -5301,7 +5301,7 @@ For tests, pass a Ghostty instance directly:
         } else {
           error.value = true;
         }
-        const modelsRes = await fetch("/agent/models");
+        const modelsRes = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
         if (modelsRes.ok) {
           const info = await modelsRes.json();
           if (info.current) currentModel.value = info.current;
@@ -5336,7 +5336,7 @@ For tests, pass a Ghostty instance directly:
     }, []);
     const fetchContext = q2(async () => {
       try {
-        const res = await fetch("/agent/context");
+        const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()));
         if (res.ok) {
           agentContext.value = await res.json();
         }
@@ -5450,7 +5450,7 @@ For tests, pass a Ghostty instance directly:
       showPicker.value = true;
       if (!models.value.length) models.value = FALLBACK_MODELS;
       try {
-        const res = await fetch("/agent/models");
+        const res = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
         if (res.ok) {
           const info = await res.json();
           const entries = info.model_options?.length ? info.model_options.map((o4) => ({ id: o4.id, context_window: o4.context_window })) : info.models?.length ? info.models.map((id) => ({ id })) : FALLBACK_MODELS;

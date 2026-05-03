@@ -1,4 +1,4 @@
-import { getMessageUrl } from "../api/chat-jid";
+import { getMessageUrl, getChatJid } from "../api/chat-jid";
 import { useCallback, useEffect } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 
@@ -104,7 +104,7 @@ export function ModelContextBar() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch("/agent/status");
+      const res = await fetch("/agent/status?chat_jid=" + encodeURIComponent(getChatJid()));
       if (res.ok) {
         agentStatus.value = await res.json() as AgentStatus;
         error.value = false;
@@ -113,7 +113,7 @@ export function ModelContextBar() {
         error.value = true;
       }
       // Also fetch current model (status.data is null when idle)
-      const modelsRes = await fetch("/agent/models");
+      const modelsRes = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
       if (modelsRes.ok) {
         const info = await modelsRes.json() as ModelInfo;
         if (info.current) currentModel.value = info.current;
@@ -153,7 +153,7 @@ export function ModelContextBar() {
 
   const fetchContext = useCallback(async () => {
     try {
-      const res = await fetch("/agent/context");
+      const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()));
       if (res.ok) {
         agentContext.value = await res.json() as AgentContext;
       }
@@ -290,7 +290,7 @@ export function ModelContextBar() {
     if (!models.value.length) models.value = FALLBACK_MODELS;
 
     try {
-      const res = await fetch("/agent/models");
+      const res = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
       if (res.ok) {
         const info = await res.json() as ModelInfo;
         const entries: ModelEntry[] = info.model_options?.length
