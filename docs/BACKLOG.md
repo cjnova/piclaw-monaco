@@ -1,6 +1,7 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-03 (post-review)
+Updated: 2026-05-03
+Total open issues: 30
 
 ## Vision
 
@@ -210,8 +211,8 @@ Technical debt cleanup. Each PR includes regression tests.
 
 | # | Task | Issue | Severity | Status |
 |---|---|---|---|---|
-| 1 | Restore type safety in markdown/rendering utils | #172 | High | ⏳ |
-| 2 | Break up oversized controller components | #174 | Medium | ⏳ |
+| 1 | Restore type safety in markdown/rendering utils | #172 | High | ✅ |
+| 2 | Break up oversized controller components | #174 | Medium | ✅ |
 | 3 | Remove deprecated dead code + duplicate metadata | #175 | Medium | ⏳ |
 | 4 | Harden ModelContextBar polling races | #176 | Medium | ⏳ |
 | 5 | Wire or remove unused workspace settings | #177 | Low | ⏳ |
