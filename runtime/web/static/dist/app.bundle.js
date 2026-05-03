@@ -5155,11 +5155,17 @@ For tests, pass a Ghostty instance directly:
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
   }
-  function StatsDisplay({ stats }) {
-    if (!stats) return /* @__PURE__ */ u4("span", { className: "sys-stats", children: "CPU -- RAM -- RSS -- SWP --" });
+  function StatsDisplay({ stats, isStale }) {
+    if (!stats) {
+      return /* @__PURE__ */ u4("span", { className: "sys-stats", children: [
+        isStale && /* @__PURE__ */ u4("span", { className: "sys-stats__stale", title: "System stats unavailable", children: "\u26A0" }),
+        "CPU -- RAM -- RSS -- SWP --"
+      ] });
+    }
     const rssMb = Math.round((stats.process_memory?.rss_bytes ?? 0) / (1024 * 1024));
     const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
     return /* @__PURE__ */ u4("span", { className: "sys-stats", children: [
+      isStale && /* @__PURE__ */ u4("span", { className: "sys-stats__stale", title: "System stats unavailable", children: "\u26A0" }),
       /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "CPU" }),
       " ",
       stats.cpu_percent,
@@ -5180,6 +5186,13 @@ For tests, pass a Ghostty instance directly:
   function SystemStats() {
     const clockText = useSignal(formatClock(/* @__PURE__ */ new Date()));
     const stats = useSignal(null);
+    const statsError = useSignal(false);
+    const lastStatsSuccess = useSignal(0);
+    const statsPollTick = useSignal(0);
+    const isStale = useComputed(() => {
+      void statsPollTick.value;
+      return statsError.value && lastStatsSuccess.value > 0 && Date.now() - lastStatsSuccess.value > 15e3;
+    });
     y2(() => {
       const tick = () => {
         clockText.value = formatClock(/* @__PURE__ */ new Date());
@@ -5202,9 +5215,17 @@ For tests, pass a Ghostty instance directly:
           const res = await fetch("/agent/system-metrics");
           if (res.ok) {
             stats.value = await res.json();
+            statsError.value = false;
+            lastStatsSuccess.value = Date.now();
+            statsPollTick.value += 1;
+          } else {
+            statsError.value = true;
+            statsPollTick.value += 1;
           }
         } catch (err) {
           console.warn("[SystemStats] fetch failed:", err);
+          statsError.value = true;
+          statsPollTick.value += 1;
         }
       };
       fetchStats();
@@ -5212,7 +5233,7 @@ For tests, pass a Ghostty instance directly:
       return () => clearInterval(interval);
     }, [stats]);
     return /* @__PURE__ */ u4("span", { className: "sys-stats-bar", children: [
-      /* @__PURE__ */ u4(StatsDisplay, { stats: stats.value }),
+      /* @__PURE__ */ u4(StatsDisplay, { stats: stats.value, isStale: isStale.value }),
       "\xA0\xA0\u2014\xA0\xA0",
       clockText.value
     ] });
@@ -5287,6 +5308,11 @@ For tests, pass a Ghostty instance directly:
     const agentContext = useSignal(loadCachedContext());
     const error = useSignal(false);
     const lastSuccessAt = useSignal(0);
+    const pollTick = useSignal(0);
+    const isStale = useComputed(() => {
+      void pollTick.value;
+      return error.value && lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value > 3e4;
+    });
     const showPicker = useSignal(false);
     const showThinkingPicker = useSignal(false);
     const models = useSignal([]);
@@ -5338,9 +5364,11 @@ For tests, pass a Ghostty instance directly:
             }
           }
         }
+        pollTick.value += 1;
       } catch (err) {
         console.warn("[ModelContextBar] status fetch failed:", err);
         error.value = true;
+        pollTick.value += 1;
       }
     }, []);
     const fetchContext = q2(async () => {
@@ -5466,6 +5494,7 @@ For tests, pass a Ghostty instance directly:
         }
       } catch {
         isCompacting.value = false;
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Compaction failed", type: "error" } }));
       }
     };
     const flashStatus = (message) => {
@@ -5556,7 +5585,7 @@ For tests, pass a Ghostty instance directly:
       "span",
       {
         "data-model-picker": true,
-        className: "model-badge-wrapper",
+        className: `model-badge-wrapper${isStale.value ? " model-badge-wrapper--stale" : ""}`,
         children: [
           showPicker.value && /* @__PURE__ */ u4(
             "div",

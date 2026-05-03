@@ -94,6 +94,11 @@ export function ModelContextBar() {
   const agentContext = useSignal<AgentContext | null>(loadCachedContext());
   const error = useSignal<boolean>(false);
   const lastSuccessAt = useSignal<number>(0);
+  const pollTick = useSignal(0);
+  const isStale = useComputed(() => {
+    void pollTick.value; // subscribe to poll ticks for reactivity
+    return error.value && lastSuccessAt.value > 0 && Date.now() - lastSuccessAt.value > 30000;
+  });
   const showPicker = useSignal<boolean>(false);
   const showThinkingPicker = useSignal<boolean>(false);
   const models = useSignal<ModelEntry[]>([]);
@@ -154,9 +159,11 @@ export function ModelContextBar() {
           }
         }
       }
+      pollTick.value += 1;
     } catch (err) {
       console.warn("[ModelContextBar] status fetch failed:", err);
       error.value = true;
+      pollTick.value += 1;
     }
   }, []);
 
@@ -296,6 +303,7 @@ export function ModelContextBar() {
       }
     } catch {
       isCompacting.value = false;
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Compaction failed", type: "error" } }));
     }
   };
 
@@ -401,7 +409,7 @@ export function ModelContextBar() {
   return (
     <span
       data-model-picker
-      className="model-badge-wrapper"
+      className={`model-badge-wrapper${isStale.value ? " model-badge-wrapper--stale" : ""}`}
     >
       {/* Model picker dropdown — opens above */}
       {showPicker.value && (

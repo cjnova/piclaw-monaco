@@ -1,5 +1,5 @@
 import { useEffect } from "preact/hooks";
-import { useSignal } from "@preact/signals";
+import { useSignal, useComputed } from "@preact/signals";
 
 interface StatsData {
   cpu_percent: number;
@@ -20,12 +20,20 @@ function formatClock(date: Date): string {
   return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
 }
 
-function StatsDisplay({ stats }: { stats: StatsData | null }) {
-  if (!stats) return <span className="sys-stats">CPU -- RAM -- RSS -- SWP --</span>;
+function StatsDisplay({ stats, isStale }: { stats: StatsData | null; isStale: boolean }) {
+  if (!stats) {
+    return (
+      <span className="sys-stats">
+        {isStale && <span className="sys-stats__stale" title="System stats unavailable">⚠</span>}
+        CPU -- RAM -- RSS -- SWP --
+      </span>
+    );
+  }
   const rssMb = Math.round((stats.process_memory?.rss_bytes ?? 0) / (1024 * 1024));
   const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
   return (
     <span className="sys-stats">
+      {isStale && <span className="sys-stats__stale" title="System stats unavailable">⚠</span>}
       <span className="sys-stats__label">CPU</span> {stats.cpu_percent}%
       <span className="sys-stats__label">RAM</span> {stats.ram_percent}%
       <span className="sys-stats__label">RSS</span> {rssMb}M
@@ -37,6 +45,13 @@ function StatsDisplay({ stats }: { stats: StatsData | null }) {
 export function SystemStats() {
   const clockText = useSignal<string>(formatClock(new Date()));
   const stats = useSignal<StatsData | null>(null);
+  const statsError = useSignal(false);
+  const lastStatsSuccess = useSignal(0);
+  const statsPollTick = useSignal(0);
+  const isStale = useComputed(() => {
+    void statsPollTick.value;
+    return statsError.value && lastStatsSuccess.value > 0 && Date.now() - lastStatsSuccess.value > 15000;
+  });
 
   // Clock: align to next full minute, then tick every 60s
   useEffect(() => {
@@ -66,9 +81,17 @@ export function SystemStats() {
         const res = await fetch("/agent/system-metrics");
         if (res.ok) {
           stats.value = await res.json() as StatsData;
+          statsError.value = false;
+          lastStatsSuccess.value = Date.now();
+          statsPollTick.value += 1;
+        } else {
+          statsError.value = true;
+          statsPollTick.value += 1;
         }
       } catch (err) {
         console.warn("[SystemStats] fetch failed:", err);
+        statsError.value = true;
+        statsPollTick.value += 1;
       }
     };
 
@@ -79,7 +102,7 @@ export function SystemStats() {
 
   return (
     <span className="sys-stats-bar">
-      <StatsDisplay stats={stats.value} />&nbsp;&nbsp;&mdash;&nbsp;&nbsp;{clockText.value}
+      <StatsDisplay stats={stats.value} isStale={isStale.value} />&nbsp;&nbsp;&mdash;&nbsp;&nbsp;{clockText.value}
     </span>
   );
 }
