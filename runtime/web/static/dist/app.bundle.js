@@ -6695,7 +6695,6 @@ ${code}
           className: "chat-tabs__iframe",
           src: activeTab.value,
           sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
-          ...{ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" },
           title: extractDisplayName(pages.find((p6) => p6.prefix === activeTab.value)?.extensionPath ?? "")
         }
       ) }) : /* @__PURE__ */ u4("div", { className: "chat-tabs__blocked", children: "Blocked: unsafe extension URL" })
@@ -11246,7 +11245,6 @@ For tests, pass a Ghostty instance directly:
           className: "extension-frame__iframe",
           src: extensionPageUrl,
           sandbox: "allow-same-origin allow-scripts allow-forms allow-popups",
-          ...{ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" },
           title: extensionPageName ?? "Extension Page"
         }
       ) })
