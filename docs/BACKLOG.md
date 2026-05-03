@@ -1,6 +1,6 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-02 (post-review)
+Updated: 2026-05-03 (post-review)
 
 ## Vision
 
@@ -124,6 +124,29 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | 038-task-search-sidebar-ui | Search input + results UI in sidebar | ✅ |
 | chat-send | Wire compose box to POST /agent/message | ✅ |
 
+### Completed / Closed Items
+
+| Issue | Status |
+|---|---|
+| #125 color contrast | ✅ |
+| #126 main landmark | ✅ |
+| #132 LCP lazy-load | ✅ |
+| #134 dropped | ❌ closed / won't do |
+| #168 security fix | ✅ |
+| #169 security fix | ✅ |
+| #173 CSP meta tag | ✅ (reverted after validation) |
+| #178 review bug | ✅ |
+| #179 review bug | ✅ |
+| #180 review bug | ✅ |
+| #181 review bug | ✅ |
+| #182 review bug | ✅ |
+| #183 review bug | ✅ |
+| #189 review bug | ✅ |
+| #215 terminal popup | ✅ |
+| #219 file tree state persistence | ✅ |
+| #147 streaming improvements | ❌ closed (superseded by #230) |
+| #145 tool lifecycle events | ❌ closed (superseded by #230) |
+
 ### Wave 10b — Upstream Sync & Foundation
 
 | Task | Description | Status |
@@ -181,29 +204,75 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | theming-debt | Replace hardcoded colors with CSS variables in ModelContextBar (#111) | ✅ |
 | minor-cleanup | Unused memo deps, inline DOM styling, duplicate CSS selectors (#114) | ✅ |
 
-### Wave 11 — Full Functionality
+### Next: Wave 11a — Refactors (do BEFORE new features)
+
+Technical debt cleanup. Each PR includes regression tests.
+
+| # | Task | Issue | Severity | Status |
+|---|---|---|---|---|
+| 1 | Restore type safety in markdown/rendering utils | #172 | High | ⏳ |
+| 2 | Break up oversized controller components | #174 | Medium | ⏳ |
+| 3 | Remove deprecated dead code + duplicate metadata | #175 | Medium | ⏳ |
+| 4 | Harden ModelContextBar polling races | #176 | Medium | ⏳ |
+| 5 | Wire or remove unused workspace settings | #177 | Low | ⏳ |
+| 6 | Prune unused shell.css selectors | #193 | Medium | ⏳ |
+
+### Wave 11b — UX Polish (after refactors)
 
 | Task | Description | Status |
 |---|---|---|
-| search-scope-media-filters | Search scope selector (Current/Branch/All) + Images/Attachments checkboxes + OR/AND toggle (#85) | ⏳ |
-| qr-code-pairing-settings | QR code device pairing in Settings panel (#86) | ⏳ |
-| central-pane-tab-bar | Central pane tab bar: Chat / Dashboards dropdown / Terminal tabs (#89) | ⏳ |
-| full-compose-bar-redesign | Send/stop cycle, attachments, queue management, session pill | ⏳ |
-| wire-side-prompt-panel-to-monaco | Side-prompt panel using upstream streaming API | ⏳ |
-| wire-fleet-batch-to-command-palette | Expose fleet_batch tool via UI | ⏳ |
-| wire-terminal-profile-selector | Terminal profile selection (Shell, Pi TUI) | ⏳ |
-| leverage-tool-lifecycle-events-in-chat | Show tool_aborted, richer tool events in chat | ⏳ |
-| 016-task-markdown-renderer | Markdown + code + KaTeX + Mermaid rendering (#146) | ✅ |
-|   ↳ 146-A-vendor-bundles | KaTeX, beautiful-mermaid, CodeMirror highlight vendor bundles (#153) | ✅ |
-|   ↳ 146-B-syntax-highlighting | CodeMirror/Lezer syntax highlighting for code blocks (#154) | ✅ |
-|     ↳ bicep-highlighting | Bicep language syntax highlighting — refinement of #154 (#160) | ✅ |
-|   ↳ 146-C-markdown-pipeline | Full markdown rendering pipeline (#155) | ✅ |
-|   ↳ 146-D-code-block-ux | Code block copy button + language label (#156) | ✅ |
-|   ↳ 146-E-post-render-hooks | Mermaid SVG rendering + theme awareness (#157) | ✅ |
-| 017-task-streaming-handler | Real-time agent streaming improvements | ⏳ |
-| 018-task-adaptive-cards-renderer | Adaptive cards in chat | ⏳ |
-| 019-task-widget-iframe-host | Dashboard widgets in chat | ⏳ |
-| 024-task-terminal-tabs | Multi-tab terminal | ⏳ |
+| real-time-agent-turn-progress | Thoughts, tool calls, draft panels (#230) — supersedes #147, #145 | ⏳ |
+| message-collapse-delete-actions | Message collapse + delete actions (#209) | ⏳ |
+| message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ⏳ |
+| separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ⏳ (partially done) |
+
+### Wave 11 — Full Functionality (after UX polish)
+
+| Task | Description | Status |
+|---|---|---|
+| 018-task-adaptive-cards-renderer | Adaptive cards in chat (#148) | ⏳ |
+| 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ⏳ |
+| full-compose-bar-redesign | Send/stop cycle, attachments, queue (#141, depends on #230) | ⏳ |
+| central-pane-tab-bar | Chat / Dashboards / Terminal tabs (#89) | ⏳ |
+| 024-task-terminal-tabs | Multi-tab terminal (#150) | ⏳ |
+| wire-terminal-profile-selector | Terminal profiles — Shell, Pi TUI (#144) | ⏳ |
+| wire-scheduled-tasks-api | Scheduled task cards in Tasks panel (#104) | ⏳ |
+| search-scope-media-filters | Search scope + media filters (#85) | ⏳ |
+| wire-side-prompt-panel-to-monaco | Side-prompt panel (#142) | ⏳ |
+| wire-fleet-batch-to-command-palette | Fleet batch via UI (#143) | ⏳ |
+| qr-code-pairing-settings | QR code pairing (#86) | ⏳ |
+| inline-provider-setup | Provider setup form in Settings (#96) | ⏳ |
+
+### Wave 12 — Performance & Cleanup
+
+| Task | Issue | Status |
+|---|---|---|
+| LCP: Code-split ghostty-web | #131 | ⏳ |
+| LCP: Lazy-load marked + DOMPurify | #132 | ✅ |
+| LCP: Subset JetBrains Mono fonts | #133 | ⏳ |
+| LCP: Purge unused CSS | #134 | ❌ closed / won't do |
+| LCP: Preload critical UI fonts | #135 | ⏳ |
+| LCP: Enable gzip/brotli compression | #136 | ⏳ |
+| Virtualize chat timeline | #184 | ⏳ |
+
+### Wave 13 — A11y & Polish
+
+| Task | Issue | Status |
+|---|---|---|
+| Replace custom click targets with semantic controls | #170 | ⏳ |
+| Associate labels with inputs | #171 | ⏳ |
+| Mobile breakpoints | #185 | ⏳ |
+| SEO metadata | #186 | ⏳ |
+| Browser compat fallbacks | #187 | ⏳ |
+
+### Unscheduled
+
+| Task | Issue | Status |
+|---|---|---|
+| Copilot agents integration | #19 | ⏳ |
+| Passkey auth support | #139 | ⏳ |
+| Passkey management UI | #151 (depends on #139) | ⏳ |
+| Browser voice integration | #140 | ⏳ |
 
 ### Future (V2)
 
