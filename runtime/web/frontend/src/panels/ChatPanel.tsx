@@ -163,7 +163,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           <iframe
             className="chat-tabs__iframe"
             src={activeTab.value}
-            sandbox="allow-same-origin allow-scripts allow-forms"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             {...({ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" } as any)}
             title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
           />
