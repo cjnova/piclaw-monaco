@@ -18,6 +18,8 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeTab = useSignal<string>("chat");
   const extensionPages = useSignal<ExtensionRoute[]>([]);
+  const isSending = useSignal(false);
+  const sendError = useSignal<string | null>(null);
 
   useEffect(() => {
     fetch("/api/extension-routes", { credentials: "include" })
@@ -26,8 +28,8 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         const pages = routes.filter((r) => r.prefix.endsWith("-page"));
         extensionPages.value = pages;
       })
-      .catch(() => {
-        // silently ignore if endpoint not available
+      .catch((err) => {
+        console.warn("[chat] extension route discovery failed:", err);
       });
   }, []);
 
@@ -48,29 +50,45 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
 
   const sendMessage = async () => {
     const el = textareaRef.current;
-    if (!el) return;
+    if (!el || isSending.value) return;
     const content = el.value.trim();
     if (!content) return;
+
+    isSending.value = true;
+    sendError.value = null;
+
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const res = await fetch(getMessageUrl(), {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       if (!res.ok) {
-        console.warn("[chat] send failed:", res.status);
+        sendError.value = `Send failed (HTTP ${res.status}). Try again.`;
+        isSending.value = false;
         return;
       }
+
       // Only clear draft after confirmed success
       el.value = "";
       el.style.height = "auto";
+      sendError.value = null;
       const data = await res.json();
       if (data?.user_message) {
         window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
       }
-    } catch (err) {
-      console.warn("[chat] send failed:", err);
+    } catch (err: any) {
+      sendError.value = err?.name === "AbortError"
+        ? "Send timed out. Try again."
+        : "Failed to send. Check connection.";
+    } finally {
+      isSending.value = false;
     }
   };
 
@@ -124,12 +142,20 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
             />
             <button
               type="button"
-              className="chat__send-btn"
+              className={`chat__send-btn${isSending.value ? " chat__send-btn--sending" : ""}`}
               onClick={sendMessage}
+              disabled={isSending.value}
+              aria-label={isSending.value ? "Sending..." : "Send message"}
             >
-              Send
+              {isSending.value ? "Sending..." : "Send"}
             </button>
           </div>
+          {sendError.value && (
+            <div className="chat__send-error">
+              {sendError.value}
+              <button type="button" className="chat__send-error-dismiss" onClick={() => (sendError.value = null)}>✕</button>
+            </div>
+          )}
         </>
       ) : isSafeExtensionUrl(activeTab.value) ? (
         <>
