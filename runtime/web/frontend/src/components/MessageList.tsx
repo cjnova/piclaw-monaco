@@ -6,12 +6,14 @@ import { useScrollManager } from "./message-list/useScrollManager";
 import { useTimelineFetch } from "./message-list/useTimelineFetch";
 import { useTimelineStream } from "./message-list/useTimelineStream";
 import { MessageItem } from "./message-list/MessageItem";
+import { ThoughtsPanel } from "./message-list/ThoughtsPanel";
 import { useCollapsedMessages } from "./message-list/useCollapsedMessages";
 import type { Interaction } from "./message-list/types";
 
 export function MessageList() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [draft, setDraft] = useState<string>("");
+  const [thought, setThought] = useState<string>("");
   const timelineError = useSignal<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +58,7 @@ export function MessageList() {
   useTimelineStream({
     setMessages,
     setDraft,
+    setThought,
     setConnected,
     scrollToBottom,
     refetchTimelineOnReconnect,
@@ -141,6 +144,8 @@ export function MessageList() {
           onDelete={() => handleDeleteMessage(msg.id)}
         />
       ))}
+
+      <ThoughtsPanel thought={thought} />
 
       {draft && (
         <div className="message-list__draft">

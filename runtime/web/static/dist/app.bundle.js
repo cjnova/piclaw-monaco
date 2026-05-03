@@ -6230,6 +6230,7 @@ ${code}
   function useTimelineStream({
     setMessages,
     setDraft,
+    setThought,
     setConnected,
     scrollToBottom,
     refetchTimelineOnReconnect,
@@ -6252,6 +6253,27 @@ ${code}
           scrollToBottom(true);
         } catch (err) {
           console.warn("[MessageList] SSE parse error:", err);
+        }
+      });
+      es.addEventListener("agent_thought_delta", (e5) => {
+        try {
+          const parsed = JSON.parse(e5.data);
+          if (parsed.delta) {
+            setThought((prev) => prev + parsed.delta);
+          } else if (parsed.text !== void 0) {
+            setThought(parsed.text);
+          }
+        } catch (err) {
+          console.warn("[MessageList] SSE thought parse error:", err);
+        }
+      });
+      es.addEventListener("agent_thought", (e5) => {
+        try {
+          const parsed = JSON.parse(e5.data);
+          const text = parsed.text ?? parsed.content ?? "";
+          setThought(text);
+        } catch (err) {
+          console.warn("[MessageList] SSE thought parse error:", err);
         }
       });
       es.addEventListener("agent_draft_delta", (e5) => {
@@ -6286,6 +6308,7 @@ ${code}
             return [...prev, interaction];
           });
           setDraft("");
+          setThought("");
           scrollToBottom(true);
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
@@ -6293,6 +6316,7 @@ ${code}
         } catch (err) {
           console.warn("[MessageList] SSE parse error:", err);
           setDraft("");
+          setThought("");
           scrollToBottom(true);
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
@@ -6332,6 +6356,7 @@ ${code}
       scrollToBottom,
       setConnected,
       setDraft,
+      setThought,
       setMessages,
       timelineError
     ]);
@@ -6607,6 +6632,29 @@ ${code}
     );
   }
 
+  // runtime/web/frontend/src/components/message-list/ThoughtsPanel.tsx
+  function ThoughtsPanel({ thought }) {
+    const contentRef = A2(null);
+    y2(() => {
+      const el = contentRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, [thought]);
+    if (!thought) return null;
+    return /* @__PURE__ */ u4("div", { className: "thoughts-panel", ref: contentRef, children: [
+      /* @__PURE__ */ u4("div", { className: "thoughts-panel__header", children: [
+        /* @__PURE__ */ u4("i", { className: "codicon codicon-lightbulb" }),
+        /* @__PURE__ */ u4("span", { className: "thoughts-panel__title", children: "Thinking..." })
+      ] }),
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          className: "thoughts-panel__content",
+          dangerouslySetInnerHTML: { __html: renderThinkingMarkdown(thought) }
+        }
+      )
+    ] });
+  }
+
   // runtime/web/frontend/src/components/message-list/useCollapsedMessages.ts
   var STORAGE_KEY = () => `piclaw:collapsed-messages:${getChatJid()}`;
   function loadCollapsed() {
@@ -6641,6 +6689,7 @@ ${code}
   function MessageList() {
     const [connected, setConnected] = d2(null);
     const [draft, setDraft] = d2("");
+    const [thought, setThought] = d2("");
     const timelineError = useSignal(null);
     const bottomRef = A2(null);
     const replaceMessagesRef = A2(null);
@@ -6674,6 +6723,7 @@ ${code}
     useTimelineStream({
       setMessages,
       setDraft,
+      setThought,
       setConnected,
       scrollToBottom,
       refetchTimelineOnReconnect,
@@ -6744,6 +6794,7 @@ ${code}
         },
         msg.id
       )),
+      /* @__PURE__ */ u4(ThoughtsPanel, { thought }),
       draft && /* @__PURE__ */ u4("div", { className: "message-list__draft", children: [
         /* @__PURE__ */ u4(
           "div",

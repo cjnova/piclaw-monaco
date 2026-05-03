@@ -7,6 +7,7 @@ import type { Interaction } from "./types";
 interface UseTimelineStreamParams {
   setMessages: (fn: (prev: Interaction[]) => Interaction[]) => void;
   setDraft: (v: string | ((prev: string) => string)) => void;
+  setThought: (v: string | ((prev: string) => string)) => void;
   setConnected: (v: boolean) => void;
   scrollToBottom: (force?: boolean) => void;
   refetchTimelineOnReconnect: () => Promise<void>;
@@ -24,6 +25,7 @@ interface UseTimelineStreamParams {
 export function useTimelineStream({
   setMessages,
   setDraft,
+  setThought,
   setConnected,
   scrollToBottom,
   refetchTimelineOnReconnect,
@@ -50,6 +52,29 @@ export function useTimelineStream({
         scrollToBottom(true);
       } catch (err) {
         console.warn("[MessageList] SSE parse error:", err);
+      }
+    });
+
+    es.addEventListener("agent_thought_delta", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        if (parsed.delta) {
+          setThought((prev) => prev + parsed.delta);
+        } else if (parsed.text !== undefined) {
+          setThought(parsed.text);
+        }
+      } catch (err) {
+        console.warn("[MessageList] SSE thought parse error:", err);
+      }
+    });
+
+    es.addEventListener("agent_thought", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        const text = parsed.text ?? parsed.content ?? "";
+        setThought(text);
+      } catch (err) {
+        console.warn("[MessageList] SSE thought parse error:", err);
       }
     });
 
@@ -87,6 +112,7 @@ export function useTimelineStream({
           return [...prev, interaction];
         });
         setDraft("");
+        setThought("");
         scrollToBottom(true);
         // Signal that agent turn is complete (clears compaction badge, etc.)
         window.dispatchEvent(
@@ -95,6 +121,7 @@ export function useTimelineStream({
       } catch (err) {
         console.warn("[MessageList] SSE parse error:", err);
         setDraft("");
+        setThought("");
         scrollToBottom(true);
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
@@ -144,6 +171,7 @@ export function useTimelineStream({
     scrollToBottom,
     setConnected,
     setDraft,
+    setThought,
     setMessages,
     timelineError,
   ]);

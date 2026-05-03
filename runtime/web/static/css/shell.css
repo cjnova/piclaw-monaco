@@ -1257,6 +1257,48 @@ body {
   border-radius: 0;
 }
 
+/* ── Thoughts Panel ─────────────────────────────── */
+.thoughts-panel {
+  margin: 10px 14px;
+  padding: 14px 16px;
+  background: rgba(203, 166, 247, 0.12);
+  border: 1px solid rgba(203, 166, 247, 0.25);
+  border-left: 4px solid var(--accent-purple, #cba6f7);
+  border-radius: 0 8px 8px 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+
+.thoughts-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--accent-purple, #cba6f7);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.thoughts-panel__content {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thoughts-panel__content p {
+  margin: 2px 0;
+}
+
+.thoughts-panel__content code {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
 /* Draft */
 .message-list__draft {
   display: flex;
