@@ -5398,6 +5398,14 @@ For tests, pass a Ghostty instance directly:
     y2(() => {
       const onStatus = (e5) => {
         const detail = e5.detail;
+        if (detail?.context_usage && detail.context_usage.tokens !== null && detail.context_usage.tokens !== void 0) {
+          const cu = detail.context_usage;
+          agentContext.value = { tokens: cu.tokens, contextWindow: cu.contextWindow ?? 0, percent: cu.percent ?? 0 };
+          try {
+            localStorage.setItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(agentContext.value));
+          } catch {
+          }
+        }
         if (detail?.intent_key === "compaction" && !isCompacting.value) {
           isCompacting.value = true;
           compactStartTime.value = Date.now();
@@ -5406,10 +5414,10 @@ For tests, pass a Ghostty instance directly:
         if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {
           if (isCompacting.value) {
             isCompacting.value = false;
-            setTimeout(() => {
-              void fetchContext();
-            }, 1e3);
           }
+          setTimeout(() => {
+            void fetchContext();
+          }, 500);
         }
       };
       window.addEventListener("piclaw:agent-status", onStatus);

@@ -217,24 +217,29 @@ export function ModelContextBar() {
     return () => clearInterval(interval);
   }, [isCompacting.value]);
 
-  // #68: listen for agent completion to clear compaction state
+  // #68: listen for agent completion to clear compaction state + update context
   useEffect(() => {
     const onStatus = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      // Extract context_usage from done event (pushed by backend after each turn)
+      if (detail?.context_usage && detail.context_usage.tokens !== null && detail.context_usage.tokens !== undefined) {
+        const cu = detail.context_usage;
+        agentContext.value = { tokens: cu.tokens, contextWindow: cu.contextWindow ?? 0, percent: cu.percent ?? 0 };
+        try { localStorage.setItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(agentContext.value)); } catch {}
+      }
       // Detect compaction started (from /compact command or auto-compaction)
       if (detail?.intent_key === "compaction" && !isCompacting.value) {
         isCompacting.value = true;
         compactStartTime.value = Date.now();
         compactElapsed.value = 0;
       }
-      // Detect compaction/turn done
+      // Detect compaction/turn done — also refresh context
       if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {
         if (isCompacting.value) {
           isCompacting.value = false;
-          setTimeout(() => {
-            void fetchContext();
-          }, 1000);
         }
+        // Always refresh context after a turn completes
+        setTimeout(() => { void fetchContext(); }, 500);
       }
     };
     window.addEventListener("piclaw:agent-status", onStatus);
