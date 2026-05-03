@@ -52,7 +52,6 @@ export type RouteFlags = {
   isDocsAsset: boolean;
   /** True when the request targets the agent avatar endpoint. */
   isAvatar: boolean;
-  isWasmFallback: boolean;
   /** True when the request method mutates state (POST/PUT/DELETE/PATCH). */
   isMutating: boolean;
   /** True when the request targets any auth endpoint. */
@@ -73,7 +72,7 @@ export function isPublicStaticPath(pathname: string): boolean {
   if (pathname === "/static/dist/login.bundle.css") return true;
   if (pathname === "/static/dist/login.bundle.css.map") return true;
 
-  if (pathname.startsWith("/static/") && /\.(png|ico|svg|jpg|jpeg|webp|gif|wasm)$/i.test(pathname)) return true;
+  if (pathname.startsWith("/static/") && /\.(png|ico|svg|jpg|jpeg|webp|gif)$/i.test(pathname)) return true;
   return false;
 }
 
@@ -123,8 +122,6 @@ export function getRouteFlags(req: Request, pathname: string): RouteFlags {
     isPublicStatic: isStaticAsset && isPublicStaticPath(pathname),
     isDocsAsset: pathname.startsWith("/docs/"),
     isAvatar: isGetOrHead && pathname === "/avatar/agent",
-    // FORK-MODIFIED: cjnova/piclaw-monaco — ghostty-web fallback tries /ghostty-vt.wasm
-    isWasmFallback: isGetOrHead && pathname === "/ghostty-vt.wasm",
     isMutating: req.method === "POST" || req.method === "PUT" || req.method === "DELETE" || req.method === "PATCH",
     isAuthEndpoint,
   };
@@ -151,7 +148,6 @@ export function shouldSkipAuthCheck(flags: RouteFlags, hasInternalAccess: boolea
     flags.isAppleIcon ||
     flags.isServiceWorker ||
     flags.isPublicStatic ||
-    flags.isAvatar ||
-    flags.isWasmFallback
+    flags.isAvatar
   );
 }

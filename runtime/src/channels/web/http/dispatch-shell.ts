@@ -59,9 +59,8 @@ export async function handleShellRoutes(
     return channel.serveStatic("sw.js");
   }
 
-  // FORK-MODIFIED: cjnova/piclaw-monaco — redirect to /static/ path which is always served correctly
   if (req.method === "GET" && pathname === "/ghostty-vt.wasm") {
-    return Response.redirect(new URL("/static/js/vendor/ghostty-vt.wasm", req.url).href, 302);
+    return channel.serveStatic("js/vendor/ghostty-vt.wasm");
   }
 
   if (flags.isStaticAsset) {
