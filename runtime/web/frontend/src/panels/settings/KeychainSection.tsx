@@ -20,6 +20,8 @@ export function KeychainSection() {
   const newSecret = useSignal("");
   const newType = useSignal("secret");
   const keychainError = useSignal<string | null>(null);
+  const loading = useSignal(true);
+  const loadError = useSignal<string | null>(null);
   const keychainErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showKeychainError = (msg: string) => {
@@ -28,11 +30,27 @@ export function KeychainSection() {
     keychainErrorTimer.current = setTimeout(() => (keychainError.value = null), 3000);
   };
 
-  const fetchEntries = useCallback(() => {
-    fetch("/agent/keychain", { credentials: "same-origin" })
-      .then(r => r.json())
-      .then((d: KeychainResponse) => { entries.value = d.entries ?? []; })
-      .catch(() => {});
+  const fetchEntries = useCallback(async () => {
+    loading.value = true;
+    loadError.value = null;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch("/agent/keychain", { credentials: "same-origin", signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        loadError.value = `Failed to load keychain (HTTP ${res.status})`;
+        loading.value = false;
+        return;
+      }
+      const data = await res.json() as KeychainResponse;
+      entries.value = data.entries ?? [];
+      loadError.value = null;
+    } catch (err: any) {
+      loadError.value = err?.name === "AbortError" ? "Keychain request timed out" : "Failed to load keychain";
+    } finally {
+      loading.value = false;
+    }
   }, []);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
@@ -107,9 +125,20 @@ export function KeychainSection() {
         </button>
       </div>
 
-      <p className="settings-panel__description">
-        {entries.value.length} entries, encrypted at rest.
-      </p>
+      {loading.value && !entries.value.length && (
+        <p className="settings-panel__description">Loading keychain...</p>
+      )}
+      {loadError.value && (
+        <div className="settings-panel__save-status settings-panel__save-status--error">
+          {loadError.value}
+          <button type="button" className="settings-panel__provider-btn" onClick={fetchEntries} style="margin-left:8px">Retry</button>
+        </div>
+      )}
+      {!loading.value && !loadError.value && (
+        <p className="settings-panel__description">
+          {entries.value.length} entries, encrypted at rest.
+        </p>
+      )}
 
       {showAdd.value && (
         <div className="settings-panel__card settings-panel__card--spaced">
@@ -149,7 +178,7 @@ export function KeychainSection() {
           </tr>
         </thead>
         <tbody>
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !loading.value && !loadError.value ? (
             <tr><td colSpan={5} className="settings-panel__table-empty">No keychain entries.</td></tr>
           ) : (
             filtered.map(e => (
