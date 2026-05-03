@@ -155,7 +155,18 @@ export function ModelContextBar() {
     try {
       const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()));
       if (res.ok) {
-        agentContext.value = await res.json() as AgentContext;
+        const data = await res.json() as AgentContext;
+        // Only update if backend returned real data (not all-null)
+        if (data.tokens !== null) {
+          agentContext.value = data;
+          try { localStorage.setItem("piclaw:context-cache", JSON.stringify(data)); } catch {}
+        } else if (!agentContext.value) {
+          // Load from cache on first null response
+          try {
+            const cached = localStorage.getItem("piclaw:context-cache");
+            if (cached) agentContext.value = JSON.parse(cached) as AgentContext;
+          } catch {}
+        }
       }
     } catch (err) {
       console.warn("[ModelContextBar] context fetch failed:", err);
