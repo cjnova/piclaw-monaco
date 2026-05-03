@@ -8835,17 +8835,35 @@ ${code}
     const newSecret = useSignal("");
     const newType = useSignal("secret");
     const keychainError = useSignal(null);
+    const loading = useSignal(true);
+    const loadError = useSignal(null);
     const keychainErrorTimer = A2(null);
     const showKeychainError = (msg) => {
       keychainError.value = msg;
       if (keychainErrorTimer.current) clearTimeout(keychainErrorTimer.current);
       keychainErrorTimer.current = setTimeout(() => keychainError.value = null, 3e3);
     };
-    const fetchEntries = q2(() => {
-      fetch("/agent/keychain", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
-        entries.value = d5.entries ?? [];
-      }).catch(() => {
-      });
+    const fetchEntries = q2(async () => {
+      loading.value = true;
+      loadError.value = null;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1e4);
+        const res = await fetch("/agent/keychain", { credentials: "same-origin", signal: controller.signal });
+        clearTimeout(timeout);
+        if (!res.ok) {
+          loadError.value = `Failed to load keychain (HTTP ${res.status})`;
+          loading.value = false;
+          return;
+        }
+        const data = await res.json();
+        entries.value = data.entries ?? [];
+        loadError.value = null;
+      } catch (err) {
+        loadError.value = err?.name === "AbortError" ? "Keychain request timed out" : "Failed to load keychain";
+      } finally {
+        loading.value = false;
+      }
     }, []);
     y2(() => {
       fetchEntries();
@@ -8910,7 +8928,12 @@ ${code}
         ),
         /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: () => showAdd.value = !showAdd.value, children: "+ Add entry" })
       ] }),
-      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: [
+      loading.value && !entries.value.length && /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Loading keychain..." }),
+      loadError.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status settings-panel__save-status--error", children: [
+        loadError.value,
+        /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: fetchEntries, style: "margin-left:8px", children: "Retry" })
+      ] }),
+      !loading.value && !loadError.value && /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: [
         entries.value.length,
         " entries, encrypted at rest."
       ] }),
@@ -8946,7 +8969,7 @@ ${code}
           /* @__PURE__ */ u4("th", { children: "Updated" }),
           /* @__PURE__ */ u4("th", {})
         ] }) }),
-        /* @__PURE__ */ u4("tbody", { children: filtered.length === 0 ? /* @__PURE__ */ u4("tr", { children: /* @__PURE__ */ u4("td", { colSpan: 5, className: "settings-panel__table-empty", children: "No keychain entries." }) }) : filtered.map((e5) => /* @__PURE__ */ u4("tr", { children: [
+        /* @__PURE__ */ u4("tbody", { children: filtered.length === 0 && !loading.value && !loadError.value ? /* @__PURE__ */ u4("tr", { children: /* @__PURE__ */ u4("td", { colSpan: 5, className: "settings-panel__table-empty", children: "No keychain entries." }) }) : filtered.map((e5) => /* @__PURE__ */ u4("tr", { children: [
           /* @__PURE__ */ u4("td", { children: e5.name }),
           /* @__PURE__ */ u4("td", { children: e5.type ?? "\u2014" }),
           /* @__PURE__ */ u4("td", { children: /* @__PURE__ */ u4("code", { className: "settings-panel__env-var", children: e5.envVar ?? "\u2014" }) }),
