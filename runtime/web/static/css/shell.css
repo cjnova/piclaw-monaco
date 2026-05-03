@@ -104,12 +104,6 @@ body {
   overflow: hidden;
 }
 
-.shell-root {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
 .activity-bar {
   width: 48px;
   flex: 0 0 48px;
@@ -159,52 +153,6 @@ body {
 .icon--size-24.codicon {
   font-size: 24px;
 }
-
-.shell-content {
-  display: flex;
-  flex: 1;
-  height: 100%;
-  overflow: hidden;
-  flex-direction: column;
-}
-
-.shell-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  font-size: 12px;
-  color: var(--text-soft);
-}
-
-.shell-status__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  display: inline-block;
-}
-
-.shell-status__dot.is-connected {
-  background: var(--success);
-}
-
-.shell-status__dot.is-disconnected {
-  background: var(--error);
-}
-
-.shell-main-layout {
-  flex: 1;
-  min-height: 0;
-}
-
-.shell-sidebar {
-  height: 100%;
-  padding: 16px;
-  border-right: 1px solid var(--border);
-  color: var(--text-soft);
-  background: var(--bg-sidebar);
-}
-
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -365,29 +313,6 @@ body {
   padding: 6px 8px;
   color: var(--text-muted);
   font-size: 11px;
-}
-
-.chat-messages {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--input-border) transparent;
-}
-
-.chat-messages::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chat-messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chat-messages::-webkit-scrollbar-thumb {
-  background: var(--input-border);
-  border-radius: 3px;
-}
-
-.chat-messages::-webkit-scrollbar-thumb:hover {
-  background: var(--handle);
 }
 
 /* System stats bar */
@@ -976,22 +901,6 @@ body {
   padding: 0;
 }
 
-.chat__empty {
-  text-align: center;
-}
-
-.chat__empty-title {
-  margin: 0;
-  font-size: 30px;
-  color: var(--text);
-}
-
-.chat__empty-subtitle {
-  margin: 10px 0 0;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
 .chat__compose {
   background: var(--bg-sidebar);
   border-top: 1px solid var(--border);
@@ -1485,10 +1394,6 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-}
-
-.workspace__section-empty {
-  color: var(--text-muted);
 }
 
 .workspace__drag-handle {
@@ -2219,98 +2124,6 @@ body {
   height: 100%;
 }
 
-.addons-panel__section-header {
-  padding: 6px 12px 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: var(--panel-bg, var(--sidebar-bg));
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.addons-panel__item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.1));
-  cursor: default;
-  transition: background 0.1s;
-}
-
-.addons-panel__item:hover {
-  background: var(--item-hover-bg, rgba(128, 128, 128, 0.08));
-}
-
-.addons-panel__item-icon {
-  flex-shrink: 0;
-  font-size: 16px;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-
-.addons-panel__item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.addons-panel__item-header {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.addons-panel__item-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary, var(--foreground));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.addons-panel__item-version {
-  font-size: 10px;
-  color: var(--text-muted);
-  background: var(--badge-bg, rgba(128, 128, 128, 0.15));
-  padding: 1px 5px;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-.addons-panel__item-update-badge {
-  font-size: 10px;
-  color: var(--accent, #4fc1ff);
-  font-weight: 700;
-}
-
-.addons-panel__item-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.addons-panel__item-status {
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--border-subtle, rgba(128, 128, 128, 0.3));
-  margin-top: 5px;
-}
-
-.addons-panel__item-status--enabled {
-  background: var(--success, #4caf50);
-}
-
 .addons-panel__empty {
   padding: 16px 12px;
   font-size: 12px;
@@ -2785,52 +2598,6 @@ body {
 
 .settings-panel__input:focus { border-color: var(--accent); outline: none; }
 
-.settings-panel__value { font-size: 13px; color: var(--text); }
-
-.settings-panel__value--accent { color: var(--accent); }
-
-.settings-panel__meta {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-left: 4px;
-}
-
-.settings-panel__status { font-size: 11px; padding: 2px 6px; border-radius: 3px; }
-
-.settings-panel__status--ok,
-.settings-panel__status--active,
-.settings-panel__status--connected { background: rgba(0,200,0,0.15); color: var(--success, #4caf50); }
-
-.settings-panel__status--error,
-.settings-panel__status--disconnected { background: rgba(200,0,0,0.15); color: var(--error, #f44336); }
-
-.settings-panel__status--unknown,
-.settings-panel__status--pending {
-  background: rgba(255,255,255,0.08);
-  color: var(--text-muted);
-}
-
-.settings-panel__list {
-  list-style: none;
-  margin: 0 0 0 132px;
-  padding: 0;
-}
-
-.settings-panel__list-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.settings-panel__list-item--active {
-  color: var(--accent);
-  background: var(--bg-elevated);
-}
-
 .settings-panel__empty {
   font-size: 12px;
   color: var(--text-muted);
@@ -3122,18 +2889,6 @@ body {
   gap: 8px;
   margin-top: 8px;
 }
-
-/* ── Models / Keychain / Tools (settings) ── */
-.settings-panel__model-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  font-size: 13px;
-}
-.settings-panel__model-name { color: var(--text); flex: 1; }
-.settings-panel__model-provider { color: var(--text-muted); font-size: 11px; }
-.settings-panel__model-ctx { color: var(--text-muted); font-size: 11px; min-width: 50px; text-align: right; }
 
 .settings-panel__tools-filter {
   width: 100%;
@@ -3470,11 +3225,6 @@ body {
 .scratchpad-panel__item--selected {
   background: rgba(0, 150, 255, 0.08);
 }
-.scratchpad-panel__checkbox {
-  margin-top: 2px;
-  accent-color: var(--accent);
-  flex-shrink: 0;
-}
 .scratchpad-panel__text {
   flex: 1;
   color: var(--text);
@@ -3503,36 +3253,6 @@ body {
 }
 .scratchpad-panel__item:hover .scratchpad-panel__delete-btn {
   opacity: 1;
-}
-.scratchpad-panel__actions {
-  display: flex;
-  gap: 6px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.scratchpad-panel__action-btn {
-  padding: 5px 12px;
-  font-size: 11px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 3px;
-  cursor: pointer;
-}
-.scratchpad-panel__action-btn:hover:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-.scratchpad-panel__action-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.scratchpad-panel__action-btn--send {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
 }
 .scratchpad-panel__textarea {
   width: 100%;
@@ -3587,27 +3307,6 @@ body {
 .scratchpad-panel__item--sent {
   opacity: 0.6;
 }
-.scratchpad-panel__edit-row {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-}
-.scratchpad-panel__edit-textarea {
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent);
-  color: var(--text);
-  padding: 3px 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-family: inherit;
-  outline: none;
-  resize: vertical;
-}
-.scratchpad-panel__edit-actions {
-  display: flex;
-  gap: 4px;
-}
 
 .scratchpad-panel__editor {
   display: flex;
@@ -3617,17 +3316,6 @@ body {
   border-bottom: 1px solid var(--border);
   flex: 1;
   min-height: 0;
-}
-.scratchpad-panel__editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.scratchpad-panel__editor-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 .scratchpad-panel__item--active {
   background: rgba(0, 150, 255, 0.12);
@@ -3679,13 +3367,6 @@ body {
 }
 .scratchpad-panel__divider:hover {
   background: var(--accent);
-}
-
-.scratchpad-panel__send-icon {
-  color: var(--accent);
-}
-.scratchpad-panel__send-icon--disabled {
-  opacity: 0.3;
 }
 
 .scratchpad-panel__play-btn {
