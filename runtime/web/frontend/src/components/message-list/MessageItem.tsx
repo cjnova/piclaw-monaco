@@ -123,6 +123,7 @@ export function MessageItem({
         <div className="message-list__body message-list__body--collapsed">
           <MessageActionBar
             messageId={interaction.id}
+            content={interaction.content ?? ""}
             isCollapsed={true}
             onToggleCollapse={onToggleCollapse}
             onDelete={onDelete}
@@ -171,6 +172,7 @@ export function MessageItem({
       <div className="message-list__body">
         <MessageActionBar
           messageId={interaction.id}
+          content={interaction.content ?? ""}
           isCollapsed={false}
           onToggleCollapse={onToggleCollapse}
           onDelete={onDelete}
