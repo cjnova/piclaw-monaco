@@ -1280,9 +1280,21 @@
     const sessionTokens = useSignal(0);
     const usageLabel = useSignal("");
     const providerUsage = useSignal(null);
+    const statusVersion = A2(0);
+    const contextVersion = A2(0);
+    const statusAbort = A2(null);
+    const contextAbort = A2(null);
+    const isFetchingStatus = A2(false);
+    const isFetchingContext = A2(false);
     const fetchStatus = q2(async () => {
+      if (isFetchingStatus.current) return;
+      isFetchingStatus.current = true;
+      statusAbort.current?.abort();
+      statusAbort.current = new AbortController();
+      const myVersion = ++statusVersion.current;
       try {
-        const res = await fetch("/agent/status?chat_jid=" + encodeURIComponent(getChatJid()));
+        const res = await fetch("/agent/status?chat_jid=" + encodeURIComponent(getChatJid()), { signal: statusAbort.current.signal });
+        if (statusVersion.current !== myVersion) return;
         if (res.ok) {
           agentStatus.value = await res.json();
           error.value = false;
@@ -1290,7 +1302,8 @@
         } else {
           error.value = true;
         }
-        const modelsRes = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
+        const modelsRes = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()), { signal: statusAbort.current.signal });
+        if (statusVersion.current !== myVersion) return;
         if (modelsRes.ok) {
           const info = await modelsRes.json();
           if (info.current) currentModel.value = info.current;
@@ -1320,14 +1333,23 @@
         }
         pollTick.value += 1;
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
         console.warn("[ModelContextBar] status fetch failed:", err);
         error.value = true;
         pollTick.value += 1;
+      } finally {
+        isFetchingStatus.current = false;
       }
     }, []);
     const fetchContext = q2(async () => {
+      if (isFetchingContext.current) return;
+      isFetchingContext.current = true;
+      contextAbort.current?.abort();
+      contextAbort.current = new AbortController();
+      const myVersion = ++contextVersion.current;
       try {
-        const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()));
+        const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()), { signal: contextAbort.current.signal });
+        if (contextVersion.current !== myVersion) return;
         if (res.ok) {
           const data = await res.json();
           if (data.tokens !== null) {
@@ -1345,7 +1367,10 @@
           }
         }
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
         console.warn("[ModelContextBar] context fetch failed:", err);
+      } finally {
+        isFetchingContext.current = false;
       }
     }, []);
     y2(() => {
@@ -5014,8 +5039,6 @@ ${code}
     const ws = data.workspaceSettings ?? {};
     const treeMaxDepth = useSignal(ws.treeMaxDepth ?? 4);
     const treeMaxEntries = useSignal(ws.treeMaxEntries ?? 5e3);
-    const refreshInterval = useSignal(Number(safeGetItem("piclaw-ws-refresh-interval")) || 60);
-    const folderPreviewDepth = useSignal(Number(safeGetItem("piclaw-ws-folder-preview-depth")) || 3);
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Workspace" }),
       /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "Access" }),
@@ -5058,18 +5081,7 @@ ${code}
         /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Max entries per scan" }),
         /* @__PURE__ */ u4(NumberStepper, { value: treeMaxEntries, min: 50, max: 1e4, step: 50, onSave: (v5) => onSaveWorkspace("treeMaxEntries", v5) }),
         /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "truncate oversized tree walks earlier" })
-      ] }),
-      /* @__PURE__ */ u4("h3", { className: "settings-panel__subsection-title", children: "This browser" }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Refresh interval (seconds)" }),
-        /* @__PURE__ */ u4(NumberStepper, { value: refreshInterval, min: 5, max: 600, step: 5, onSave: (v5) => safeSetItem("piclaw-ws-refresh-interval", String(v5)) })
-      ] }),
-      /* @__PURE__ */ u4("div", { className: "settings-panel__field", children: [
-        /* @__PURE__ */ u4("label", { className: "settings-panel__label", children: "Folder preview scan depth" }),
-        /* @__PURE__ */ u4(NumberStepper, { value: folderPreviewDepth, min: 0, max: 20, onSave: (v5) => safeSetItem("piclaw-ws-folder-preview-depth", String(v5)) }),
-        /* @__PURE__ */ u4("span", { className: "settings-panel__description", children: "set to 0 to disable folder size preview scans" })
-      ] }),
-      /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Root and folder-expansion tree loads remain shallow; the folder size preview is the deepest workspace scan in the UI." })
+      ] })
     ] });
   }
 
