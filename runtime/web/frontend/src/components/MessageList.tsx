@@ -1,4 +1,5 @@
 import { getMessageUrl, buildChatUrl } from "../api/chat-jid";
+import { useSignal } from "@preact/signals";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { renderMarkdown, renderThinkingMarkdown } from "../utils/markdown-pipeline";
 import { renderMermaidDiagrams } from "../utils/mermaid-render";
@@ -233,6 +234,7 @@ export function MessageList() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const timelineError = useSignal<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
@@ -268,8 +270,9 @@ export function MessageList() {
     if (!timeline) return;
     setMessages((prev) => mergeInteractions(prev, timeline.posts));
     setHasMore(timeline.hasMore);
+    timelineError.value = null;
     scrollToBottom(true);
-  }, [fetchTimeline, scrollToBottom]);
+  }, [fetchTimeline, scrollToBottom, timelineError]);
 
   // Initial fetch
   useEffect(() => {
@@ -279,6 +282,7 @@ export function MessageList() {
         if (!timeline) return;
         setMessages((prev) => mergeInteractions(prev, timeline.posts));
         setHasMore(timeline.hasMore);
+        timelineError.value = null;
         setConnected(true);
         initialTimelineFetchedRef.current = true;
         // Scroll to bottom after first load
@@ -309,8 +313,8 @@ export function MessageList() {
           setDraft("");
         }
         scrollToBottom(true);
-      } catch {
-        // ignore parse errors
+      } catch (err) {
+        console.warn("[MessageList] SSE parse error:", err);
       }
     });
 
@@ -323,8 +327,8 @@ export function MessageList() {
           setDraft(parsed.text);
         }
         scrollToBottom();
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("[MessageList] SSE parse error:", err);
       }
     });
 
@@ -334,8 +338,8 @@ export function MessageList() {
         const text = parsed.text ?? parsed.content ?? "";
         setDraft(text);
         scrollToBottom();
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("[MessageList] SSE parse error:", err);
       }
     });
 
@@ -351,7 +355,8 @@ export function MessageList() {
         scrollToBottom(true);
         // Signal that agent turn is complete (clears compaction badge, etc.)
         window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
-      } catch {
+      } catch (err) {
+        console.warn("[MessageList] SSE parse error:", err);
         setDraft("");
         scrollToBottom(true);
         window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
@@ -362,7 +367,9 @@ export function MessageList() {
       try {
         const data = JSON.parse(e.data);
         window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: data }));
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.warn("[MessageList] SSE parse error:", err);
+      }
     });
 
     es.onopen = () => {
@@ -376,7 +383,10 @@ export function MessageList() {
       if (isFirstOpen) return;
 
       // Reconnection — merge new messages
-      refetchTimelineOnReconnect().catch(() => {});
+      refetchTimelineOnReconnect().catch((err) => {
+        console.warn("[MessageList] reconnect refresh failed:", err);
+        timelineError.value = "Timeline may be stale. Click to refresh.";
+      });
     };
     es.onerror = () => {
       setConnected(false);
@@ -435,7 +445,10 @@ export function MessageList() {
             }, 100);
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[MessageList] jump-to-message failed:", err);
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to load message", type: "error" } }));
+      }
     };
     window.addEventListener("piclaw:scroll-to-message", handler);
     return () => window.removeEventListener("piclaw:scroll-to-message", handler);
@@ -487,7 +500,9 @@ export function MessageList() {
     // Render any pending mermaid blocks
     const render = () => {
       if (container.querySelector(".mermaid-container[data-mermaid]")) {
-        renderMermaidDiagrams(container).catch(() => {});
+        renderMermaidDiagrams(container).catch((err) => {
+          console.warn("[MessageList] mermaid render failed:", err);
+        });
       }
     };
 
@@ -530,10 +545,11 @@ export function MessageList() {
         buildChatUrl("/timeline", { limit: "50", before: String(oldestId) }),
         { credentials: "include" }
       );
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: TimelineResponse = await res.json();
       const olderPosts = (data.posts ?? []).map(normalizePost);
       setHasMore(data.has_more ?? false);
+      timelineError.value = null;
       if (olderPosts.length) {
         const el = listRef.current;
         const prevScrollHeight = el?.scrollHeight ?? 0;
@@ -545,6 +561,9 @@ export function MessageList() {
           }
         });
       }
+    } catch (err) {
+      console.warn("[MessageList] loadMore failed:", err);
+      timelineError.value = "Failed to load older messages. Try again.";
     } finally {
       setLoadingMore(false);
     }
@@ -562,6 +581,20 @@ export function MessageList() {
 
   return (
     <div className="message-list" ref={listRef}>
+      {timelineError.value && (
+        <div
+          className="message-list__error-banner"
+          onClick={() => {
+            timelineError.value = null;
+            void fetchTimeline().then(() => {
+              timelineError.value = null;
+              scrollToBottom(true);
+            });
+          }}
+        >
+          ⚠ {timelineError.value}
+        </div>
+      )}
       {hasMore && (
         <div className="message-list__load-more">
           <button
