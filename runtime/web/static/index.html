@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; worker-src 'self' blob:; frame-src 'self'; object-src 'self'; base-uri 'self'; form-action 'self';" />
+  <!-- CSP is set by the backend via HTTP header (security.ts). Do not add a meta tag CSP here
+       — dual CSPs create a more restrictive intersection that breaks terminal WASM loading. -->
   <title>PiClaw Monaco</title>
   <link rel="stylesheet" href="/static/css/fonts.css" />
   <link rel="stylesheet" href="/static/css/codicons.css" />
