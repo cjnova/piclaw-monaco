@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
 import { relativeTime, getBlockKey } from "./helpers";
+import { MessageActionBar } from "./MessageActionBar";
 import type { ContentBlock, Interaction } from "./types";
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────
@@ -64,9 +65,17 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
 
 interface MessageItemProps {
   interaction: Interaction;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  onDelete: () => void;
 }
 
-export function MessageItem({ interaction }: MessageItemProps) {
+export function MessageItem({
+  interaction,
+  isCollapsed,
+  onToggleCollapse,
+  onDelete,
+}: MessageItemProps) {
   const isUser = interaction.type === "user";
 
   // Pair tool_use with their tool_result blocks
@@ -92,6 +101,52 @@ export function MessageItem({ interaction }: MessageItemProps) {
   const displayName = isUser ? "You" : "PiClaw";
   const avatarLetter = isUser ? "Y" : "P";
 
+  // ── Collapsed render ───────────────────────────────────────────────────
+  if (isCollapsed) {
+    return (
+      <div
+        className={`message-list__item message-list__item--collapsed ${
+          isUser ? "message-list__item--user" : "message-list__item--agent"
+        }`}
+        data-message-id={interaction.id}
+      >
+        <MessageActionBar
+          messageId={interaction.id}
+          isCollapsed={true}
+          onToggleCollapse={onToggleCollapse}
+          onDelete={onDelete}
+        />
+        <div
+          className={`message-list__avatar-circle ${
+            isUser
+              ? "message-list__avatar-circle--user"
+              : "message-list__avatar-circle--agent"
+          }`}
+          aria-hidden="true"
+        >
+          {avatarLetter}
+        </div>
+        <div className="message-list__body message-list__body--collapsed">
+          <span
+            className={`message-list__name ${
+              isUser ? "message-list__name--user" : "message-list__name--agent"
+            }`}
+          >
+            {displayName}
+          </span>
+          <span
+            className="message-list__time"
+            title={new Date(interaction.created_at).toLocaleString()}
+          >
+            {relativeTime(interaction.created_at)}
+          </span>
+          <span className="message-list__collapsed-label">— collapsed</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Expanded render ────────────────────────────────────────────────────
   return (
     <div
       className={`message-list__item ${
@@ -99,6 +154,12 @@ export function MessageItem({ interaction }: MessageItemProps) {
       }`}
       data-message-id={interaction.id}
     >
+      <MessageActionBar
+        messageId={interaction.id}
+        isCollapsed={false}
+        onToggleCollapse={onToggleCollapse}
+        onDelete={onDelete}
+      />
       <div
         className={`message-list__avatar-circle ${
           isUser

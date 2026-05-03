@@ -3544,3 +3544,62 @@ pre.frontmatter-block {
   margin-right: 4px;
   font-size: 10px;
 }
+
+/* ── Message Action Bar ─────────────────────────── */
+.message-action-bar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+
+.message-list__item {
+  position: relative;
+}
+
+.message-list__item:hover .message-action-bar,
+.message-action-bar:focus-within {
+  opacity: 1;
+}
+
+.message-action-bar__btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.message-action-bar__btn:hover {
+  color: var(--text);
+  background: var(--hover-overlay, rgba(255,255,255,0.07));
+}
+
+.message-action-bar__btn--delete:hover {
+  color: var(--error);
+}
+
+/* Collapsed message */
+.message-list__item--collapsed .message-list__body {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+}
+
+.message-list__body--collapsed {
+  opacity: 0.6;
+}
+
+.message-list__collapsed-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+}
