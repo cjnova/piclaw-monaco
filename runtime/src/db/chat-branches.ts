@@ -6,9 +6,19 @@
  */
 
 import { getDb } from "./connection.js";
-import { deleteUnreferencedMedia } from "./media.js";
+import { attachMediaToMessage, deleteUnreferencedMedia } from "./media.js";
 import type { ChatBranchRecord } from "./types.js";
 import { createUuid } from "../utils/ids.js";
+
+interface QueuedFollowupForMerge {
+  rowId: number;
+  queuedContent: string;
+  threadId: number | null;
+  queuedAt: string;
+  mediaIds?: number[];
+  contentBlocks?: unknown[];
+  linkPreviews?: unknown[];
+}
 
 interface ChatBranchRow {
   branch_id: string;
@@ -109,6 +119,18 @@ export function getChatBranchByAgentName(agentName: string): ChatBranchRecord | 
        FROM chat_branches
       WHERE agent_name = ?
         AND archived_at IS NULL`
+  ).get(normalized) as ChatBranchRow | undefined;
+  return toRecord(row);
+}
+
+function getChatBranchByBranchId(branchId: string): ChatBranchRecord | null {
+  const normalized = String(branchId || "").trim();
+  if (!normalized) return null;
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT branch_id, chat_jid, root_chat_jid, parent_branch_id, agent_name, created_at, updated_at, archived_at
+       FROM chat_branches
+      WHERE branch_id = ?`
   ).get(normalized) as ChatBranchRow | undefined;
   return toRecord(row);
 }
@@ -378,6 +400,271 @@ export function previewPermanentDeleteArchivedBranch(chatJid: string): ArchivedB
   };
 }
 
+function sanitizeQueuedFollowupForMerge(value: unknown): QueuedFollowupForMerge | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.queuedContent !== "string" || !record.queuedContent.trim()) return null;
+  return {
+    rowId: Number.isFinite(record.rowId) ? Number(record.rowId) : 0,
+    queuedContent: record.queuedContent,
+    threadId: Number.isFinite(record.threadId) ? Number(record.threadId) : null,
+    queuedAt: typeof record.queuedAt === "string" && record.queuedAt.trim()
+      ? record.queuedAt.trim()
+      : new Date().toISOString(),
+    mediaIds: Array.isArray(record.mediaIds)
+      ? record.mediaIds.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+      : undefined,
+    contentBlocks: Array.isArray(record.contentBlocks) ? [...record.contentBlocks] : undefined,
+    linkPreviews: Array.isArray(record.linkPreviews) ? [...record.linkPreviews] : undefined,
+  };
+}
+
+function readQueuedFollowupsForMerge(chatJid: string): QueuedFollowupForMerge[] {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT queued_followups_json FROM chat_cursors WHERE chat_jid = ?`
+  ).get(chatJid) as { queued_followups_json: string | null } | undefined;
+  if (!row?.queued_followups_json) return [];
+  try {
+    const parsed = JSON.parse(row.queued_followups_json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => sanitizeQueuedFollowupForMerge(item))
+      .filter((item): item is QueuedFollowupForMerge => Boolean(item));
+  } catch {
+    return [];
+  }
+}
+
+function getLatestChatPosition(chatJid: string): string {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT MAX(timestamp) AS ts FROM messages WHERE chat_jid = ?`
+  ).get(chatJid) as { ts: string | null } | undefined;
+  if (typeof row?.ts === "string" && row.ts.trim()) return row.ts;
+
+  const chat = db.prepare(
+    `SELECT last_message_time AS ts FROM chats WHERE jid = ?`
+  ).get(chatJid) as { ts: string | null } | undefined;
+  return typeof chat?.ts === "string" ? chat.ts : "";
+}
+
+function moveChatCursorToLastPosition(chatJid: string): void {
+  const ts = getLatestChatPosition(chatJid);
+  if (!ts) return;
+  getDb().prepare(`
+    INSERT INTO chat_cursors (chat_jid, cursor_ts, queued_followups_json)
+    VALUES (?, ?, NULL)
+    ON CONFLICT(chat_jid) DO UPDATE SET
+      cursor_ts = excluded.cursor_ts,
+      queued_followups_json = NULL
+  `).run(chatJid, ts);
+}
+
+function materializeQueuedFollowupsForTimelineMove(chatJid: string): number {
+  const queued = readQueuedFollowupsForMerge(chatJid);
+  if (queued.length === 0) return 0;
+
+  const db = getDb();
+  let inserted = 0;
+  let latestTimestamp = "";
+  const existingRow = db.prepare(`SELECT rowid FROM messages WHERE chat_jid = ? AND rowid = ?`);
+  const insertMessage = db.prepare(`INSERT INTO messages (
+      id, chat_jid, sender, sender_name, content, content_blocks, link_previews,
+      thread_id, timestamp, is_from_me, is_bot_message, is_terminal_agent_reply, is_steering_message
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const getInsertedRow = db.prepare(`SELECT rowid FROM messages WHERE chat_jid = ? AND id = ?`);
+  const threadExists = db.prepare(`SELECT rowid FROM messages WHERE chat_jid = ? AND rowid = ?`);
+
+  for (const item of queued) {
+    if (item.rowId > 0 && existingRow.get(chatJid, item.rowId)) {
+      if (item.queuedAt > latestTimestamp) latestTimestamp = item.queuedAt;
+      continue;
+    }
+
+    const messageId = createUuid("web");
+    const contentBlocks = Array.isArray(item.contentBlocks) ? JSON.stringify(item.contentBlocks) : null;
+    const linkPreviews = Array.isArray(item.linkPreviews) ? JSON.stringify(item.linkPreviews) : null;
+    const explicitThreadId = item.threadId && threadExists.get(chatJid, item.threadId) ? item.threadId : null;
+    insertMessage.run(
+      messageId,
+      chatJid,
+      "web-user",
+      "You",
+      item.queuedContent,
+      contentBlocks,
+      linkPreviews,
+      explicitThreadId,
+      item.queuedAt,
+      0,
+      0,
+      0,
+      0,
+    );
+    const row = getInsertedRow.get(chatJid, messageId) as { rowid: number } | undefined;
+    const rowId = row?.rowid ?? 0;
+    if (rowId > 0) {
+      if (!explicitThreadId) db.prepare(`UPDATE messages SET thread_id = ? WHERE rowid = ?`).run(rowId, rowId);
+      if (item.mediaIds?.length) attachMediaToMessage(rowId, item.mediaIds);
+      inserted += 1;
+    }
+    if (item.queuedAt > latestTimestamp) latestTimestamp = item.queuedAt;
+  }
+
+  db.prepare(`UPDATE chat_cursors SET queued_followups_json = NULL WHERE chat_jid = ?`).run(chatJid);
+  if (latestTimestamp) {
+    db.prepare(
+      `UPDATE chats
+          SET last_message_time = CASE
+                WHEN last_message_time IS NULL OR ? > last_message_time THEN ?
+                ELSE last_message_time
+              END
+        WHERE jid = ?`
+    ).run(latestTimestamp, latestTimestamp, chatJid);
+  }
+  return inserted;
+}
+
+export interface MergeChatBranchIntoParentResult {
+  source: ChatBranchRecord;
+  parent: ChatBranchRecord;
+  counts: {
+    messages: number;
+    token_usage: number;
+    scheduled_tasks: number;
+    chat_cursors: number;
+    ssh_configs: number;
+    proxmox_configs: number;
+    portainer_configs: number;
+    extension_kv: number;
+    chat_branches_deleted: number;
+    chats_deleted: number;
+  };
+}
+
+export function mergeChatBranchIntoParent(chatJid: string): MergeChatBranchIntoParentResult {
+  const normalizedChatJid = String(chatJid || "").trim();
+  if (!normalizedChatJid) throw new Error("chat_jid is required");
+
+  const source = getChatBranchByChatJid(normalizedChatJid);
+  if (!source) throw new Error(`Unknown chat branch: ${normalizedChatJid}`);
+  if (!source.parent_branch_id) {
+    throw new Error(`Cannot merge a root chat session into a parent: ${normalizedChatJid}`);
+  }
+
+  const parent = getChatBranchByBranchId(source.parent_branch_id);
+  if (!parent) throw new Error(`Missing parent branch for chat: ${normalizedChatJid}`);
+  if (parent.archived_at) throw new Error(`Cannot merge into an archived parent chat: ${parent.chat_jid}`);
+
+  const childCount = countRows(
+    `SELECT COUNT(*) AS count FROM chat_branches WHERE parent_branch_id = ?`,
+    source.branch_id,
+  );
+  if (childCount > 0) {
+    throw new Error(`Cannot merge a chat branch that still has child branches: ${normalizedChatJid}`);
+  }
+
+  const messageCollisionCount = countRows(
+    `SELECT COUNT(*) AS count
+       FROM messages source
+       JOIN messages parent ON parent.chat_jid = ? AND parent.id = source.id
+      WHERE source.chat_jid = ?`,
+    parent.chat_jid,
+    source.chat_jid,
+  );
+  if (messageCollisionCount > 0) {
+    throw new Error(`Cannot merge chat branch because ${messageCollisionCount} message id(s) already exist in the parent chat.`);
+  }
+
+  const db = getDb();
+  let counts: MergeChatBranchIntoParentResult["counts"];
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    materializeQueuedFollowupsForTimelineMove(source.chat_jid);
+
+    counts = {
+      messages: countRows(`SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?`, source.chat_jid),
+      token_usage: countRows(`SELECT COUNT(*) AS count FROM token_usage WHERE chat_jid = ?`, source.chat_jid),
+      scheduled_tasks: countRows(`SELECT COUNT(*) AS count FROM scheduled_tasks WHERE chat_jid = ?`, source.chat_jid),
+      chat_cursors: countRows(`SELECT COUNT(*) AS count FROM chat_cursors WHERE chat_jid = ?`, source.chat_jid),
+      ssh_configs: countRows(`SELECT COUNT(*) AS count FROM ssh_configs WHERE chat_jid = ?`, source.chat_jid),
+      proxmox_configs: countRows(`SELECT COUNT(*) AS count FROM proxmox_configs WHERE chat_jid = ?`, source.chat_jid),
+      portainer_configs: countRows(`SELECT COUNT(*) AS count FROM portainer_configs WHERE chat_jid = ?`, source.chat_jid),
+      extension_kv: countRows(`SELECT COUNT(*) AS count FROM extension_kv WHERE scope = 'chat' AND scope_key = ?`, source.chat_jid),
+      chat_branches_deleted: 1,
+      chats_deleted: countRows(`SELECT COUNT(*) AS count FROM chats WHERE jid = ?`, source.chat_jid),
+    };
+
+    db.prepare(`UPDATE messages SET chat_jid = ? WHERE chat_jid = ?`).run(parent.chat_jid, source.chat_jid);
+    db.prepare(`UPDATE token_usage SET chat_jid = ? WHERE chat_jid = ?`).run(parent.chat_jid, source.chat_jid);
+    db.prepare(`UPDATE scheduled_tasks SET chat_jid = ? WHERE chat_jid = ?`).run(parent.chat_jid, source.chat_jid);
+
+    moveChatCursorToLastPosition(parent.chat_jid);
+    db.prepare(`DELETE FROM chat_cursors WHERE chat_jid = ?`).run(source.chat_jid);
+
+    db.prepare(
+      `INSERT OR IGNORE INTO ssh_configs (
+         chat_jid, ssh_target, ssh_port, private_key_keychain, known_hosts_keychain,
+         strict_host_key_checking, created_at, updated_at
+       )
+       SELECT ?, ssh_target, ssh_port, private_key_keychain, known_hosts_keychain,
+              strict_host_key_checking, created_at, updated_at
+         FROM ssh_configs
+        WHERE chat_jid = ?`
+    ).run(parent.chat_jid, source.chat_jid);
+    db.prepare(`DELETE FROM ssh_configs WHERE chat_jid = ?`).run(source.chat_jid);
+
+    db.prepare(
+      `INSERT OR IGNORE INTO proxmox_configs (
+         chat_jid, base_url, api_token_keychain, allow_insecure_tls, created_at, updated_at
+       )
+       SELECT ?, base_url, api_token_keychain, allow_insecure_tls, created_at, updated_at
+         FROM proxmox_configs
+        WHERE chat_jid = ?`
+    ).run(parent.chat_jid, source.chat_jid);
+    db.prepare(`DELETE FROM proxmox_configs WHERE chat_jid = ?`).run(source.chat_jid);
+
+    db.prepare(
+      `INSERT OR IGNORE INTO portainer_configs (
+         chat_jid, base_url, api_token_keychain, allow_insecure_tls, created_at, updated_at
+       )
+       SELECT ?, base_url, api_token_keychain, allow_insecure_tls, created_at, updated_at
+         FROM portainer_configs
+        WHERE chat_jid = ?`
+    ).run(parent.chat_jid, source.chat_jid);
+    db.prepare(`DELETE FROM portainer_configs WHERE chat_jid = ?`).run(source.chat_jid);
+
+    db.prepare(
+      `INSERT OR IGNORE INTO extension_kv (extension_id, scope, scope_key, key, value, created_at, updated_at)
+       SELECT extension_id, scope, ?, key, value, created_at, updated_at
+         FROM extension_kv
+        WHERE scope = 'chat'
+          AND scope_key = ?`
+    ).run(parent.chat_jid, source.chat_jid);
+    db.prepare(`DELETE FROM extension_kv WHERE scope = 'chat' AND scope_key = ?`).run(source.chat_jid);
+
+    db.prepare(
+      `UPDATE chats
+          SET last_message_time = CASE
+                WHEN (SELECT last_message_time FROM chats WHERE jid = ?) > last_message_time
+                  THEN (SELECT last_message_time FROM chats WHERE jid = ?)
+                ELSE last_message_time
+              END
+        WHERE jid = ?`
+    ).run(source.chat_jid, source.chat_jid, parent.chat_jid);
+    db.prepare(`DELETE FROM chat_branches WHERE branch_id = ?`).run(source.branch_id);
+    db.prepare(`DELETE FROM chats WHERE jid = ?`).run(source.chat_jid);
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { source, parent, counts };
+}
+
 export function permanentDeleteArchivedBranch(chatJid: string): PermanentDeleteArchivedBranchResult {
   const preview = previewPermanentDeleteArchivedBranch(chatJid);
   const branch = preview.branch;
@@ -555,7 +842,6 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
     db.exec(`INSERT INTO messages_fts(messages_fts) VALUES ('rebuild')`);
   } catch (_ftsErr) {
     // Non-fatal: search may lag until the next natural rebuild.
-    // eslint-disable-next-line no-console
     console.debug("[chat-branches] FTS rebuild after rename failed — search may lag", _ftsErr);
   }
 

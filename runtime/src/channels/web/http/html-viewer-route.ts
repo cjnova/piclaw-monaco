@@ -22,7 +22,7 @@ const VIEWER_CSP = [
   "form-action 'self'",
 ].join('; ');
 
-function generateHtmlViewerPage(): string {
+export function generateHtmlViewerPage(): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -50,6 +50,7 @@ function generateHtmlViewerPage(): string {
     <button id="btnRefresh" title="Reload">↻ Refresh</button>
     <button id="btnNewTab" title="Open in new tab">↗ New Tab</button>
   </div>
+  <!-- allow-same-origin is critical for dynamic HTML widgets/previews that load same-origin vendored/workspace assets. -->
   <iframe id="frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
   <script>
   (function() {
@@ -90,7 +91,7 @@ function generateHtmlViewerPage(): string {
 </html>`;
 }
 
-function handleHtmlViewerRoute(req: Request, pathname: string): Response | null {
+export function handleRoute(req: Request, pathname: string): Response | null {
   if (req.method !== "GET" && req.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -114,4 +115,4 @@ function handleHtmlViewerRoute(req: Request, pathname: string): Response | null 
   return new Response(generateHtmlViewerPage(), { status: 200, headers });
 }
 
-registerExtensionRoute(ROUTE_PREFIX, handleHtmlViewerRoute, import.meta.dir);
+registerExtensionRoute(ROUTE_PREFIX, handleRoute, import.meta.dir);

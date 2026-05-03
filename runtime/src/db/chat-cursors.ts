@@ -53,10 +53,10 @@ interface PendingRunState {
 }
 
 /** Shape returned by getPreflightRuns(). */
-export interface PreflightRun extends PendingRunState {}
+export type PreflightRun = PendingRunState;
 
 /** Shape returned by getInflightRuns(). */
-export interface InflightRun extends PendingRunState {}
+export type InflightRun = PendingRunState;
 
 export interface ChatCompactionBackoffState {
   chatJid: string;

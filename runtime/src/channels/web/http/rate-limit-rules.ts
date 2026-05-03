@@ -70,7 +70,7 @@ export function getDataRateLimitRule(method: string, pathname: string): DataRate
       message: "Too many queued-message actions. Slow down.",
     };
   }
-  if (method === "POST" && (pathname === "/agent/branch-fork" || pathname === "/agent/branch-rename" || pathname === "/agent/branch-prune" || pathname === "/agent/branch-purge" || pathname === "/agent/branch-restore")) {
+  if (method === "POST" && (pathname === "/agent/branch-fork" || pathname === "/agent/root-session" || pathname === "/agent/branch-rename" || pathname === "/agent/branch-merge-parent" || pathname === "/agent/branch-prune" || pathname === "/agent/branch-purge" || pathname === "/agent/branch-restore")) {
     return {
       bucket: "data/agent_branch",
       limit: DATA_AGENT_BRANCH_LIMIT,

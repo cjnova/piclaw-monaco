@@ -50,9 +50,6 @@ const MAX_PROMPT_CHARS = 60_000;
 /** Per-tool-result truncation limit when serializing. */
 const TOOL_RESULT_MAX_CHARS = 1_500;
 
-/** How many recent messages to always include verbatim. */
-const TAIL_MESSAGES = 30;
-
 /** Char budget for the backwards-walk recent context. */
 const RECENT_CONTEXT_BUDGET_CHARS = 25_000;
 
@@ -65,9 +62,6 @@ const HEAD_USER_TURNS = 3;
 /** Context messages to pin around a detected topic-shift boundary. */
 const TOPIC_SHIFT_CONTEXT_BEFORE = 2;
 const TOPIC_SHIFT_CONTEXT_AFTER = 6;
-
-/** Context messages to pin after the latest user request (separate from shift). */
-const LATEST_REQUEST_CONTEXT_AFTER = 12;
 
 /** Preview length for embedded user-topic snippets. */
 const USER_PREVIEW_MAX_CHARS = 300;

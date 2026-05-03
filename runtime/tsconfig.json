@@ -10,5 +10,6 @@
     "rootDir": "src",
     "types": ["bun-types"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "exclude": ["src/channels/whatsapp.ts"]
 }

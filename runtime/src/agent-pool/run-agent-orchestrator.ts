@@ -26,6 +26,7 @@ import { pruneOrphanToolResults } from "./orphan-tool-results.js";
 import { writeAgentLog } from "./logging.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
 import { getSessionFileLineCount, getSessionFileSize, rotateSession } from "../session-rotation.js";
+import { getCompactionSuccessCount, resetCompactionSuccessCount } from "./compaction.js";
 import { withChatContext } from "../core/chat-context.js";
 import {
   formatTimeoutDuration,
@@ -34,12 +35,14 @@ import {
 } from "./prompt-utils.js";
 import {
   DEFAULT_FALLBACK_CONTEXT_WINDOW,
+  cancelScheduledIdleAutoCompaction,
   clearCompactionFailureBackoff,
   estimateContextTokensFromSession,
   getModelContextWindow,
   maybeAutoCompactSessionBeforePrompt,
   noteCompactionFailure,
   runCompactionWithTimeout,
+  scheduleIdleAutoCompaction,
 } from "./compaction.js";
 import {
   inspectBlankTurnSessionDelta,
@@ -53,6 +56,7 @@ import {
   beginTrackedPhase,
   heartbeatTrackedPhase,
   endTrackedPhase,
+  getProgressWatchdogTimeoutMs,
 } from "../runtime/progress-watchdog.js";
 
 const log = createLogger("agent-pool.run-orchestrator");
@@ -74,6 +78,107 @@ export interface RunAgentOrchestratorOptions {
 async function sleep(ms: number): Promise<void> {
   if (ms <= 0) return;
   await Bun.sleep(ms);
+}
+
+const MIN_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS = 1_000;
+const MAX_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS = 15_000;
+
+type ToolExecutionWatchdogEvent = {
+  type: "tool_execution_start" | "tool_execution_update" | "tool_execution_end";
+  toolCallId?: unknown;
+  toolName?: unknown;
+};
+
+function getToolExecutionWatchdogHeartbeatIntervalMs(timeoutMs = getProgressWatchdogTimeoutMs()): number {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return 0;
+  return Math.max(
+    MIN_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS,
+    Math.min(MAX_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS, Math.floor(timeoutMs / 3)),
+  );
+}
+
+export function createToolExecutionWatchdogHeartbeatController(
+  chatJid: string,
+  options: {
+    heartbeat?: (chatJid: string, phase: "tool_execution", metadata?: Record<string, unknown>) => void;
+    getIntervalMs?: () => number;
+  } = {},
+): { handleEvent: (event: ToolExecutionWatchdogEvent) => void; stop: () => void } {
+  const heartbeat = options.heartbeat ?? heartbeatTrackedPhase;
+  const getIntervalMs = options.getIntervalMs ?? (() => getToolExecutionWatchdogHeartbeatIntervalMs());
+  const activeTools = new Map<string, string | null>();
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let anonymousToolCounter = 0;
+
+  const stopTimerIfIdle = () => {
+    if (activeTools.size > 0 || !timer) return;
+    clearInterval(timer);
+    timer = null;
+  };
+
+  const publishHeartbeat = () => {
+    if (activeTools.size === 0) return;
+    const toolNames = Array.from(new Set(
+      Array.from(activeTools.values()).filter((value): value is string => typeof value === "string" && value.trim().length > 0),
+    )).slice(0, 3);
+    heartbeat(chatJid, "tool_execution", {
+      eventType: "tool_execution_watchdog_heartbeat",
+      activeToolCount: activeTools.size,
+      activeToolNames: toolNames,
+    });
+  };
+
+  const ensureTimer = () => {
+    if (timer || activeTools.size === 0) return;
+    const intervalMs = getIntervalMs();
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) return;
+    timer = setInterval(() => {
+      publishHeartbeat();
+    }, intervalMs);
+    if (typeof timer.unref === "function") timer.unref();
+  };
+
+  const resolveToolKey = (event: ToolExecutionWatchdogEvent): string => {
+    if (typeof event.toolCallId === "string" && event.toolCallId.trim()) return event.toolCallId;
+    anonymousToolCounter += 1;
+    return `anonymous-tool:${anonymousToolCounter}`;
+  };
+
+  const removeTool = (event: ToolExecutionWatchdogEvent) => {
+    if (typeof event.toolCallId === "string" && event.toolCallId.trim()) {
+      activeTools.delete(event.toolCallId);
+      return;
+    }
+    const targetName = typeof event.toolName === "string" && event.toolName.trim() ? event.toolName : null;
+    for (const [key, activeName] of activeTools) {
+      if (targetName === null || activeName === targetName) {
+        activeTools.delete(key);
+        return;
+      }
+    }
+  };
+
+  return {
+    handleEvent(event: ToolExecutionWatchdogEvent) {
+      if (event.type === "tool_execution_start") {
+        const toolName = typeof event.toolName === "string" && event.toolName.trim() ? event.toolName : null;
+        activeTools.set(resolveToolKey(event), toolName);
+        ensureTimer();
+        return;
+      }
+      if (event.type === "tool_execution_end") {
+        removeTool(event);
+        stopTimerIfIdle();
+      }
+    },
+    stop() {
+      activeTools.clear();
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    },
+  };
 }
 
 async function maybeAutoRotateSession(
@@ -98,7 +203,10 @@ async function maybeAutoRotateSession(
   const exceedsLines = sessionStorageConfig.maxLines > 0
     && sessionFileLines !== null
     && sessionFileLines >= sessionStorageConfig.maxLines;
-  if (!exceedsSize && !exceedsLines) return session;
+  const compactionCount = getCompactionSuccessCount(chatJid);
+  const exceedsCompactions = sessionStorageConfig.maxCompactionsBeforeRotation > 0
+    && compactionCount >= sessionStorageConfig.maxCompactionsBeforeRotation;
+  if (!exceedsSize && !exceedsLines && !exceedsCompactions) return session;
 
   if (session.isStreaming || session.isCompacting || session.isRetrying) {
     const idleMaxWaitMs = resolveSessionIdleMaxWaitMs(session);
@@ -123,13 +231,14 @@ async function maybeAutoRotateSession(
 
   const result = await rotateSession(session, runtime, { reason: "automatic" });
   if (result.status === "success") {
+    resetCompactionSuccessCount(chatJid);
     options.onInfo?.("Auto-rotated oversized session", {
       operation: "maybe_auto_rotate_session",
       chatJid,
       previousSize: result.previousSize ?? sessionFileSize,
       previousLines: sessionFileLines,
       nextSize: result.nextSize ?? "unknown",
-      trigger: exceedsLines ? "lines" : "size",
+      trigger: exceedsCompactions ? "compactions" : exceedsLines ? "lines" : "size",
     });
     return runtime.session;
   }
@@ -298,6 +407,7 @@ async function runPromptAttempt(
     : undefined;
 
   const tracker = options.turnCoordinator.createTracker(chatJid, onTurnComplete);
+  const toolExecutionWatchdogHeartbeat = createToolExecutionWatchdogHeartbeatController(chatJid);
   const isRetrySafeToolName = (toolName: unknown): boolean => typeof toolName === "string" && [
     "read",
     "read_attachment",
@@ -306,6 +416,12 @@ async function runPromptAttempt(
     "list_tools",
     "list_scripts",
   ].includes(toolName);
+  const isTerminalSideEffectToolName = (toolName: unknown): boolean => typeof toolName === "string" && [
+    "send_adaptive_card",
+    "send_dashboard_widget",
+    "exit_process",
+  ].includes(toolName);
+  let sawTerminalSideEffectToolActivity = false;
   const wrappedOnEvent = (event: AgentSessionEvent) => {
     if (event.type === "message_update") {
       heartbeatTrackedPhase(chatJid, "streaming", { eventType: event.type });
@@ -321,6 +437,24 @@ async function runPromptAttempt(
     } else if (event.type === "compaction_start" || event.type === "compaction_end") {
       heartbeatTrackedPhase(chatJid, event.type === "compaction_start" ? "preprompt_compaction" : "prompt", {
         eventType: event.type,
+      });
+    }
+
+    if (event.type === "tool_execution_start" || event.type === "tool_execution_end") {
+      toolExecutionWatchdogHeartbeat.handleEvent(event as ToolExecutionWatchdogEvent);
+    }
+
+    if (event.type === "thinking_level_changed") {
+      const level = typeof (event as { level?: unknown }).level === "string"
+        ? (event as { level: string }).level
+        : session.thinkingLevel ?? null;
+      updateSessionModel(chatJid, modelLabel, level);
+      options.onInfo?.("Thinking level changed", {
+        operation: "model.thinking_level_changed",
+        chatJid,
+        model: modelLabel,
+        thinkingLevel: level,
+        ...getRunObservabilityDetails(runOptions),
       });
     }
 
@@ -403,6 +537,9 @@ async function runPromptAttempt(
         if (!failedToolName && typeof toolName === "string") {
           failedToolName = toolName;
         }
+      }
+      if (event.type === "tool_execution_end" && !(event as { isError?: unknown }).isError && isTerminalSideEffectToolName(toolName)) {
+        sawTerminalSideEffectToolActivity = true;
       }
       // If exit_process was called, do NOT abort immediately — let the LLM
       // finish its current text response so the agent's reply is captured and
@@ -506,6 +643,7 @@ async function runPromptAttempt(
     promptThrownError = error instanceof Error ? error.message : String(error);
   } finally {
     finishPromptTimeout();
+    toolExecutionWatchdogHeartbeat.stop();
     unsub();
   }
 
@@ -583,17 +721,21 @@ async function runPromptAttempt(
             ...getRunObservabilityDetails(runOptions),
           });
         }
-        // When the provider stopped cleanly after tool use with no other failure
-        // signal, this is a tool-only completion — not an error worth alarming about.
+        // Some UI/process tools intentionally terminate the turn through their
+        // side effect (for example posting an Adaptive Card/dashboard widget or
+        // requesting process exit). If such a tool completed successfully, a
+        // missing closing assistant text is informational, not a failed turn.
+        // Read-only tool-only stops remain recoverable so we can retry and ask
+        // the provider for the final prose reply.
         const isToolOnlyCompletion = hadToolActivity
           && !hadPartialOutput
+          && !hadToolFailure
           && !isBlankTurnSessionDelta(blankTurnDelta)
-          && detail.includes("provider stopped after tool use");
+          && (sawTerminalSideEffectToolActivity || (!onlyReadOnlyToolActivity && detail.includes("provider stopped after tool use")));
         output = isToolOnlyCompletion
           ? {
             status: "tool_complete" as const,
             result: null,
-            error: `Prompt completed without emitting an assistant reply before finalization (${detail}).`,
           }
           : {
             status: "error",
@@ -664,6 +806,10 @@ export async function runAgentPrompt(
   let originalSetActiveToolsByName: ((names: string[]) => void) | null = null;
 
   try {
+    if (runOptions.scheduleIdleAutoCompaction) {
+      cancelScheduledIdleAutoCompaction(chatJid);
+    }
+
     const runtime = await options.getOrCreateRuntime(chatJid);
     let session = runtime.session;
     session = await maybeAutoRotateSession(session, runtime, chatJid, options);
@@ -761,7 +907,7 @@ export async function runAgentPrompt(
       return Math.max(0, Date.now() - anchor);
     };
 
-    return await withChatContext(chatJid, channel, async () => {
+    const runResult: AgentOutput = await withChatContext(chatJid, channel, async () => {
       while (true) {
         const attempt = await runPromptAttempt(
           prompt,
@@ -815,6 +961,19 @@ export async function runAgentPrompt(
               recoveryDiagnostics,
             );
           }
+          return attempt.output;
+        }
+
+        if (attempt.output.status === "tool_complete") {
+          const duration = Date.now() - startTime;
+          writeAgentLog(options.logsDir, chatJid, duration, false, null, null, null);
+          options.onInfo?.("Agent run completed via terminal tool", {
+            operation: "run_agent.tool_complete",
+            chatJid,
+            model: modelLabel,
+            durationMs: duration,
+            ...getRunObservabilityDetails(runOptions),
+          });
           return attempt.output;
         }
 
@@ -999,6 +1158,12 @@ export async function runAgentPrompt(
         options.clearAttachments(chatJid);
       }
     });
+
+    if (runOptions.scheduleIdleAutoCompaction && runResult.status === "success") {
+      scheduleIdleAutoCompaction(session, chatJid, options, runOptions.onEvent);
+    }
+
+    return runResult;
   } catch (err) {
     options.clearAttachments(chatJid);
     const duration = Date.now() - startTime;

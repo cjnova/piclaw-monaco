@@ -23,6 +23,8 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
       compactionTimeoutSec: 240,
       compactionBackoffBaseMin: 12,
       compactionBackoffMaxMin: 180,
+      compactionThresholdPercent: 75,
+      compactionBackoffDecayFactor: 0.25,
       progressWatchdogEnabled: true,
       progressWatchdogTimeoutSec: 75,
     });
@@ -31,6 +33,8 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
       compactionTimeoutSec: 240,
       compactionBackoffBaseMin: 12,
       compactionBackoffMaxMin: 180,
+      compactionThresholdPercent: 75,
+      compactionBackoffDecayFactor: 0.25,
       progressWatchdogEnabled: true,
       progressWatchdogTimeoutSec: 75,
     });
@@ -41,6 +45,8 @@ test('saveCompactionSettings persists and applies compaction settings immediatel
         timeoutMs: 240000,
         backoffBaseMs: 720000,
         backoffMaxMs: 10800000,
+        thresholdPercent: 75,
+        backoffDecayFactor: 0.25,
         progressWatchdogEnabled: true,
         progressWatchdogTimeoutMs: 75000,
       },

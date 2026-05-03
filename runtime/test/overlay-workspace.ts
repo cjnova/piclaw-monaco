@@ -8,8 +8,8 @@
  * not available (no root, no overlay module, non-Linux).
  */
 
-import { execSync, spawnSync } from "child_process";
-import { mkdtempSync, mkdirSync, rmSync, existsSync, cpSync } from "fs";
+import { spawnSync } from "child_process";
+import { mkdtempSync, mkdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 

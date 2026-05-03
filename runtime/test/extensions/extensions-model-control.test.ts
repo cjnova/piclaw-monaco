@@ -39,6 +39,7 @@ function makeOpus46Model(overrides: Partial<Model<any>> = {}): Model<any> {
     provider: "github-copilot",
     id: "claude-opus-4.6-1m",
     name: "Claude Opus 4.6 (1M)",
+    thinkingLevelMap: { xhigh: "xhigh" },
     ...overrides,
   });
 }

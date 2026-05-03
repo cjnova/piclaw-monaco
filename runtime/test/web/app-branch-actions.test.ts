@@ -90,7 +90,7 @@ test('renameCurrentBranch validates, renames, and updates shared locks', async (
   expect(refreshes.sort()).toEqual(['active', 'branches']);
   expect(closeCalls).toContain('close');
   expect(renamingStates).toEqual([true, false]);
-  expect(toasts).toContainEqual(['Branch renamed', '@next-handle', 'info', 3500]);
+  expect(toasts).toContainEqual(['Session renamed', '@next-handle', 'info', 3500]);
   expect(renameBranchInFlightRef.current).toBe(false);
   expect(formLock.inFlight).toBe(false);
   expect(renameBranchLockUntilRef.current).toBe(1050);

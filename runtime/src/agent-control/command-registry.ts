@@ -44,6 +44,7 @@ export const CONTROL_COMMAND_DEFINITIONS: ControlCommandDefinition[] = [
   { name: "/new-session", description: "Start a new session" },
   { name: "/switch-session", description: "Switch to a session file" },
   { name: "/session-rotate", description: "Rotate the current persisted session into an archived file" },
+  { name: "/rollup", description: "Merge the current branch chat back into its parent chat (SQLite state only)" },
   { name: "/fork", description: "Fork from a previous message" },
   { name: "/clone", description: "Clone from the current tree entry into a new session" },
   { name: "/forks", description: "List forkable messages" },

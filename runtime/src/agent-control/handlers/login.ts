@@ -19,7 +19,7 @@ import { writeFileSync, readFileSync, existsSync, copyFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { createLogger } from "../../utils/logger.js";
-import { PROVIDER_DEFS, type ProviderDef } from "../provider-defs.js";
+import { getProviderDefs, type ProviderDef } from "../provider-defs.js";
 import { handleModel } from "./model.js";
 
 const log = createLogger("agent-control.login");
@@ -48,6 +48,8 @@ interface AuthStorageLike {
 interface ModelRegistryLike {
   refresh?: () => void;
   getAll(): Array<{ id: string; name: string; provider: string; contextWindow?: number }>;
+  getProviderAuthStatus?: (provider: string) => { configured: boolean; source?: string; label?: string };
+  getProviderDisplayName?: (provider: string) => string;
 }
 
 // ── Config paths ────────────────────────────────────────────────
@@ -98,11 +100,15 @@ function refreshModelRegistry(registry: ModelRegistryLike): void {
 
 interface ProviderStatus {
   def: ProviderDef;
-  authType: "oauth" | "api_key" | "custom" | "none";
+  authType: "oauth" | "api_key" | "custom" | "external" | "none";
 }
 
-function getProviderStatuses(authStorage: AuthStorageLike): ProviderStatus[] {
-  return PROVIDER_DEFS.map((def) => {
+function getProviderDef(authStorage: AuthStorageLike, registry: ModelRegistryLike, providerId: string): ProviderDef | undefined {
+  return getProviderDefs(registry, authStorage).find((provider) => provider.id === providerId);
+}
+
+function getProviderStatuses(authStorage: AuthStorageLike, registry?: ModelRegistryLike): ProviderStatus[] {
+  return getProviderDefs(registry, authStorage).map((def) => {
     const cred = authStorage.get(def.id);
     let authType: ProviderStatus["authType"] = "none";
     if (cred?.type === "oauth") authType = "oauth";
@@ -111,6 +117,17 @@ function getProviderStatuses(authStorage: AuthStorageLike): ProviderStatus[] {
       const models = readJsonFile(getModelsJsonPath()) as { providers?: Record<string, unknown> };
       if (models.providers?.[def.id]) authType = "custom";
     }
+
+    if (authType === "none") {
+      const registryStatus = registry?.getProviderAuthStatus?.(def.id);
+      if (registryStatus?.configured) {
+        const source = registryStatus.source || "";
+        if (source === "environment") authType = "api_key";
+        else if (source.startsWith("models_json")) authType = "custom";
+        else authType = "external";
+      }
+    }
+
     return { def, authType };
   });
 }
@@ -119,6 +136,7 @@ function statusLabel(s: ProviderStatus): string {
   if (s.authType === "oauth") return "✓ OAuth";
   if (s.authType === "api_key") return "✓ API key";
   if (s.authType === "custom") return "✓ Configured";
+  if (s.authType === "external") return "✓ External";
   return "—";
 }
 
@@ -127,6 +145,7 @@ function methodsLabel(def: ProviderDef): string {
   if (def.hasOAuth) parts.push("OAuth");
   if (def.hasApiKey) parts.push("Key");
   if (def.isCustom) parts.push("Configure");
+  if (def.hasExternalAuth) parts.push("External");
   return parts.join(" · ") || "—";
 }
 
@@ -287,11 +306,32 @@ function buildCard2Logout(def: ProviderDef, currentAuth: string): Record<string,
   };
 }
 
+function buildCard2ExternalInfo(def: ProviderDef): Record<string, unknown> {
+  return {
+    type: "adaptive_card",
+    card_id: `login-2-external-${def.id}-${Date.now()}`,
+    schema_version: "1.5", state: "active",
+    fallback_text: `${def.name} uses external authentication.`,
+    payload: {
+      type: "AdaptiveCard", version: "1.5",
+      body: [
+        { type: "TextBlock", text: `${def.name} — External Authentication`, weight: "Bolder", size: "Medium" },
+        {
+          type: "TextBlock",
+          text: def.authNote || "Configure this provider outside Piclaw, then return to /model once credentials are available.",
+          wrap: true,
+        },
+      ],
+    },
+  };
+}
+
 function buildCard2AuthPicker(def: ProviderDef): Record<string, unknown> {
   const methods: Array<{ title: string; value: string }> = [];
   if (def.hasOAuth) methods.push({ title: "Login with OAuth", value: "oauth" });
   if (def.hasApiKey) methods.push({ title: "Enter API key", value: "api_key" });
   if (def.isCustom) methods.push({ title: "Configure provider", value: "configure" });
+  if (def.hasExternalAuth) methods.push({ title: "External credential setup", value: "external" });
   methods.push({ title: "Logout / Remove", value: "logout" });
 
   return {
@@ -415,15 +455,16 @@ async function startOAuthBackground(
 /** Card 1 submitted → show Card 2 (auth method picker or direct form). */
 async function handleStep1(
   authStorage: AuthStorageLike,
+  registry: ModelRegistryLike,
   data: Record<string, unknown>,
 ): Promise<AgentControlResult> {
   const providerId = String(data.provider || "").trim();
-  const def = PROVIDER_DEFS.find((p) => p.id === providerId);
+  const def = getProviderDef(authStorage, registry, providerId);
   if (!def) return { status: "error", message: `Unknown provider "${providerId}".` };
 
   // Count applicable methods
-  const methods = [def.hasOAuth, def.hasApiKey, def.isCustom].filter(Boolean).length;
-  const hasLogoutOption = getProviderStatuses(authStorage).find((s) => s.def.id === providerId)?.authType !== "none";
+  const methods = [def.hasOAuth, def.hasApiKey, def.isCustom, def.hasExternalAuth].filter(Boolean).length;
+  const hasLogoutOption = getProviderStatuses(authStorage, registry).find((s) => s.def.id === providerId)?.authType !== "none";
 
   // If only one auth method (+ optional logout), go straight to the form
   if (methods === 1 && !hasLogoutOption) {
@@ -434,6 +475,7 @@ async function handleStep1(
     }
     if (def.hasApiKey) return { status: "success", message: `Enter API key for ${def.name}`, contentBlocks: [buildCard2ApiKey(def)] };
     if (def.isCustom) return { status: "success", message: `Configure ${def.name}`, contentBlocks: [buildCard2Config(def)] };
+    if (def.hasExternalAuth) return { status: "success", message: `${def.name} uses external authentication`, contentBlocks: [buildCard2ExternalInfo(def)] };
   }
 
   // Multiple methods → show method picker
@@ -443,11 +485,12 @@ async function handleStep1(
 /** Card 2 method picker submitted → show the actual auth form. */
 async function handleStep1Method(
   authStorage: AuthStorageLike,
+  registry: ModelRegistryLike,
   data: Record<string, unknown>,
 ): Promise<AgentControlResult> {
   const providerId = String(data.provider || "").trim();
   const action = String(data.action || "").trim();
-  const def = PROVIDER_DEFS.find((p) => p.id === providerId);
+  const def = getProviderDef(authStorage, registry, providerId);
   if (!def) return { status: "error", message: `Unknown provider "${providerId}".` };
 
   if (action === "oauth") {
@@ -464,8 +507,12 @@ async function handleStep1Method(
     if (!def.isCustom) return { status: "error", message: `**${def.name}** doesn't need configuration.` };
     return { status: "success", message: `Configure ${def.name}`, contentBlocks: [buildCard2Config(def)] };
   }
+  if (action === "external") {
+    if (!def.hasExternalAuth) return { status: "error", message: `**${def.name}** does not require external setup.` };
+    return { status: "success", message: `${def.name} uses external authentication`, contentBlocks: [buildCard2ExternalInfo(def)] };
+  }
   if (action === "logout") {
-    const status = getProviderStatuses(authStorage).find((s) => s.def.id === providerId);
+    const status = getProviderStatuses(authStorage, registry).find((s) => s.def.id === providerId);
     if (!status || status.authType === "none") return { status: "error", message: `**${def.name}** is not configured.` };
     return { status: "success", message: `Confirm removal for ${def.name}`, contentBlocks: [buildCard2Logout(def, statusLabel(status))] };
   }
@@ -483,7 +530,7 @@ async function handleStep2(
 ): Promise<AgentControlResult> {
   const providerId = String(data.provider || "").trim();
   const method = String(data.method || "").trim();
-  const def = PROVIDER_DEFS.find((p) => p.id === providerId);
+  const def = getProviderDef(authStorage, registry, providerId);
   const name = def?.name || providerId;
 
   if (method === "api_key") {
@@ -641,11 +688,11 @@ export async function handleLogin(
   // Internal routing from card submissions
   if (command.provider?.startsWith("__step1 ")) {
     const json = command.provider.slice(8);
-    try { return await handleStep1(authStorage, JSON.parse(json)); } catch { return { status: "error", message: "Invalid data." }; }
+    try { return await handleStep1(authStorage, registry, JSON.parse(json)); } catch { return { status: "error", message: "Invalid data." }; }
   }
   if (command.provider?.startsWith("__step1method ")) {
     const json = command.provider.slice(14);
-    try { return await handleStep1Method(authStorage, JSON.parse(json)); } catch { return { status: "error", message: "Invalid data." }; }
+    try { return await handleStep1Method(authStorage, registry, JSON.parse(json)); } catch { return { status: "error", message: "Invalid data." }; }
   }
   if (command.provider?.startsWith("__step2 ")) {
     const json = command.provider.slice(8);
@@ -657,7 +704,7 @@ export async function handleLogin(
   }
 
   // No args → show Card 1
-  const statuses = getProviderStatuses(authStorage);
+  const statuses = getProviderStatuses(authStorage, registry);
   return { status: "success", message: "Provider authentication", contentBlocks: [buildCard1(statuses)] };
 }
 
@@ -668,6 +715,7 @@ export async function handleLogout(
 ): Promise<AgentControlResult> {
   const authStorage = getAuthStorage(session, modelRegistry);
   if (!authStorage) return { status: "error", message: "Auth storage is not available." };
+  const registry = getModelRegistry(session, modelRegistry);
 
   if (command.provider) {
     const providerId = command.provider.trim().toLowerCase();
@@ -679,6 +727,6 @@ export async function handleLogout(
     return { status: "success", message: `✓ Logged out from **${providerId}**.` };
   }
 
-  const statuses = getProviderStatuses(authStorage);
+  const statuses = getProviderStatuses(authStorage, registry);
   return { status: "success", message: "Provider authentication", contentBlocks: [buildCard1(statuses)] };
 }

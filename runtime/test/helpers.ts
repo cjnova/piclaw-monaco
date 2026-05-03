@@ -154,7 +154,7 @@ export function closeDbQuietly(db: { getDb: () => { close: () => void } } | null
   try {
     db.getDb().close();
     return true;
-  } catch (_error) {
+  } catch {
     return false;
   }
 }
@@ -164,7 +164,7 @@ export async function resetWebTotpSecretIfLoaded(): Promise<boolean> {
     const config = await import("../src/core/config.js");
     config.setWebTotpSecret("");
     return true;
-  } catch (_error) {
+  } catch {
     return false;
   }
 }
@@ -172,7 +172,7 @@ export async function resetWebTotpSecretIfLoaded(): Promise<boolean> {
 export function tryRun<T>(run: () => T): { ok: true; value: T } | { ok: false } {
   try {
     return { ok: true, value: run() };
-  } catch (_error) {
+  } catch {
     return { ok: false };
   }
 }
@@ -181,7 +181,7 @@ export async function probeHttpOk(url: string): Promise<boolean> {
   try {
     const response = await fetch(url);
     return response.ok;
-  } catch (_error) {
+  } catch {
     return false;
   }
 }
@@ -191,7 +191,7 @@ export async function stopQuietly(stop: (() => Promise<unknown>) | null | undefi
   try {
     await stop();
     return true;
-  } catch (_error) {
+  } catch {
     return false;
   }
 }

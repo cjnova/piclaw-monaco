@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeAll } from "bun:test";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { describe, test, expect } from "bun:test";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
@@ -53,7 +53,6 @@ describe("overlay-workspace", () => {
     expect(readFileSync(join(base, "test.txt"), "utf-8")).toBe("original");
 
     // Cleanup base
-    const { rmSync } = require("fs");
     rmSync(base, { recursive: true, force: true });
   });
 
@@ -64,11 +63,9 @@ describe("overlay-workspace", () => {
     const prevWorkspace = process.env.PICLAW_WORKSPACE;
 
     let capturedWorkspace: string | undefined;
-    let capturedIsOverlay: boolean | undefined;
 
     await withOverlayWorkspace(base, (overlay) => {
       capturedWorkspace = process.env.PICLAW_WORKSPACE;
-      capturedIsOverlay = overlay.isOverlay;
       expect(process.env.PICLAW_WORKSPACE).toBe(overlay.merged);
     });
 
@@ -76,7 +73,6 @@ describe("overlay-workspace", () => {
     expect(process.env.PICLAW_WORKSPACE).toBe(prevWorkspace);
     expect(capturedWorkspace).toBeTruthy();
 
-    const { rmSync } = require("fs");
     rmSync(base, { recursive: true, force: true });
   });
 
@@ -103,7 +99,6 @@ describe("overlay-workspace", () => {
     expect(readFileSync(join(base, "subdir", "nested.txt"), "utf-8")).toBe("nested content");
     expect(existsSync(join(base, "junk.txt"))).toBe(false);
 
-    const { rmSync } = require("fs");
     rmSync(base, { recursive: true, force: true });
   });
 });

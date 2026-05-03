@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { closeDbQuietly, createTempWorkspace, importFresh, setEnv } from "../helpers.js";
 import {
   STARTUP_STATUS_CHAT_JID,
   STARTUP_STATUS_TURN_ID,
@@ -9,7 +10,6 @@ import {
   resolveStartupSessionWarmupOptions,
   runWebStartupRecoveryBootstrap,
 } from "../../src/runtime/startup.js";
-import { closeDbQuietly, createTempWorkspace, importFresh, setEnv } from "../helpers.js";
 
 const TEST_SHELL = process.env.SHELL || "bash";
 const RUNTIME_DIR = join(import.meta.dir, "../..");
@@ -50,6 +50,38 @@ describe("runtime startup helpers", () => {
     }
   });
 
+  test("initializeRuntimeEnvironment can seed workspace files from a packaged skel directory", () => {
+    const ws = createTempWorkspace("piclaw-startup-");
+    const skelDir = join(ws.base, "packaged-skel");
+    mkdirSync(skelDir, { recursive: true });
+    writeFileSync(join(skelDir, "AGENTS.md"), "# Packaged desktop instructions\n");
+
+    try {
+      const run = Bun.spawnSync({
+        cmd: [
+          TEST_SHELL,
+          "-lc",
+          "bun -e \"import { initializeRuntimeEnvironment } from './src/runtime/startup.js'; initializeRuntimeEnvironment({ loadTimestamps() {}, loadChats() {} });\"",
+        ],
+        cwd: RUNTIME_DIR,
+        env: {
+          ...process.env,
+          PICLAW_WORKSPACE: ws.workspace,
+          PICLAW_STORE: ws.store,
+          PICLAW_DATA: ws.data,
+          PICLAW_SKEL_DIR: skelDir,
+          PICLAW_DB_IN_MEMORY: "1",
+          PICLAW_DISABLE_BACKGROUND_WORKSPACE_INDEX: "1",
+        },
+      });
+      expect(run.exitCode, run.stderr.toString() || run.stdout.toString()).toBe(0);
+
+      expect(readFileSync(join(ws.workspace, "AGENTS.md"), "utf8")).toBe("# Packaged desktop instructions\n");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   test("initializeRuntimeEnvironment removes orphaned active chat artifacts with empty session dirs", async () => {
     const ws = createTempWorkspace("piclaw-startup-");
     const restoreEnv = setEnv({
@@ -84,6 +116,65 @@ describe("runtime startup helpers", () => {
     } finally {
       closeDbQuietly(dbMod);
       restoreEnv();
+      ws.cleanup();
+    }
+  });
+
+  test("createWhatsAppChannel is a no-op by default even when legacy phone config exists", () => {
+    const ws = createTempWorkspace("piclaw-startup-");
+
+    try {
+      const run = Bun.spawnSync({
+        cmd: [
+          TEST_SHELL,
+          "-lc",
+          "bun -e \"import { createWhatsAppChannel } from './src/runtime/startup.js'; const channel = createWhatsAppChannel({ chatJids: new Set(), saveChats() {} }); await channel.connect(); await channel.sendMessage('12345@s.whatsapp.net', 'hi'); console.log(JSON.stringify({ connected: channel.isConnected() }));\"",
+        ],
+        cwd: RUNTIME_DIR,
+        env: {
+          ...process.env,
+          PICLAW_WORKSPACE: ws.workspace,
+          PICLAW_STORE: ws.store,
+          PICLAW_DATA: ws.data,
+          PICLAW_DB_IN_MEMORY: "1",
+          PICLAW_DISABLE_BACKGROUND_WORKSPACE_INDEX: "1",
+          PICLAW_WHATSAPP_PHONE: "+15557654321",
+          PICLAW_WHATSAPP_ENABLED: "0",
+        },
+      });
+      expect(run.exitCode, run.stderr.toString() || run.stdout.toString()).toBe(0);
+      expect(JSON.parse(run.stdout.toString().trim().split("\n").at(-1) || "{}")).toEqual({ connected: false });
+    } finally {
+      ws.cleanup();
+    }
+  });
+
+  test("createWhatsAppChannel stays no-op when explicitly enabled without a phone", () => {
+    const ws = createTempWorkspace("piclaw-startup-");
+
+    try {
+      const run = Bun.spawnSync({
+        cmd: [
+          TEST_SHELL,
+          "-lc",
+          "bun -e \"import { createWhatsAppChannel } from './src/runtime/startup.js'; const channel = createWhatsAppChannel({ chatJids: new Set(), saveChats() {} }); await channel.connect(); console.log(JSON.stringify({ connected: channel.isConnected() }));\"",
+        ],
+        cwd: RUNTIME_DIR,
+        env: {
+          ...process.env,
+          PICLAW_WORKSPACE: ws.workspace,
+          PICLAW_STORE: ws.store,
+          PICLAW_DATA: ws.data,
+          PICLAW_DB_IN_MEMORY: "1",
+          PICLAW_DISABLE_BACKGROUND_WORKSPACE_INDEX: "1",
+          PICLAW_WHATSAPP_PHONE: "",
+          WHATSAPP_PHONE: "",
+          PICLAW_WHATSAPP_ENABLED: "1",
+        },
+      });
+      expect(run.exitCode, run.stderr.toString() || run.stdout.toString()).toBe(0);
+      expect(JSON.parse(run.stdout.toString().trim().split("\n").at(-1) || "{}")).toEqual({ connected: false });
+    } finally {
       ws.cleanup();
     }
   });

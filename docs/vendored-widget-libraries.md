@@ -7,11 +7,11 @@ same-origin script loading (`script-src 'unsafe-inline' 'self'`).
 The following libraries are vendored as static assets and available to any widget
 and to generated HTML artifacts from the `visual-artifact-generator` skill:
 
-## Babylon.js 7.x
+## Babylon.js 9.5
 
-**Size:** 7.7 MB (minified UMD)  
-**Path:** `/static/js/vendor/babylon/babylon.js`  
-**Global:** `BABYLON`  
+**Size:** 7.7 MB (UMD)
+**Path:** `/static/js/vendor/babylon/babylon.js`
+**Global:** `BABYLON`
 **License:** Apache-2.0
 
 3D engine with PBR materials, GlowLayer, MeshBuilder, ArcRotateCamera,
@@ -33,11 +33,11 @@ SceneLoader (STL, glTF), physics, particles, and post-processing.
 </script>
 ```
 
-## ECharts 5.6
+## ECharts 6.0
 
-**Size:** 1010 KB (minified UMD)  
-**Path:** `/static/js/vendor/echarts/echarts.min.js`  
-**Global:** `echarts`  
+**Size:** 1.1 MB (minified UMD)
+**Path:** `/static/js/vendor/echarts/echarts.min.js`
+**Global:** `echarts`
 **License:** Apache-2.0
 
 Rich charting library: bar, line, pie, scatter, radar, heatmap, treemap,
@@ -62,9 +62,9 @@ Dark theme built in.
 
 ## D3 7.9
 
-**Size:** 274 KB (minified UMD)  
-**Path:** `/static/js/vendor/d3/d3.min.js`  
-**Global:** `d3`  
+**Size:** 274 KB (minified UMD)
+**Path:** `/static/js/vendor/d3/d3.min.js`
+**Global:** `d3`
 **License:** ISC
 
 Low-level data visualization toolkit: selections, scales, axes, shapes,
@@ -157,10 +157,9 @@ file-type glyphs. Also serves as the terminal font.
 }
 ```
 
-> **Widget CSP note:** Widgets rendered via `send_dashboard_widget` must be
-> posted as `interactive: true` to receive `allow-same-origin` in the sandbox
-> attribute. Non-interactive widgets lack `allow-same-origin` and cannot load
-> fonts from `/static/` paths.
+> **Widget sandbox note:** Interactive widgets do not receive
+> `allow-same-origin`. Treat the iframe as an opaque-origin execution context
+> and use the `piclawWidget` bridge for host communication.
 
 ## Mermaid post-processing helper
 

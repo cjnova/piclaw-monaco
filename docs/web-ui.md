@@ -88,8 +88,8 @@ Configuration details live in [configuration.md](configuration.md).
 - **PDF, images, video** — inline viewers
 - **Text/code attachments** — timeline preview modal for common code/config
   formats
-- **Kanban boards** — `*.kanban.md` in a drag-and-drop board editor (Obsidian
-  Kanban compatible)
+- **Kanban boards** — `*.kanban.md` in a drag-and-drop board editor via the
+  `kanban-editor` add-on (Obsidian Kanban compatible)
 - **Mindmaps** — `*.mindmap.yaml` in a D3/SVG visual editor
 - **VNC remote display** — connect to allowlisted targets from a tab; direct
   targets are enabled by default on Linux/macOS/Windows and can be disabled

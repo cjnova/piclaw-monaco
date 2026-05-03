@@ -161,7 +161,10 @@ export const keychainTools: ExtensionFactory = (pi: ExtensionAPI) => {
           };
         }
 
-        const lines = entries.map((entry) => `• ${entry.name} (${entry.type})`);
+        const lines = entries.map((entry) => {
+          const note = typeof entry.agentNote === "string" && entry.agentNote.trim() ? ` — ${entry.agentNote.trim()}` : "";
+          return `• ${entry.name} (${entry.type})${note}`;
+        });
         const injectable = listInjectableKeychainEnvNames();
         const envNote = injectable.length > 0
           ? `\n\nEntries with shell-safe names are auto-injected as env vars into bash by default. Prefer $NAME in commands instead of keychain get or inlining secrets.`

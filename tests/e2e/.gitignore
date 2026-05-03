@@ -1,0 +1,6 @@
+reports/
+test-results/
+*.mp4
+*.png
+.env
+node_modules/

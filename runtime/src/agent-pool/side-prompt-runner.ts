@@ -276,8 +276,8 @@ export async function runSidePrompt(
 
   return {
     status: "success",
-    result: text || extractAssistantText(completedMessage) || sideSession.getLastAssistantText() || null,
-    thinking: thinking || extractAssistantThinking(completedMessage) || null,
+    result: extractAssistantText(completedMessage) || text || sideSession.getLastAssistantText() || null,
+    thinking: extractAssistantThinking(completedMessage) || thinking || null,
     model: `${model.provider}/${model.id}`,
     usage: completedMessage.usage as Usage | undefined,
     stopReason: completedMessage.stopReason,

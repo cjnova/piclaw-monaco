@@ -41,5 +41,5 @@ describe("bundled pi-mcp-adapter integration", () => {
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 });

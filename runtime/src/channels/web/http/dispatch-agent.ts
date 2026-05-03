@@ -3,7 +3,6 @@
  */
 
 import type { WebChannelLike } from "../core/web-channel-contracts.js";
-import { PICLAW_CONFIG_PATH } from "../../../core/config.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -20,17 +19,24 @@ import {
   handleUninstallAddon,
 } from "../handlers/addons.js";
 import { getCompactionSettingsData, resetCompactionBackoff, saveCompactionSettings } from "../handlers/compaction-settings.js";
-import { getGeneralSettingsData, saveGeneralSettings } from "../handlers/general-settings.js";
+import { getGeneralSettingsData, rotateWidgetTokenSettings, saveGeneralSettings } from "../handlers/general-settings.js";
 import { getQuickActionsSettingsData, saveQuickActionsSettings } from "../handlers/quick-actions-settings.js";
 import { getWorkspaceSettingsData, saveWorkspaceSettings } from "../handlers/workspace-settings.js";
-import { PROVIDER_DEFS } from "../../../agent-control/provider-defs.js";
+import { getServerUiState, setServerUiMetersConfig, setServerUiThemeConfig } from "../ui-state.js";
 import {
-  listKeychainEntries,
+  clearEnvironmentOverride,
+  getEnvironmentSettingsData,
+  setEnvironmentOverride,
+} from "../../../environment-overrides.js";
+import { getProviderDefs } from "../../../agent-control/provider-defs.js";
+import {
+  listKeychainEntriesForUi,
   getKeychainEntry,
   setKeychainEntry,
   deleteKeychainEntry,
   listInjectableKeychainEntries,
-  type KeychainEntryMetadata,
+  updateKeychainEntryNotes,
+  type KeychainEntryUiMetadata,
 } from "../../../secure/keychain.js";
 import {
   handleWebPushPresence,
@@ -157,6 +163,11 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
   },
   {
     method: "POST",
+    path: "/agent/root-session",
+    handle: (channel, req) => channel.handleAgentRootSessionCreate(req),
+  },
+  {
+    method: "POST",
     path: "/agent/branch-rename",
     handle: (channel, req) => channel.handleAgentBranchRename(req),
   },
@@ -164,6 +175,11 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
     method: "POST",
     path: "/agent/rename-jid",
     handle: (channel, req) => channel.handleAgentRenameJid(req),
+  },
+  {
+    method: "POST",
+    path: "/agent/branch-merge-parent",
+    handle: (channel, req) => channel.handleAgentBranchMergeParent(req),
   },
   {
     method: "POST",
@@ -246,6 +262,38 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
   },
   {
     method: "GET",
+    path: "/agent/ui-state",
+    handle: (channel) => channel.json({ ok: true, ...getServerUiState() }, 200),
+  },
+  {
+    method: "POST",
+    path: "/agent/ui-state",
+    handle: async (channel, req) => {
+      const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+      const response: Record<string, unknown> = { ok: true };
+      if (body?.ui_theme && typeof body.ui_theme === "object") {
+        const themeBody = body.ui_theme as Record<string, unknown>;
+        const nextTheme = setServerUiThemeConfig({
+          ...(typeof themeBody.theme === "string" ? { theme: themeBody.theme } : {}),
+          ...(themeBody.tint !== undefined ? { tint: typeof themeBody.tint === "string" ? themeBody.tint : null } : {}),
+        });
+        response.ui_theme = nextTheme;
+        channel.broadcastEvent("ui_theme", { ...nextTheme });
+      }
+      if (body?.ui_meters && typeof body.ui_meters === "object") {
+        const metersBody = body.ui_meters as Record<string, unknown>;
+        const nextMeters = setServerUiMetersConfig({
+          ...(typeof metersBody.enabled === "boolean" ? { enabled: metersBody.enabled } : {}),
+          ...(typeof metersBody.collapsed === "boolean" ? { collapsed: metersBody.collapsed } : {}),
+        });
+        response.ui_meters = nextMeters;
+        channel.broadcastEvent("ui_meters", { mode: "set", ...nextMeters });
+      }
+      return channel.json(response, 200);
+    },
+  },
+  {
+    method: "GET",
     path: "/agent/settings-data",
     handle: (channel) => {
       const themes = THEME_PRESETS.map((p) => {
@@ -258,16 +306,6 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
         }
         return { name: p.name, label: p.label, mode: p.mode, colors };
       });
-      // Read raw config for extra fields
-      let rawConfig: Record<string, unknown> = {};
-      try {
-        if (existsSync(PICLAW_CONFIG_PATH)) {
-          rawConfig = JSON.parse(readFileSync(PICLAW_CONFIG_PATH, "utf-8"));
-        }
-      } catch (e) { /* context usage non-critical — best effort */ void e; }
-      const assistantSection = typeof rawConfig.assistant === "object" && rawConfig.assistant ? rawConfig.assistant as Record<string, unknown> : rawConfig;
-      const userSection = typeof rawConfig.user === "object" && rawConfig.user ? rawConfig.user as Record<string, unknown> : rawConfig;
-
       // Read auth + custom provider state
       const piAgentDir = process.env.PICLAW_PI_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
       let authProviders: Record<string, unknown> = {};
@@ -284,7 +322,7 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
         }
       } catch (e) { /* context usage non-critical — best effort */ void e; }
 
-      const providers = PROVIDER_DEFS.map((p) => {
+      const providers = getProviderDefs().map((p) => {
         const auth = authProviders[p.id] as Record<string, unknown> | undefined;
         const authTypeFromAuth = typeof auth?.type === "string" ? auth.type : null;
         const hasCustomConfig = Boolean(p.isCustom && modelProviders[p.id]);
@@ -298,6 +336,7 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
         ...getCompactionSettingsData(),
         quickActions: getQuickActionsSettingsData(),
         workspaceSettings: getWorkspaceSettingsData(),
+        environmentSettings: getEnvironmentSettingsData(),
         runtimePlatform: process.platform,
         providers,
         themes,
@@ -355,6 +394,14 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
   },
   {
     method: "POST",
+    path: "/agent/settings/widget-token/regenerate",
+    handle: (channel) => {
+      const settings = rotateWidgetTokenSettings();
+      return channel.json({ ok: true, settings }, 200);
+    },
+  },
+  {
+    method: "POST",
     path: "/agent/settings/workspace",
     handle: async (channel, req) => {
       try {
@@ -364,6 +411,29 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return channel.json({ error: message || "Failed to save workspace settings." }, 400);
+      }
+    },
+  },
+  {
+    method: "GET",
+    path: "/agent/settings/environment",
+    handle: (channel) => channel.json({ ok: true, settings: getEnvironmentSettingsData() }, 200),
+  },
+  {
+    method: "POST",
+    path: "/agent/settings/environment",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({}));
+        const payload = (body && typeof body === "object") ? body as Record<string, unknown> : {};
+        const action = typeof payload.action === "string" ? payload.action.trim().toLowerCase() : "set";
+        const saved = action === "clear"
+          ? clearEnvironmentOverride(payload.name)
+          : setEnvironmentOverride(payload.name, payload.value);
+        return channel.json({ ok: true, settings: saved }, 200);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message || "Failed to save environment override." }, 400);
       }
     },
   },
@@ -404,13 +474,13 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
     path: "/agent/keychain",
     handle: (channel) => {
       try {
-        const entries = listKeychainEntries();
+        const entries = listKeychainEntriesForUi();
         const injectable = listInjectableKeychainEntries();
         const envMap: Record<string, string> = {};
         for (const { keychainName, envName } of injectable) {
           envMap[keychainName] = envName;
         }
-        const result = entries.map((e: KeychainEntryMetadata) => ({
+        const result = entries.map((e: KeychainEntryUiMetadata) => ({
           ...e,
           envVar: envMap[e.name] || null,
         }));
@@ -436,7 +506,9 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
           ? (body.type as "token" | "password" | "basic" | "secret")
           : "secret";
         const username = typeof body.username === "string" && body.username.trim() ? body.username.trim() : undefined;
-        await setKeychainEntry({ name, type, secret, username });
+        const userNote = typeof body.userNote === "string" ? body.userNote : undefined;
+        const agentNote = typeof body.agentNote === "string" ? body.agentNote : undefined;
+        await setKeychainEntry({ name, type, secret, username, userNote, agentNote });
         return channel.json({ ok: true, name, type });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -456,6 +528,27 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
         }
         const removed = deleteKeychainEntry(name);
         return channel.json({ ok: true, removed });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return channel.json({ error: message }, 400);
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/agent/keychain/notes",
+    handle: async (channel, req) => {
+      try {
+        const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        if (!name) {
+          return channel.json({ error: "Provide name." }, 400);
+        }
+        const userNote = typeof body.userNote === "string" ? body.userNote : "";
+        const agentNote = typeof body.agentNote === "string" ? body.agentNote : "";
+        const updated = updateKeychainEntryNotes(name, { userNote, agentNote });
+        if (!updated) return channel.json({ error: `Keychain entry not found: ${name}` }, 404);
+        return channel.json({ ok: true, name, userNote, agentNote });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return channel.json({ error: message }, 400);

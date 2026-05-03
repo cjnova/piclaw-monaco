@@ -9,20 +9,22 @@ import {
 } from "../../../extensions/session-status.js";
 import {
   getIdentityConfig,
+  getOrCreateWebWidgetToken,
   getSessionStorageConfig,
   getToolUseMessageBudget,
   getWebRuntimeConfig,
   getSearchMatchMode,
-  getUiThemeConfig,
   setAssistantAvatar,
   setAssistantName,
   setSessionStorageConfig,
   setToolUseMessageBudget,
+  getToolOutputStoreThreshold,
+  setToolOutputStoreThreshold,
   setSearchMatchMode,
-  setUiThemeConfig,
   setUserAvatar,
   setUserAvatarBackground,
   setUserName,
+  rotateWebWidgetToken,
   setWebComposeUploadLimitMb,
   setWebTerminalEnabled,
   setWebWorkspaceUploadLimitMb,
@@ -30,6 +32,7 @@ import {
 } from "../../../core/config.js";
 import { updateAssistantConfig, updateUserConfig } from "../../../agent-control/agent-control-helpers.js";
 import { generateTotpQr } from "../../../utils/totp-qr.js";
+import { getServerUiThemeConfig, setServerUiThemeConfig } from "../ui-state.js";
 
 export interface GeneralSettingsData {
   assistantName: string;
@@ -39,10 +42,13 @@ export interface GeneralSettingsData {
   userAvatarBackground: string;
   sessionAutoRotate: boolean;
   sessionMaxSizeMb: number;
+  sessionMaxLines: number;
   webTerminalEnabled: boolean;
   composeUploadLimitMb: number;
   workspaceUploadLimitMb: number;
   toolUseBudget: number;
+  toolOutputStoreThreshold: number;
+  sessionMaxCompactions: number;
   instanceTotp: {
     configured: boolean;
     issuer: string;
@@ -55,6 +61,7 @@ export interface GeneralSettingsData {
   searchMatchMode: "or" | "and";
   uiTheme: string;
   uiTint: string | null;
+  widgetToken: string;
 }
 
 export interface GeneralSettingsInput {
@@ -64,10 +71,13 @@ export interface GeneralSettingsInput {
   userAvatar?: unknown;
   sessionAutoRotate?: unknown;
   sessionMaxSizeMb?: unknown;
+  sessionMaxLines?: unknown;
   webTerminalEnabled?: unknown;
   composeUploadLimitMb?: unknown;
   workspaceUploadLimitMb?: unknown;
   toolUseBudget?: unknown;
+  toolOutputStoreThreshold?: unknown;
+  sessionMaxCompactions?: unknown;
   sessionIsolation?: unknown;
   searchMatchMode?: unknown;
   uiTheme?: unknown;
@@ -124,6 +134,7 @@ export function getGeneralSettingsData(): GeneralSettingsData {
   const identity = getIdentityConfig();
   const session = getSessionStorageConfig();
   const web = getWebRuntimeConfig();
+  const uiTheme = getServerUiThemeConfig();
   return {
     assistantName: identity.assistantName || "PiClaw",
     assistantAvatar: identity.assistantAvatar || "",
@@ -132,16 +143,25 @@ export function getGeneralSettingsData(): GeneralSettingsData {
     userAvatarBackground: identity.userAvatarBackground || "",
     sessionAutoRotate: session.autoRotate,
     sessionMaxSizeMb: session.maxSizeMb,
+    sessionMaxLines: session.maxLines,
     webTerminalEnabled: web.terminalEnabled,
     composeUploadLimitMb: web.composeUploadLimitMb,
     workspaceUploadLimitMb: web.workspaceUploadLimitMb,
     toolUseBudget: getToolUseMessageBudget(),
+    toolOutputStoreThreshold: getToolOutputStoreThreshold(),
+    sessionMaxCompactions: session.maxCompactionsBeforeRotation,
     instanceTotp: buildTotpSettingsData(),
     sessionIsolation: getSessionIsolationLevel(),
     searchMatchMode: getSearchMatchMode(),
-    uiTheme: getUiThemeConfig().theme,
-    uiTint: getUiThemeConfig().tint,
+    uiTheme: uiTheme.theme,
+    uiTint: uiTheme.tint,
+    widgetToken: getOrCreateWebWidgetToken(),
   };
+}
+
+export function rotateWidgetTokenSettings(): GeneralSettingsData {
+  rotateWebWidgetToken();
+  return getGeneralSettingsData();
 }
 
 export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<GeneralSettingsData> {
@@ -175,10 +195,14 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
     }
   }
 
-  const sessionPatch: { maxSizeMb?: number; autoRotate?: boolean } = {};
+  const sessionPatch: { maxSizeMb?: number; maxLines?: number; maxCompactionsBeforeRotation?: number; autoRotate?: boolean } = {};
   const nextSessionMaxSizeMb = normalizeOptionalInt(input.sessionMaxSizeMb, 1, 256);
   if (nextSessionMaxSizeMb !== undefined) {
     sessionPatch.maxSizeMb = nextSessionMaxSizeMb;
+  }
+  const nextSessionMaxLines = normalizeOptionalInt(input.sessionMaxLines, 100, 50000);
+  if (nextSessionMaxLines !== undefined) {
+    sessionPatch.maxLines = nextSessionMaxLines;
   }
   const nextSessionAutoRotate = normalizeOptionalBoolean(input.sessionAutoRotate);
   if (nextSessionAutoRotate !== undefined) {
@@ -208,6 +232,16 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
     setToolUseMessageBudget(nextToolUseBudget);
   }
 
+  const nextToolOutputThreshold = normalizeOptionalInt(input.toolOutputStoreThreshold, 500, 100000);
+  if (nextToolOutputThreshold !== undefined) {
+    setToolOutputStoreThreshold(nextToolOutputThreshold);
+  }
+
+  const nextMaxCompactions = normalizeOptionalInt(input.sessionMaxCompactions, 1, 20);
+  if (nextMaxCompactions !== undefined) {
+    sessionPatch.maxCompactionsBeforeRotation = nextMaxCompactions;
+  }
+
   const nextSessionIsolation = typeof input.sessionIsolation === "string" ? input.sessionIsolation.trim().toLowerCase() : undefined;
   if (nextSessionIsolation === "none" || nextSessionIsolation === "summary" || nextSessionIsolation === "full") {
     setSessionIsolationLevel(nextSessionIsolation as SessionIsolationLevel);
@@ -225,7 +259,7 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
       ? input.uiTint.trim()
       : null;
   if (nextUiTheme !== undefined || nextUiTint !== undefined) {
-    setUiThemeConfig({
+    setServerUiThemeConfig({
       ...(nextUiTheme !== undefined ? { theme: nextUiTheme || "default" } : {}),
       ...(nextUiTint !== undefined ? { tint: nextUiTint } : {}),
     });

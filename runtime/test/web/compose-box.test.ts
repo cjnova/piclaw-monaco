@@ -5,10 +5,12 @@ import {
   formatModelPickerContextWindow,
   formatModelPickerDisplayLabel,
   getComposeHistoryStorageKey,
+  getModelPickerContextLimit,
   getModelPickerOptionSearchLabel,
   normalizeModelPickerOptions,
   resolveComposeExtensionWorkingDisplay,
   resolveComposeModelPickerState,
+  resolveComposeRoutedModelStatus,
   buildReturnedQueuedDraft,
   parseQueuedContent,
   returnQueuedFollowupToEditor,
@@ -288,7 +290,7 @@ test('returnQueuedFollowupToEditor restores compose state before removing the qu
   expect(calls.indexOf('content:Please check this later.')).toBeLessThan(calls.indexOf('remove'));
 });
 
-test('model picker helpers expose searchable names and formatted context windows', () => {
+test('model picker helpers expose searchable names, formatted context windows, and context-fit guards', () => {
   const option = {
     label: 'anthropic/claude-sonnet-4',
     provider: 'anthropic',
@@ -303,6 +305,49 @@ test('model picker helpers expose searchable names and formatted context windows
   expect(getModelPickerOptionSearchLabel(option)).toContain('anthropic/claude-sonnet-4');
   expect(getModelPickerOptionSearchLabel(option)).toContain('Claude Sonnet 4');
   expect(getModelPickerOptionSearchLabel(option)).toContain('200K ctx');
+
+  expect(getModelPickerContextLimit(option, { tokens: 150000 })).toEqual({
+    blocked: false,
+    note: '',
+    title: '',
+    tokens: 150000,
+    contextWindow: 200000,
+  });
+
+  expect(getModelPickerContextLimit({ ...option, contextWindow: 128000 }, { tokens: 150000 })).toEqual({
+    blocked: true,
+    note: 'Current context won’t fit — compact first',
+    title: 'Current context uses 150K tokens, but this model only fits 128K. Compact first.',
+    tokens: 150000,
+    contextWindow: 128000,
+  });
+});
+
+test('resolveComposeRoutedModelStatus shows latest routed model when it differs from the requested model', () => {
+  expect(resolveComposeRoutedModelStatus('openrouter/auto', {
+    current: 'openrouter/auto',
+    latest_requested_model: 'openrouter/auto',
+    latest_response_model: 'anthropic/claude-sonnet-4-5',
+  })).toEqual({
+    label: 'Routed: anthropic/claude-sonnet-4-5',
+    title: 'Requested model: openrouter/auto • Routed model: anthropic/claude-sonnet-4-5',
+    requestedModel: 'openrouter/auto',
+    responseModel: 'anthropic/claude-sonnet-4-5',
+  });
+});
+
+test('resolveComposeRoutedModelStatus hides matching or stale routed model state', () => {
+  expect(resolveComposeRoutedModelStatus('openrouter/auto', {
+    current: 'openrouter/auto',
+    latest_requested_model: 'openrouter/auto',
+    latest_response_model: 'openrouter/auto',
+  })).toBeNull();
+
+  expect(resolveComposeRoutedModelStatus('anthropic/claude-opus-4-5', {
+    current: 'anthropic/claude-opus-4-5',
+    latest_requested_model: 'openrouter/auto',
+    latest_response_model: 'anthropic/claude-sonnet-4-5',
+  })).toBeNull();
 });
 
 test('resolveComposeModelPickerState keeps the model picker visible for cold chats with available models', () => {

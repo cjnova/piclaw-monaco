@@ -19,3 +19,13 @@ export function buildChatUrl(path: string, params?: Record<string, string>): str
   const qs = new URLSearchParams({ chat_jid: getChatJid(), ...params });
   return `${path}?${qs}`;
 }
+
+/** Alias for buildChatUrl — matches upstream API name (chat_jid appended last). */
+export function buildChatScopedUrl(path: string, params?: Record<string, number | string>): string {
+  const qs = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
+  }
+  qs.set("chat_jid", getChatJid());
+  return `${path}?${qs}`;
+}

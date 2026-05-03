@@ -109,6 +109,49 @@ test("processMessages persists lastAgentTimestamp after a recovered successful a
   });
 });
 
+test("processMessages treats leading path-like slash text after trigger as a normal prompt", async () => {
+  await withTempWorkspaceEnv("piclaw-message-loop-", { PICLAW_KEYCHAIN_KEY: "test-key" }, async () => {
+    const db = await importFresh<typeof import("../../src/db.js")>("../src/db.js");
+    const loop = await importFresh<typeof import("../../src/runtime/message-loop.js")>("../src/runtime/message-loop.js");
+    db.initDatabase();
+
+    const chatJid = `wa:${Date.now()}`;
+    const timestamp = "2026-04-17T01:03:00.000Z";
+    db.storeMessage(makeMessage(chatJid, "@Pi /workspace/piclaw is the repo; mention /agent/keychain literally", timestamp));
+
+    const state = {
+      lastAgentTimestamp: {} as Record<string, string>,
+      wasCommandProcessed: () => false,
+      markCommandProcessed: () => {},
+      saveTimestamps: () => {},
+    };
+
+    let prompt = "";
+    const ok = await loop.processMessages(chatJid, {
+      state: state as any,
+      assistantName: "Pi",
+      triggerPattern: /@Pi/i,
+      whatsapp: {
+        sendMessage: async () => {},
+        setTyping: async () => {},
+      } as any,
+      agentPool: {
+        applySlashCommand: async () => {
+          throw new Error("path-like slash text must not execute as slash command");
+        },
+        runAgent: async (nextPrompt: string) => {
+          prompt = nextPrompt;
+          return { status: "success", result: "done" };
+        },
+      } as any,
+    });
+
+    expect(ok).toBe(true);
+    expect(prompt).toContain("/workspace/piclaw");
+    expect(prompt).toContain("/agent/keychain");
+  });
+});
+
 test("processMessages persists lastAgentTimestamp after a successful agent run", async () => {
   await withTempWorkspaceEnv("piclaw-message-loop-", { PICLAW_KEYCHAIN_KEY: "test-key" }, async () => {
     const db = await importFresh<typeof import("../../src/db.js")>("../src/db.js");

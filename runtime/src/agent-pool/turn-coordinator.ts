@@ -237,9 +237,10 @@ export class AgentTurnCoordinator {
             hadToolCallContent,
             hadThinkingContent,
           };
-          if (!messageHasDelta) {
-            currentTurnText = extracted.text;
-          }
+          // message_end is authoritative: extensions can replace the finalized
+          // message, so do not trust accumulated streaming buffers as the final
+          // turn payload.
+          currentTurnText = extracted.text;
           currentTurnPhase = extracted.phase;
           if (hadToolCallContent) {
             // Assistant text that ships in the same message as a tool call is

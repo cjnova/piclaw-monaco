@@ -61,6 +61,36 @@ test("AgentTurnCoordinator tracks streamed turns and fallback assistant text aft
   expect(tracker.getFinalText()).toBe("fallback answer");
 });
 
+test("AgentTurnCoordinator trusts finalized message_end text over streamed draft text", () => {
+  const coordinator = new AgentTurnCoordinator({
+    takeAttachments: () => [],
+    touchSession: () => {},
+    recordMessageUsage: () => {},
+  });
+
+  const tracker = coordinator.createTracker("web:default");
+  const signature = JSON.stringify({ v: 1, id: "msg_1", phase: "final_answer" });
+
+  tracker.handleMessageUpdate({
+    type: "message_update",
+    assistantMessageEvent: {
+      type: "text_delta",
+      delta: "streamed draft",
+      contentIndex: 0,
+      partial: { content: [{ type: "text", textSignature: signature }] },
+    },
+  } as any);
+  tracker.handleMessageUpdate({
+    type: "message_end",
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text: "final replacement", textSignature: signature }],
+    },
+  } as any);
+
+  expect(tracker.getFinalText()).toBe("final replacement");
+});
+
  test("AgentTurnCoordinator ignores commentary-only assistant text", () => {
   const coordinator = new AgentTurnCoordinator({
     takeAttachments: () => [],

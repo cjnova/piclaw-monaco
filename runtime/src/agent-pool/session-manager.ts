@@ -7,6 +7,7 @@
  */
 
 import type { AgentSession, AgentSessionRuntime, ExtensionFactory, ModelRegistry, SettingsManager, AuthStorage } from "@mariozechner/pi-coding-agent";
+import { closeOpenAICodexWebSocketSessions } from "@mariozechner/pi-ai";
 
 import {
   claimDeferredBranchSeed,
@@ -359,6 +360,7 @@ export class AgentSessionManager {
   ): Promise<void> {
     const entry = map.get(chatJid);
     if (!entry) return;
+    const sessionId = entry.runtime.session.sessionId;
     try {
       await entry.runtime.dispose();
       this.options.onInfo?.(side ? "Disposed side session" : "Disposed session", {
@@ -372,6 +374,7 @@ export class AgentSessionManager {
         err,
       });
     } finally {
+      closeOpenAICodexWebSocketSessions(sessionId);
       map.delete(chatJid);
     }
   }
@@ -512,6 +515,7 @@ export class AgentSessionManager {
     }
 
     const task = (async () => {
+      const sessionId = runtime.session.sessionId;
       try {
         await runtime.dispose();
       } catch (err) {
@@ -519,6 +523,8 @@ export class AgentSessionManager {
           ...details,
           err,
         });
+      } finally {
+        closeOpenAICodexWebSocketSessions(sessionId);
       }
     })();
     this.runtimeDisposeInFlight.set(runtime, task);

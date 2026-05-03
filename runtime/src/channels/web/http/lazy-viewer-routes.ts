@@ -7,7 +7,13 @@ type ViewerRouteModule = {
   handleRoute(req: Request, pathname: string): Response | Promise<Response> | null;
 };
 
-const OFFICE_VIEWER_EXTENSION_PATH = resolve(import.meta.dir, "../../../../extensions/viewers/office-viewer/index.ts");
+const OFFICE_VIEWER_EXTENSION_PATH = resolve(
+  process.env.PICLAW_RUNTIME_ROOT || resolve(import.meta.dir, "../../../.."),
+  "extensions",
+  "viewers",
+  "office-viewer",
+  "index.ts",
+);
 const OFFICE_VIEWER_EXTENSION_URL = pathToFileURL(OFFICE_VIEWER_EXTENSION_PATH).href;
 
 async function loadViewerRoute(moduleUrl: string, req: Request, pathname: string): Promise<Response> {

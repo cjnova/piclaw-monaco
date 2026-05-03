@@ -6155,6 +6155,36 @@ For tests, pass a Ghostty instance directly:
   }
 
   // runtime/web/frontend/src/components/FileTree.tsx
+  var EXPANDED_KEY = () => `piclaw:tree-expanded:${getChatJid()}`;
+  var SELECTED_KEY = () => `piclaw:tree-selected:${getChatJid()}`;
+  function loadExpandedPaths() {
+    try {
+      const raw = localStorage.getItem(EXPANDED_KEY());
+      if (raw) return new Set(JSON.parse(raw));
+    } catch {
+    }
+    return /* @__PURE__ */ new Set();
+  }
+  function saveExpandedPaths(paths) {
+    try {
+      localStorage.setItem(EXPANDED_KEY(), JSON.stringify([...paths]));
+    } catch {
+    }
+  }
+  function loadSelectedPath() {
+    try {
+      return localStorage.getItem(SELECTED_KEY());
+    } catch {
+    }
+    return null;
+  }
+  function saveSelectedPath(path) {
+    try {
+      if (path) localStorage.setItem(SELECTED_KEY(), path);
+      else localStorage.removeItem(SELECTED_KEY());
+    } catch {
+    }
+  }
   async function fetchTree(dirPath) {
     const params = new URLSearchParams({ path: dirPath, depth: "1" });
     const res = await fetch(`/workspace/tree?${params}`, { credentials: "same-origin" });
@@ -6163,15 +6193,28 @@ For tests, pass a Ghostty instance directly:
     const data = await res.json();
     return data.root?.children ?? [];
   }
-  function TreeItem({ node, selectedPath, onSelect }) {
+  function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand }) {
     const isDir = node.type === "dir";
-    const [expanded, setExpanded] = d2(false);
+    const expanded = expandedPaths.has(node.path);
     const [children, setChildren] = d2(
       node.children !== void 0 ? node.children : null
     );
     const [loading, setLoading] = d2(false);
     const [error, setError] = d2(null);
     const isSelected = selectedPath === node.path;
+    y2(() => {
+      if (expanded && isDir && children === null && !loading) {
+        setLoading(true);
+        setError(null);
+        fetchTree(node.path).then((loaded) => {
+          setChildren(loaded);
+        }).catch((err) => {
+          setError(err instanceof Error ? err.message : "Failed to load");
+        }).finally(() => {
+          setLoading(false);
+        });
+      }
+    }, [expanded, isDir, children, loading, node.path]);
     const toggle = q2(async () => {
       if (!isDir) {
         onSelect(node);
@@ -6192,11 +6235,9 @@ For tests, pass a Ghostty instance directly:
             setLoading(false);
           }
         }
-        setExpanded(true);
-      } else {
-        setExpanded(false);
       }
-    }, [isDir, expanded, children, node, onSelect]);
+      onToggleExpand(node.path);
+    }, [isDir, expanded, children, node, onSelect, onToggleExpand]);
     const iconName = isDir ? expanded ? "folder-opened" : "folder" : getFileIcon(node.name);
     const meta = isDir ? node.child_count !== void 0 ? `${node.child_count}` : "" : node.size !== null ? formatBytes(node.size) : "";
     return /* @__PURE__ */ u4("div", { children: [
@@ -6243,7 +6284,7 @@ For tests, pass a Ghostty instance directly:
               e5.stopPropagation();
               setError(null);
               setChildren(null);
-              setExpanded(false);
+              onToggleExpand(node.path);
             },
             children: "Retry"
           }
@@ -6254,7 +6295,9 @@ For tests, pass a Ghostty instance directly:
         {
           node: child,
           selectedPath,
-          onSelect
+          expandedPaths,
+          onSelect,
+          onToggleExpand
         },
         child.path
       )) }),
@@ -6294,7 +6337,22 @@ For tests, pass a Ghostty instance directly:
     const [rootChildren, setRootChildren] = d2(null);
     const [loading, setLoading] = d2(true);
     const [error, setError] = d2(null);
-    const [selectedPath, setSelectedPath] = d2(null);
+    const [selectedPath, setSelectedPath] = d2(loadSelectedPath);
+    const [expandedPaths, setExpandedPaths] = d2(loadExpandedPaths);
+    y2(() => {
+      saveSelectedPath(selectedPath);
+    }, [selectedPath]);
+    y2(() => {
+      saveExpandedPaths(expandedPaths);
+    }, [expandedPaths]);
+    const toggleExpanded = q2((path) => {
+      setExpandedPaths((prev) => {
+        const next = new Set(prev);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+    }, []);
     const load = q2(async () => {
       setLoading(true);
       setError(null);
@@ -6311,6 +6369,21 @@ For tests, pass a Ghostty instance directly:
     y2(() => {
       load();
     }, [load]);
+    y2(() => {
+      if (!selectedPath || !rootChildren) return;
+      const parts = selectedPath.split("/");
+      const parents = [];
+      for (let i6 = 1; i6 < parts.length; i6++) {
+        parents.push(parts.slice(0, i6).join("/"));
+      }
+      if (parents.length > 0) {
+        setExpandedPaths((prev) => {
+          const next = new Set(prev);
+          parents.forEach((p6) => next.add(p6));
+          return next;
+        });
+      }
+    }, [rootChildren]);
     const handleSelect = q2(
       (node) => {
         setSelectedPath(node.path);
@@ -6335,7 +6408,9 @@ For tests, pass a Ghostty instance directly:
       {
         node,
         selectedPath,
-        onSelect: handleSelect
+        expandedPaths,
+        onSelect: handleSelect,
+        onToggleExpand: toggleExpanded
       },
       node.path
     )) });

@@ -14,6 +14,7 @@ import {
   getChatBranchByAgentName,
   getChatBranchByChatJid,
   listChatBranches,
+  mergeChatBranchIntoParent as mergeChatBranchIntoParentDb,
   permanentDeleteArchivedBranch,
   renameChatBranchIdentity,
   renameChatJid as renameChatJidDb,
@@ -25,7 +26,6 @@ import { SESSIONS_DIR } from "../core/config.js";
 import { sanitiseJid } from "./session.js";
 import { existsSync, readdirSync, renameSync, rmSync } from "fs";
 import { join } from "path";
-import { createUuid } from "../utils/ids.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
 import { createDeferredBranchSeed, writeDeferredBranchSeed } from "./branch-seeding.js";
 import type { PoolEntry } from "./session-manager.js";
@@ -85,9 +85,57 @@ function deriveAgentHandle(chatJid: string, sessionName?: string | null): string
   return "agent";
 }
 
-function buildForkedChatJid(sourceChatJid: string): string {
-  const root = sourceChatJid.startsWith("web:") ? sourceChatJid : `web:${sourceChatJid}`;
-  return `${root}:branch:${createUuid("chat").split("-").pop()}`;
+function buildBranchVisualPrefix(sourceBranch: ChatBranchRecord, branches: ChatBranchRecord[]): string {
+  const rootChatJid = sourceBranch.root_chat_jid || sourceBranch.chat_jid;
+  const rootPrefix = rootChatJid.startsWith("web:") ? rootChatJid : `web:${rootChatJid}`;
+  if (sourceBranch.chat_jid === rootChatJid) return rootPrefix;
+
+  // Preserve already-readable JID paths. Renaming a session updates only
+  // metadata, so descendants should append to the stable existing path rather
+  // than rebuilding ancestor path segments from renamed handles.
+  if (sourceBranch.chat_jid.startsWith(`${rootPrefix}:`) && !sourceBranch.chat_jid.includes(":branch:")) {
+    return sourceBranch.chat_jid;
+  }
+
+  const byId = new Map(branches.map((branch) => [branch.branch_id, branch]));
+  const segments: string[] = [];
+  let cursor: ChatBranchRecord | null = sourceBranch;
+  const seen = new Set<string>();
+
+  while (cursor && cursor.chat_jid !== rootChatJid && !seen.has(cursor.branch_id)) {
+    seen.add(cursor.branch_id);
+    const handle = normalizeAgentHandlePart(cursor.agent_name || "");
+    if (handle) segments.unshift(handle);
+    cursor = cursor.parent_branch_id ? byId.get(cursor.parent_branch_id) ?? null : null;
+  }
+
+  if (segments.length === 0) {
+    return sourceBranch.chat_jid.startsWith("web:") ? sourceBranch.chat_jid : `web:${sourceBranch.chat_jid}`;
+  }
+
+  return `${rootPrefix}:${segments.join(":")}`;
+}
+
+function buildForkedChatIdentity(sourceBranch: ChatBranchRecord, requestedAgentName: string, branches: ChatBranchRecord[]): { chatJid: string; agentName: string } {
+  const base = normalizeAgentHandlePart(requestedAgentName) || "branch";
+  const prefix = buildBranchVisualPrefix(sourceBranch, branches);
+  const usedActiveHandles = new Set(
+    branches
+      .filter((branch) => !branch.archived_at)
+      .map((branch) => normalizeAgentHandlePart(branch.agent_name || ""))
+      .filter(Boolean),
+  );
+  const usedChatJids = new Set(branches.map((branch) => branch.chat_jid));
+
+  let suffix = 0;
+  for (;;) {
+    const agentName = suffix === 0 ? base : `${base}-${suffix}`;
+    const chatJid = `${prefix}:${agentName}`;
+    if (!usedActiveHandles.has(agentName) && !usedChatJids.has(chatJid)) {
+      return { chatJid, agentName };
+    }
+    suffix = suffix === 0 ? 2 : suffix + 1;
+  }
 }
 
 function createVolatileBranchRecord(chatJid: string, session?: AgentSession | null): ChatBranchRecord {
@@ -183,22 +231,6 @@ export class AgentBranchManager {
       }
     }
 
-    // Auto-rename the JID to web:<agent_name> so @-mentions work naturally.
-    const desiredJid = `web:${renamed.agent_name}`;
-    if (renamed.chat_jid !== desiredJid) {
-      try {
-        const jidResult = await this.renameChatJid(renamed.chat_jid, desiredJid);
-        return jidResult.branch;
-      } catch (err) {
-        this.options.onWarn?.("JID auto-rename after agent rename failed; agent_name updated but JID unchanged", {
-          operation: "rename_chat_branch.auto_rename_jid",
-          chatJid: renamed.chat_jid,
-          desiredJid,
-          err,
-        });
-      }
-    }
-
     return renamed;
   }
 
@@ -282,6 +314,68 @@ export class AgentBranchManager {
       }
     } catch (e) { debugSuppressedError(log, "best-effort child branch directory rename failed", e, { old, next }); }
 
+    return result;
+  }
+
+  async createRootChatSession(agentName: string): Promise<ChatBranchRecord> {
+    const normalized = normalizeAgentHandlePart(agentName || "");
+    if (!normalized) throw new Error("Root session handle must contain at least one letter or number.");
+    if (normalized === "branch") throw new Error("Root session handle cannot be 'branch'.");
+
+    const chatJid = `web:${normalized}`;
+    const existingByJid = getChatBranchByChatJid(chatJid);
+    if (existingByJid) {
+      throw new Error(`Root session already exists: ${chatJid}`);
+    }
+
+    const existingByHandle = getChatBranchByAgentName(normalized);
+    if (existingByHandle && !existingByHandle.archived_at) {
+      throw new Error(`Session handle already exists: @${normalized}`);
+    }
+
+    storeChatMetadata(chatJid, new Date().toISOString(), normalized);
+    const branch = ensureChatBranch({
+      chat_jid: chatJid,
+      root_chat_jid: chatJid,
+      parent_branch_id: null,
+      agent_name: normalized,
+    });
+    this.options.scheduleSessionWarmup?.(chatJid);
+    return branch;
+  }
+
+  async mergeChatBranchIntoParent(
+    chatJid: string,
+  ): Promise<ReturnType<typeof mergeChatBranchIntoParentDb>> {
+    const normalizedChatJid = String(chatJid || "").trim();
+    if (!normalizedChatJid) throw new Error("chat_jid is required");
+    if (this.options.isActive(normalizedChatJid)) {
+      throw new Error("Cannot merge a chat branch while it has an active turn.");
+    }
+
+    const mainEntry = this.options.pool.get(normalizedChatJid);
+    if (mainEntry) {
+      try { await mainEntry.runtime.dispose(); } catch (e) { debugSuppressedError(log, "best-effort dispose failed for merged session", e, { jid: normalizedChatJid }); }
+      this.options.pool.delete(normalizedChatJid);
+    }
+    const sideEntry = this.options.sidePool.get(normalizedChatJid);
+    if (sideEntry) {
+      try { await sideEntry.runtime.dispose(); } catch (e) { debugSuppressedError(log, "best-effort dispose failed for merged side session", e, { jid: normalizedChatJid }); }
+      this.options.sidePool.delete(normalizedChatJid);
+    }
+    this.options.activeForkBaseLeafByChat.delete(normalizedChatJid);
+    this.options.cancelSessionWarmup?.(normalizedChatJid);
+
+    const result = mergeChatBranchIntoParentDb(normalizedChatJid);
+    try {
+      removeSessionArtifacts(normalizedChatJid);
+    } catch (err) {
+      this.options.onWarn?.("Failed to remove merged session artifacts", {
+        operation: "merge_chat_branch.remove_session_artifacts",
+        chatJid: normalizedChatJid,
+        err,
+      });
+    }
     return result;
   }
 
@@ -433,16 +527,17 @@ export class AgentBranchManager {
     }
 
     const sourceBranch = this.ensureBranchRegistration(sourceChatJid, sourceSession);
-    const nextChatJid = buildForkedChatJid(sourceChatJid);
     const requestedAgentName = typeof options.agentName === "string" && options.agentName.trim()
       ? options.agentName.trim()
       : sourceBranch.agent_name;
-    storeChatMetadata(nextChatJid, new Date().toISOString(), requestedAgentName || nextChatJid);
+    const knownBranches = listChatBranches(null, { includeArchived: true });
+    const { chatJid: nextChatJid, agentName: nextAgentName } = buildForkedChatIdentity(sourceBranch, requestedAgentName, knownBranches);
+    storeChatMetadata(nextChatJid, new Date().toISOString(), nextAgentName || nextChatJid);
     const nextBranch = ensureChatBranch({
       chat_jid: nextChatJid,
       root_chat_jid: sourceBranch.root_chat_jid || sourceBranch.chat_jid,
       parent_branch_id: sourceBranch.branch_id,
-      agent_name: requestedAgentName,
+      agent_name: nextAgentName,
     });
 
     writeDeferredBranchSeed(nextChatJid, createDeferredBranchSeed(sourceSession, {

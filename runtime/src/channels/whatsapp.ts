@@ -12,8 +12,8 @@
  *   - Phone number filtering (`WHATSAPP_CONFIG.phoneNumber`) to restrict inbound handling.
  *
  * Consumers:
- *   - runtime.ts creates a WhatsAppChannel at startup (if `WHATSAPP_CONFIG.phoneNumber`
- *     is configured) and wires its callbacks.
+ *   - runtime/startup.ts lazy-loads WhatsAppChannel only when `WHATSAPP_CONFIG.enabled`
+ *     and `WHATSAPP_CONFIG.phoneNumber` are configured, then wires its callbacks.
  *   - runtime/message-loop.ts polls for new WhatsApp messages via the DB.
  */
 

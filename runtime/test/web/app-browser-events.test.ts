@@ -46,7 +46,6 @@ test('watchPaneOpenEvents routes supported tab, edit-source, and popout custom e
   doc.dispatch('html-viewer:open-tab', { detail: { path: '/site/index.html', label: 'Home' } });
   doc.dispatch('html-viewer:edit-source', { detail: { path: '/site/index.html', label: 'Home' } });
   doc.dispatch('mindmap:open-tab', { detail: { path: '/maps/plan.mindmap.yaml', label: 'Plan' } });
-  doc.dispatch('kanban:open-tab', { detail: { path: '/boards/work.kanban.md', label: 'Board' } });
   doc.dispatch('pane:popout', { detail: { path: '/tabs/terminal', label: 'Terminal' } });
   expect(events).toEqual([
     'tab:/widgets/system.widget:Widget',
@@ -54,7 +53,6 @@ test('watchPaneOpenEvents routes supported tab, edit-source, and popout custom e
     'tab:/site/index.html:Home',
     'edit:/site/index.html:Home',
     'tab:/maps/plan.mindmap.yaml:Plan',
-    'tab:/boards/work.kanban.md:Board',
     'pop:/tabs/terminal:Terminal',
   ]);
 
@@ -64,7 +62,6 @@ test('watchPaneOpenEvents routes supported tab, edit-source, and popout custom e
   expect(doc.count('html-viewer:open-tab')).toBe(0);
   expect(doc.count('html-viewer:edit-source')).toBe(0);
   expect(doc.count('mindmap:open-tab')).toBe(0);
-  expect(doc.count('kanban:open-tab')).toBe(0);
   expect(doc.count('pane:popout')).toBe(0);
 });
 

@@ -294,10 +294,15 @@ export function parseTreeArgs(args: string): {
   return { targetId, summarize, customInstructions, replaceInstructions, label, limit, offset, mode };
 }
 
-/** Remove the @BotName trigger prefix from a message. */
+/** Remove the @BotName trigger only when it is the leading addressed token. */
 export function stripTrigger(text: string, triggerPattern?: RegExp): string {
-  if (!triggerPattern) return text.trim();
-  const flags = triggerPattern.flags.includes("g") ? triggerPattern.flags : `${triggerPattern.flags}g`;
+  const trimmed = text.trim();
+  if (!triggerPattern) return trimmed;
+
+  const flags = triggerPattern.flags.replace(/g/g, "");
   const pattern = new RegExp(triggerPattern.source, flags);
-  return text.replace(pattern, " ").trim();
+  const match = pattern.exec(trimmed);
+  if (!match || match.index !== 0) return trimmed;
+
+  return trimmed.slice(match[0].length).trim();
 }

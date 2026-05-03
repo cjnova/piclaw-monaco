@@ -21,6 +21,7 @@
 
 import { existsSync } from "fs";
 import Database from "bun:sqlite";
+import { computeChartYAxis } from "./chart-axis-scale";
 import { PROVIDER_MODEL_PRICING_REFERENCE_TAG, resolveProviderModelPricing } from "./provider-model-pricing-reference";
 
 export interface ProviderModelEstimatedCostChartDataPoint {
@@ -57,18 +58,6 @@ function formatFixedUsd(value: number): string {
     minimumFractionDigits: value >= 10 ? 2 : 4,
     maximumFractionDigits: 4,
   }).format(value);
-}
-
-function niceMax(value: number): number {
-  if (value <= 0) return 1;
-  const exponent = 10 ** Math.floor(Math.log10(value));
-  const fraction = value / exponent;
-  let nice = 1;
-  if (fraction <= 1) nice = 1;
-  else if (fraction <= 2) nice = 2;
-  else if (fraction <= 5) nice = 5;
-  else nice = 10;
-  return nice * exponent;
 }
 
 function splitSeriesKey(key: `${string} / ${string}`): { provider: string; model: string } {
@@ -217,7 +206,8 @@ export function generateProviderModelEstimatedCostChart(options: {
   }
 
   const maxDayTotal = Math.max(0, ...Array.from(totalsByDay.values()));
-  const yMax = Math.ceil(niceMax(maxDayTotal * 1.15 || 1));
+  const yScale = computeChartYAxis(maxDayTotal || 1);
+  const yMax = yScale.yMax;
 
   const providerBaseHue: Record<string, number> = {
     "github-copilot": 215,
@@ -287,8 +277,7 @@ export function generateProviderModelEstimatedCostChart(options: {
   svg.push(`<text class="title" x="${marginLeft}" y="42">Estimated cost by provider + model — last ${days} days</text>`);
   svg.push(`<text class="subtitle" x="${marginLeft}" y="64">Provider hues mirror the token chart • pricing reference tag ${PROVIDER_MODEL_PRICING_REFERENCE_TAG} • UTC dates</text>`);
 
-  for (let i = 0; i <= 5; i += 1) {
-    const value = (yMax * i) / 5;
+  for (const value of yScale.ticks) {
     const y = plotY1 - chartHeight * (value / yMax);
     svg.push(`<line class="grid" x1="${plotX0}" y1="${y.toFixed(1)}" x2="${plotX0 + chartWidth}" y2="${y.toFixed(1)}"/>`);
     svg.push(`<text class="tick" x="${marginLeft - 10}" y="${(y + 4).toFixed(1)}" text-anchor="end">${formatCompactUsd(value)}</text>`);

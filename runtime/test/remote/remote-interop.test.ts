@@ -21,7 +21,6 @@ let cleanupWorkspace: (() => void) | null = null;
 
 let deriveInstanceId: (publicKey: string) => string;
 let resetInteropIdentityForTests: () => void;
-let signPayload: (identity: InteropIdentity, payload: string) => string;
 let buildCanonicalRequest: (params: any) => string;
 let hashBody: (body: Uint8Array) => string;
 let signRequest: (identity: InteropIdentity, canonical: string) => string;
@@ -31,7 +30,6 @@ let getPendingRemoteRequests: () => any[];
 let updateRemoteRequestDecision: (id: string, decision: string, result?: string | null, error?: string | null) => void;
 let storeRemoteRequest: (request: any) => void;
 let updatePairRequestStatus: (id: string, status: string) => void;
-let updateRemotePeer: (id: string, updates: any) => void;
 let upsertRemotePeer: (peer: any) => void;
 let createOutboundPairRequest: (record: any) => void;
 let initDatabase: () => void;
@@ -64,10 +62,6 @@ function makeIdentity(): InteropIdentity {
   };
 }
 
-function buildCallbackProofString(requestId: string, challenge: string, receiverInstanceId: string): string {
-  return `${requestId}\n${challenge}\n${receiverInstanceId}`;
-}
-
 /** Insert a peer directly into the DB in "paired" status for tests that need a valid signed peer. */
 function insertPairedPeer(peer: InteropIdentity, overrides: Record<string, unknown> = {}): void {
   const now = new Date().toISOString();
@@ -85,31 +79,6 @@ function insertPairedPeer(peer: InteropIdentity, overrides: Record<string, unkno
     blocked_reason: null,
     base_url: overrides.base_url ?? TEST_REMOTE_BASE_URL,
   });
-}
-
-function installCallbackStub(peer: InteropIdentity): () => void {
-  const original = globalThis.fetch;
-  globalThis.fetch = async (_input, init) => {
-    const bodyText = typeof init?.body === "string" ? init.body : "";
-    const payload = bodyText ? JSON.parse(bodyText) : {};
-    const requestId = String(payload.request_id || "");
-    const challenge = String(payload.challenge || "");
-    const receiverInstanceId = String(payload.receiver_instance_id || "");
-    const proof = buildCallbackProofString(requestId, challenge, receiverInstanceId);
-    const signature = signPayload(peer, proof);
-    return new Response(
-      JSON.stringify({
-        request_id: requestId,
-        challenge,
-        instance_id: peer.instance_id,
-        signature,
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
-  };
-  return () => {
-    globalThis.fetch = original;
-  };
 }
 
 function buildSignedRequest(
@@ -170,7 +139,6 @@ describe("remote interop", () => {
     const identityMod = await importFresh("../src/remote/identity.js");
     deriveInstanceId = identityMod.deriveInstanceId;
     resetInteropIdentityForTests = identityMod.resetInteropIdentityForTests;
-    signPayload = identityMod.signPayload;
 
     const signatureMod = await importFresh("../src/remote/signature.js");
     buildCanonicalRequest = signatureMod.buildCanonicalRequest;
@@ -187,7 +155,6 @@ describe("remote interop", () => {
     updateRemoteRequestDecision = remoteDbMod.updateRemoteRequestDecision;
     storeRemoteRequest = remoteDbMod.storeRemoteRequest;
     updatePairRequestStatus = remoteDbMod.updatePairRequestStatus;
-    updateRemotePeer = remoteDbMod.updateRemotePeer;
     upsertRemotePeer = remoteDbMod.upsertRemotePeer;
     createOutboundPairRequest = remoteDbMod.createOutboundPairRequest;
 

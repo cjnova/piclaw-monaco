@@ -113,7 +113,7 @@ test("loads config-file aliases for pushover and identity fields", () => {
     expect(snapshot.USER_NAME).toBe("Casey");
     expect(snapshot.USER_AVATAR).toBe("/user.png");
     expect(snapshot.USER_AVATAR_BACKGROUND).toBe("#123456");
-    expect(snapshot.WHATSAPP_CONFIG).toEqual({ phoneNumber: "+15551234567" });
+    expect(snapshot.WHATSAPP_CONFIG).toEqual({ enabled: false, phoneNumber: "+15551234567" });
   } finally {
     ws.cleanup();
   }
@@ -207,7 +207,7 @@ test("CLI workspace flag overrides env workspace and relocates derived state pat
     expect(snapshot.STORE_DIR).toBe(resolve(cliWs.workspace, ".piclaw", "store"));
     expect(snapshot.DATA_DIR).toBe(resolve(cliWs.workspace, ".piclaw", "data"));
     expect(snapshot.PICLAW_CONFIG_PATH).toBe(resolve(cliWs.workspace, ".piclaw", "config.json"));
-    expect(snapshot.WHATSAPP_CONFIG).toEqual({ phoneNumber: "+15550001111" });
+    expect(snapshot.WHATSAPP_CONFIG).toEqual({ enabled: false, phoneNumber: "+15550001111" });
   } finally {
     envWs.cleanup();
     cliWs.cleanup();
@@ -255,6 +255,7 @@ test("config and env fallback chains handle booleans and session settings", () =
       totpWindow: 4,
       sessionTtl: 120,
       internalSecret: "env-secret",
+      widgetToken: "",
       passkeyMode: "passkey-only",
       terminalEnabled: false,
       notificationDebugLabels: false,
@@ -269,6 +270,7 @@ test("config and env fallback chains handle booleans and session settings", () =
       maxSizeMb: 8,
       maxSizeBytes: 8 * 1024 * 1024,
       maxLines: 8000,
+      maxCompactionsBeforeRotation: 3,
       autoRotate: false,
     });
   } finally {
@@ -391,7 +393,7 @@ test("pushover config getter groups aliased config file settings", () => {
   }
 });
 
-test("whatsapp config getter groups the configured phone number", () => {
+test("whatsapp config getter groups the configured phone number and defaults disabled", () => {
   const ws = createTempWorkspace("piclaw-config-");
   try {
     writeWorkspaceConfig(ws.workspace, { whatsappPhone: "+15557654321" });
@@ -403,7 +405,27 @@ test("whatsapp config getter groups the configured phone number", () => {
     ]);
     expect(snapshot["same:getWhatsAppConfig:WHATSAPP_CONFIG"]).toBe(true);
     expect(snapshot["frozen:WHATSAPP_CONFIG"]).toBe(true);
-    expect(snapshot.WHATSAPP_CONFIG).toEqual({ phoneNumber: "+15557654321" });
+    expect(snapshot.WHATSAPP_CONFIG).toEqual({ enabled: false, phoneNumber: "+15557654321" });
+    expect(snapshot["call:getWhatsAppConfig"]).toEqual(snapshot.WHATSAPP_CONFIG);
+  } finally {
+    ws.cleanup();
+  }
+});
+
+test("whatsapp config requires explicit enablement", () => {
+  const ws = createTempWorkspace("piclaw-config-");
+  try {
+    writeWorkspaceConfig(ws.workspace, {
+      whatsapp: {
+        enabled: true,
+        phoneNumber: "+15557654321",
+      },
+    });
+    const snapshot = loadConfigInSubprocess(ws, [
+      "WHATSAPP_CONFIG",
+      "call:getWhatsAppConfig",
+    ]);
+    expect(snapshot.WHATSAPP_CONFIG).toEqual({ enabled: true, phoneNumber: "+15557654321" });
     expect(snapshot["call:getWhatsAppConfig"]).toEqual(snapshot.WHATSAPP_CONFIG);
   } finally {
     ws.cleanup();
@@ -423,7 +445,13 @@ test("session storage config getter groups size and auto-rotate settings", () =>
     });
     expect(snapshot["same:getSessionStorageConfig:SESSION_STORAGE_CONFIG"]).toBe(true);
     expect(snapshot["frozen:SESSION_STORAGE_CONFIG"]).toBe(true);
-    expect(snapshot.SESSION_STORAGE_CONFIG).toEqual({ maxSizeMb: 64, maxSizeBytes: 64 * 1024 * 1024, maxLines: 8000, autoRotate: true });
+    expect(snapshot.SESSION_STORAGE_CONFIG).toEqual({
+      maxSizeMb: 64,
+      maxSizeBytes: 64 * 1024 * 1024,
+      maxLines: 8000,
+      maxCompactionsBeforeRotation: 3,
+      autoRotate: true,
+    });
     expect(snapshot["call:getSessionStorageConfig"]).toEqual(snapshot.SESSION_STORAGE_CONFIG);
   } finally {
     ws.cleanup();
@@ -454,7 +482,13 @@ test("session storage config defaults to 32 MB with auto-rotate enabled", () => 
   const ws = createTempWorkspace("piclaw-config-");
   try {
     const snapshot = loadConfigInSubprocess(ws, ["SESSION_STORAGE_CONFIG", "call:getSessionStorageConfig"]);
-    expect(snapshot.SESSION_STORAGE_CONFIG).toEqual({ maxSizeMb: 32, maxSizeBytes: 32 * 1024 * 1024, maxLines: 8000, autoRotate: true });
+    expect(snapshot.SESSION_STORAGE_CONFIG).toEqual({
+      maxSizeMb: 32,
+      maxSizeBytes: 32 * 1024 * 1024,
+      maxLines: 8000,
+      maxCompactionsBeforeRotation: 3,
+      autoRotate: true,
+    });
     expect(snapshot["call:getSessionStorageConfig"]).toEqual(snapshot.SESSION_STORAGE_CONFIG);
   } finally {
     ws.cleanup();
@@ -582,6 +616,7 @@ test("web runtime config getter groups auth/session/proxy settings", () => {
       totpWindow: 4,
       sessionTtl: 120,
       internalSecret: "env-secret",
+      widgetToken: "",
       passkeyMode: "passkey-only",
       terminalEnabled: false,
       notificationDebugLabels: false,
@@ -757,6 +792,7 @@ test("in-process module init handles deprecated env warnings, argv parsing, and 
       totpWindow: 1,
       sessionTtl: 7 * 24 * 60 * 60,
       internalSecret: "",
+      widgetToken: "",
       passkeyMode: "totp-fallback",
       terminalEnabled: true,
       notificationDebugLabels: false,
@@ -773,6 +809,7 @@ test("in-process module init handles deprecated env warnings, argv parsing, and 
       maxSizeMb: 64,
       maxSizeBytes: 64 * 1024 * 1024,
       maxLines: 8000,
+      maxCompactionsBeforeRotation: 3,
       autoRotate: true,
     });
     expect(snapshot["same:getSessionStorageConfig:SESSION_STORAGE_CONFIG"]).toBe(true);

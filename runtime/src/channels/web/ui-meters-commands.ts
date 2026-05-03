@@ -4,6 +4,7 @@
 
 export type UiMetersPayload =
   | { mode: "set"; enabled: boolean }
+  | { mode: "collapse"; collapsed: boolean }
   | { mode: "toggle" };
 
 export interface UiMetersCommandResult {
@@ -49,6 +50,22 @@ export function handleUiMetersCommand(rawText: string): UiMetersCommandResult | 
     };
   }
 
+  if (["collapse", "collapsed", "min", "minimize"].includes(args)) {
+    return {
+      status: "success",
+      message: "CPU/RAM meters collapsed.",
+      payload: { mode: "collapse", collapsed: true },
+    };
+  }
+
+  if (["expand", "expanded", "open", "restore"].includes(args)) {
+    return {
+      status: "success",
+      message: "CPU/RAM meters expanded.",
+      payload: { mode: "collapse", collapsed: false },
+    };
+  }
+
   if (args === "toggle") {
     return {
       status: "success",
@@ -59,6 +76,6 @@ export function handleUiMetersCommand(rawText: string): UiMetersCommandResult | 
 
   return {
     status: "error",
-    message: `Unknown /meters option: ${args}. Use /meters on, /meters off, or /meters toggle.`,
+    message: `Unknown /meters option: ${args}. Use /meters on, /meters off, /meters toggle, /meters collapse, or /meters expand.`,
   };
 }

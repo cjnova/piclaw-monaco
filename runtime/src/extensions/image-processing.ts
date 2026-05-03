@@ -16,10 +16,6 @@ import { existsSync, statSync } from "node:fs";
 import { resolve, basename, extname, dirname, join } from "node:path";
 import { stripBaseDirForDisplay } from "../utils/path-safety.js";
 import { WORKSPACE_DIR } from "../core/config.js";
-import { createLogger, debugSuppressedError } from "../utils/logger.js";
-
-const log = createLogger("extensions.image-processing");
-
 const SUPPORTED_OUTPUT_FORMATS = ["png", "jpeg", "webp", "avif", "tiff", "gif"] as const;
 type OutputFormat = typeof SUPPORTED_OUTPUT_FORMATS[number];
 
@@ -535,7 +531,6 @@ async function executeImageProcess(
           details: { action: "frames", input: params.input, pages: 1 },
         };
       }
-      const pageHeight = meta.pageHeight ?? meta.height ?? 0;
       const frameDir = params.output ? resolveWorkspacePath(params.output) : buildOutputPath(inputPath, "png", "-frames");
       const { mkdirSync: mkdirSyncFs } = await import("node:fs");
       mkdirSyncFs(frameDir, { recursive: true });

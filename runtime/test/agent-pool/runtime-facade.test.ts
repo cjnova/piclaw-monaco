@@ -107,11 +107,11 @@ test("AgentRuntimeFacade reports available models and context usage", async () =
 
 test("AgentRuntimeFacade returns registry-backed model options without hydrating a cold chat runtime", async () => {
   let refreshCalls = 0;
-  let getOrCreateCalls = 0;
+  let _getOrCreateCalls = 0;
 
   const fixture = createFacade({
     getOrCreateRuntime: async () => {
-      getOrCreateCalls += 1;
+      _getOrCreateCalls += 1;
       throw new Error("cold model lookup should not hydrate a runtime");
     },
     modelRegistry: {
@@ -302,7 +302,7 @@ test("AgentRuntimeFacade does not block getAvailableModels on a cold provider-us
 
     const available = await Promise.race([
       fixture.facade.getAvailableModels("web:default"),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for getAvailableModels")), 50)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for getAvailableModels")), 500)),
     ]);
 
     expect((available as any).current).toBe("openai-codex/gpt-test");

@@ -139,6 +139,9 @@ test("parseControlCommand parses model and thinking commands", () => {
   const abortCmd = parseControlCommand("/abort");
   expect(abortCmd?.type).toBe("abort");
 
+  const rollupCmd = parseControlCommand("/rollup");
+  expect(rollupCmd?.type).toBe("rollup");
+
   const treeCmd = parseControlCommand("/tree abc123 --summarize --label checkpoint");
   expect(treeCmd?.type).toBe("tree");
   expect(treeCmd && "targetId" in treeCmd ? treeCmd.targetId : null).toBe("abc123");

@@ -34,6 +34,14 @@ export interface TokenUsageByModelSummary extends TokenUsageTotalsSummary {
   model: string | null;
 }
 
+/** Latest model metadata recorded for a chat's token-usage stream. */
+export interface LatestTokenUsageModelSummary {
+  model: string | null;
+  response_model: string | null;
+  provider: string | null;
+  run_at: string | null;
+}
+
 /**
  * Shape of a single token-usage record to be persisted.
  * Maps 1:1 to the `token_usage` table columns.
@@ -63,8 +71,10 @@ export interface TokenUsageRecord {
   cost_cache_write: number;
   /** Total dollar cost for the run. */
   cost_total: number;
-  /** Model identifier (e.g. "claude-sonnet-4-20250514"). */
+  /** Requested model identifier (e.g. "auto" or "claude-sonnet-4-20250514"). */
   model?: string | null;
+  /** Concrete upstream model returned by a router/gateway when it differs from the requested model. */
+  response_model?: string | null;
   /** Provider name (e.g. "anthropic"). */
   provider?: string | null;
   /** API variant used (e.g. "messages", "chat"). */
@@ -91,10 +101,11 @@ export function storeTokenUsage(record: TokenUsageRecord): void {
       cost_cache_write,
       cost_total,
       model,
+      response_model,
       provider,
       api,
       turns
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.chat_jid,
     record.run_at,
@@ -109,6 +120,7 @@ export function storeTokenUsage(record: TokenUsageRecord): void {
     record.cost_cache_write,
     record.cost_total,
     record.model ?? null,
+    record.response_model ?? null,
     record.provider ?? null,
     record.api ?? null,
     record.turns ?? null
@@ -172,7 +184,7 @@ export function getTokenUsageByModel(chatJid: string, limit = 5): TokenUsageByMo
   const db = getDb();
   return db.prepare(
     `SELECT
-      model,
+      COALESCE(response_model, model) AS model,
       COALESCE(SUM(input_tokens), 0) AS input_tokens,
       COALESCE(SUM(output_tokens), 0) AS output_tokens,
       COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
@@ -182,8 +194,26 @@ export function getTokenUsageByModel(chatJid: string, limit = 5): TokenUsageByMo
       COUNT(*) AS runs
      FROM token_usage
      WHERE chat_jid = ?
-     GROUP BY model
+     GROUP BY COALESCE(response_model, model)
      ORDER BY total_tokens DESC
      LIMIT ?`
   ).all(chatJid, normalizeLimit(limit)) as TokenUsageByModelSummary[];
+}
+
+/** Return the most recent token-usage model metadata for a chat, if any. */
+export function getLatestTokenUsageModel(chatJid: string): LatestTokenUsageModelSummary | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT
+      model,
+      response_model,
+      provider,
+      run_at
+     FROM token_usage
+     WHERE chat_jid = ?
+     ORDER BY run_at DESC, id DESC
+     LIMIT 1`
+  ).get(chatJid) as LatestTokenUsageModelSummary | undefined;
+
+  return row ?? null;
 }

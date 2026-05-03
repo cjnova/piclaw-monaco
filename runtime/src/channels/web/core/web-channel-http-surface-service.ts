@@ -46,8 +46,10 @@ type WebChannelHttpSurfaceControlPlane = Pick<
   | "handleAgentQueueSteer"
   | "handleAgentQueueReorder"
   | "handleAgentBranchFork"
+  | "handleAgentRootSessionCreate"
   | "handleAgentBranchRename"
   | "handleAgentRenameJid"
+  | "handleAgentBranchMergeParent"
   | "handleAgentBranchPrune"
   | "handleAgentBranchPurge"
   | "handleAgentBranchRestore"
@@ -247,12 +249,20 @@ export class WebChannelHttpSurfaceService {
     return await this.channel.controlPlaneService.handleAgentBranchFork(req);
   }
 
+  async handleAgentRootSessionCreate(req: Request): Promise<Response> {
+    return await this.channel.controlPlaneService.handleAgentRootSessionCreate(req);
+  }
+
   async handleAgentBranchRename(req: Request): Promise<Response> {
     return await this.channel.controlPlaneService.handleAgentBranchRename(req);
   }
 
   async handleAgentRenameJid(req: Request): Promise<Response> {
     return await this.channel.controlPlaneService.handleAgentRenameJid(req);
+  }
+
+  async handleAgentBranchMergeParent(req: Request): Promise<Response> {
+    return await this.channel.controlPlaneService.handleAgentBranchMergeParent(req);
   }
 
   async handleAgentBranchPrune(req: Request): Promise<Response> {

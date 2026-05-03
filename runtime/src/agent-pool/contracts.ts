@@ -101,6 +101,11 @@ export interface RunAgentOptions {
    */
   skipPrePromptCompaction?: boolean;
   /**
+   * Schedule a background idle compaction shortly after a successful turn
+   * when the session remains near the context threshold.
+   */
+  scheduleIdleAutoCompaction?: boolean;
+  /**
    * If set, the active tool set is clamped to names passing this predicate for
    * the entire run. The predicate is also enforced against any
    * setActiveToolsByName calls made by the agent during the run, preventing
