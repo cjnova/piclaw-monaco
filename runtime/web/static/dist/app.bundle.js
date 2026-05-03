@@ -5806,7 +5806,10 @@ For tests, pass a Ghostty instance directly:
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: command })
-    }).catch((err) => console.warn("[CommandPalette] send failed:", err));
+    }).catch((err) => {
+      console.warn("[CommandPalette] send failed:", err);
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Command failed", type: "error" } }));
+    });
   }
   function CommandPalette({ visible, onClose }) {
     const [query, setQuery] = d2("");
@@ -9172,9 +9175,11 @@ ${code}
         });
         if (!res.ok) {
           console.warn("[providers] command failed:", res.status);
+          window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Provider action failed", type: "error" } }));
         }
       } catch (err) {
         console.warn("[providers] command failed:", err);
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Provider action failed", type: "error" } }));
       }
     };
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section", children: [
@@ -9376,12 +9381,14 @@ ${code}
         });
         if (!res.ok) {
           console.warn("[scratchpad] send failed:", res.status);
+          window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to send note to chat", type: "error" } }));
           return;
         }
         const now = (/* @__PURE__ */ new Date()).toISOString();
         persist(items.value.map((n4) => n4.id === id ? { ...n4, sentAt: now } : n4));
       } catch (err) {
         console.warn("[scratchpad] send failed:", err);
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to send note to chat", type: "error" } }));
       }
     };
     const listHeight = useSignal(Number(safeGetItem("piclaw-scratchpad-split")) || 50);

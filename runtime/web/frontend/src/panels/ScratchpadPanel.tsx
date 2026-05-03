@@ -100,6 +100,7 @@ export function ScratchpadPanel() {
       });
       if (!res.ok) {
         console.warn("[scratchpad] send failed:", res.status);
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to send note to chat", type: "error" } }));
         return;
       }
       // Only mark sent after confirmed success
@@ -107,6 +108,7 @@ export function ScratchpadPanel() {
       persist(items.value.map(n => n.id === id ? { ...n, sentAt: now } : n));
     } catch (err) {
       console.warn("[scratchpad] send failed:", err);
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to send note to chat", type: "error" } }));
     }
   };
 
