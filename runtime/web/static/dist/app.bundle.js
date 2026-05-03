@@ -5155,11 +5155,17 @@ For tests, pass a Ghostty instance directly:
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
   }
-  function StatsDisplay({ stats }) {
-    if (!stats) return /* @__PURE__ */ u4("span", { className: "sys-stats", children: "CPU -- RAM -- RSS -- SWP --" });
+  function StatsDisplay({ stats, isStale }) {
+    if (!stats) {
+      return /* @__PURE__ */ u4("span", { className: "sys-stats", children: [
+        isStale && /* @__PURE__ */ u4("span", { className: "sys-stats__stale", title: "System stats unavailable", children: "\u26A0" }),
+        "CPU -- RAM -- RSS -- SWP --"
+      ] });
+    }
     const rssMb = Math.round((stats.process_memory?.rss_bytes ?? 0) / (1024 * 1024));
     const swp = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
     return /* @__PURE__ */ u4("span", { className: "sys-stats", children: [
+      isStale && /* @__PURE__ */ u4("span", { className: "sys-stats__stale", title: "System stats unavailable", children: "\u26A0" }),
       /* @__PURE__ */ u4("span", { className: "sys-stats__label", children: "CPU" }),
       " ",
       stats.cpu_percent,
@@ -5180,6 +5186,9 @@ For tests, pass a Ghostty instance directly:
   function SystemStats() {
     const clockText = useSignal(formatClock(/* @__PURE__ */ new Date()));
     const stats = useSignal(null);
+    const statsError = useSignal(false);
+    const lastStatsSuccess = useSignal(Date.now());
+    const statsPollTick = useSignal(0);
     y2(() => {
       const tick = () => {
         clockText.value = formatClock(/* @__PURE__ */ new Date());
@@ -5196,15 +5205,23 @@ For tests, pass a Ghostty instance directly:
         if (interval !== null) clearInterval(interval);
       };
     }, [clockText]);
+    const isStale = useComputed(() => statsError.value && statsPollTick.value >= 0 && Date.now() - lastStatsSuccess.value > 15e3);
     y2(() => {
       const fetchStats = async () => {
         try {
           const res = await fetch("/agent/system-metrics");
           if (res.ok) {
             stats.value = await res.json();
+            statsError.value = false;
+            lastStatsSuccess.value = Date.now();
+          } else {
+            statsError.value = true;
           }
         } catch (err) {
           console.warn("[SystemStats] fetch failed:", err);
+          statsError.value = true;
+        } finally {
+          statsPollTick.value += 1;
         }
       };
       fetchStats();
@@ -5212,7 +5229,7 @@ For tests, pass a Ghostty instance directly:
       return () => clearInterval(interval);
     }, [stats]);
     return /* @__PURE__ */ u4("span", { className: "sys-stats-bar", children: [
-      /* @__PURE__ */ u4(StatsDisplay, { stats: stats.value }),
+      /* @__PURE__ */ u4(StatsDisplay, { stats: stats.value, isStale: isStale.value }),
       "\xA0\xA0\u2014\xA0\xA0",
       clockText.value
     ] });
@@ -5287,6 +5304,7 @@ For tests, pass a Ghostty instance directly:
     const agentContext = useSignal(loadCachedContext());
     const error = useSignal(false);
     const lastSuccessAt = useSignal(0);
+    const statusPollTick = useSignal(0);
     const showPicker = useSignal(false);
     const showThinkingPicker = useSignal(false);
     const models = useSignal([]);
@@ -5341,6 +5359,8 @@ For tests, pass a Ghostty instance directly:
       } catch (err) {
         console.warn("[ModelContextBar] status fetch failed:", err);
         error.value = true;
+      } finally {
+        statusPollTick.value += 1;
       }
     }, []);
     const fetchContext = q2(async () => {
@@ -5466,6 +5486,7 @@ For tests, pass a Ghostty instance directly:
         }
       } catch {
         isCompacting.value = false;
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Compaction failed", type: "error" } }));
       }
     };
     const flashStatus = (message) => {
@@ -5551,12 +5572,13 @@ For tests, pass a Ghostty instance directly:
       const t4 = contextTokens.value;
       return agentContext.value?.percent ?? (w4 > 0 ? t4 / w4 * 100 : 0);
     });
+    const isStale = useComputed(() => error.value && lastSuccessAt.value > 0 && statusPollTick.value >= 0 && Date.now() - lastSuccessAt.value > 3e4);
     const activeModel = currentModel.value ?? modelName;
     return /* @__PURE__ */ u4(
       "span",
       {
         "data-model-picker": true,
-        className: "model-badge-wrapper",
+        className: `model-badge-wrapper${isStale.value ? " model-badge-wrapper--stale" : ""}`,
         children: [
           showPicker.value && /* @__PURE__ */ u4(
             "div",
@@ -10509,10 +10531,10 @@ ${code}
           terminalMaximized.value = false;
         } },
         { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal", handler: () => {
-          window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+          window.open("/static/terminal.html", "_blank");
         } },
         { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal", handler: () => {
-          window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+          window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
         } },
         { id: "terminal.close", label: "Close Terminal", category: "terminal", handler: () => {
           terminalVisible.value = false;
@@ -10768,10 +10790,10 @@ ${code}
                   role: "button",
                   tabIndex: 0,
                   onClick: () => {
-                    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+                    window.open("/static/terminal.html", "_blank");
                   },
                   onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
-                    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+                    window.open("/static/terminal.html", "_blank");
                   }),
                   title: "Open in new tab",
                   "aria-label": "Open in new tab",
@@ -10785,10 +10807,10 @@ ${code}
                   role: "button",
                   tabIndex: 0,
                   onClick: () => {
-                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
                   },
                   onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
-                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
                   }),
                   title: "Pop out to window",
                   "aria-label": "Pop out to window",

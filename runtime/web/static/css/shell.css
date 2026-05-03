@@ -408,6 +408,12 @@ body {
   margin-left: 0;
 }
 
+.sys-stats__stale {
+  color: var(--warning);
+  margin-right: 4px;
+  font-size: 10px;
+}
+
 /* ===== App Layout ===== */
 .app-layout {
   display: flex;
@@ -734,6 +740,17 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
+}
+
+.model-badge-wrapper--stale {
+  opacity: 0.5;
+}
+
+.model-badge-wrapper--stale::after {
+  content: "⚠";
+  margin-left: 4px;
+  color: var(--warning);
+  font-size: 10px;
 }
 
 .model-picker {
