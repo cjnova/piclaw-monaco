@@ -3843,3 +3843,21 @@ pre.frontmatter-block {
   border-radius: 0 0 6px 6px;
   border-top: none;
 }
+
+/* Status bar stale indicators */
+.model-badge-wrapper--stale {
+  opacity: 0.5;
+}
+
+.model-badge-wrapper--stale::after {
+  content: "⚠";
+  margin-left: 4px;
+  color: var(--warning);
+  font-size: 10px;
+}
+
+.sys-stats__stale {
+  color: var(--warning);
+  margin-right: 4px;
+  font-size: 10px;
+}
