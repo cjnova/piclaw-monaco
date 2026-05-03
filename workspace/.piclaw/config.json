@@ -13,6 +13,7 @@
   "sessionMaxSizeMb": 32,
   "sessionAutoRotate": true,
   "web": {
-    "terminalEnabled": true
+    "terminalEnabled": true,
+    "widgetToken": "2CRc7jlrA8xGzOn-G5YO6nzZflhnJoU-LQhfGwtiyzg"
   }
 }

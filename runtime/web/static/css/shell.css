@@ -100,6 +100,8 @@ body {
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 13px;
+  margin: 0;
+  overflow: hidden;
 }
 
 .shell-root {
@@ -411,7 +413,7 @@ body {
 /* ===== App Layout ===== */
 .app-layout {
   display: flex;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
   background: var(--bg);
