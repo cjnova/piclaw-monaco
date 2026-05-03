@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "preact/hooks";
+import { useCallback, useEffect, useRef } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 import { getChatJid } from "../../api/chat-jid";
 import type { AgentStatus, AgentContext, ModelInfo, ProviderUsage, ModelEntry } from "./types";
@@ -47,9 +47,25 @@ export function useStatusPolling(): UseStatusPollingResult {
   const usageLabel = useSignal<string>("");
   const providerUsage = useSignal<ProviderUsage | null>(null);
 
+  // Anti-race refs: versioning, abort controllers, and in-flight guards
+  const statusVersion = useRef(0);
+  const contextVersion = useRef(0);
+  const statusAbort = useRef<AbortController | null>(null);
+  const contextAbort = useRef<AbortController | null>(null);
+  const isFetchingStatus = useRef(false);
+  const isFetchingContext = useRef(false);
+
   const fetchStatus = useCallback(async () => {
+    if (isFetchingStatus.current) return;
+    isFetchingStatus.current = true;
+    // Abort any previous in-flight request and assign a new controller
+    statusAbort.current?.abort();
+    statusAbort.current = new AbortController();
+    const myVersion = ++statusVersion.current;
     try {
-      const res = await fetch("/agent/status?chat_jid=" + encodeURIComponent(getChatJid()));
+      const res = await fetch("/agent/status?chat_jid=" + encodeURIComponent(getChatJid()), { signal: statusAbort.current.signal });
+      // Discard stale response if a newer request has started
+      if (statusVersion.current !== myVersion) return;
       if (res.ok) {
         agentStatus.value = await res.json() as AgentStatus;
         error.value = false;
@@ -58,7 +74,8 @@ export function useStatusPolling(): UseStatusPollingResult {
         error.value = true;
       }
       // Also fetch current model (status.data is null when idle)
-      const modelsRes = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
+      const modelsRes = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()), { signal: statusAbort.current.signal });
+      if (statusVersion.current !== myVersion) return;
       if (modelsRes.ok) {
         const info = await modelsRes.json() as ModelInfo;
         if (info.current) currentModel.value = info.current;
@@ -92,15 +109,26 @@ export function useStatusPolling(): UseStatusPollingResult {
       }
       pollTick.value += 1;
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.warn("[ModelContextBar] status fetch failed:", err);
       error.value = true;
       pollTick.value += 1;
+    } finally {
+      isFetchingStatus.current = false;
     }
   }, []);
 
   const fetchContext = useCallback(async () => {
+    if (isFetchingContext.current) return;
+    isFetchingContext.current = true;
+    // Abort any previous in-flight request and assign a new controller
+    contextAbort.current?.abort();
+    contextAbort.current = new AbortController();
+    const myVersion = ++contextVersion.current;
     try {
-      const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()));
+      const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()), { signal: contextAbort.current.signal });
+      // Discard stale response if a newer request has started
+      if (contextVersion.current !== myVersion) return;
       if (res.ok) {
         const data = await res.json() as AgentContext;
         // Only update if backend returned real data (not all-null)
@@ -116,7 +144,10 @@ export function useStatusPolling(): UseStatusPollingResult {
         }
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.warn("[ModelContextBar] context fetch failed:", err);
+    } finally {
+      isFetchingContext.current = false;
     }
   }, []);
 
