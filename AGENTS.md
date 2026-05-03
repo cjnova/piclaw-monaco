@@ -31,6 +31,15 @@
 - `bun test runtime/test/monaco/` — run Monaco frontend regression tests
 - `make ci-fast` — full CI gate
 
+### Code transformation rules
+
+- **Never use `sed` for code changes** — fragile, breaks on edge cases
+- Use `code_rewrite` (ast-grep) for structural find-and-replace — AST-safe, pattern-based
+- Use `code_search` to find patterns before rewriting
+- Always run `code_rewrite` with `dry_run: true` first to preview changes
+- Use `edit` tool for targeted small changes (exact text replacement)
+- Use `delegate` or `fleet_spawn` for large multi-file refactors
+
 ### Testing rules (mandatory)
 
 1. **Every PR must include regression tests** for the changes it introduces
