@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Full markdown rendering pipeline — ported from upstream piclaw.
  *
@@ -14,8 +13,8 @@
 import { applySyntaxHighlighting } from "./code-highlighting";
 
 /** Get the marked library from the deferred vendor global. */
-function getMarked(): { parse: (src: string, options?: any) => string } | null {
-  return (window as any).marked ?? null;
+function getMarked(): PiclawMarked | null {
+  return window.marked ?? null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -58,7 +57,7 @@ const KATEX_TAGS = [
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:", ""]);
 
-const RESTORABLE_HTML_ATTRS = {
+const RESTORABLE_HTML_ATTRS: Record<string, Set<string>> = {
   span: new Set(["title", "class", "lang", "dir"]),
   input: new Set(["type", "checked", "disabled"]),
 };
@@ -77,8 +76,8 @@ function escapeHtmlAttr(value: string): string {
 // ── Stage 5: Sanitization (DOMPurify — battle-tested) ──────────────────────
 
 /** Get DOMPurify from the deferred vendor global. */
-function getDOMPurify(): { sanitize: (html: string, config?: any) => string } | null {
-  return (window as any).DOMPurify ?? null;
+function getDOMPurify(): PiclawDOMPurify | null {
+  return window.DOMPurify ?? null;
 }
 
 /** DOMPurify configuration: allow KaTeX/MathML, data attributes, classes. */
@@ -368,7 +367,7 @@ function injectMermaidBlocks(html: string, blocks: string[]): string {
 }
 
 export function renderMath(html_content: string): string {
-  const katex = (window as any).katex;
+  const katex = window.katex;
   if (!katex) return html_content;
 
   const decodeMath = (value: string) =>
@@ -413,8 +412,9 @@ export function renderMath(html_content: string): string {
           throwOnError: false,
         });
         return `${leading}${rendered}`;
-      } catch (e: any) {
-        return `<span class="math-error" title="${escapeHtmlAttr(e.message)}">${match}</span>`;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return `<span class="math-error" title="${escapeHtmlAttr(msg)}">${match}</span>`;
       }
     }
   );
@@ -483,7 +483,7 @@ export function renderMarkdown(text: string, options: { sanitize?: boolean } = {
 
   const m = getMarked();
   let html = m
-    ? m.parse(safeHtml, { headerIds: false, mangle: false }) as string
+    ? m.parse(safeHtml, { headerIds: false, mangle: false })
     : safeHtml.replace(/\n/g, "<br>");
 
   html = decodeCodeEntities(html);
@@ -508,7 +508,7 @@ export function renderThinkingMarkdown(text: string): string {
   const safeHtml = restoreAllowedHtmlTags(escaped);
   const m = getMarked();
   let html = m
-    ? m.parse(safeHtml, { headerIds: false, mangle: false }) as string
+    ? m.parse(safeHtml, { headerIds: false, mangle: false })
     : safeHtml.replace(/\n/g, "<br>");
   html = decodeCodeEntities(html);
   html = decodeTextEntities(html);

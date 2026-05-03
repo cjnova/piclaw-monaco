@@ -29,6 +29,14 @@ const BUILTINS = new Set([
   "sys", "az",
 ]);
 
+interface StreamLike {
+  eatSpace(): boolean;
+  match(pattern: string | RegExp): string | boolean | null;
+  current(): string;
+  next(): string | null;
+  skipToEnd(): void;
+}
+
 export interface StreamState {
   inBlockComment: boolean;
   inMultilineString: boolean;
@@ -39,7 +47,7 @@ export const bicepMode = {
     return { inBlockComment: false, inMultilineString: false };
   },
 
-  token(stream: any, state: StreamState): string | null {
+  token(stream: StreamLike, state: StreamState): string | null {
     // Block comment continuation
     if (state.inBlockComment) {
       if (stream.match(/.*?\*\//)) {
