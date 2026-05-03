@@ -145,6 +145,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | #189 review bug | ✅ |
 | #215 terminal popup | ✅ |
 | #219 file tree state persistence | ✅ |
+| #245 Fleet iframe fix | ✅ |
 | #147 streaming improvements | ❌ closed (superseded by #230) |
 | #145 tool lifecycle events | ❌ closed (superseded by #230) |
 
@@ -225,8 +226,8 @@ Technical debt cleanup. Each PR includes regression tests.
 | Task | Description | Status |
 |---|---|---|
 | real-time-agent-turn-progress | Thoughts, tool calls, draft panels (#230) — supersedes #147, #145 | ⏳ |
-| message-collapse-delete-actions | Message collapse + delete actions (#209) | ⏳ |
-| message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ⏳ |
+| message-collapse-delete-actions | Message collapse + delete actions (#209) | ✅ |
+| message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ⏳ (PR #250 ready for merge) |
 | separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ⏳ (partially done) |
 
 ### Wave 11 — Full Functionality (after UX polish)
@@ -256,6 +257,7 @@ Technical debt cleanup. Each PR includes regression tests.
 | LCP: Purge unused CSS | #134 | ❌ closed / won't do |
 | LCP: Preload critical UI fonts | #135 | ⏳ |
 | LCP: Enable gzip/brotli compression | #136 | ⏳ |
+| Extract rgba CSS variables | #251 | ⏳ |
 | Virtualize chat timeline | #184 | ⏳ |
 
 ### Wave 13 — A11y & Polish
