@@ -5275,7 +5275,16 @@ For tests, pass a Ghostty instance directly:
   }
   function ModelContextBar() {
     const agentStatus = useSignal(null);
-    const agentContext = useSignal(null);
+    function loadCachedContext() {
+      try {
+        const jid = getChatJid();
+        const cached = localStorage.getItem(`piclaw:context-cache:${jid}`) || localStorage.getItem("piclaw:context-cache");
+        if (cached) return JSON.parse(cached);
+      } catch {
+      }
+      return null;
+    }
+    const agentContext = useSignal(loadCachedContext());
     const error = useSignal(false);
     const lastSuccessAt = useSignal(0);
     const showPicker = useSignal(false);

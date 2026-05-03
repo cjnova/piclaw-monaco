@@ -82,7 +82,16 @@ function ContextRing({ percent, tokens, contextWindow, onClick }: { percent: num
 
 export function ModelContextBar() {
   const agentStatus = useSignal<AgentStatus | null>(null);
-  const agentContext = useSignal<AgentContext | null>(null);
+  // Load cached context immediately (before first fetch) so hard refresh shows last known values
+  function loadCachedContext(): AgentContext | null {
+    try {
+      const jid = getChatJid();
+      const cached = localStorage.getItem(`piclaw:context-cache:${jid}`) || localStorage.getItem("piclaw:context-cache");
+      if (cached) return JSON.parse(cached) as AgentContext;
+    } catch {}
+    return null;
+  }
+  const agentContext = useSignal<AgentContext | null>(loadCachedContext());
   const error = useSignal<boolean>(false);
   const lastSuccessAt = useSignal<number>(0);
   const showPicker = useSignal<boolean>(false);
