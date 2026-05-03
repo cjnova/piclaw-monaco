@@ -9767,6 +9767,7 @@ ${code}
     const [hasMore, setHasMore] = d2(false);
     const [loadingMore, setLoadingMore] = d2(false);
     const [connected, setConnected] = d2(null);
+    const timelineError = useSignal(null);
     const listRef = A2(null);
     const bottomRef = A2(null);
     const sseRef = A2(null);
@@ -9799,8 +9800,9 @@ ${code}
       if (!timeline) return;
       setMessages((prev) => mergeInteractions(prev, timeline.posts));
       setHasMore(timeline.hasMore);
+      timelineError.value = null;
       scrollToBottom(true);
-    }, [fetchTimeline, scrollToBottom]);
+    }, [fetchTimeline, scrollToBottom, timelineError]);
     y2(() => {
       async function fetchInitialTimeline() {
         try {
@@ -9808,6 +9810,7 @@ ${code}
           if (!timeline) return;
           setMessages((prev) => mergeInteractions(prev, timeline.posts));
           setHasMore(timeline.hasMore);
+          timelineError.value = null;
           setConnected(true);
           initialTimelineFetchedRef.current = true;
           setTimeout(() => scrollToBottom(true), 50);
@@ -9832,7 +9835,8 @@ ${code}
             setDraft("");
           }
           scrollToBottom(true);
-        } catch {
+        } catch (err) {
+          console.warn("[MessageList] SSE parse error:", err);
         }
       });
       es.addEventListener("agent_draft_delta", (e5) => {
@@ -9844,7 +9848,8 @@ ${code}
             setDraft(parsed.text);
           }
           scrollToBottom();
-        } catch {
+        } catch (err) {
+          console.warn("[MessageList] SSE parse error:", err);
         }
       });
       es.addEventListener("agent_draft", (e5) => {
@@ -9853,7 +9858,8 @@ ${code}
           const text = parsed.text ?? parsed.content ?? "";
           setDraft(text);
           scrollToBottom();
-        } catch {
+        } catch (err) {
+          console.warn("[MessageList] SSE parse error:", err);
         }
       });
       es.addEventListener("agent_response", (e5) => {
@@ -9867,7 +9873,8 @@ ${code}
           setDraft("");
           scrollToBottom(true);
           window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
-        } catch {
+        } catch (err) {
+          console.warn("[MessageList] SSE parse error:", err);
           setDraft("");
           scrollToBottom(true);
           window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
@@ -9877,7 +9884,8 @@ ${code}
         try {
           const data = JSON.parse(e5.data);
           window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: data }));
-        } catch {
+        } catch (err) {
+          console.warn("[MessageList] SSE parse error:", err);
         }
       });
       es.onopen = () => {
@@ -9886,7 +9894,9 @@ ${code}
         const isFirstOpen = !hasHandledFirstOpenRef.current;
         hasHandledFirstOpenRef.current = true;
         if (isFirstOpen) return;
-        refetchTimelineOnReconnect().catch(() => {
+        refetchTimelineOnReconnect().catch((err) => {
+          console.warn("[MessageList] reconnect refresh failed:", err);
+          timelineError.value = "Timeline may be stale. Click to refresh.";
         });
       };
       es.onerror = () => {
@@ -9943,7 +9953,9 @@ ${code}
               }, 100);
             }
           }
-        } catch {
+        } catch (err) {
+          console.warn("[MessageList] jump-to-message failed:", err);
+          window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to load message", type: "error" } }));
         }
       };
       window.addEventListener("piclaw:scroll-to-message", handler);
@@ -9987,7 +9999,8 @@ ${code}
       if (!container) return;
       const render = () => {
         if (container.querySelector(".mermaid-container[data-mermaid]")) {
-          renderMermaidDiagrams(container).catch(() => {
+          renderMermaidDiagrams(container).catch((err) => {
+            console.warn("[MessageList] mermaid render failed:", err);
           });
         }
       };
@@ -10022,10 +10035,11 @@ ${code}
           buildChatUrl("/timeline", { limit: "50", before: String(oldestId) }),
           { credentials: "include" }
         );
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const olderPosts = (data.posts ?? []).map(normalizePost);
         setHasMore(data.has_more ?? false);
+        timelineError.value = null;
         if (olderPosts.length) {
           const el = listRef.current;
           const prevScrollHeight = el?.scrollHeight ?? 0;
@@ -10036,6 +10050,9 @@ ${code}
             }
           });
         }
+      } catch (err) {
+        console.warn("[MessageList] loadMore failed:", err);
+        timelineError.value = "Failed to load older messages. Try again.";
       } finally {
         setLoadingMore(false);
       }
@@ -10044,6 +10061,23 @@ ${code}
       return /* @__PURE__ */ u4("div", { className: "message-list message-list--disconnected", children: /* @__PURE__ */ u4("div", { className: "message-list__status-banner", children: "\u26A0\uFE0F Not connected \u2014 unable to load messages" }) });
     }
     return /* @__PURE__ */ u4("div", { className: "message-list", ref: listRef, children: [
+      timelineError.value && /* @__PURE__ */ u4(
+        "div",
+        {
+          className: "message-list__error-banner",
+          onClick: () => {
+            timelineError.value = null;
+            void fetchTimeline().then(() => {
+              timelineError.value = null;
+              scrollToBottom(true);
+            });
+          },
+          children: [
+            "\u26A0 ",
+            timelineError.value
+          ]
+        }
+      ),
       hasMore && /* @__PURE__ */ u4("div", { className: "message-list__load-more", children: /* @__PURE__ */ u4(
         "button",
         {
