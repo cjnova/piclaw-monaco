@@ -40,7 +40,7 @@ export function useModelPicker(): UseModelPickerResult {
       if (res.ok) {
         const info = await res.json() as ModelInfo;
         models.value = info.model_options?.length
-          ? info.model_options.map(o => ({ id: o.id, context_window: o.context_window }))
+          ? info.model_options.map(o => ({ id: o.label ?? o.id, context_window: o.context_window }))
           : (info.models?.length ? info.models.map(id => ({ id })) : FALLBACK_MODELS);
         onCurrentModel(info.current ?? currentModelName);
         if (info.thinking_level) onThinkingLevel(info.thinking_level);
@@ -56,8 +56,25 @@ export function useModelPicker(): UseModelPickerResult {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: `/model ${id}` }),
       });
-      if (res.ok) { onCurrentModel(id); showPicker.value = false; }
-      else flashStatus("Model switch failed");
+      if (!res.ok) { flashStatus("Model switch failed"); return; }
+      const data = await res.json().catch(() => null);
+      // If the command returned immediately (e.g. error), don't update
+      if (data?.command === false || data?.error) {
+        flashStatus(data?.error ?? "Model switch failed");
+        return;
+      }
+      onCurrentModel(id);
+      showPicker.value = false;
+      // Re-fetch models after a brief delay to confirm backend accepted
+      setTimeout(async () => {
+        try {
+          const r = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
+          if (r.ok) {
+            const info = await r.json() as ModelInfo;
+            if (info.current) onCurrentModel(info.current);
+          }
+        } catch {}
+      }, 1500);
     } catch { flashStatus("Model switch failed"); }
   }, []);
 

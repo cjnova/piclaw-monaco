@@ -1483,7 +1483,7 @@
         const res = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
         if (res.ok) {
           const info = await res.json();
-          models.value = info.model_options?.length ? info.model_options.map((o4) => ({ id: o4.id, context_window: o4.context_window })) : info.models?.length ? info.models.map((id) => ({ id })) : FALLBACK_MODELS;
+          models.value = info.model_options?.length ? info.model_options.map((o4) => ({ id: o4.label ?? o4.id, context_window: o4.context_window })) : info.models?.length ? info.models.map((id) => ({ id })) : FALLBACK_MODELS;
           onCurrentModel(info.current ?? currentModelName);
           if (info.thinking_level) onThinkingLevel(info.thinking_level);
           thinkingLevels.value = info.available_thinking_levels?.length ? info.available_thinking_levels : FALLBACK_THINKING_LEVELS;
@@ -1502,10 +1502,27 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: `/model ${id}` })
         });
-        if (res.ok) {
-          onCurrentModel(id);
-          showPicker.value = false;
-        } else flashStatus("Model switch failed");
+        if (!res.ok) {
+          flashStatus("Model switch failed");
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        if (data?.command === false || data?.error) {
+          flashStatus(data?.error ?? "Model switch failed");
+          return;
+        }
+        onCurrentModel(id);
+        showPicker.value = false;
+        setTimeout(async () => {
+          try {
+            const r4 = await fetch("/agent/models?chat_jid=" + encodeURIComponent(getChatJid()));
+            if (r4.ok) {
+              const info = await r4.json();
+              if (info.current) onCurrentModel(info.current);
+            }
+          } catch {
+          }
+        }, 1500);
       } catch {
         flashStatus("Model switch failed");
       }
@@ -1703,7 +1720,7 @@
           showPicker.value && /* @__PURE__ */ u4(
             ModelPicker,
             {
-              models: models.value,
+              models: models.value ?? [],
               activeModel,
               onSelectModel: (id) => handleSelectModel(id, (m5) => {
                 currentModel.value = m5;
@@ -1764,7 +1781,7 @@
             showThinkingPicker.value && /* @__PURE__ */ u4(
               ThinkingPicker,
               {
-                thinkingLevels: thinkingLevels.value,
+                thinkingLevels: thinkingLevels.value ?? [],
                 currentLevel: thinkingLevel,
                 onSelectThinking: handleSelectThinking
               }
