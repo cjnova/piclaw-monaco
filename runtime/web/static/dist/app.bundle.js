@@ -10509,10 +10509,10 @@ ${code}
           terminalMaximized.value = false;
         } },
         { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal", handler: () => {
-          window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+          window.open("/static/terminal.html", "_blank");
         } },
         { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal", handler: () => {
-          window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+          window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
         } },
         { id: "terminal.close", label: "Close Terminal", category: "terminal", handler: () => {
           terminalVisible.value = false;
@@ -10768,10 +10768,10 @@ ${code}
                   role: "button",
                   tabIndex: 0,
                   onClick: () => {
-                    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+                    window.open("/static/terminal.html", "_blank");
                   },
                   onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
-                    window.open("/static/terminal.html", "_blank", "noopener,noreferrer");
+                    window.open("/static/terminal.html", "_blank");
                   }),
                   title: "Open in new tab",
                   "aria-label": "Open in new tab",
@@ -10785,10 +10785,10 @@ ${code}
                   role: "button",
                   tabIndex: 0,
                   onClick: () => {
-                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
                   },
                   onKeyDown: (e5) => activateOnEnterOrSpace(e5, () => {
-                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer");
+                    window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no");
                   }),
                   title: "Pop out to window",
                   "aria-label": "Pop out to window",

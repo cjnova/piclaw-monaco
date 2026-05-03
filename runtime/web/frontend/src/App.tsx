@@ -152,8 +152,8 @@ function AppContent() {
       { id: "terminal.toggle", label: "Toggle Terminal", category: "terminal" as const, keybinding: "Ctrl+`", handler: () => { terminalVisible.value = !terminalVisible.value; } },
       { id: "terminal.maximize", label: "Maximize Terminal", category: "terminal" as const, handler: () => { terminalVisible.value = true; terminalMaximized.value = true; } },
       { id: "terminal.restore", label: "Restore Terminal", category: "terminal" as const, handler: () => { terminalMaximized.value = false; } },
-      { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); } },
-      { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); } },
+      { id: "terminal.newTab", label: "Open Terminal in New Tab", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "_blank"); } },
+      { id: "terminal.popOut", label: "Pop Out Terminal", category: "terminal" as const, handler: () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); } },
       { id: "terminal.close", label: "Close Terminal", category: "terminal" as const, handler: () => { terminalVisible.value = false; terminalMaximized.value = false; } },
       // Theme
       { id: "theme.toggleDarkLight", label: "Toggle Dark/Light Theme", category: "theme" as const, handler: () => { themeControl.toggleMode(); } },
@@ -397,8 +397,8 @@ function AppContent() {
                   className="terminal__btn"
                   role="button"
                   tabIndex={0}
-                  onClick={() => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); }}
-                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { window.open("/static/terminal.html", "_blank", "noopener,noreferrer"); })}
+                  onClick={() => { window.open("/static/terminal.html", "_blank"); }}
+                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { window.open("/static/terminal.html", "_blank"); })}
                   title="Open in new tab"
                   aria-label="Open in new tab"
                 >
@@ -408,8 +408,8 @@ function AppContent() {
                   className="terminal__btn"
                   role="button"
                   tabIndex={0}
-                  onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); }}
-                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no,noopener,noreferrer"); })}
+                  onClick={() => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); }}
+                  onKeyDown={(e) => activateOnEnterOrSpace(e, () => { window.open("/static/terminal.html", "piclaw-terminal", "width=800,height=600,menubar=no,toolbar=no"); })}
                   title="Pop out to window"
                   aria-label="Pop out to window"
                 >
