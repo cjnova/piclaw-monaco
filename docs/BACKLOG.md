@@ -145,6 +145,8 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | #189 review bug | ✅ |
 | #215 terminal popup | ✅ |
 | #219 file tree state persistence | ✅ |
+| #195 TTS + copy | ✅ |
+| #209 message collapse + delete | ✅ |
 | #245 Fleet iframe fix | ✅ |
 | #147 streaming improvements | ❌ closed (superseded by #230) |
 | #145 tool lifecycle events | ❌ closed (superseded by #230) |
@@ -225,9 +227,10 @@ Technical debt cleanup. Each PR includes regression tests.
 
 | Task | Description | Status |
 |---|---|---|
-| real-time-agent-turn-progress | Thoughts, tool calls, draft panels (#230) — supersedes #147, #145 | ⏳ |
+| real-time-agent-turn-progress | Unified AgentProgressPanel — thoughts, draft, tools, MCP progress (positioned between timeline and compose box, like upstream). Requires lifting SSE state out of MessageList. Sub-issues #252-254 exist but need redesign. | ⏳ |
+| #252 | (PR #255 closed — needs redesign as part of unified panel) | ⏳ |
 | message-collapse-delete-actions | Message collapse + delete actions (#209) | ✅ |
-| message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ⏳ (PR #250 ready for merge) |
+| message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ✅ |
 | separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ⏳ (partially done) |
 
 ### Wave 11 — Full Functionality (after UX polish)
@@ -236,7 +239,7 @@ Technical debt cleanup. Each PR includes regression tests.
 |---|---|---|
 | 018-task-adaptive-cards-renderer | Adaptive cards in chat (#148) | ⏳ |
 | 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ⏳ |
-| full-compose-bar-redesign | Send/stop cycle, attachments, queue (#141, depends on #230) | ⏳ |
+| full-compose-bar-redesign | Full compose bar redesign — send/stop, attachments, paste images, workspace file attach, queue, steer button (depends on #230) | ⏳ |
 | central-pane-tab-bar | Chat / Dashboards / Terminal tabs (#89) | ⏳ |
 | 024-task-terminal-tabs | Multi-tab terminal (#150) | ⏳ |
 | wire-terminal-profile-selector | Terminal profiles — Shell, Pi TUI (#144) | ⏳ |
