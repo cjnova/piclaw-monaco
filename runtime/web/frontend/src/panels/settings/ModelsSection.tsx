@@ -24,37 +24,77 @@ export function ModelsSection({ data: _data }: { data: SettingsData }) {
   const current = useSignal("");
   const thinkingLevel = useSignal("medium");
   const filter = useSignal("");
+  const loading = useSignal(true);
+  const loadError = useSignal<string | null>(null);
+  const switching = useSignal(false);
 
-  useEffect(() => {
-    fetch("/agent/models", { credentials: "same-origin" })
-      .then(r => r.json())
-      .then((d: ModelsResponse) => {
-        current.value = d.current ?? "";
-        thinkingLevel.value = d.thinking_level ?? "medium";
-        models.value = d.model_options ?? [];
-      })
-      .catch(() => {});
-  }, []);
-
-  const sendCommand = async (cmd: string) => {
+  const fetchModels = async () => {
+    loading.value = true;
+    loadError.value = null;
     try {
-      await fetch(getMessageUrl(), {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch("/agent/models", { credentials: "same-origin", signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        loadError.value = `Failed to load models (HTTP ${res.status})`;
+        loading.value = false;
+        return;
+      }
+      const d = await res.json() as ModelsResponse;
+      current.value = d.current ?? "";
+      thinkingLevel.value = d.thinking_level ?? "medium";
+      models.value = d.model_options ?? [];
+      loadError.value = null;
+    } catch (err: any) {
+      loadError.value = err?.name === "AbortError" ? "Models request timed out" : "Failed to load models";
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  useEffect(() => { fetchModels(); }, []);
+
+  const sendCommand = async (cmd: string): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(getMessageUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ content: cmd }),
+        signal: controller.signal,
       });
-    } catch {}
+      clearTimeout(timeout);
+      return res.ok;
+    } catch {
+      return false;
+    }
   };
 
-  const switchModel = (label: string) => {
+  const switchModel = async (label: string) => {
+    const prev = current.value;
     current.value = label;
-    sendCommand(`/model ${label}`);
+    switching.value = true;
+    const ok = await sendCommand(`/model ${label}`);
+    switching.value = false;
+    if (!ok) {
+      current.value = prev;
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Model switch failed", type: "error" } }));
+    }
   };
 
-  const switchThinking = (level: string) => {
+  const switchThinking = async (level: string) => {
+    const prev = thinkingLevel.value;
     thinkingLevel.value = level;
-    sendCommand(`/thinking ${level}`);
+    switching.value = true;
+    const ok = await sendCommand(`/thinking ${level}`);
+    switching.value = false;
+    if (!ok) {
+      thinkingLevel.value = prev;
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Thinking level change failed", type: "error" } }));
+    }
   };
 
   const filtered = filter.value
@@ -64,6 +104,16 @@ export function ModelsSection({ data: _data }: { data: SettingsData }) {
   return (
     <section className="settings-panel__section settings-panel__section--models">
       <h2 className="settings-panel__section-title">Models</h2>
+
+      {loading.value && !models.value.length && (
+        <p className="settings-panel__description">Loading models...</p>
+      )}
+      {loadError.value && (
+        <div className="settings-panel__save-status settings-panel__save-status--error">
+          {loadError.value}
+          <button type="button" className="settings-panel__provider-btn" onClick={fetchModels} style="margin-left:8px">Retry</button>
+        </div>
+      )}
 
       <input
         className="settings-panel__input settings-panel__model-filter"

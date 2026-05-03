@@ -8717,36 +8717,83 @@ ${code}
     const current = useSignal("");
     const thinkingLevel = useSignal("medium");
     const filter = useSignal("");
-    y2(() => {
-      fetch("/agent/models", { credentials: "same-origin" }).then((r4) => r4.json()).then((d5) => {
+    const loading = useSignal(true);
+    const loadError = useSignal(null);
+    const switching = useSignal(false);
+    const fetchModels = async () => {
+      loading.value = true;
+      loadError.value = null;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1e4);
+        const res = await fetch("/agent/models", { credentials: "same-origin", signal: controller.signal });
+        clearTimeout(timeout);
+        if (!res.ok) {
+          loadError.value = `Failed to load models (HTTP ${res.status})`;
+          loading.value = false;
+          return;
+        }
+        const d5 = await res.json();
         current.value = d5.current ?? "";
         thinkingLevel.value = d5.thinking_level ?? "medium";
         models.value = d5.model_options ?? [];
-      }).catch(() => {
-      });
+        loadError.value = null;
+      } catch (err) {
+        loadError.value = err?.name === "AbortError" ? "Models request timed out" : "Failed to load models";
+      } finally {
+        loading.value = false;
+      }
+    };
+    y2(() => {
+      fetchModels();
     }, []);
     const sendCommand2 = async (cmd) => {
       try {
-        await fetch(getMessageUrl(), {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1e4);
+        const res = await fetch(getMessageUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ content: cmd })
+          body: JSON.stringify({ content: cmd }),
+          signal: controller.signal
         });
+        clearTimeout(timeout);
+        return res.ok;
       } catch {
+        return false;
       }
     };
-    const switchModel = (label) => {
+    const switchModel = async (label) => {
+      const prev = current.value;
       current.value = label;
-      sendCommand2(`/model ${label}`);
+      switching.value = true;
+      const ok = await sendCommand2(`/model ${label}`);
+      switching.value = false;
+      if (!ok) {
+        current.value = prev;
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Model switch failed", type: "error" } }));
+      }
     };
-    const switchThinking = (level) => {
+    const switchThinking = async (level) => {
+      const prev = thinkingLevel.value;
       thinkingLevel.value = level;
-      sendCommand2(`/thinking ${level}`);
+      switching.value = true;
+      const ok = await sendCommand2(`/thinking ${level}`);
+      switching.value = false;
+      if (!ok) {
+        thinkingLevel.value = prev;
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Thinking level change failed", type: "error" } }));
+      }
     };
     const filtered = filter.value ? models.value.filter((m5) => m5.name.toLowerCase().includes(filter.value.toLowerCase()) || m5.provider.toLowerCase().includes(filter.value.toLowerCase())) : models.value;
     return /* @__PURE__ */ u4("section", { className: "settings-panel__section settings-panel__section--models", children: [
       /* @__PURE__ */ u4("h2", { className: "settings-panel__section-title", children: "Models" }),
+      loading.value && !models.value.length && /* @__PURE__ */ u4("p", { className: "settings-panel__description", children: "Loading models..." }),
+      loadError.value && /* @__PURE__ */ u4("div", { className: "settings-panel__save-status settings-panel__save-status--error", children: [
+        loadError.value,
+        /* @__PURE__ */ u4("button", { type: "button", className: "settings-panel__provider-btn", onClick: fetchModels, style: "margin-left:8px", children: "Retry" })
+      ] }),
       /* @__PURE__ */ u4(
         "input",
         {
