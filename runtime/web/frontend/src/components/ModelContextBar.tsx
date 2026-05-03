@@ -159,11 +159,11 @@ export function ModelContextBar() {
         // Only update if backend returned real data (not all-null)
         if (data.tokens !== null) {
           agentContext.value = data;
-          try { localStorage.setItem("piclaw:context-cache", JSON.stringify(data)); } catch {}
+          try { localStorage.setItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(data)); } catch {}
         } else if (!agentContext.value) {
           // Load from cache on first null response
           try {
-            const cached = localStorage.getItem("piclaw:context-cache");
+            const cached = localStorage.getItem(`piclaw:context-cache:${getChatJid()}`);
             if (cached) agentContext.value = JSON.parse(cached) as AgentContext;
           } catch {}
         }
