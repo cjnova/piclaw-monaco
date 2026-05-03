@@ -90,7 +90,10 @@ function sendCommand(command: string) {
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content: command }),
-  }).catch((err) => console.warn("[CommandPalette] send failed:", err));
+  }).catch((err) => {
+    console.warn("[CommandPalette] send failed:", err);
+    window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Command failed", type: "error" } }));
+  });
 }
 
 export function CommandPalette({ visible, onClose }: CommandPaletteProps) {

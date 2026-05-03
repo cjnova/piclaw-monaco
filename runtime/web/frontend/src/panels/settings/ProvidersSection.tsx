@@ -12,9 +12,11 @@ export function ProvidersSection({ providers }: { providers: Provider[] }) {
       });
       if (!res.ok) {
         console.warn("[providers] command failed:", res.status);
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Provider action failed", type: "error" } }));
       }
     } catch (err) {
       console.warn("[providers] command failed:", err);
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Provider action failed", type: "error" } }));
     }
   };
 
