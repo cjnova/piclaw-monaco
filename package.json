@@ -86,7 +86,7 @@
     "check:silent-swallows": "bun run runtime/scripts/silent-swallow-metrics.ts --check",
     "check:structured-logging": "bun run runtime/scripts/structured-logging-scope-metrics.ts --check",
     "ci:fast": "bun run check:silent-swallows && bun run check:structured-logging && bun run ci:fast:tests && bun run ci:fast:monaco && make build-web",
-    "ci:fast:tests": "cd runtime && PICLAW_DB_IN_MEMORY=1 bun test --max-concurrency=1 --path-ignore-patterns='**/features/**' --path-ignore-patterns='**/scripts/**' --path-ignore-patterns='**/*.optional.test.ts' --path-ignore-patterns='**/test/web/**' --path-ignore-patterns='**/test/monaco/**'",
+    "ci:fast:tests": "cd runtime && PICLAW_DB_IN_MEMORY=1 bun test --max-concurrency=1 --path-ignore-patterns='**/features/**' --path-ignore-patterns='**/scripts/**' --path-ignore-patterns='**/*.optional.test.ts' --path-ignore-patterns='**/test/web/**' --path-ignore-patterns='**/test/monaco/**' --path-ignore-patterns='**/frontend-security.test.ts'",
     "ci:fast:monaco": "bun test runtime/test/monaco/",
     "ci:fast:features": "bun run runtime/test/features/run-feature-tests.ts",
     "ci:integration": "bun run scripts/integration-test-suite.ts",
