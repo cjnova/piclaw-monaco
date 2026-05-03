@@ -310,6 +310,9 @@ export async function startWebChannel(queue: AgentQueue, agentPool: AgentPool): 
   const web = new WebChannel({ queue, agentPool });
   await web.start();
   registerLazyViewerRoutes();
+  // FORK-MODIFIED: cjnova/piclaw-monaco — deferred extension route freeze to session init.
+  // Upstream freezes here; we defer because workspace/add-on extensions register routes during
+  // the first session resource reload. Must be preserved on upstream rebase. See PR #519.
   // freezeExtensionRoutes(); // Moved to session.ts — workspace extensions register routes during session init
   captureStartupMemorySnapshot(agentPool, { label: "post-web-start" });
   queueStartupSessionWarmup(agentPool, resolveStartupSessionWarmupOptions());
