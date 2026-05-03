@@ -6,7 +6,7 @@
 
 /** Sanitize SVG output from mermaid renderer using DOMPurify vendor global. */
 function sanitizeSvg(svg: string): string {
-  const purify = (window as any).DOMPurify;
+  const purify = window.DOMPurify;
   if (!purify) return svg; // fallback: accept as-is if DOMPurify not loaded
   return purify.sanitize(svg, {
     USE_PROFILES: { svg: true, svgFilters: true },
@@ -101,7 +101,7 @@ function isDarkMode(): boolean {
 /** Lazy-load beautiful-mermaid vendor bundle */
 let loadPromise: Promise<void> | null = null;
 function ensureMermaidLoaded(): Promise<void> {
-  if ((window as any).beautifulMermaid) return Promise.resolve();
+  if (window.beautifulMermaid) return Promise.resolve();
   if (loadPromise) return loadPromise;
   loadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
@@ -133,7 +133,7 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
     return;
   }
 
-  const bm = (window as any).beautifulMermaid;
+  const bm = window.beautifulMermaid;
   if (!bm?.renderMermaid) return;
 
   const dark = isDarkMode();
@@ -148,11 +148,11 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
       svg = roundPolylineCorners(svg);
       el.innerHTML = sanitizeSvg(svg);
       el.removeAttribute("data-mermaid");
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("[mermaid] Render error:", e);
       const pre = document.createElement("pre");
       pre.className = "mermaid-error";
-      pre.textContent = `Diagram error: ${e.message || e}`;
+      pre.textContent = `Diagram error: ${e instanceof Error ? e.message : String(e)}`;
       el.innerHTML = "";
       el.appendChild(pre);
       el.removeAttribute("data-mermaid");

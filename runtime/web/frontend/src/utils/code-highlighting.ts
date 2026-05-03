@@ -4,42 +4,8 @@
  */
 import { bicepMode } from "./bicep-mode";
 
-interface CmHighlight {
-  classHighlighter: any;
-  highlightTree: (tree: any, highlighter: any, callback: (from: number, to: number, cls: string) => void) => void;
-  StreamLanguage: { define: (spec: any) => { parser: any } };
-  // Language parsers
-  cssLanguage: { parser: any };
-  cppLanguage: { parser: any };
-  goLanguage: { parser: any };
-  htmlLanguage: { parser: any };
-  javascriptLanguage: { parser: any };
-  jsxLanguage: { parser: any };
-  tsxLanguage: { parser: any };
-  typescriptLanguage: { parser: any };
-  jsonLanguage: { parser: any };
-  markdownLanguage: { parser: any };
-  pythonLanguage: { parser: any };
-  rustLanguage: { parser: any };
-  StandardSQL: { language: { parser: any } };
-  xmlLanguage: { parser: any };
-  yamlLanguage: { parser: any };
-  dockerFile: any;
-  powerShell: any;
-  ruby: any;
-  shell: any;
-  swift: any;
-  toml: any;
-}
-
-declare global {
-  interface Window {
-    cmHighlight?: CmHighlight;
-  }
-}
-
-function getCm(): CmHighlight | null {
-  return (window as any).cmHighlight ?? null;
+function getCm(): PiclawCmHighlight | null {
+  return window.cmHighlight ?? null;
 }
 
 function escapeHtml(value: string): string {
@@ -82,15 +48,15 @@ export function normalizeCodeLanguageLabel(lang: string): string {
 }
 
 // Cache legacy parsers so StreamLanguage.define is only called once
-let _shellParser: any;
-let _powerShellParser: any;
-let _dockerFileParser: any;
-let _rubyParser: any;
-let _swiftParser: any;
-let _tomlParser: any;
-let _bicepParser: any;
+let _shellParser: { parse: (input: string) => unknown } | null = null;
+let _powerShellParser: { parse: (input: string) => unknown } | null = null;
+let _dockerFileParser: { parse: (input: string) => unknown } | null = null;
+let _rubyParser: { parse: (input: string) => unknown } | null = null;
+let _swiftParser: { parse: (input: string) => unknown } | null = null;
+let _tomlParser: { parse: (input: string) => unknown } | null = null;
+let _bicepParser: { parse: (input: string) => unknown } | null = null;
 
-function getLegacyParser(cm: CmHighlight, name: string): any {
+function getLegacyParser(cm: PiclawCmHighlight, name: string): { parse: (input: string) => unknown } | null {
   switch (name) {
     case "shell": return _shellParser ??= cm.StreamLanguage.define(cm.shell).parser;
     case "powershell": return _powerShellParser ??= cm.StreamLanguage.define(cm.powerShell).parser;
@@ -103,7 +69,7 @@ function getLegacyParser(cm: CmHighlight, name: string): any {
   }
 }
 
-export function parserForCodeFenceLanguage(lang: string): { parse: (input: string) => any } | null {
+export function parserForCodeFenceLanguage(lang: string): { parse: (input: string) => unknown } | null {
   const cm = getCm();
   if (!cm) return null;
 
