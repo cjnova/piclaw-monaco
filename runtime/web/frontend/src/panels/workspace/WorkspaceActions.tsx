@@ -1,0 +1,101 @@
+import { useCallback } from "preact/hooks";
+import type { TreeNode } from "../../components/FileTree";
+import { renderMarkdown } from "../../utils/markdown-pipeline";
+
+const OPENABLE_EXTS = new Set([
+  'md', 'mdx', 'markdown',
+  'csv', 'pdf', 'html', 'htm',
+  'docx', 'xlsx', 'pptx',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
+  'mp4', 'webm', 'mov',
+]);
+
+interface WorkspaceActionsProps {
+  node: TreeNode;
+  downloadUrl: string;
+  isDeleting: boolean;
+  onDelete: () => void;
+}
+
+export function WorkspaceActions({ node, downloadUrl, isDeleting, onDelete }: WorkspaceActionsProps) {
+  const ext = node.path.split('.').pop()?.toLowerCase() ?? '';
+
+  const copyPath = useCallback(() => {
+    navigator.clipboard.writeText(node.path).then(() => {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Path copied", type: "success" } }));
+    }).catch(() => {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Copy failed — clipboard unavailable", type: "error" } }));
+    });
+  }, [node.path]);
+
+  const handleOpenFile = useCallback(async () => {
+    const encoded = encodeURIComponent(node.path);
+    const name = node.path.split('/').pop() ?? node.name;
+
+    if (['md', 'mdx', 'markdown'].includes(ext)) {
+      try {
+        const res = await fetch(`/workspace/file?path=${encoded}`, { credentials: 'same-origin' });
+        const data = await res.json() as { content?: string; text?: string };
+        const text = data.content ?? data.text ?? '';
+        const html = renderMarkdown(text);
+        window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { html, name, mode: 'markdown' } }));
+      } catch {
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to open file preview", type: "error" } }));
+      }
+      return;
+    }
+
+    let viewerUrl: string;
+    if (ext === 'csv') viewerUrl = `/csv-viewer?path=${encoded}`;
+    else if (['html', 'htm'].includes(ext)) viewerUrl = `/html-viewer?path=${encoded}`;
+    else if (ext === 'pdf') {
+      window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { name, mode: 'pdf', sourceUrl: `/workspace/raw?path=${encoded}` } }));
+      return;
+    }
+    else if (['docx', 'xlsx', 'pptx'].includes(ext)) viewerUrl = `/office-viewer?path=${encoded}`;
+    else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) viewerUrl = `/image-viewer?path=${encoded}`;
+    else if (['mp4', 'webm', 'mov'].includes(ext)) viewerUrl = `/video-viewer?path=${encoded}`;
+    else return;
+    window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { url: viewerUrl, name } }));
+  }, [node.path, node.name, ext]);
+
+  return (
+    <div className="workspace__preview-actions">
+      <button
+        className="workspace__preview-action-btn"
+        onClick={copyPath}
+        title="Copy path"
+      >
+        <span className="codicon codicon-copy" />
+        Copy path
+      </button>
+      <a
+        className="workspace__preview-action-btn"
+        href={downloadUrl}
+        title="Download"
+      >
+        <span className="codicon codicon-cloud-download" />
+        Download
+      </a>
+      {OPENABLE_EXTS.has(ext) && (
+        <button
+          className="workspace__preview-action-btn"
+          onClick={() => void handleOpenFile()}
+          title="Open in central pane"
+        >
+          <span className="codicon codicon-open-preview" />
+          Open
+        </button>
+      )}
+      <button
+        className="workspace__preview-action-btn workspace__preview-action-btn--danger"
+        disabled={isDeleting}
+        onClick={onDelete}
+        title="Delete file"
+      >
+        <span className="codicon codicon-trash" />
+        {isDeleting ? "Deleting…" : "Delete"}
+      </button>
+    </div>
+  );
+}
