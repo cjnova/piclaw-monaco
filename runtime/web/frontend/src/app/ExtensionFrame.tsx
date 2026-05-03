@@ -43,7 +43,7 @@ export function ExtensionFrame({ extensionPageUrl, extensionPageName, extensionP
           <iframe
             className="extension-frame__iframe"
             src={extensionPageUrl!}
-            sandbox="allow-same-origin allow-scripts allow-forms"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             {...({ csp: "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" } as any)}
             title={extensionPageName ?? "Extension Page"}
           />
