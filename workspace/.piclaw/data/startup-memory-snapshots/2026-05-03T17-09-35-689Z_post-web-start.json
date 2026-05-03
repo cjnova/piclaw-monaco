@@ -1,0 +1,68 @@
+{
+  "captured_at": "2026-05-03T17:09:35.689Z",
+  "pid": 19186,
+  "label": "post-web-start",
+  "snapshot": {
+    "cpu_percent": 0,
+    "ram_percent": 17.7,
+    "swap_percent": 0,
+    "cpu_series": [
+      0
+    ],
+    "ram_series": [
+      17.7
+    ],
+    "swap_series": [
+      0
+    ],
+    "buffer_cache_bytes": 663060480,
+    "buffer_cache_series_bytes": [
+      663060480
+    ],
+    "process_rss_series_bytes": [
+      209580032
+    ],
+    "process_heap_used_series_bytes": [
+      28116944
+    ],
+    "swap_total_bytes": 2147483648,
+    "swap_used_bytes": 0,
+    "sample_interval_ms": 2000,
+    "platform": "linux",
+    "process_memory": {
+      "rss_bytes": 209580032,
+      "heap_total_bytes": 29681664,
+      "heap_used_bytes": 28116944,
+      "external_bytes": 9391760,
+      "array_buffers_bytes": 464,
+      "vm_rss_bytes": 209580032,
+      "vm_hwm_bytes": 209580032,
+      "rss_anon_bytes": 161607680,
+      "rss_file_bytes": 47972352,
+      "rss_shmem_bytes": 0,
+      "pss_bytes": 186130432,
+      "private_clean_bytes": 229376,
+      "private_dirty_bytes": 162267136,
+      "shared_clean_bytes": 48390144,
+      "shared_dirty_bytes": 0,
+      "cgroup_memory_current_bytes": 894242816,
+      "threads": 24
+    },
+    "runtime_memory": {
+      "cached_main_sessions": 0,
+      "cached_side_sessions": 0,
+      "active_fork_base_leaves": 0,
+      "active_chats": 0,
+      "create_in_flight": 0,
+      "branch_seed_realizations_in_flight": 0,
+      "invalid_deferred_seed_errors": 0,
+      "prewarm_in_flight": 0,
+      "queued_prewarms": 0,
+      "prewarm_queue_length": 0,
+      "prewarm_cooldowns": 0,
+      "recovery_attempts_total": 0,
+      "recovery_recovered_runs": 0,
+      "recovery_exhausted_runs": 0
+    }
+  }
+}

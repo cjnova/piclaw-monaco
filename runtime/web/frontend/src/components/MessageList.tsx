@@ -6,6 +6,7 @@ import { useScrollManager } from "./message-list/useScrollManager";
 import { useTimelineFetch } from "./message-list/useTimelineFetch";
 import { useTimelineStream } from "./message-list/useTimelineStream";
 import { MessageItem } from "./message-list/MessageItem";
+import { useCollapsedMessages } from "./message-list/useCollapsedMessages";
 import type { Interaction } from "./message-list/types";
 
 export function MessageList() {
@@ -23,6 +24,21 @@ export function MessageList() {
   }, []);
 
   const { listRef, scrollToBottom, userScrolledRef } = useScrollManager(onReplaceMessages);
+
+  const { isCollapsed, toggle: toggleCollapse } = useCollapsedMessages();
+
+  const handleDeleteMessage = async (id: number) => {
+    try {
+      const res = await fetch(`/post/${id}`, { method: "DELETE", credentials: "same-origin" });
+      if (res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      } else {
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to delete message", type: "error" } }));
+      }
+    } catch {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to delete message", type: "error" } }));
+    }
+  };
 
   const {
     messages,
@@ -117,7 +133,13 @@ export function MessageList() {
       )}
 
       {messages.map((msg) => (
-        <MessageItem key={msg.id} interaction={msg} />
+        <MessageItem
+          key={msg.id}
+          interaction={msg}
+          isCollapsed={isCollapsed(msg.id)}
+          onToggleCollapse={() => toggleCollapse(msg.id)}
+          onDelete={() => handleDeleteMessage(msg.id)}
+        />
       ))}
 
       {draft && (

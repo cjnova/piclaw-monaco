@@ -6337,6 +6337,44 @@ ${code}
     ]);
   }
 
+  // runtime/web/frontend/src/components/message-list/MessageActionBar.tsx
+  function MessageActionBar({
+    messageId: _messageId,
+    isCollapsed,
+    onToggleCollapse,
+    onDelete
+  }) {
+    const handleDelete = () => {
+      if (confirm("Delete this message?")) {
+        onDelete();
+      }
+    };
+    return /* @__PURE__ */ u4("div", { className: "message-action-bar", children: [
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          className: "message-action-bar__btn",
+          onClick: onToggleCollapse,
+          title: isCollapsed ? "Expand message" : "Collapse message",
+          "aria-label": isCollapsed ? "Expand" : "Collapse",
+          type: "button",
+          children: /* @__PURE__ */ u4("i", { className: `codicon codicon-${isCollapsed ? "chevron-down" : "chevron-up"}` })
+        }
+      ),
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          className: "message-action-bar__btn message-action-bar__btn--delete",
+          onClick: handleDelete,
+          title: "Delete message",
+          "aria-label": "Delete message",
+          type: "button",
+          children: /* @__PURE__ */ u4("i", { className: "codicon codicon-trash" })
+        }
+      )
+    ] });
+  }
+
   // runtime/web/frontend/src/components/message-list/MessageItem.tsx
   function ToolCallBlock({ useBlock, resultBlock }) {
     const [open, setOpen] = d2(false);
@@ -6374,7 +6412,12 @@ ${code}
       ] })
     ] });
   }
-  function MessageItem({ interaction }) {
+  function MessageItem({
+    interaction,
+    isCollapsed,
+    onToggleCollapse,
+    onDelete
+  }) {
     const isUser = interaction.type === "user";
     const toolPairs = [];
     if (interaction.content_blocks?.length) {
@@ -6396,6 +6439,52 @@ ${code}
     }
     const displayName = isUser ? "You" : "PiClaw";
     const avatarLetter = isUser ? "Y" : "P";
+    if (isCollapsed) {
+      return /* @__PURE__ */ u4(
+        "div",
+        {
+          className: `message-list__item message-list__item--collapsed ${isUser ? "message-list__item--user" : "message-list__item--agent"}`,
+          "data-message-id": interaction.id,
+          children: [
+            /* @__PURE__ */ u4(
+              "div",
+              {
+                className: `message-list__avatar-circle ${isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"}`,
+                "aria-hidden": "true",
+                children: avatarLetter
+              }
+            ),
+            /* @__PURE__ */ u4("div", { className: "message-list__body message-list__body--collapsed", children: [
+              /* @__PURE__ */ u4(
+                MessageActionBar,
+                {
+                  messageId: interaction.id,
+                  isCollapsed: true,
+                  onToggleCollapse,
+                  onDelete
+                }
+              ),
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  className: `message-list__name ${isUser ? "message-list__name--user" : "message-list__name--agent"}`,
+                  children: displayName
+                }
+              ),
+              /* @__PURE__ */ u4(
+                "span",
+                {
+                  className: "message-list__time",
+                  title: new Date(interaction.created_at).toLocaleString(),
+                  children: relativeTime(interaction.created_at)
+                }
+              ),
+              /* @__PURE__ */ u4("span", { className: "message-list__collapsed-preview", children: interaction.content ? interaction.content.replace(/\s+/g, " ").slice(0, 120) + (interaction.content.length > 120 ? "\u2026" : "") : "\u2014 collapsed" })
+            ] })
+          ]
+        }
+      );
+    }
     return /* @__PURE__ */ u4(
       "div",
       {
@@ -6411,6 +6500,15 @@ ${code}
             }
           ),
           /* @__PURE__ */ u4("div", { className: "message-list__body", children: [
+            /* @__PURE__ */ u4(
+              MessageActionBar,
+              {
+                messageId: interaction.id,
+                isCollapsed: false,
+                onToggleCollapse,
+                onDelete
+              }
+            ),
             /* @__PURE__ */ u4("div", { className: "message-list__header", children: [
               /* @__PURE__ */ u4(
                 "span",
@@ -6450,6 +6548,36 @@ ${code}
     );
   }
 
+  // runtime/web/frontend/src/components/message-list/useCollapsedMessages.ts
+  var STORAGE_KEY = () => `piclaw:collapsed-messages:${getChatJid()}`;
+  function loadCollapsed() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY());
+      if (raw) return new Set(JSON.parse(raw));
+    } catch {
+    }
+    return /* @__PURE__ */ new Set();
+  }
+  function saveCollapsed(ids) {
+    try {
+      const arr = [...ids].slice(-500);
+      localStorage.setItem(STORAGE_KEY(), JSON.stringify(arr));
+    } catch {
+    }
+  }
+  function useCollapsedMessages() {
+    const collapsed = useSignal(loadCollapsed());
+    const toggle = (id) => {
+      const next = new Set(collapsed.value);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      collapsed.value = next;
+      saveCollapsed(next);
+    };
+    const isCollapsed = (id) => collapsed.value.has(id);
+    return { isCollapsed, toggle };
+  }
+
   // runtime/web/frontend/src/components/MessageList.tsx
   function MessageList() {
     const [connected, setConnected] = d2(null);
@@ -6461,6 +6589,19 @@ ${code}
       replaceMessagesRef.current?.(posts);
     }, []);
     const { listRef, scrollToBottom, userScrolledRef } = useScrollManager(onReplaceMessages);
+    const { isCollapsed, toggle: toggleCollapse } = useCollapsedMessages();
+    const handleDeleteMessage = async (id) => {
+      try {
+        const res = await fetch(`/post/${id}`, { method: "DELETE", credentials: "same-origin" });
+        if (res.ok) {
+          setMessages((prev) => prev.filter((m5) => m5.id !== id));
+        } else {
+          window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to delete message", type: "error" } }));
+        }
+      } catch {
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to delete message", type: "error" } }));
+      }
+    };
     const {
       messages,
       setMessages,
@@ -6534,7 +6675,16 @@ ${code}
         }
       ) }),
       messages.length === 0 && connected === true && /* @__PURE__ */ u4("div", { className: "message-list__empty", children: /* @__PURE__ */ u4("p", { children: "No messages yet. Say hello! \u{1F44B}" }) }),
-      messages.map((msg) => /* @__PURE__ */ u4(MessageItem, { interaction: msg }, msg.id)),
+      messages.map((msg) => /* @__PURE__ */ u4(
+        MessageItem,
+        {
+          interaction: msg,
+          isCollapsed: isCollapsed(msg.id),
+          onToggleCollapse: () => toggleCollapse(msg.id),
+          onDelete: () => handleDeleteMessage(msg.id)
+        },
+        msg.id
+      )),
       draft && /* @__PURE__ */ u4("div", { className: "message-list__draft", children: [
         /* @__PURE__ */ u4(
           "div",
