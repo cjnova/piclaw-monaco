@@ -7411,7 +7411,10 @@ ${code}
     const rawUrl = preview?.url ?? `/workspace/raw?path=${encodedPath}`;
     const downloadUrl = `/workspace/raw?path=${encodedPath}&download=1`;
     const copyPath = q2(() => {
-      navigator.clipboard.writeText(node.path).catch(() => {
+      navigator.clipboard.writeText(node.path).then(() => {
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Path copied", type: "success" } }));
+      }).catch(() => {
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Copy failed \u2014 clipboard unavailable", type: "error" } }));
       });
     }, [node.path]);
     const handleOpenFile = q2(async () => {
@@ -7426,6 +7429,7 @@ ${code}
           const html = renderMarkdown(text);
           window.dispatchEvent(new CustomEvent("piclaw:open-page", { detail: { html, name, mode: "markdown" } }));
         } catch {
+          window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to open file preview", type: "error" } }));
         }
         return;
       }

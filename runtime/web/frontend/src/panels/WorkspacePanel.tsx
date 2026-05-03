@@ -320,7 +320,11 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
   const downloadUrl = `/workspace/raw?path=${encodedPath}&download=1`;
 
   const copyPath = useCallback(() => {
-    navigator.clipboard.writeText(node.path).catch(() => {});
+    navigator.clipboard.writeText(node.path).then(() => {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Path copied", type: "success" } }));
+    }).catch(() => {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Copy failed — clipboard unavailable", type: "error" } }));
+    });
   }, [node.path]);
 
   const handleOpenFile = useCallback(async () => {
@@ -337,7 +341,7 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
         const html = renderMarkdown(text);
         window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { html, name, mode: 'markdown' } }));
       } catch {
-        // fallback: nothing
+        window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to open file preview", type: "error" } }));
       }
       return;
     }
