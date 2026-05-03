@@ -1,407 +1,106 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { JSX } from "preact";
-import { commandRegistry } from "../services";
-import { getMessageUrl } from "../api/chat-jid";
-
-interface CommandPaletteProps {
-  visible: boolean;
-  onClose: () => void;
-}
-
-interface BackendCommand {
-  name: string;
-  description: string;
-  source: string;
-}
-
-interface MergedCommand {
-  id: string;
-  label: string;
-  description?: string;
-  category: string;
-  keybinding?: string;
-  handler?: () => void;
-  isBackend: boolean;
-}
-
-type ParamType = "bare" | "autocomplete" | "text";
-
-interface CommandParam {
-  type: ParamType;
-  fetch?: string;          // API endpoint for autocomplete options
-  extractField?: string;   // field in API response to get options from
-  placeholder?: string;    // for text input
-}
-
-const COMMAND_PARAMS: Record<string, CommandParam> = {
-  "/model": { type: "autocomplete", fetch: "/agent/models", extractField: "models" },
-  "/thinking": { type: "autocomplete", fetch: "/agent/models", extractField: "available_thinking_levels" },
-  "/switch-session": { type: "text", placeholder: "Session path or JID" },
-  "/compact": { type: "bare" },
-  "/stats": { type: "bare" },
-  "/state": { type: "bare" },
-  "/context": { type: "bare" },
-  "/abort": { type: "bare" },
-  "/last": { type: "bare" },
-  "/restart": { type: "bare" },
-  "/tree": { type: "bare" },
-  "/forks": { type: "bare" },
-  "/auto-compact": { type: "bare" },
-  "/auto-retry": { type: "bare" },
-  "/cycle-model": { type: "bare" },
-  "/cycle-thinking": { type: "bare" },
-  "/shell": { type: "text", placeholder: "Shell command" },
-  "/bash": { type: "text", placeholder: "Bash command" },
-  "/user-github": { type: "text", placeholder: "GitHub username or URL" },
-  "/session-name": { type: "text", placeholder: "Session name" },
-  "/agent-name": { type: "text", placeholder: "Agent display name" },
-  "/agent-avatar": { type: "text", placeholder: "Avatar URL" },
-  "/user-name": { type: "text", placeholder: "Your display name" },
-  "/user-avatar": { type: "text", placeholder: "Avatar URL" },
-  "/new-session": { type: "bare" },
-  "/fork": { type: "text", placeholder: "Entry ID (use /forks to list)" },
-  "/clone": { type: "text", placeholder: "Entry ID" },
-  "/ask": { type: "text", placeholder: "instance_id prompt" },
-  "/queue": { type: "text", placeholder: "Follow-up message" },
-  "/queue-all": { type: "text", placeholder: "Follow-up message (batch)" },
-  "/steer": { type: "text", placeholder: "Steering message" },
-  "/followup-mode": { type: "text", placeholder: "all or one" },
-  "/steering-mode": { type: "text", placeholder: "all or one" },
-  "/session-rotate": { type: "bare" },
-  "/abort-bash": { type: "bare" },
-  "/abort-retry": { type: "bare" },
-};
-
-const CATEGORY_BADGE_CLASS: Record<string, string> = {
-  navigation: "command-palette__badge--navigation",
-  terminal: "command-palette__badge--terminal",
-  session: "command-palette__badge--session",
-  theme: "command-palette__badge--theme",
-  general: "command-palette__badge--general",
-  core: "command-palette__badge--core",
-  extension: "command-palette__badge--extension",
-  skill: "command-palette__badge--skill",
-  template: "command-palette__badge--template",
-};
-
-function sendCommand(command: string) {
-  fetch(getMessageUrl(), {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: command }),
-  }).catch((err) => {
-    console.warn("[CommandPalette] send failed:", err);
-    window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Command failed", type: "error" } }));
-  });
-}
+import { COMMAND_PARAMS } from "./command-palette-params";
+import { CommandList } from "./command-palette/CommandList";
+import { useCommandFetch } from "./command-palette/useCommandFetch";
+import { useKeyboardNav } from "./command-palette/useKeyboardNav";
+import { fetchAutocompleteOptions, sendCommand } from "./command-palette/utils";
+import type { CommandPaletteProps, MergedCommand } from "./command-palette/types";
 
 export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [backendCommands, setBackendCommands] = useState<BackendCommand[]>([]);
-  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const [step, setStep] = useState<"command" | "parameter">("command");
   const [selectedCommand, setSelectedCommand] = useState<string>("");
   const [autoCompleteOptions, setAutoCompleteOptions] = useState<string[]>([]);
   const [paramPlaceholder, setParamPlaceholder] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset state when palette opens/closes
+  const allCommands = useCommandFetch(visible);
+
   useEffect(() => {
     if (visible) {
-      setQuery("");
-      setSelectedIndex(0);
-      setStep("command");
-      setSelectedCommand("");
-      setAutoCompleteOptions([]);
-      setParamPlaceholder("");
-
-      const timer = window.setTimeout(() => {
-        inputRef.current?.focus();
-      }, 0);
-
-      const controller = new AbortController();
-
-      // Fetch real piclaw commands from backend
-      fetch("/agent/commands", { credentials: "same-origin", signal: controller.signal })
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json() as Promise<{ commands: BackendCommand[] }>;
-        })
-        .then((data) => {
-          setBackendCommands(data.commands ?? []);
-        })
-        .catch((err) => {
-          if (err.name === "AbortError") return;
-          console.warn("[CommandPalette] Failed to fetch backend commands:", err);
-          setBackendCommands([]);
-        });
-
-      return () => {
-        window.clearTimeout(timer);
-        controller.abort();
-      };
+      setQuery(""); setStep("command"); setSelectedCommand("");
+      setAutoCompleteOptions([]); setParamPlaceholder("");
+      const t = window.setTimeout(() => inputRef.current?.focus(), 0);
+      return () => window.clearTimeout(t);
     } else {
-      // Reset on close
-      setStep("command");
-      setSelectedCommand("");
-      setAutoCompleteOptions([]);
+      setStep("command"); setSelectedCommand(""); setAutoCompleteOptions([]);
     }
   }, [visible]);
 
-  // Merge local UI commands (first) with backend commands (after)
-  const allCommands = useMemo((): MergedCommand[] => {
-    const localCmds: MergedCommand[] = commandRegistry.getAll().map((cmd) => ({
-      id: cmd.id,
-      label: cmd.label,
-      category: cmd.category,
-      keybinding: cmd.keybinding,
-      handler: cmd.handler,
-      isBackend: false,
-    }));
-
-    const backendCmds: MergedCommand[] = backendCommands
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((cmd) => ({
-        id: `backend:${cmd.name}`,
-        label: cmd.name,
-        description: cmd.description,
-        category: cmd.source ?? "core",
-        isBackend: true,
-      }));
-
-    return [...localCmds, ...backendCmds];
-  }, [backendCommands]);
-
-  // Filter by query (for both steps)
   const results = useMemo(() => {
     if (step === "parameter" && autoCompleteOptions.length > 0) {
-      // Step 2: filter autocomplete options
       const q = query.trim().toLowerCase();
-      if (!q) return autoCompleteOptions;
-      return autoCompleteOptions.filter((opt) => opt.toLowerCase().includes(q));
+      return q ? autoCompleteOptions.filter((o) => o.toLowerCase().includes(q)) : autoCompleteOptions;
     }
-
-    if (step === "parameter") {
-      // Free text step — no list
-      return [];
-    }
-
-    // Step 1: filter commands
+    if (step === "parameter") return [];
     const q = query.trim().toLowerCase();
     if (!q) return allCommands;
     return allCommands.filter(
-      (cmd) =>
-        cmd.label.toLowerCase().includes(q) ||
-        (cmd.description?.toLowerCase().includes(q) ?? false)
+      (c) => c.label.toLowerCase().includes(q) || (c.description?.toLowerCase().includes(q) ?? false)
     );
   }, [query, allCommands, step, autoCompleteOptions]);
 
-  useEffect(() => {
-    setSelectedIndex((current) => {
-      if (results.length === 0) return 0;
-      return Math.min(current, results.length - 1);
-    });
-  }, [results]);
+  const handleBack = () => {
+    setStep("command"); setSelectedCommand(""); setAutoCompleteOptions([]); setQuery("");
+  };
 
-  if (!visible) {
-    return null;
-  }
+  const enterParameterStep = (name: string, options: string[], placeholder: string) => {
+    setSelectedCommand(name); setAutoCompleteOptions(options);
+    setParamPlaceholder(placeholder); setStep("parameter");
+    setSelectedIndex(0); setQuery("");
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
 
   const executeBackendCommand = async (command: MergedCommand) => {
-    const name = command.label; // e.g., "/model"
+    const name = command.label;
     const param = COMMAND_PARAMS[name];
-
-    if (!param || param.type === "bare") {
-      // Execute immediately
-      sendCommand(name);
-      onClose();
+    if (!param || param.type === "bare") { sendCommand(name); onClose(); return; }
+    if (param.type === "autocomplete") {
+      const opts = param.options ?? (param.fetch ? await fetchAutocompleteOptions(param.fetch, param.extractField) : []);
+      enterParameterStep(name, opts, "");
       return;
     }
-
-    if (param.type === "autocomplete" && param.fetch) {
-      // Fetch options, switch to step 2
-      try {
-        const res = await fetch(param.fetch, { credentials: "same-origin" });
-        const data = await res.json();
-        const options = param.extractField ? data[param.extractField] ?? [] : [];
-        setAutoCompleteOptions(Array.isArray(options) ? options : []);
-      } catch (err) {
-        console.warn("[CommandPalette] Failed to fetch autocomplete options:", err);
-        setAutoCompleteOptions([]);
-      }
-      setSelectedCommand(name);
-      setStep("parameter");
-      setSelectedIndex(0);
-      setQuery(""); // clear query for parameter filtering
-      window.setTimeout(() => inputRef.current?.focus(), 0);
-      return;
-    }
-
     if (param.type === "text") {
-      setSelectedCommand(name);
-      setParamPlaceholder(param.placeholder ?? "Enter value");
-      setStep("parameter");
-      setQuery(""); // clear for text input
-      window.setTimeout(() => inputRef.current?.focus(), 0);
-      return;
+      enterParameterStep(name, [], param.placeholder ?? "Enter value");
     }
   };
 
   const executeSelected = () => {
     if (step === "parameter") {
       if (autoCompleteOptions.length > 0) {
-        // Autocomplete: user selected an option from the list
-        const selectedOption = (results as string[])[selectedIndex];
-        if (selectedOption != null) {
-          const fullCommand = `${selectedCommand} ${selectedOption}`;
-          sendCommand(fullCommand);
-          onClose();
-        }
+        const opt = (results as string[])[selectedIndex];
+        if (opt != null) { sendCommand(`${selectedCommand} ${opt}`); onClose(); }
       } else {
-        // Free text: user typed and pressed Enter
         const trimmed = query.trim();
-        if (trimmed) {
-          const fullCommand = `${selectedCommand} ${trimmed}`;
-          sendCommand(fullCommand);
-          onClose();
-        }
+        if (trimmed) { sendCommand(`${selectedCommand} ${trimmed}`); onClose(); }
       }
       return;
     }
-
     const command = (results as MergedCommand[])[selectedIndex];
     if (!command) return;
-
-    if (command.handler) {
-      command.handler();
-      onClose();
-    } else if (command.isBackend) {
-      executeBackendCommand(command);
-    } else {
-      onClose();
-    }
+    if (command.handler) { command.handler(); onClose(); }
+    else if (command.isBackend) { executeBackendCommand(command); }
+    else { onClose(); }
   };
 
-  const scrollActiveIntoView = (index: number) => {
-    requestAnimationFrame(() => {
-      const list = listRef.current;
-      if (!list) return;
-      const active = list.children[index] as HTMLElement | undefined;
-      active?.scrollIntoView({ block: "nearest" });
-    });
-  };
+  const { selectedIndex, setSelectedIndex, handleKeyDown } = useKeyboardNav({
+    resultsLength: results.length, onExecute: executeSelected,
+    onClose, onBack: handleBack, query, step, listRef,
+  });
 
-  const handleKeyDown = (event: JSX.TargetedKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-      return;
-    }
-
-    if (event.key === "Backspace" && query === "") {
-      event.preventDefault();
-      if (step === "parameter") {
-        // Go back to command list
-        setStep("command");
-        setSelectedCommand("");
-        setAutoCompleteOptions([]);
-        setQuery("");
-        setSelectedIndex(0);
-      } else {
-        onClose();
-      }
-      return;
-    }
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setSelectedIndex((current) => {
-        if (results.length === 0) return 0;
-        const next = (current + 1) % results.length;
-        scrollActiveIntoView(next);
-        return next;
-      });
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setSelectedIndex((current) => {
-        if (results.length === 0) return 0;
-        const prev = (current - 1 + results.length) % results.length;
-        scrollActiveIntoView(prev);
-        return prev;
-      });
-      return;
-    }
-
-    if (event.key === "PageDown") {
-      event.preventDefault();
-      setSelectedIndex((current) => {
-        if (results.length === 0) return 0;
-        const next = Math.min(current + 10, results.length - 1);
-        scrollActiveIntoView(next);
-        return next;
-      });
-      return;
-    }
-
-    if (event.key === "PageUp") {
-      event.preventDefault();
-      setSelectedIndex((current) => {
-        if (results.length === 0) return 0;
-        const prev = Math.max(current - 10, 0);
-        scrollActiveIntoView(prev);
-        return prev;
-      });
-      return;
-    }
-
-    if (event.key === "Home") {
-      event.preventDefault();
-      setSelectedIndex(0);
-      scrollActiveIntoView(0);
-      return;
-    }
-
-    if (event.key === "End") {
-      event.preventDefault();
-      const last = Math.max(results.length - 1, 0);
-      setSelectedIndex(last);
-      scrollActiveIntoView(last);
-      return;
-    }
-
-    if (event.key === "Enter") {
-      event.preventDefault();
-      executeSelected();
-    }
-  };
+  if (!visible) return null;
 
   const isParameterStep = step === "parameter";
   const isAutocompleteStep = isParameterStep && autoCompleteOptions.length > 0;
   const isTextStep = isParameterStep && autoCompleteOptions.length === 0;
-
-  const inputPlaceholder = isAutocompleteStep
-    ? `${selectedCommand} > Select option...`
-    : isTextStep
-    ? `${selectedCommand} > ${paramPlaceholder}`
-    : "Type a command...";
-  const activeOptionId = !isTextStep && results.length > 0
-    ? `command-palette-option-${selectedIndex}`
-    : undefined;
+  const inputPlaceholder = isAutocompleteStep ? `${selectedCommand} > Select option...`
+    : isTextStep ? `${selectedCommand} > ${paramPlaceholder}` : "Type a command...";
+  const activeOptionId = !isTextStep && results.length > 0 ? `command-palette-option-${selectedIndex}` : undefined;
 
   return (
     <div className="command-palette-backdrop" onClick={onClose}>
-      <div
-        className="command-palette"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div className="command-palette" onClick={(e) => e.stopPropagation()}>
         {isParameterStep && (
           <div className="command-palette__step-indicator">
             <span className="command-palette__step-command">{selectedCommand}</span>
@@ -411,96 +110,26 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
             </span>
           </div>
         )}
-        <input
-          ref={inputRef}
-          className="command-palette__input"
-          placeholder={inputPlaceholder}
-          value={query}
-          aria-activedescendant={activeOptionId}
-          onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
+        <input ref={inputRef} className="command-palette__input" placeholder={inputPlaceholder}
+          value={query} aria-activedescendant={activeOptionId}
+          onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
           onKeyDown={handleKeyDown}
         />
-        {copiedLabel && (
-          <div className="command-palette__copied">
-            Copied to clipboard: <strong>{copiedLabel}</strong>
-          </div>
-        )}
         {isTextStep ? (
           <div className="command-palette__text-hint">
             Press <kbd>Enter</kbd> to send{query.trim() ? `: ${selectedCommand} ${query.trim()}` : ""}
           </div>
         ) : (
-          <ul ref={listRef} className="command-palette__results" role="listbox" aria-label="Commands">
-            {isAutocompleteStep
-              ? (results as string[]).map((option, index) => (
-                <li
-                  key={option}
-                  id={`command-palette-option-${index}`}
-                  role="option"
-                  aria-selected={index === selectedIndex}
-                  className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    const fullCommand = `${selectedCommand} ${option}`;
-                    sendCommand(fullCommand);
-                    onClose();
-                  }}
-                >
-                  <span className="command-palette__row-content">
-                    <span className="command-palette__label">{option}</span>
-                  </span>
-                </li>
-              ))
-              : (results as MergedCommand[]).map((command, index) => {
-                const badgeClass = CATEGORY_BADGE_CLASS[command.category] ?? "command-palette__badge--default";
-                return (
-                  <li
-                    key={command.id}
-                    id={`command-palette-option-${index}`}
-                    role="option"
-                    aria-selected={index === selectedIndex}
-                    className={`command-palette__row ${index === selectedIndex ? "is-active" : ""}`}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      if (command.handler) {
-                        command.handler();
-                        onClose();
-                      } else if (command.isBackend) {
-                        executeBackendCommand(command);
-                      } else {
-                        onClose();
-                      }
-                    }}
-                  >
-                    <span className="command-palette__row-content">
-                      <span className="command-palette__label">{command.label}</span>
-                      {command.description && (
-                        <span className="command-palette__description">
-                          {command.description}
-                        </span>
-                      )}
-                    </span>
-                    <span className="command-palette__row-meta">
-                      <span
-                        className={`command-palette__badge ${badgeClass}`}
-                      >
-                        {command.category}
-                      </span>
-                      {command.keybinding && (
-                        <span className="command-palette__keybinding command-palette__keybinding--static">
-                          {command.keybinding}
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            {results.length === 0 && !isTextStep && (
-              <li className="command-palette__empty">
-                No matching commands
-              </li>
-            )}
-          </ul>
+          <CommandList results={results} selectedIndex={selectedIndex}
+            isAutocompleteStep={isAutocompleteStep} selectedCommand={selectedCommand}
+            listRef={listRef}
+            onSelectCommand={(cmd) => {
+              if (cmd.handler) { cmd.handler(); onClose(); }
+              else if (cmd.isBackend) { executeBackendCommand(cmd); }
+              else { onClose(); }
+            }}
+            onSelectOption={(opt) => { sendCommand(`${selectedCommand} ${opt}`); onClose(); }}
+          />
         )}
       </div>
     </div>
