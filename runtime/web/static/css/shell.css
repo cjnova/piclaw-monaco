@@ -3557,7 +3557,7 @@ pre.frontmatter-block {
   z-index: 1;
 }
 
-.message-list__item {
+.message-list__body {
   position: relative;
 }
 
@@ -3598,8 +3598,12 @@ pre.frontmatter-block {
   opacity: 0.6;
 }
 
-.message-list__collapsed-label {
+.message-list__collapsed-preview {
   color: var(--text-muted);
-  font-size: 11px;
-  font-style: italic;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }

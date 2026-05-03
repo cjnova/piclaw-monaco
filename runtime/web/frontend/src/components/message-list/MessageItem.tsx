@@ -110,12 +110,6 @@ export function MessageItem({
         }`}
         data-message-id={interaction.id}
       >
-        <MessageActionBar
-          messageId={interaction.id}
-          isCollapsed={true}
-          onToggleCollapse={onToggleCollapse}
-          onDelete={onDelete}
-        />
         <div
           className={`message-list__avatar-circle ${
             isUser
@@ -127,6 +121,12 @@ export function MessageItem({
           {avatarLetter}
         </div>
         <div className="message-list__body message-list__body--collapsed">
+          <MessageActionBar
+            messageId={interaction.id}
+            isCollapsed={true}
+            onToggleCollapse={onToggleCollapse}
+            onDelete={onDelete}
+          />
           <span
             className={`message-list__name ${
               isUser ? "message-list__name--user" : "message-list__name--agent"
@@ -140,7 +140,11 @@ export function MessageItem({
           >
             {relativeTime(interaction.created_at)}
           </span>
-          <span className="message-list__collapsed-label">— collapsed</span>
+          <span className="message-list__collapsed-preview">
+            {interaction.content
+              ? interaction.content.replace(/\s+/g, " ").slice(0, 120) + (interaction.content.length > 120 ? "…" : "")
+              : "— collapsed"}
+          </span>
         </div>
       </div>
     );
@@ -154,12 +158,6 @@ export function MessageItem({
       }`}
       data-message-id={interaction.id}
     >
-      <MessageActionBar
-        messageId={interaction.id}
-        isCollapsed={false}
-        onToggleCollapse={onToggleCollapse}
-        onDelete={onDelete}
-      />
       <div
         className={`message-list__avatar-circle ${
           isUser
@@ -171,6 +169,12 @@ export function MessageItem({
         {avatarLetter}
       </div>
       <div className="message-list__body">
+        <MessageActionBar
+          messageId={interaction.id}
+          isCollapsed={false}
+          onToggleCollapse={onToggleCollapse}
+          onDelete={onDelete}
+        />
         <div className="message-list__header">
           <span
             className={`message-list__name ${
