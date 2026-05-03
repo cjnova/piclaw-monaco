@@ -55,9 +55,13 @@ const SECURITY_HEADERS: Record<string, string> = {
   // headers (e.g., draw.io embed, external widgets). Extensions needing
   // SharedArrayBuffer (e.g., office-viewer for Emscripten pthreads)
   // set their own COOP/COEP on their route responses.
+  // FORK-MODIFIED: cjnova/piclaw-monaco — added ws:/wss: to connect-src, blob: to script-src,
+  // and worker-src for ghostty-web terminal (WebSocket PTY + WASM blob workers).
+  // Must be preserved on upstream rebase. See PR #213.
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' https: http: data: blob:; font-src 'self' data:; connect-src 'self'; " +
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' https: http: data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; " +
+    "worker-src 'self' blob:; " +
     "frame-src 'self'; " +
     "frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
 };
