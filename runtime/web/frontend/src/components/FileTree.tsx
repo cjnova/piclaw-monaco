@@ -4,10 +4,14 @@
  * Fetches directory listings from GET /workspace/tree and renders
  * an expandable tree with codicon icons. Clicking a folder toggles
  * expand/collapse and lazy-loads children. Clicking a file selects it.
+ *
+ * Expanded folder paths and selected file path are persisted to localStorage
+ * keyed by chat JID so state survives page reloads.
  */
 
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { formatBytes } from "../utils/formatBytes";
+import { getChatJid } from "../api/chat-jid";
 
 /** Tree node shape returned by GET /workspace/tree */
 interface TreeNode {
@@ -26,6 +30,39 @@ interface TreeResponse {
   truncated?: boolean;
 }
 
+// ─── persistence helpers ───────────────────────────────────────────────────────
+
+const EXPANDED_KEY = () => `piclaw:tree-expanded:${getChatJid()}`;
+const SELECTED_KEY = () => `piclaw:tree-selected:${getChatJid()}`;
+
+function loadExpandedPaths(): Set<string> {
+  try {
+    const raw = localStorage.getItem(EXPANDED_KEY());
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {}
+  return new Set();
+}
+
+function saveExpandedPaths(paths: Set<string>): void {
+  try {
+    localStorage.setItem(EXPANDED_KEY(), JSON.stringify([...paths]));
+  } catch {}
+}
+
+function loadSelectedPath(): string | null {
+  try {
+    return localStorage.getItem(SELECTED_KEY());
+  } catch {}
+  return null;
+}
+
+function saveSelectedPath(path: string | null): void {
+  try {
+    if (path) localStorage.setItem(SELECTED_KEY(), path);
+    else localStorage.removeItem(SELECTED_KEY());
+  } catch {}
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 async function fetchTree(dirPath: string): Promise<TreeNode[]> {
@@ -42,18 +79,38 @@ async function fetchTree(dirPath: string): Promise<TreeNode[]> {
 interface TreeItemProps {
   node: TreeNode;
   selectedPath: string | null;
+  expandedPaths: Set<string>;
   onSelect: (node: TreeNode) => void;
+  onToggleExpand: (path: string) => void;
 }
 
-function TreeItem({ node, selectedPath, onSelect }: TreeItemProps) {
+function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand }: TreeItemProps) {
   const isDir = node.type === "dir";
-  const [expanded, setExpanded] = useState(false);
+  const expanded = expandedPaths.has(node.path);
   const [children, setChildren] = useState<TreeNode[] | null>(
     node.children !== undefined ? node.children : null
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSelected = selectedPath === node.path;
+
+  // Auto-fetch children when expanded is restored from localStorage
+  useEffect(() => {
+    if (expanded && isDir && children === null && !loading) {
+      setLoading(true);
+      setError(null);
+      fetchTree(node.path)
+        .then((loaded) => {
+          setChildren(loaded);
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Failed to load");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [expanded, isDir, children, loading, node.path]);
 
   const toggle = useCallback(async () => {
     if (!isDir) {
@@ -77,11 +134,9 @@ function TreeItem({ node, selectedPath, onSelect }: TreeItemProps) {
           setLoading(false);
         }
       }
-      setExpanded(true);
-    } else {
-      setExpanded(false);
     }
-  }, [isDir, expanded, children, node, onSelect]);
+    onToggleExpand(node.path);
+  }, [isDir, expanded, children, node, onSelect, onToggleExpand]);
 
   const iconName = isDir
     ? expanded
@@ -142,7 +197,7 @@ function TreeItem({ node, selectedPath, onSelect }: TreeItemProps) {
               e.stopPropagation();
               setError(null);
               setChildren(null);
-              setExpanded(false);
+              onToggleExpand(node.path); // collapse on error
             }}
           >
             Retry
@@ -157,7 +212,9 @@ function TreeItem({ node, selectedPath, onSelect }: TreeItemProps) {
               key={child.path}
               node={child}
               selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
               onSelect={onSelect}
+              onToggleExpand={onToggleExpand}
             />
           ))}
         </div>
@@ -212,7 +269,27 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   const [rootChildren, setRootChildren] = useState<TreeNode[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(loadSelectedPath);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(loadExpandedPaths);
+
+  // Persist selected path
+  useEffect(() => {
+    saveSelectedPath(selectedPath);
+  }, [selectedPath]);
+
+  // Persist expanded paths
+  useEffect(() => {
+    saveExpandedPaths(expandedPaths);
+  }, [expandedPaths]);
+
+  const toggleExpanded = useCallback((path: string) => {
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -231,6 +308,23 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Auto-expand parents of the restored selected path on initial load
+  useEffect(() => {
+    if (!selectedPath || !rootChildren) return;
+    const parts = selectedPath.split("/");
+    const parents: string[] = [];
+    for (let i = 1; i < parts.length; i++) {
+      parents.push(parts.slice(0, i).join("/"));
+    }
+    if (parents.length > 0) {
+      setExpandedPaths((prev) => {
+        const next = new Set(prev);
+        parents.forEach((p) => next.add(p));
+        return next;
+      });
+    }
+  }, [rootChildren]); // intentionally omit selectedPath — only run when root loads
 
   const handleSelect = useCallback(
     (node: TreeNode) => {
@@ -274,7 +368,9 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
           key={node.path}
           node={node}
           selectedPath={selectedPath}
+          expandedPaths={expandedPaths}
           onSelect={handleSelect}
+          onToggleExpand={toggleExpanded}
         />
       ))}
     </div>
