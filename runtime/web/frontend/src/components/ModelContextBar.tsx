@@ -56,7 +56,7 @@ export function ModelContextBar() {
     >
       {showPicker.value && (
         <ModelPicker
-          models={models.value}
+          models={models.value ?? []}
           activeModel={activeModel}
           onSelectModel={(id) => handleSelectModel(id, (m) => { currentModel.value = m; })}
         />
@@ -91,7 +91,7 @@ export function ModelContextBar() {
           </span>
           {showThinkingPicker.value && (
             <ThinkingPicker
-              thinkingLevels={thinkingLevels.value}
+              thinkingLevels={thinkingLevels.value ?? []}
               currentLevel={thinkingLevel}
               onSelectThinking={handleSelectThinking}
             />
