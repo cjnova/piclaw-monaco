@@ -94,6 +94,18 @@
       statusText.textContent = msg;
     }
 
+    // Get or create anonymous terminal client ID (matches TerminalComponent.tsx)
+    function getTerminalClientId() {
+      const key = 'piclaw-terminal-client-id';
+      let id = localStorage.getItem(key);
+      if (!id) {
+        id = crypto.randomUUID?.() || (Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+        try { localStorage.setItem(key, id); } catch {}
+      }
+      return id;
+    }
+    const clientId = getTerminalClientId();
+
     async function main() {
       // Initialize WASM
       await init();
@@ -101,7 +113,7 @@
       // Fetch session info
       let sessionInfo;
       try {
-        const resp = await fetch('/terminal/session', { credentials: 'same-origin' });
+        const resp = await fetch(`/terminal/session?client=${clientId}`, { credentials: 'same-origin' });
         sessionInfo = await resp.json();
       } catch (err) {
         setStatus(false, 'Failed to fetch session info');
@@ -131,7 +143,7 @@
 
       // Connect WebSocket
       const wsPath = (sessionInfo && sessionInfo.ws_path) || '/terminal/ws';
-      const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + wsPath;
+      const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + wsPath + (wsPath.includes('?') ? '&' : '?') + 'client=' + clientId;
       let activeWs = null;
       let reconnectTimer = null;
 
