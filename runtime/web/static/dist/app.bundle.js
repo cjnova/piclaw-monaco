@@ -5338,7 +5338,20 @@ For tests, pass a Ghostty instance directly:
       try {
         const res = await fetch("/agent/context?chat_jid=" + encodeURIComponent(getChatJid()));
         if (res.ok) {
-          agentContext.value = await res.json();
+          const data = await res.json();
+          if (data.tokens !== null) {
+            agentContext.value = data;
+            try {
+              localStorage.setItem("piclaw:context-cache", JSON.stringify(data));
+            } catch {
+            }
+          } else if (!agentContext.value) {
+            try {
+              const cached = localStorage.getItem("piclaw:context-cache");
+              if (cached) agentContext.value = JSON.parse(cached);
+            } catch {
+            }
+          }
         }
       } catch (err) {
         console.warn("[ModelContextBar] context fetch failed:", err);
