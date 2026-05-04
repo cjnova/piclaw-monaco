@@ -13,11 +13,19 @@ function truncate(text: string, maxChars: number): { visible: string; truncated:
   return { visible: text.slice(0, maxChars), truncated: true };
 }
 
+interface ToolCall {
+  id: string;
+  name: string;
+  title: string;
+  status: "running" | "done" | "error";
+}
+
 export function AgentStatusPanel() {
   const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: false });
   const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: false });
   const [status, setStatus] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
+  const [tools, setTools] = useState<ToolCall[]>([]);
 
   const draftBufferRef = useRef("");
   const thoughtBufferRef = useRef("");
@@ -61,6 +69,23 @@ export function AgentStatusPanel() {
 
     const handleStatus = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      if (detail.type === "tool_call") {
+        setTools((prev) => {
+          const id = detail.title || detail.tool_name || "unknown";
+          if (prev.some((t) => t.id === id && t.status === "running")) return prev;
+          return [...prev, {
+            id,
+            name: detail.tool_name || "tool",
+            title: detail.title || detail.tool_name || "Running tool...",
+            status: "running",
+          }];
+        });
+      } else if (detail.type === "tool_status") {
+        const id = detail.title || detail.tool_name || "unknown";
+        setTools((prev) => prev.map((t) =>
+          t.id === id ? { ...t, status: "done" as const, title: detail.title || t.title } : t
+        ));
+      }
       if (detail.type) setStatus(detail.type);
       if (detail.text || detail.message) setStatusText(detail.text || detail.message || "");
     };
@@ -76,6 +101,7 @@ export function AgentStatusPanel() {
       setThoughtState({ text: "", expanded: false });
       setStatus(null);
       setStatusText("");
+      setTools([]);
     };
 
     window.addEventListener("piclaw:agent-draft", handleDraft);
@@ -93,7 +119,7 @@ export function AgentStatusPanel() {
     };
   }, [flushDraft, flushThought]);
 
-  const hasContent = draft.text || thought.text || (status && status !== "idle" && status !== "done");
+  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done");
   if (!hasContent) return null;
 
   const toggleDraftExpand = () => setDraftState((prev) => ({ ...prev, expanded: !prev.expanded }));
@@ -107,6 +133,21 @@ export function AgentStatusPanel() {
           <span className="agent-status-panel__status-text">
             {statusText || status}
           </span>
+        </div>
+      )}
+
+      {tools.length > 0 && (
+        <div className="agent-status-panel__tools">
+          {tools.map((tool) => (
+            <div key={tool.id} className={`agent-status-panel__tool agent-status-panel__tool--${tool.status}`}>
+              {tool.status === "running" ? (
+                <div className="agent-status-panel__spinner" />
+              ) : (
+                <span className="agent-status-panel__tool-check">✓</span>
+              )}
+              <span className="agent-status-panel__tool-title">{tool.title}</span>
+            </div>
+          ))}
         </div>
       )}
 

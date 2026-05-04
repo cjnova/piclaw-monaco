@@ -3768,3 +3768,40 @@ pre.frontmatter-block {
   color: var(--accent);
   opacity: 1;
 }
+
+/* ── Tool Progress Cards ─────────────────────────── */
+.agent-status-panel__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agent-status-panel__tool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono NF', 'JetBrains Mono', monospace;
+  transition: opacity 0.3s;
+}
+
+.agent-status-panel__tool--done {
+  opacity: 0.5;
+}
+
+.agent-status-panel__tool-check {
+  color: #a6e3a1;
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.agent-status-panel__tool-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
