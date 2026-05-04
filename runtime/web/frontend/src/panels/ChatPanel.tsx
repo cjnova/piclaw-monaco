@@ -1,7 +1,7 @@
 import { AgentStatusPanel } from "../components/AgentStatusPanel";
 import { WidgetPane } from "../components/WidgetPane";
 import { getMessageUrl } from "../api/chat-jid";
-import { useRef, useEffect } from "preact/hooks";
+import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
 import { extractDisplayName } from "../utils/extractDisplayName";
@@ -16,13 +16,24 @@ interface ChatPanelProps {
   onOpenPalette?: () => void;
 }
 
+interface Attachment {
+  id?: number;
+  name: string;
+  type: string;
+  size: number;
+  file?: File;
+}
+
 export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const activeTab = useSignal<string>("chat");
   const extensionPages = useSignal<ExtensionRoute[]>([]);
   const isSending = useSignal(false);
   const sendError = useSignal<string | null>(null);
   const isAgentRunning = useSignal(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
 
   useEffect(() => {
     const agentStatusHandler = (e: Event) => {
@@ -102,6 +113,30 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Attachment handlers
+  const handleClipClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const files = input.files;
+    if (!files?.length) return;
+    for (const file of Array.from(files)) {
+      setAttachments((prev) => [...prev, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file,
+      }]);
+    }
+    input.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const sendMessage = async () => {
     const el = textareaRef.current;
     if (!el || isSending.value) return;
@@ -111,6 +146,30 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     isSending.value = true;
     sendError.value = null;
 
+    // Upload pending attachments
+    const mediaIds: number[] = [];
+    for (const att of attachments) {
+      if (att.id) {
+        mediaIds.push(att.id);
+      } else if (att.file) {
+        try {
+          const form = new FormData();
+          form.append("file", att.file);
+          const res = await fetch("/media/upload", {
+            method: "POST",
+            credentials: "same-origin",
+            body: form,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.id) mediaIds.push(data.id);
+          }
+        } catch {
+          // skip failed uploads
+        }
+      }
+    }
+
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -118,7 +177,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, media_ids: mediaIds.length > 0 ? mediaIds : undefined }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -133,6 +192,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       el.value = "";
       el.style.height = "auto";
       sendError.value = null;
+      setAttachments([]);
       const data = await res.json();
       if (data?.user_message) {
         window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
@@ -185,22 +245,55 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           <WidgetPane />
 
           <div className="chat__compose">
-            <textarea
-              ref={textareaRef}
-              className="chat__input"
-              placeholder="Type a message..."
-              rows={3}
-              onInput={handleInput}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-                if (e.key === "Escape" && isAgentRunning.value) {
-                  abortAgent();
-                }
-              }}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              style={{ display: "none" }}
+              onChange={handleFileSelect}
             />
+            <div className="chat__compose-container">
+              <button
+                type="button"
+                className="chat__clip-btn"
+                onClick={handleClipClick}
+                aria-label="Attach file"
+                title="Attach file"
+              >
+                <i className="codicon codicon-attach" />
+              </button>
+              {attachments.length > 0 && (
+                <div className="chat__attachments">
+                  {attachments.map((att, i) => (
+                    <span key={att.id ?? i} className="chat__attachment-pill">
+                      <span className="chat__attachment-name">{att.name}</span>
+                      <button
+                        type="button"
+                        className="chat__attachment-remove"
+                        onClick={() => removeAttachment(i)}
+                        aria-label={`Remove ${att.name}`}
+                      >✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                className="chat__input"
+                placeholder="Type a message..."
+                rows={3}
+                onInput={handleInput}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                  if (e.key === "Escape" && isAgentRunning.value) {
+                    abortAgent();
+                  }
+                }}
+              />
+            </div>
             {isAgentRunning.value ? (
               <button
                 type="button"
@@ -218,7 +311,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
                 type="button"
                 className="chat__send-btn"
                 onClick={sendMessage}
-                disabled={isSending.value || !hasText.value}
+                disabled={isSending.value || (!hasText.value && attachments.length === 0)}
                 aria-label={isSending.value ? "Sending..." : "Send message"}
                 title="Send (Enter)"
               >

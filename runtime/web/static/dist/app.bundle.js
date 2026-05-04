@@ -6374,10 +6374,12 @@ ${code}
     const userScrolledRef = A2(false);
     const scrollToBottom = q2((force = false) => {
       if (force || !userScrolledRef.current) {
-        const el = listRef.current;
-        if (el) {
-          el.scrollTop = el.scrollHeight;
-        }
+        const doScroll = () => {
+          const el = listRef.current;
+          if (el) el.scrollTop = el.scrollHeight;
+        };
+        doScroll();
+        requestAnimationFrame(doScroll);
       }
     }, []);
     y2(() => {
@@ -7393,11 +7395,13 @@ ${code}
   // runtime/web/frontend/src/panels/ChatPanel.tsx
   function ChatPanel({ onOpenPalette } = {}) {
     const textareaRef = A2(null);
+    const fileInputRef = A2(null);
     const activeTab = useSignal("chat");
     const extensionPages = useSignal([]);
     const isSending = useSignal(false);
     const sendError = useSignal(null);
     const isAgentRunning = useSignal(false);
+    const [attachments, setAttachments] = d2([]);
     y2(() => {
       const agentStatusHandler = (e5) => {
         const detail = e5.detail;
@@ -7463,6 +7467,26 @@ ${code}
       window.addEventListener("keydown", handler);
       return () => window.removeEventListener("keydown", handler);
     }, []);
+    const handleClipClick = () => {
+      fileInputRef.current?.click();
+    };
+    const handleFileSelect = (e5) => {
+      const input = e5.target;
+      const files = input.files;
+      if (!files?.length) return;
+      for (const file of Array.from(files)) {
+        setAttachments((prev) => [...prev, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          file
+        }]);
+      }
+      input.value = "";
+    };
+    const removeAttachment = (index) => {
+      setAttachments((prev) => prev.filter((_5, i6) => i6 !== index));
+    };
     const sendMessage = async () => {
       const el = textareaRef.current;
       if (!el || isSending.value) return;
@@ -7470,6 +7494,27 @@ ${code}
       if (!content) return;
       isSending.value = true;
       sendError.value = null;
+      const mediaIds = [];
+      for (const att of attachments) {
+        if (att.id) {
+          mediaIds.push(att.id);
+        } else if (att.file) {
+          try {
+            const form = new FormData();
+            form.append("file", att.file);
+            const res = await fetch("/media/upload", {
+              method: "POST",
+              credentials: "same-origin",
+              body: form
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.id) mediaIds.push(data.id);
+            }
+          } catch {
+          }
+        }
+      }
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15e3);
@@ -7477,7 +7522,7 @@ ${code}
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, media_ids: mediaIds.length > 0 ? mediaIds : void 0 }),
           signal: controller.signal
         });
         clearTimeout(timeout);
@@ -7489,6 +7534,7 @@ ${code}
         el.value = "";
         el.style.height = "auto";
         sendError.value = null;
+        setAttachments([]);
         const data = await res.json();
         if (data?.user_message) {
           window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: data.user_message }));
@@ -7533,24 +7579,60 @@ ${code}
         /* @__PURE__ */ u4(WidgetPane, {}),
         /* @__PURE__ */ u4("div", { className: "chat__compose", children: [
           /* @__PURE__ */ u4(
-            "textarea",
+            "input",
             {
-              ref: textareaRef,
-              className: "chat__input",
-              placeholder: "Type a message...",
-              rows: 3,
-              onInput: handleInput,
-              onKeyDown: (e5) => {
-                if (e5.key === "Enter" && !e5.shiftKey) {
-                  e5.preventDefault();
-                  sendMessage();
-                }
-                if (e5.key === "Escape" && isAgentRunning.value) {
-                  abortAgent();
-                }
-              }
+              ref: fileInputRef,
+              type: "file",
+              multiple: true,
+              style: { display: "none" },
+              onChange: handleFileSelect
             }
           ),
+          /* @__PURE__ */ u4("div", { className: "chat__compose-container", children: [
+            /* @__PURE__ */ u4(
+              "button",
+              {
+                type: "button",
+                className: "chat__clip-btn",
+                onClick: handleClipClick,
+                "aria-label": "Attach file",
+                title: "Attach file",
+                children: /* @__PURE__ */ u4("i", { className: "codicon codicon-attach" })
+              }
+            ),
+            attachments.length > 0 && /* @__PURE__ */ u4("div", { className: "chat__attachments", children: attachments.map((att, i6) => /* @__PURE__ */ u4("span", { className: "chat__attachment-pill", children: [
+              /* @__PURE__ */ u4("span", { className: "chat__attachment-name", children: att.name }),
+              /* @__PURE__ */ u4(
+                "button",
+                {
+                  type: "button",
+                  className: "chat__attachment-remove",
+                  onClick: () => removeAttachment(i6),
+                  "aria-label": `Remove ${att.name}`,
+                  children: "\u2715"
+                }
+              )
+            ] }, att.id ?? i6)) }),
+            /* @__PURE__ */ u4(
+              "textarea",
+              {
+                ref: textareaRef,
+                className: "chat__input",
+                placeholder: "Type a message...",
+                rows: 3,
+                onInput: handleInput,
+                onKeyDown: (e5) => {
+                  if (e5.key === "Enter" && !e5.shiftKey) {
+                    e5.preventDefault();
+                    sendMessage();
+                  }
+                  if (e5.key === "Escape" && isAgentRunning.value) {
+                    abortAgent();
+                  }
+                }
+              }
+            )
+          ] }),
           isAgentRunning.value ? /* @__PURE__ */ u4(
             "button",
             {
@@ -7567,7 +7649,7 @@ ${code}
               type: "button",
               className: "chat__send-btn",
               onClick: sendMessage,
-              disabled: isSending.value || !hasText.value,
+              disabled: isSending.value || !hasText.value && attachments.length === 0,
               "aria-label": isSending.value ? "Sending..." : "Send message",
               title: "Send (Enter)",
               children: /* @__PURE__ */ u4("svg", { viewBox: "0 0 24 24", width: "22", height: "22", fill: "currentColor", children: /* @__PURE__ */ u4("path", { d: "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" }) })
