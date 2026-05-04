@@ -1,7 +1,7 @@
 # PiClaw Monaco — Backlog & Current State
 
 Updated: 2026-05-04
-Total open issues: 31
+Total open issues: 32
 
 ## Vision
 
@@ -131,8 +131,12 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 |---|---|
 | #125 color contrast | ✅ |
 | #126 main landmark | ✅ |
+| #131 minify + ESM | ✅ (Phase 1) |
 | #132 LCP lazy-load | ✅ |
 | #134 dropped | ❌ closed / won't do |
+| #135 font preload | ✅ (closed — no benefit on HTTP/1.1) |
+| #136 compression | ✅ (closed — coming from upstream) |
+| #142 side-prompt | ✅ (closed — superseded by #230) |
 | #168 security fix | ✅ |
 | #169 security fix | ✅ |
 | #173 CSP meta tag | ✅ (reverted after validation) |
@@ -160,6 +164,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | #267 image paste | ✅ |
 | #268 file drag & drop | ✅ |
 | #276 tool card context + icons | ✅ |
+| #281 attachment references fix | ✅ |
 | #147 streaming improvements | ❌ closed (superseded by #230) |
 | #145 tool lifecycle events | ❌ closed (superseded by #230) |
 
@@ -283,12 +288,13 @@ Technical debt cleanup. Each PR includes regression tests.
 
 | Task | Issue | Status |
 |---|---|---|
-| LCP: Code-split ghostty-web | #131 | ⏳ |
+| LCP: Code-split ghostty-web | #131 | ✅ (Phase 1: minify + ESM done. Full code-split deferred to post-HTTP/2) |
 | LCP: Lazy-load marked + DOMPurify | #132 | ✅ |
 | LCP: Subset JetBrains Mono fonts | #133 | ⏳ |
 | LCP: Purge unused CSS | #134 | ❌ closed / won't do |
-| LCP: Preload critical UI fonts | #135 | ⏳ |
-| LCP: Enable gzip/brotli compression | #136 | ⏳ |
+| LCP: Preload critical UI fonts | #135 | ✅ closed (no benefit on HTTP/1.1) |
+| LCP: Enable gzip/brotli compression | #136 | ✅ (coming from upstream sync) |
+| CLS: Improve layout stability | #283 | ⏳ |
 | Extract rgba CSS variables | #251 | ⏳ |
 | Virtualize chat timeline | #184 | ⏳ |
 
