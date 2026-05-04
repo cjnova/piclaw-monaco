@@ -7775,19 +7775,31 @@ ${code}
                     children: /* @__PURE__ */ u4("i", { className: "codicon codicon-attach" })
                   }
                 ),
-                attachments.length > 0 && /* @__PURE__ */ u4("div", { className: "chat__attachments", children: attachments.map((att, i6) => /* @__PURE__ */ u4("span", { className: "chat__attachment-pill", children: [
-                  /* @__PURE__ */ u4("span", { className: "chat__attachment-name", children: att.name }),
+                attachments.length > 0 && /* @__PURE__ */ u4("div", { className: "chat__attachments", children: [
+                  attachments.map((att, i6) => /* @__PURE__ */ u4("span", { className: "chat__attachment-pill", children: [
+                    /* @__PURE__ */ u4("span", { className: "chat__attachment-name", children: att.name }),
+                    /* @__PURE__ */ u4(
+                      "button",
+                      {
+                        type: "button",
+                        className: "chat__attachment-remove",
+                        onClick: () => removeAttachment(i6),
+                        "aria-label": `Remove ${att.name}`,
+                        children: "\u2715"
+                      }
+                    )
+                  ] }, att.id ?? i6)),
                   /* @__PURE__ */ u4(
                     "button",
                     {
                       type: "button",
-                      className: "chat__attachment-remove",
-                      onClick: () => removeAttachment(i6),
-                      "aria-label": `Remove ${att.name}`,
-                      children: "\u2715"
+                      className: "chat__attachment-clear",
+                      onClick: () => setAttachments([]),
+                      "aria-label": "Clear all attachments",
+                      children: "Clear all"
                     }
                   )
-                ] }, att.id ?? i6)) }),
+                ] }),
                 /* @__PURE__ */ u4(
                   "textarea",
                   {

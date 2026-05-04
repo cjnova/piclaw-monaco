@@ -371,6 +371,12 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
                       >✕</button>
                     </span>
                   ))}
+                  <button
+                    type="button"
+                    className="chat__attachment-clear"
+                    onClick={() => setAttachments([])}
+                    aria-label="Clear all attachments"
+                  >Clear all</button>
                 </div>
               )}
               <textarea
