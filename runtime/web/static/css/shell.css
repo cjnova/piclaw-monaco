@@ -3823,3 +3823,66 @@ pre.frontmatter-block {
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Adaptive Cards ─────────────────────────────── */
+.message-list__adaptive-cards {
+  margin: 8px 0;
+}
+
+.adaptive-card-container {
+  background: var(--sidebarBg);
+  border: 1px solid var(--border-color, var(--border));
+  border-radius: 8px;
+  padding: 12px;
+  margin: 4px 0;
+}
+
+.adaptive-card-fallback {
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.adaptive-card-notice {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.adaptive-card-notice-error {
+  background: rgba(243, 139, 168, 0.15);
+  color: #f38ba8;
+}
+
+.adaptive-card-notice-info {
+  background: rgba(137, 180, 250, 0.15);
+  color: #89b4fa;
+}
+
+.adaptive-card-finished {
+  opacity: 0.7;
+}
+
+.adaptive-card-busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.adaptive-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.adaptive-card-status-completed { color: #a6e3a1; }
+.adaptive-card-status-cancelled { color: #f9e2af; }
+.adaptive-card-status-failed    { color: #f38ba8; }
+
+.adaptive-card-status-detail {
+  opacity: 0.75;
+}

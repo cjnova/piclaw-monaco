@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
 import { relativeTime, getBlockKey } from "./helpers";
 import { MessageActionBar } from "./MessageActionBar";
+import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer";
 import type { ContentBlock, Interaction } from "./types";
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────
@@ -202,6 +203,12 @@ export function MessageItem({
               />
             ))}
           </div>
+        )}
+        {interaction.content_blocks && extractCardBlocks(interaction.content_blocks).length > 0 && (
+          <AdaptiveCardRenderer
+            blocks={interaction.content_blocks}
+            postId={interaction.id}
+          />
         )}
         {interaction.content && (
           <div
