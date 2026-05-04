@@ -326,6 +326,23 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     }
   }, [rootChildren]); // intentionally omit selectedPath — only run when root loads
 
+  // Restore preview for saved selected path on initial load
+  useEffect(() => {
+    if (!selectedPath || !rootChildren || !onFileSelect) return;
+    const findNode = (nodes: TreeNode[], path: string): TreeNode | null => {
+      for (const n of nodes) {
+        if (n.path === path) return n;
+        if (n.children) {
+          const found = findNode(n.children, path);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const node = findNode(rootChildren, selectedPath);
+    if (node) onFileSelect(node);
+  }, [rootChildren]); // run once when tree loads
+
   const handleSelect = useCallback(
     (node: TreeNode) => {
       setSelectedPath(node.path);
