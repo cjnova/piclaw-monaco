@@ -924,7 +924,8 @@ body {
   line-height: 1.5;
   min-height: 60px;
   max-height: 30vh;
-  overflow-y: auto;
+  overflow-y: hidden;
+  transition: height 0.1s ease;
   font-family: inherit;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;

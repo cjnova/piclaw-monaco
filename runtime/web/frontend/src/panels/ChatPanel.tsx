@@ -75,10 +75,11 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       el.style.height = "auto";
       return;
     }
-    // Auto-grow
-    el.style.height = "auto";
-    const maxH = window.innerHeight * 0.25;
-    el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
+    // Auto-grow without visual jump
+    el.style.height = "0";
+    const maxH = window.innerHeight * 0.3;
+    const newH = Math.min(el.scrollHeight, maxH);
+    el.style.height = `${newH}px`;
     el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
   };
 

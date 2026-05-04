@@ -7437,9 +7437,10 @@ ${code}
         el.style.height = "auto";
         return;
       }
-      el.style.height = "auto";
-      const maxH = window.innerHeight * 0.25;
-      el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
+      el.style.height = "0";
+      const maxH = window.innerHeight * 0.3;
+      const newH = Math.min(el.scrollHeight, maxH);
+      el.style.height = `${newH}px`;
       el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
     };
     const abortAgent = async () => {
