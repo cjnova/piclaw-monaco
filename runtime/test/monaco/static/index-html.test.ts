@@ -10,8 +10,8 @@ test("index.html does NOT have a CSP meta tag", () => {
   expect(INDEX_HTML).toContain("CSP is set by the backend via HTTP header");
 });
 
-test("index.html loads app.bundle.js with defer", () => {
-  expect(INDEX_HTML).toContain('src="/static/dist/app.bundle.js" defer');
+test("index.html loads app.bundle.js as ES module", () => {
+  expect(INDEX_HTML).toContain('type="module" src="/static/dist/app.bundle.js"');
 });
 
 test("index.html loads vendor scripts with defer", () => {
