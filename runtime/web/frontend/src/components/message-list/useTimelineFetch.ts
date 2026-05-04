@@ -65,8 +65,11 @@ export function useTimelineFetch({
         timelineError.value = null;
         setConnected(true);
         initialTimelineFetchedRef.current = true;
-        // Scroll to bottom after first load
-        setTimeout(() => scrollToBottom(true), 50);
+        // Scroll to bottom after first load — wait for DOM
+        setTimeout(() => {
+          scrollToBottom(true);
+          requestAnimationFrame(() => scrollToBottom(true));
+        }, 100);
       } catch {
         setConnected(false);
       }

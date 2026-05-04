@@ -75,14 +75,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       el.style.height = "auto";
       return;
     }
-    // Auto-grow and shrink
-    el.style.minHeight = "0";
-    el.style.height = "0";
+    // Auto-grow and shrink: reset to measure true content height
     const maxH = window.innerHeight * 0.3;
-    const newH = Math.max(60, Math.min(el.scrollHeight, maxH));
-    el.style.height = `${newH}px`;
-    el.style.minHeight = "";
-    el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
+    const prev = el.style.cssText;
+    el.style.cssText = `${prev}; height:0 !important; min-height:0 !important;`;
+    const contentH = el.scrollHeight;
+    el.style.cssText = prev;
+    el.style.height = `${Math.max(60, Math.min(contentH, maxH))}px`;
+    el.style.overflowY = contentH > maxH ? "auto" : "hidden";
   };
 
   const abortAgent = async () => {
