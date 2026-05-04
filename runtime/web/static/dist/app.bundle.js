@@ -6785,6 +6785,38 @@ ${code}
     ]);
   }
 
+  // runtime/web/frontend/src/components/ImageLightbox.tsx
+  function ImageLightbox({ src, alt, onClose }) {
+    const handleKeyDown = q2((e5) => {
+      if (e5.key === "Escape") onClose();
+    }, [onClose]);
+    y2(() => {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [handleKeyDown]);
+    return /* @__PURE__ */ u4("div", { className: "lightbox__backdrop", onClick: onClose, children: /* @__PURE__ */ u4("div", { className: "lightbox__container", onClick: (e5) => e5.stopPropagation(), children: [
+      /* @__PURE__ */ u4(
+        "button",
+        {
+          type: "button",
+          className: "lightbox__close",
+          onClick: onClose,
+          "aria-label": "Close preview",
+          children: "\u2715"
+        }
+      ),
+      /* @__PURE__ */ u4(
+        "img",
+        {
+          className: "lightbox__image",
+          src,
+          alt: alt || "Preview",
+          loading: "lazy"
+        }
+      )
+    ] }) });
+  }
+
   // runtime/web/frontend/src/components/message-list/MessageActionBar.tsx
   function MessageActionBar({
     messageId: _messageId,
@@ -7128,6 +7160,14 @@ ${code}
     onDelete
   }) {
     const isUser = interaction.type === "user";
+    const [lightboxSrc, setLightboxSrc] = d2(null);
+    const handleContentClick = (e5) => {
+      const target = e5.target;
+      if (target.tagName === "IMG") {
+        const src = target.src;
+        if (src) setLightboxSrc(src);
+      }
+    };
     const toolPairs = [];
     if (interaction.content_blocks?.length) {
       const blocks = interaction.content_blocks;
@@ -7256,11 +7296,12 @@ ${code}
               "div",
               {
                 className: "message-list__content",
+                onClick: handleContentClick,
                 dangerouslySetInnerHTML: isUser ? void 0 : { __html: renderMarkdown(interaction.content) },
                 children: isUser ? interaction.content : void 0
               }
             ),
-            interaction.media_ids && interaction.media_ids.length > 0 && /* @__PURE__ */ u4("div", { className: "message-list__media", children: interaction.media_ids.map((id) => /* @__PURE__ */ u4(
+            interaction.media_ids && interaction.media_ids.length > 0 && /* @__PURE__ */ u4("div", { className: "message-list__media", onClick: handleContentClick, children: interaction.media_ids.map((id) => /* @__PURE__ */ u4(
               "img",
               {
                 className: "message-list__media-img",
@@ -7269,7 +7310,8 @@ ${code}
                 loading: "lazy"
               },
               id
-            )) })
+            )) }),
+            lightboxSrc && /* @__PURE__ */ u4(ImageLightbox, { src: lightboxSrc, onClose: () => setLightboxSrc(null) })
           ] })
         ]
       }
