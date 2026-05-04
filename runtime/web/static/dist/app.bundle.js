@@ -7441,13 +7441,6 @@ ${code}
         el.style.height = "auto";
         return;
       }
-      const maxH = window.innerHeight * 0.3;
-      const prev = el.style.cssText;
-      el.style.cssText = `${prev}; height:0 !important; min-height:0 !important;`;
-      const contentH = el.scrollHeight;
-      el.style.cssText = prev;
-      el.style.height = `${Math.max(60, Math.min(contentH, maxH))}px`;
-      el.style.overflowY = contentH > maxH ? "auto" : "hidden";
     };
     const abortAgent = async () => {
       try {
