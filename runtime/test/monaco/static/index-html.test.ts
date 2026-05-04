@@ -14,11 +14,10 @@ test("index.html loads app.bundle.js as ES module", () => {
   expect(INDEX_HTML).toContain('type="module" src="/static/dist/app.bundle.js"');
 });
 
-test("index.html loads vendor scripts with defer", () => {
-  expect(INDEX_HTML).toContain('src="/static/js/marked.min.js" defer');
-  expect(INDEX_HTML).toContain('src="/static/js/vendor/dompurify.min.js" defer');
-  expect(INDEX_HTML).toContain('src="/static/js/vendor/katex.min.js" defer');
-  expect(INDEX_HTML).toContain('src="/static/js/vendor/codemirror-highlight.min.js" defer');
+test("index.html does NOT load vendor scripts (lazy loaded by JS)", () => {
+  expect(INDEX_HTML).not.toContain('marked.min.js" defer');
+  expect(INDEX_HTML).not.toContain('dompurify.min.js" defer');
+  expect(INDEX_HTML).not.toContain('katex.min.js" defer');
 });
 
 test("index.html does NOT load mermaid eagerly", () => {

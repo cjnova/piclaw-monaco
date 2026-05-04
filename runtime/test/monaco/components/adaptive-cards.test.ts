@@ -86,8 +86,8 @@ describe("Adaptive cards regression (#148)", () => {
     expect(css).toContain("adaptive-card-status-failed");
   });
 
-  test("15) index.html includes adaptivecards SDK", () => {
-    expect(read(indexHtmlUrl)).toContain("adaptivecards.min.js");
+  test("15) adaptivecards SDK vendored file exists", () => {
+    expect(existsSync(vendorUrl)).toBe(true);
   });
 
   test("16) Vendored SDK exists", () => {
