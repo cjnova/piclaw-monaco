@@ -7402,6 +7402,10 @@ ${code}
     const sendError = useSignal(null);
     const isAgentRunning = useSignal(false);
     const [attachments, setAttachments] = d2([]);
+    const attachmentsRef = A2([]);
+    attachmentsRef.current = attachments;
+    const [isDragOver, setIsDragOver] = d2(false);
+    const dragCounterRef = A2(0);
     y2(() => {
       const agentStatusHandler = (e5) => {
         const detail = e5.detail;
@@ -7484,6 +7488,63 @@ ${code}
       }
       input.value = "";
     };
+    const handlePaste = (e5) => {
+      const items = e5.clipboardData?.items;
+      if (!items?.length) return;
+      const files = [];
+      for (const item of Array.from(items)) {
+        if (item.kind !== "file") continue;
+        const file = item.getAsFile?.();
+        if (file) files.push(file);
+      }
+      if (files.length > 0) {
+        e5.preventDefault();
+        for (const file of files) {
+          setAttachments((prev) => [...prev, {
+            name: file.name || `pasted-${Date.now()}.${file.type.split("/")[1] || "png"}`,
+            type: file.type,
+            size: file.size,
+            file
+          }]);
+        }
+      }
+    };
+    const handleDragEnter = (e5) => {
+      e5.preventDefault();
+      e5.stopPropagation();
+      dragCounterRef.current++;
+      if (e5.dataTransfer?.types?.includes("Files")) {
+        setIsDragOver(true);
+      }
+    };
+    const handleDragLeave = (e5) => {
+      e5.preventDefault();
+      e5.stopPropagation();
+      dragCounterRef.current--;
+      if (dragCounterRef.current === 0) {
+        setIsDragOver(false);
+      }
+    };
+    const handleDragOver = (e5) => {
+      e5.preventDefault();
+      e5.stopPropagation();
+    };
+    const handleDrop = (e5) => {
+      e5.preventDefault();
+      e5.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+      const files = e5.dataTransfer?.files;
+      if (!files?.length) return;
+      for (const file of Array.from(files)) {
+        setAttachments((prev) => [...prev, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          file
+        }]);
+      }
+    };
     const removeAttachment = (index) => {
       setAttachments((prev) => prev.filter((_5, i6) => i6 !== index));
     };
@@ -7491,11 +7552,11 @@ ${code}
       const el = textareaRef.current;
       if (!el || isSending.value) return;
       const content = el.value.trim();
-      if (!content) return;
+      if (!content && attachmentsRef.current.length === 0) return;
       isSending.value = true;
       sendError.value = null;
       const mediaIds = [];
-      for (const att of attachments) {
+      for (const att of attachmentsRef.current) {
         if (att.id) {
           mediaIds.push(att.id);
         } else if (att.file) {
@@ -7588,51 +7649,62 @@ ${code}
               onChange: handleFileSelect
             }
           ),
-          /* @__PURE__ */ u4("div", { className: "chat__compose-container", children: [
-            /* @__PURE__ */ u4(
-              "button",
-              {
-                type: "button",
-                className: "chat__clip-btn",
-                onClick: handleClipClick,
-                "aria-label": "Attach file",
-                title: "Attach file",
-                children: /* @__PURE__ */ u4("i", { className: "codicon codicon-attach" })
-              }
-            ),
-            attachments.length > 0 && /* @__PURE__ */ u4("div", { className: "chat__attachments", children: attachments.map((att, i6) => /* @__PURE__ */ u4("span", { className: "chat__attachment-pill", children: [
-              /* @__PURE__ */ u4("span", { className: "chat__attachment-name", children: att.name }),
-              /* @__PURE__ */ u4(
-                "button",
-                {
-                  type: "button",
-                  className: "chat__attachment-remove",
-                  onClick: () => removeAttachment(i6),
-                  "aria-label": `Remove ${att.name}`,
-                  children: "\u2715"
-                }
-              )
-            ] }, att.id ?? i6)) }),
-            /* @__PURE__ */ u4(
-              "textarea",
-              {
-                ref: textareaRef,
-                className: "chat__input",
-                placeholder: "Type a message...",
-                rows: 3,
-                onInput: handleInput,
-                onKeyDown: (e5) => {
-                  if (e5.key === "Enter" && !e5.shiftKey) {
-                    e5.preventDefault();
-                    sendMessage();
+          /* @__PURE__ */ u4(
+            "div",
+            {
+              className: `chat__compose-container${isDragOver ? " chat__compose-container--dragover" : ""}`,
+              onDragEnter: handleDragEnter,
+              onDragLeave: handleDragLeave,
+              onDragOver: handleDragOver,
+              onDrop: handleDrop,
+              children: [
+                /* @__PURE__ */ u4(
+                  "button",
+                  {
+                    type: "button",
+                    className: "chat__clip-btn",
+                    onClick: handleClipClick,
+                    "aria-label": "Attach file",
+                    title: "Attach file",
+                    children: /* @__PURE__ */ u4("i", { className: "codicon codicon-attach" })
                   }
-                  if (e5.key === "Escape" && isAgentRunning.value) {
-                    abortAgent();
+                ),
+                attachments.length > 0 && /* @__PURE__ */ u4("div", { className: "chat__attachments", children: attachments.map((att, i6) => /* @__PURE__ */ u4("span", { className: "chat__attachment-pill", children: [
+                  /* @__PURE__ */ u4("span", { className: "chat__attachment-name", children: att.name }),
+                  /* @__PURE__ */ u4(
+                    "button",
+                    {
+                      type: "button",
+                      className: "chat__attachment-remove",
+                      onClick: () => removeAttachment(i6),
+                      "aria-label": `Remove ${att.name}`,
+                      children: "\u2715"
+                    }
+                  )
+                ] }, att.id ?? i6)) }),
+                /* @__PURE__ */ u4(
+                  "textarea",
+                  {
+                    ref: textareaRef,
+                    className: "chat__input",
+                    placeholder: "Type a message...",
+                    rows: 3,
+                    onInput: handleInput,
+                    onPaste: handlePaste,
+                    onKeyDown: (e5) => {
+                      if (e5.key === "Enter" && !e5.shiftKey) {
+                        e5.preventDefault();
+                        sendMessage();
+                      }
+                      if (e5.key === "Escape" && isAgentRunning.value) {
+                        abortAgent();
+                      }
+                    }
                   }
-                }
-              }
-            )
-          ] }),
+                )
+              ]
+            }
+          ),
           isAgentRunning.value ? /* @__PURE__ */ u4(
             "button",
             {
