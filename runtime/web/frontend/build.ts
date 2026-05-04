@@ -12,11 +12,11 @@ const options: BuildOptions = {
   entryPoints: [path.join(frontendDir, "src/index.tsx")],
   outfile: path.join(outputDir, "app.bundle.js"),
   bundle: true,
-  format: "iife",
+  format: "esm",
   platform: "browser",
   target: ["es2022"],
   sourcemap: true,
-  minify: false,
+  minify: true,
   jsx: "automatic",
   jsxImportSource: "preact",
 };
