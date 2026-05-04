@@ -6230,6 +6230,10 @@ ${code}
   function useTimelineStream({
     setMessages,
     setDraft,
+    setThought,
+    setStatus,
+    setStatusText,
+    clearTurn,
     setConnected,
     scrollToBottom,
     refetchTimelineOnReconnect,
@@ -6286,6 +6290,7 @@ ${code}
             return [...prev, interaction];
           });
           setDraft("");
+          clearTurn();
           scrollToBottom(true);
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
@@ -6293,6 +6298,7 @@ ${code}
         } catch (err) {
           console.warn("[MessageList] SSE parse error:", err);
           setDraft("");
+          clearTurn();
           scrollToBottom(true);
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
@@ -6302,11 +6308,34 @@ ${code}
       es.addEventListener("agent_status", (e5) => {
         try {
           const data = JSON.parse(e5.data);
+          if (data.type) setStatus(data.type);
+          if (data.text || data.message) setStatusText(data.text || data.message || "");
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: data })
           );
         } catch (err) {
           console.warn("[MessageList] SSE parse error:", err);
+        }
+      });
+      es.addEventListener("agent_thought_delta", (e5) => {
+        try {
+          const parsed = JSON.parse(e5.data);
+          if (parsed.delta) {
+            setThought((prev) => prev + parsed.delta);
+          } else if (parsed.text !== void 0) {
+            setThought(parsed.text);
+          }
+        } catch (err) {
+          console.warn("[MessageList] SSE thought parse error:", err);
+        }
+      });
+      es.addEventListener("agent_thought", (e5) => {
+        try {
+          const parsed = JSON.parse(e5.data);
+          const text = parsed.text ?? parsed.content ?? "";
+          setThought(text);
+        } catch (err) {
+          console.warn("[MessageList] SSE thought parse error:", err);
         }
       });
       es.onopen = () => {
@@ -6332,6 +6361,10 @@ ${code}
       scrollToBottom,
       setConnected,
       setDraft,
+      setThought,
+      setStatus,
+      setStatusText,
+      clearTurn,
       setMessages,
       timelineError
     ]);
@@ -6638,7 +6671,7 @@ ${code}
   }
 
   // runtime/web/frontend/src/components/MessageList.tsx
-  function MessageList() {
+  function MessageList({ setThought, setStatus, setStatusText, clearTurn }) {
     const [connected, setConnected] = d2(null);
     const [draft, setDraft] = d2("");
     const timelineError = useSignal(null);
@@ -6674,6 +6707,10 @@ ${code}
     useTimelineStream({
       setMessages,
       setDraft,
+      setThought,
+      setStatus,
+      setStatusText,
+      clearTurn,
       setConnected,
       scrollToBottom,
       refetchTimelineOnReconnect,
@@ -6771,8 +6808,30 @@ ${code}
     ] });
   }
 
+  // runtime/web/frontend/src/hooks/useAgentProgress.ts
+  function useAgentProgress() {
+    const [thought, setThought] = d2("");
+    const [status, setStatus] = d2(null);
+    const [statusText, setStatusText] = d2("");
+    const clearTurn = q2(() => {
+      setThought("");
+      setStatus(null);
+      setStatusText("");
+    }, []);
+    return {
+      thought,
+      setThought,
+      status,
+      setStatus,
+      statusText,
+      setStatusText,
+      clearTurn
+    };
+  }
+
   // runtime/web/frontend/src/panels/ChatPanel.tsx
   function ChatPanel({ onOpenPalette } = {}) {
+    const { thought, setThought, status, setStatus, statusText, setStatusText, clearTurn } = useAgentProgress();
     const textareaRef = A2(null);
     const activeTab = useSignal("chat");
     const extensionPages = useSignal([]);
@@ -6864,7 +6923,15 @@ ${code}
         ))
       ] }),
       activeTab.value === "chat" ? /* @__PURE__ */ u4(S, { children: [
-        /* @__PURE__ */ u4("div", { className: "chat__messages", children: /* @__PURE__ */ u4(MessageList, {}) }),
+        /* @__PURE__ */ u4("div", { className: "chat__messages", children: /* @__PURE__ */ u4(
+          MessageList,
+          {
+            setThought,
+            setStatus,
+            setStatusText,
+            clearTurn
+          }
+        ) }),
         /* @__PURE__ */ u4("div", { className: "chat__compose", children: [
           /* @__PURE__ */ u4(
             "textarea",

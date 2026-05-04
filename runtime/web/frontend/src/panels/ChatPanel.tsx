@@ -2,6 +2,7 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
+import { useAgentProgress } from "../hooks/useAgentProgress";
 import { extractDisplayName } from "../utils/extractDisplayName";
 import { isSafeExtensionUrl } from "../utils/isSafeExtensionUrl";
 
@@ -15,6 +16,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
+  const { thought, setThought, status, setStatus, statusText, setStatusText, clearTurn } = useAgentProgress();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeTab = useSignal<string>("chat");
   const extensionPages = useSignal<ExtensionRoute[]>([]);
@@ -123,7 +125,12 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         <>
           {/* Chat content */}
           <div className="chat__messages">
-            <MessageList />
+            <MessageList
+              setThought={setThought}
+              setStatus={setStatus}
+              setStatusText={setStatusText}
+              clearTurn={clearTurn}
+            />
           </div>
 
           <div className="chat__compose">

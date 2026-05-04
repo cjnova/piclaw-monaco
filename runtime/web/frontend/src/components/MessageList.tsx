@@ -1,7 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
-import { buildChatUrl } from "../api/chat-jid";
 import { useScrollManager } from "./message-list/useScrollManager";
 import { useTimelineFetch } from "./message-list/useTimelineFetch";
 import { useTimelineStream } from "./message-list/useTimelineStream";
@@ -9,7 +8,14 @@ import { MessageItem } from "./message-list/MessageItem";
 import { useCollapsedMessages } from "./message-list/useCollapsedMessages";
 import type { Interaction } from "./message-list/types";
 
-export function MessageList() {
+interface MessageListProps {
+  setThought: (v: string | ((prev: string) => string)) => void;
+  setStatus: (v: string | null) => void;
+  setStatusText: (v: string) => void;
+  clearTurn: () => void;
+}
+
+export function MessageList({ setThought, setStatus, setStatusText, clearTurn }: MessageListProps) {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [draft, setDraft] = useState<string>("");
   const timelineError = useSignal<string | null>(null);
@@ -56,6 +62,10 @@ export function MessageList() {
   useTimelineStream({
     setMessages,
     setDraft,
+    setThought,
+    setStatus,
+    setStatusText,
+    clearTurn,
     setConnected,
     scrollToBottom,
     refetchTimelineOnReconnect,

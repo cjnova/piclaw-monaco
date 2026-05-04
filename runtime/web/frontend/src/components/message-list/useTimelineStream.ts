@@ -7,6 +7,10 @@ import type { Interaction } from "./types";
 interface UseTimelineStreamParams {
   setMessages: (fn: (prev: Interaction[]) => Interaction[]) => void;
   setDraft: (v: string | ((prev: string) => string)) => void;
+  setThought: (v: string | ((prev: string) => string)) => void;
+  setStatus: (v: string | null) => void;
+  setStatusText: (v: string) => void;
+  clearTurn: () => void;
   setConnected: (v: boolean) => void;
   scrollToBottom: (force?: boolean) => void;
   refetchTimelineOnReconnect: () => Promise<void>;
@@ -16,14 +20,19 @@ interface UseTimelineStreamParams {
 /**
  * Manages the SSE connection lifecycle:
  * - EventSource creation and cleanup
- * - Handles: new_post, agent_draft_delta, agent_draft, agent_response, agent_status
+ * - Handles: new_post, agent_draft_delta, agent_draft, agent_response, agent_status,
+ *            agent_thought_delta, agent_thought
  * - Reconnection logic (triggers refetchTimelineOnReconnect on re-open)
- * - Draft state updates
+ * - Draft/thought/status state updates
  * - Connection status dispatch
  */
 export function useTimelineStream({
   setMessages,
   setDraft,
+  setThought,
+  setStatus,
+  setStatusText,
+  clearTurn,
   setConnected,
   scrollToBottom,
   refetchTimelineOnReconnect,
@@ -39,7 +48,6 @@ export function useTimelineStream({
         const raw = JSON.parse(e.data) as Record<string, unknown>;
         const interaction = normalizePost(raw);
         setMessages((prev) => {
-          // Avoid duplicates
           if (prev.some((m) => m.id === interaction.id)) return prev;
           return [...prev, interaction];
         });
@@ -87,14 +95,15 @@ export function useTimelineStream({
           return [...prev, interaction];
         });
         setDraft("");
+        clearTurn();
         scrollToBottom(true);
-        // Signal that agent turn is complete (clears compaction badge, etc.)
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
         );
       } catch (err) {
         console.warn("[MessageList] SSE parse error:", err);
         setDraft("");
+        clearTurn();
         scrollToBottom(true);
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
@@ -105,11 +114,36 @@ export function useTimelineStream({
     es.addEventListener("agent_status", (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);
+        if (data.type) setStatus(data.type);
+        if (data.text || data.message) setStatusText(data.text || data.message || "");
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: data })
         );
       } catch (err) {
         console.warn("[MessageList] SSE parse error:", err);
+      }
+    });
+
+    es.addEventListener("agent_thought_delta", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        if (parsed.delta) {
+          setThought((prev) => prev + parsed.delta);
+        } else if (parsed.text !== undefined) {
+          setThought(parsed.text);
+        }
+      } catch (err) {
+        console.warn("[MessageList] SSE thought parse error:", err);
+      }
+    });
+
+    es.addEventListener("agent_thought", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        const text = parsed.text ?? parsed.content ?? "";
+        setThought(text);
+      } catch (err) {
+        console.warn("[MessageList] SSE thought parse error:", err);
       }
     });
 
@@ -120,14 +154,11 @@ export function useTimelineStream({
       const isFirstOpen = !hasHandledFirstOpenRef.current;
       hasHandledFirstOpenRef.current = true;
 
-      // Skip first open — initial fetch handles it
       if (isFirstOpen) return;
 
-      // Reconnection — merge new messages
       refetchTimelineOnReconnect().catch((err) => {
         console.warn("[MessageList] reconnect refresh failed:", err);
-        timelineError.value =
-          "Timeline may be stale. Click to refresh.";
+        timelineError.value = "Timeline may be stale. Click to refresh.";
       });
     };
 
@@ -144,6 +175,10 @@ export function useTimelineStream({
     scrollToBottom,
     setConnected,
     setDraft,
+    setThought,
+    setStatus,
+    setStatusText,
+    clearTurn,
     setMessages,
     timelineError,
   ]);
