@@ -2562,21 +2562,6 @@
         });
       }
     }, [rootChildren]);
-    y2(() => {
-      if (!selectedPath || !rootChildren || !onFileSelect) return;
-      const findNode = (nodes, path) => {
-        for (const n4 of nodes) {
-          if (n4.path === path) return n4;
-          if (n4.children) {
-            const found = findNode(n4.children, path);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-      const node = findNode(rootChildren, selectedPath);
-      if (node) onFileSelect(node);
-    }, [rootChildren]);
     const handleSelect = q2(
       (node) => {
         setSelectedPath(node.path);
