@@ -33,6 +33,10 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const sendError = useSignal<string | null>(null);
   const isAgentRunning = useSignal(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const attachmentsRef = useRef<Attachment[]>([]);
+  attachmentsRef.current = attachments;
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
 
 
   useEffect(() => {
@@ -133,6 +137,68 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     input.value = "";
   };
 
+  const handlePaste = (e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items?.length) return;
+    const files: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile?.();
+      if (file) files.push(file);
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      for (const file of files) {
+        setAttachments((prev) => [...prev, {
+          name: file.name || `pasted-${Date.now()}.${file.type.split("/")[1] || "png"}`,
+          type: file.type,
+          size: file.size,
+          file,
+        }]);
+      }
+    }
+  };
+
+  const handleDragEnter = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer?.types?.includes("Files")) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragOver(false);
+    const files = e.dataTransfer?.files;
+    if (!files?.length) return;
+    for (const file of Array.from(files)) {
+      setAttachments((prev) => [...prev, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file,
+      }]);
+    }
+  };
+
   const removeAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
@@ -141,14 +207,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     const el = textareaRef.current;
     if (!el || isSending.value) return;
     const content = el.value.trim();
-    if (!content) return;
+    if (!content && attachmentsRef.current.length === 0) return;
 
     isSending.value = true;
     sendError.value = null;
 
     // Upload pending attachments
     const mediaIds: number[] = [];
-    for (const att of attachments) {
+    for (const att of attachmentsRef.current) {
       if (att.id) {
         mediaIds.push(att.id);
       } else if (att.file) {
@@ -252,7 +318,13 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               style={{ display: "none" }}
               onChange={handleFileSelect}
             />
-            <div className="chat__compose-container">
+            <div
+              className={`chat__compose-container${isDragOver ? " chat__compose-container--dragover" : ""}`}
+              onDragEnter={handleDragEnter as any}
+              onDragLeave={handleDragLeave as any}
+              onDragOver={handleDragOver as any}
+              onDrop={handleDrop as any}
+            >
               <button
                 type="button"
                 className="chat__clip-btn"
@@ -283,6 +355,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
                 placeholder="Type a message..."
                 rows={3}
                 onInput={handleInput}
+                onPaste={handlePaste as any}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();

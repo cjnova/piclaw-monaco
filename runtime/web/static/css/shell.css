@@ -925,6 +925,12 @@ body {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+.chat__compose-container--dragover {
+  border-color: var(--accent);
+  background: rgba(137, 180, 250, 0.08);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .chat__compose-toolbar {
   display: flex;
   align-items: center;
