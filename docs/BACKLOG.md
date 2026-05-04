@@ -1,7 +1,7 @@
 # PiClaw Monaco — Backlog & Current State
 
 Updated: 2026-05-04
-Total open issues: 37
+Total open issues: 31
 
 ## Vision
 
@@ -156,6 +156,10 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | #148 adaptive cards renderer | ✅ |
 | #149 widget iframe host | ✅ |
 | #265 send/stop cycle | ✅ |
+| #266 attachment pills + clip icon | ✅ |
+| #267 image paste | ✅ |
+| #268 file drag & drop | ✅ |
+| #276 tool card context + icons | ✅ |
 | #147 streaming improvements | ❌ closed (superseded by #230) |
 | #145 tool lifecycle events | ❌ closed (superseded by #230) |
 
@@ -240,16 +244,17 @@ Technical debt cleanup. Each PR includes regression tests.
 | message-collapse-delete-actions | Message collapse + delete actions (#209) | ✅ |
 | message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ✅ |
 | separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ✅ (307 tests across 31 files) |
+| #276 | Tool card context → Wave 11b | ✅ |
 
-### Wave 11c — Compose Bar Redesign (#141)
+### Wave 11c — Compose Bar
 
 | Task | Description | Status |
 |---|---|---|
 | #265 | Send/Stop cycle | ✅ |
-| #266 | Attachment pills | ⏳ |
+| #266 | Attachment pills | ✅ |
 | #272 | Session pill | ⏳ |
-| #267 | Image paste | ⏳ |
-| #268 | File drag & drop | ⏳ |
+| #267 | Image paste | ✅ |
+| #268 | File drag & drop | ✅ |
 | #269 | Workspace file attach | ⏳ |
 | #270 | Steer | ⏳ |
 | #271 | Queued followups | ⏳ |
@@ -261,8 +266,10 @@ Technical debt cleanup. Each PR includes regression tests.
 | 018-task-adaptive-cards-renderer | Adaptive cards in chat (#148) | ✅ |
 | 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ✅ |
 | widget pane not opening | Bug (#264) | ⏳ |
+| #278 | Attachment preview lightbox → Wave 11 | ⏳ |
 | full-compose-bar-redesign | Full compose bar redesign — send/stop, attachments, paste images, workspace file attach, queue, steer button (depends on #230) | ⏳ |
 | central-pane-tab-bar | Chat / Dashboards / Terminal tabs (#89) | ⏳ |
+| #279 | File preview button alignment → Wave 10e or cleanup | ⏳ |
 | 024-task-terminal-tabs | Multi-tab terminal (#150) | ⏳ |
 | wire-terminal-profile-selector | Terminal profiles — Shell, Pi TUI (#144) | ⏳ |
 | wire-scheduled-tasks-api | Scheduled task cards in Tasks panel (#104) | ⏳ |
