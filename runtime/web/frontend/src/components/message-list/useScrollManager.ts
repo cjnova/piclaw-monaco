@@ -23,10 +23,13 @@ export function useScrollManager(
 
   const scrollToBottom = useCallback((force = false) => {
     if (force || !userScrolledRef.current) {
-      const el = listRef.current;
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
+      const doScroll = () => {
+        const el = listRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      };
+      doScroll();
+      // Double-tap: ensure scroll after Preact render cycle
+      requestAnimationFrame(doScroll);
     }
   }, []);
 
