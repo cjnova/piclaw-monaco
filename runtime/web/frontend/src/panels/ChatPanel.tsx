@@ -251,6 +251,17 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       }
     }
 
+    // Append attachment references to content (like upstream)
+    let messageContent = content;
+    if (mediaIds.length > 0) {
+      const mediaBlock = mediaIds.map((id, i) => {
+        const att = attachmentsRef.current[i];
+        const label = att?.name || `attachment-${i + 1}`;
+        return `- attachment:${id} (${label})`;
+      }).join("\n");
+      messageContent = [content, `Attachments:\n${mediaBlock}`].filter(Boolean).join("\n\n");
+    }
+
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -258,7 +269,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, media_ids: mediaIds.length > 0 ? mediaIds : undefined }),
+        body: JSON.stringify({ content: messageContent, media_ids: mediaIds.length > 0 ? mediaIds : undefined }),
         signal: controller.signal,
       });
       clearTimeout(timeout);

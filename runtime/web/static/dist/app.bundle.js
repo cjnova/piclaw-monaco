@@ -7655,6 +7655,16 @@ ${code}
           }
         }
       }
+      let messageContent = content;
+      if (mediaIds.length > 0) {
+        const mediaBlock = mediaIds.map((id, i6) => {
+          const att = attachmentsRef.current[i6];
+          const label = att?.name || `attachment-${i6 + 1}`;
+          return `- attachment:${id} (${label})`;
+        }).join("\n");
+        messageContent = [content, `Attachments:
+${mediaBlock}`].filter(Boolean).join("\n\n");
+      }
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15e3);
@@ -7662,7 +7672,7 @@ ${code}
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, media_ids: mediaIds.length > 0 ? mediaIds : void 0 }),
+          body: JSON.stringify({ content: messageContent, media_ids: mediaIds.length > 0 ? mediaIds : void 0 }),
           signal: controller.signal
         });
         clearTimeout(timeout);
