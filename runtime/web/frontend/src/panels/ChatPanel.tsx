@@ -1,4 +1,5 @@
 import { AgentStatusPanel } from "../components/AgentStatusPanel";
+import { WidgetPane } from "../components/WidgetPane";
 import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -32,6 +33,21 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       .catch((err) => {
         console.warn("[chat] extension route discovery failed:", err);
       });
+
+  // Handle widget submissions as user messages
+  const widgetSubmissionHandler = (e: Event) => {
+    const text = (e as CustomEvent).detail?.text;
+    if (text) {
+      fetch(getMessageUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ content: text }),
+      }).catch(console.error);
+    }
+  };
+  window.addEventListener("piclaw:widget-submission", widgetSubmissionHandler);
+  return () => window.removeEventListener("piclaw:widget-submission", widgetSubmissionHandler);
   }, []);
 
   const handleInput = (e: Event) => {
@@ -128,6 +144,8 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           </div>
 
           <AgentStatusPanel />
+
+          <WidgetPane />
 
           <div className="chat__compose">
             <textarea
