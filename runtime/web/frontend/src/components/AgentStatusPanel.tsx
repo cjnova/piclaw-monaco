@@ -6,6 +6,21 @@ interface PanelState {
 }
 
 const COLLAPSED_MAX_CHARS = 800;
+const STORAGE_KEY = "piclaw:agent-panel-prefs";
+
+function loadPanelPrefs(): { draftExpanded: boolean; thoughtExpanded: boolean } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { draftExpanded: false, thoughtExpanded: false };
+}
+
+function savePanelPrefs(prefs: { draftExpanded: boolean; thoughtExpanded: boolean }) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch {}
+}
 
 /** Truncate text for collapsed view. */
 function truncate(text: string, maxChars: number): { visible: string; truncated: boolean } {
@@ -21,16 +36,21 @@ interface ToolCall {
 }
 
 export function AgentStatusPanel() {
-  const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: false });
-  const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: false });
+  const prefs = loadPanelPrefs();
+  const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded });
+  const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded });
   const [status, setStatus] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [tools, setTools] = useState<ToolCall[]>([]);
+  const [elapsed, setElapsed] = useState({ draft: 0, thought: 0, tools: 0 });
 
   const draftBufferRef = useRef("");
   const thoughtBufferRef = useRef("");
   const draftRafRef = useRef<number | null>(null);
   const thoughtRafRef = useRef<number | null>(null);
+  const draftStartRef = useRef<number | null>(null);
+  const thoughtStartRef = useRef<number | null>(null);
+  const toolsStartRef = useRef<number | null>(null);
 
   const flushDraft = useCallback(() => {
     draftRafRef.current = null;
@@ -43,8 +63,20 @@ export function AgentStatusPanel() {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed({
+        draft: draftStartRef.current ? Math.floor((Date.now() - draftStartRef.current) / 1000) : 0,
+        thought: thoughtStartRef.current ? Math.floor((Date.now() - thoughtStartRef.current) / 1000) : 0,
+        tools: toolsStartRef.current ? Math.floor((Date.now() - toolsStartRef.current) / 1000) : 0,
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const handleDraft = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      if (!draftStartRef.current) draftStartRef.current = Date.now();
       if (detail.delta) {
         draftBufferRef.current += detail.delta;
       } else if (detail.text !== undefined) {
@@ -57,6 +89,7 @@ export function AgentStatusPanel() {
 
     const handleThought = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      if (!thoughtStartRef.current) thoughtStartRef.current = Date.now();
       if (detail.delta) {
         thoughtBufferRef.current += detail.delta;
       } else if (detail.text !== undefined) {
@@ -70,6 +103,7 @@ export function AgentStatusPanel() {
     const handleStatus = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail.type === "tool_call") {
+        if (!toolsStartRef.current) toolsStartRef.current = Date.now();
         setTools((prev) => {
           const id = detail.title || detail.tool_name || "unknown";
           if (prev.some((t) => t.id === id && t.status === "running")) return prev;
@@ -97,8 +131,13 @@ export function AgentStatusPanel() {
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
       draftRafRef.current = null;
       thoughtRafRef.current = null;
-      setDraftState({ text: "", expanded: false });
-      setThoughtState({ text: "", expanded: false });
+      draftStartRef.current = null;
+      thoughtStartRef.current = null;
+      toolsStartRef.current = null;
+      const savedPrefs = loadPanelPrefs();
+      setDraftState({ text: "", expanded: savedPrefs.draftExpanded });
+      setThoughtState({ text: "", expanded: savedPrefs.thoughtExpanded });
+      setElapsed({ draft: 0, thought: 0, tools: 0 });
       setStatus(null);
       setStatusText("");
       setTools([]);
@@ -122,8 +161,20 @@ export function AgentStatusPanel() {
   const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done");
   if (!hasContent) return null;
 
-  const toggleDraftExpand = () => setDraftState((prev) => ({ ...prev, expanded: !prev.expanded }));
-  const toggleThoughtExpand = () => setThoughtState((prev) => ({ ...prev, expanded: !prev.expanded }));
+  const toggleDraftExpand = () => {
+    setDraftState((prev) => {
+      const next = { ...prev, expanded: !prev.expanded };
+      savePanelPrefs({ draftExpanded: next.expanded, thoughtExpanded: thought.expanded });
+      return next;
+    });
+  };
+  const toggleThoughtExpand = () => {
+    setThoughtState((prev) => {
+      const next = { ...prev, expanded: !prev.expanded };
+      savePanelPrefs({ draftExpanded: draft.expanded, thoughtExpanded: next.expanded });
+      return next;
+    });
+  };
 
   return (
     <div className="agent-status-panel">
@@ -138,6 +189,12 @@ export function AgentStatusPanel() {
 
       {tools.length > 0 && (
         <div className="agent-status-panel__tools">
+          <div className="agent-status-panel__tools-header">
+            <span>Tools</span>
+            {elapsed.tools > 0 && (
+              <span className="agent-status-panel__elapsed">{elapsed.tools}s</span>
+            )}
+          </div>
           {tools.map((tool) => (
             <div key={tool.id} className={`agent-status-panel__tool agent-status-panel__tool--${tool.status}`}>
               {tool.status === "running" ? (
@@ -157,6 +214,7 @@ export function AgentStatusPanel() {
           titleClass="agent-status-panel__title--thought"
           text={thought.text}
           expanded={thought.expanded}
+          elapsed={elapsed.thought}
           onToggle={toggleThoughtExpand}
         />
       )}
@@ -167,6 +225,7 @@ export function AgentStatusPanel() {
           titleClass="agent-status-panel__title--draft"
           text={draft.text}
           expanded={draft.expanded}
+          elapsed={elapsed.draft}
           onToggle={toggleDraftExpand}
         />
       )}
@@ -179,10 +238,11 @@ interface AgentPanelProps {
   titleClass?: string;
   text: string;
   expanded: boolean;
+  elapsed?: number;
   onToggle: () => void;
 }
 
-function AgentPanel({ title, titleClass, text, expanded, onToggle }: AgentPanelProps) {
+function AgentPanel({ title, titleClass, text, expanded, elapsed = 0, onToggle }: AgentPanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const { visible, truncated } = expanded
     ? { visible: text, truncated: false }
@@ -217,6 +277,9 @@ function AgentPanel({ title, titleClass, text, expanded, onToggle }: AgentPanelP
         </button>
         <span className="agent-status-panel__dot" aria-hidden="true" />
         <span>{title}</span>
+        {elapsed > 0 && (
+          <span className="agent-status-panel__elapsed">{elapsed}s</span>
+        )}
       </div>
       <div
         className={`agent-status-panel__body ${expanded ? "agent-status-panel__body--expanded" : ""}`}

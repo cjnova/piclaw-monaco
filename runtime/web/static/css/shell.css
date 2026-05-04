@@ -3776,6 +3776,16 @@ pre.frontmatter-block {
   gap: 2px;
 }
 
+.agent-status-panel__tools-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .agent-status-panel__tool {
   display: flex;
   align-items: center;
@@ -3804,4 +3814,12 @@ pre.frontmatter-block {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+.agent-status-panel__elapsed {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
