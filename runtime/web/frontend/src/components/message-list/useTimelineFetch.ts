@@ -50,6 +50,8 @@ export function useTimelineFetch({
     setHasMore(timeline.hasMore);
     timelineError.value = null;
     scrollToBottom(true);
+    // Ensure scroll after DOM paint
+    requestAnimationFrame(() => scrollToBottom(true));
   }, [fetchTimeline, scrollToBottom, timelineError]);
 
   // Initial fetch
