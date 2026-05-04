@@ -64,8 +64,11 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   };
   }, []);
 
+  const hasText = useSignal(false);
+
   const handleInput = (e: Event) => {
     const el = e.target as HTMLTextAreaElement;
+    hasText.value = el.value.trim().length > 0;
     if (el.value === "/") {
       onOpenPalette?.();
       el.value = "";
@@ -219,7 +222,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
                 type="button"
                 className="chat__send-btn"
                 onClick={sendMessage}
-                disabled={isSending.value}
+                disabled={isSending.value || !hasText.value}
                 aria-label={isSending.value ? "Sending..." : "Send message"}
                 title="Send (Enter)"
               >

@@ -7427,8 +7427,10 @@ ${code}
         window.removeEventListener("piclaw:widget-submission", widgetSubmissionHandler);
       };
     }, []);
+    const hasText = useSignal(false);
     const handleInput = (e5) => {
       const el = e5.target;
+      hasText.value = el.value.trim().length > 0;
       if (el.value === "/") {
         onOpenPalette?.();
         el.value = "";
@@ -7565,7 +7567,7 @@ ${code}
               type: "button",
               className: "chat__send-btn",
               onClick: sendMessage,
-              disabled: isSending.value,
+              disabled: isSending.value || !hasText.value,
               "aria-label": isSending.value ? "Sending..." : "Send message",
               title: "Send (Enter)",
               children: /* @__PURE__ */ u4("svg", { viewBox: "0 0 24 24", width: "22", height: "22", fill: "currentColor", children: /* @__PURE__ */ u4("path", { d: "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" }) })
