@@ -1318,7 +1318,7 @@ body {
 }
 
 .message-list__name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
 }
@@ -1338,7 +1338,7 @@ body {
 
 /* Content: plain text, no bubble background */
 .message-list__content {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--text);
   word-break: break-word;
