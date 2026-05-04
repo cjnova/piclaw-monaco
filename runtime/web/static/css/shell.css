@@ -1570,7 +1570,6 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 8px 12px;
-  scrollbar-width: none;
 }
 
 .workspace__pane-bottom,
