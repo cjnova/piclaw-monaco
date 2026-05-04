@@ -28,11 +28,33 @@ function truncate(text: string, maxChars: number): { visible: string; truncated:
   return { visible: text.slice(0, maxChars), truncated: true };
 }
 
+/** Sanitize SVG string — allow only safe SVG elements and attributes. */
+function sanitizeSvg(raw: string): string {
+  if (!raw || typeof raw !== "string") return "";
+  // Strip script tags, event handlers, and non-SVG elements
+  const cleaned = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/on\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/on\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/javascript:/gi, "")
+    .replace(/data:/gi, "");
+  return cleaned;
+}
+
+
+interface StatusHint {
+  key: string;
+  icon_svg: string;
+  label: string;
+  title?: string;
+}
+
 interface ToolCall {
   id: string;
   name: string;
   title: string;
   status: "running" | "done" | "error";
+  hints: StatusHint[];    // "repo • branch"
 }
 
 export function AgentStatusPanel() {
@@ -104,14 +126,15 @@ export function AgentStatusPanel() {
       const detail = (e as CustomEvent).detail;
       if (detail.type === "tool_call") {
         if (!toolsStartRef.current) toolsStartRef.current = Date.now();
+        const id = detail.title || detail.tool_name || "unknown";
         setTools((prev) => {
-          const id = detail.title || detail.tool_name || "unknown";
           if (prev.some((t) => t.id === id && t.status === "running")) return prev;
           return [...prev, {
             id,
             name: detail.tool_name || "tool",
             title: detail.title || detail.tool_name || "Running tool...",
-            status: "running",
+            status: "running" as const,
+            hints: Array.isArray(detail.status_hints) ? detail.status_hints : [],
           }];
         });
       } else if (detail.type === "tool_status") {
@@ -143,12 +166,15 @@ export function AgentStatusPanel() {
       setTools([]);
     };
 
+    let mounted = true;
+
     window.addEventListener("piclaw:agent-draft", handleDraft);
     window.addEventListener("piclaw:agent-thought", handleThought);
     window.addEventListener("piclaw:agent-status", handleStatus);
     window.addEventListener("piclaw:agent-turn-end", handleTurnEnd);
 
     return () => {
+      mounted = false;
       window.removeEventListener("piclaw:agent-draft", handleDraft);
       window.removeEventListener("piclaw:agent-thought", handleThought);
       window.removeEventListener("piclaw:agent-status", handleStatus);
@@ -197,12 +223,27 @@ export function AgentStatusPanel() {
           </div>
           {tools.map((tool) => (
             <div key={tool.id} className={`agent-status-panel__tool agent-status-panel__tool--${tool.status}`}>
-              {tool.status === "running" ? (
-                <div className="agent-status-panel__spinner" />
-              ) : (
-                <span className="agent-status-panel__tool-check">✓</span>
-              )}
-              <span className="agent-status-panel__tool-title">{tool.title}</span>
+              <div className="agent-status-panel__tool-indicator">
+                {tool.status === "running" ? (
+                  <div className="agent-status-panel__spinner" />
+                ) : (
+                  <span className="agent-status-panel__tool-check">✓</span>
+                )}
+              </div>
+              <div className="agent-status-panel__tool-info">
+                <span className="agent-status-panel__tool-title">{tool.title}</span>
+                {tool.hints.length > 0 && (
+                  <span className="agent-status-panel__tool-context">
+                    {tool.hints.map((hint) => (
+                      <span key={hint.key} className="agent-status-panel__tool-hint" title={hint.title || hint.label}>
+                        <span className="agent-status-panel__tool-hint-icon" dangerouslySetInnerHTML={{ __html: sanitizeSvg(hint.icon_svg) }} />
+                        <span>{hint.label}</span>
+                      </span>
+                    ))}
+                  </span>
+                )}
+
+              </div>
             </div>
           ))}
         </div>
