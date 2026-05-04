@@ -9,24 +9,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Fetch upstream tags
-        run: |
-          git remote add upstream https://github.com/rcarmo/piclaw.git || true
-          git fetch upstream --tags
-      - name: Check for new release
+
+      - name: Get latest upstream container version
         id: check
         run: |
           SYNCED=$(cat .piclaw-monaco-upstream-tag 2>/dev/null || echo "v0.0.0")
-          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          # Query ghcr.io for the latest container image version
+          # The API returns tags sorted by most recent; pick the first semver tag
+          LATEST=$(curl -s "https://ghcr.io/v2/rcarmo/piclaw/tags/list" \
+            -H "Accept: application/json" \
+            | jq -r '.tags // [] | map(select(test("^v[0-9]"))) | sort_by(split(".") | map(ltrimstr("v") | tonumber? // 0)) | reverse | .[0] // empty' 2>/dev/null || echo "")
+          
+          # Fallback: use GitHub API to get package versions
+          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+            LATEST=$(curl -s "https://api.github.com/users/rcarmo/packages/container/piclaw/versions" \
+              -H "Accept: application/vnd.github+json" \
+              | jq -r '.[0].metadata.container.tags[] | select(test("^v[0-9]"))' 2>/dev/null | head -1 || echo "")
+          fi
+
+          # Final fallback: git tags
+          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+            git remote add upstream https://github.com/rcarmo/piclaw.git 2>/dev/null || true
+            git fetch upstream --tags 2>/dev/null
+            LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          fi
+
           echo "synced=$SYNCED" >> $GITHUB_OUTPUT
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
-          if [ "$LATEST" != "$SYNCED" ]; then
+          echo "latest=${LATEST:-unknown}" >> $GITHUB_OUTPUT
+          if [ -n "$LATEST" ] && [ "$LATEST" != "null" ] && [ "$LATEST" != "$SYNCED" ]; then
             echo "new_release=true" >> $GITHUB_OUTPUT
           else
             echo "new_release=false" >> $GITHUB_OUTPUT
           fi
+
       - name: Create issue for new release
         if: steps.check.outputs.new_release == 'true'
         uses: actions/github-script@v9
@@ -34,10 +49,22 @@ jobs:
           script: |
             const synced = '${{ steps.check.outputs.synced }}';
             const latest = '${{ steps.check.outputs.latest }}';
+            // Check if issue already exists
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream-sync',
+            });
+            const alreadyExists = existing.data.some(i => i.title.includes(latest));
+            if (alreadyExists) {
+              console.log(`Issue for ${latest} already exists, skipping.`);
+              return;
+            }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Upstream release ${latest} available (currently synced: ${synced})`,
-              body: `A new upstream release \`${latest}\` is available from rcarmo/piclaw.\n\nCurrent synced tag: \`${synced}\`\n\nFollow the sync strategy in \`docs/UPSTREAM-SYNC.md\` to merge.`,
+              body: `A new upstream container image \`${latest}\` is available from \`ghcr.io/rcarmo/piclaw\`.\n\nCurrent synced tag: \`${synced}\`\n\nSource: https://github.com/rcarmo/piclaw/pkgs/container/piclaw\n\nFollow the sync strategy in \`docs/UPSTREAM-SYNC.md\` to merge.`,
               labels: ['upstream-sync']
             });
