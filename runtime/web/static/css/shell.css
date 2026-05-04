@@ -1390,7 +1390,7 @@ body {
 
 .message-list__content code {
   font-family: var(--font-mono, 'Fira Mono', monospace);
-  font-size: 12px;
+  font-size: 13px;
   background: rgba(0,0,0,0.35);
   border-radius: 4px;
   padding: 1px 5px;
@@ -1398,7 +1398,7 @@ body {
 
 .message-list__content pre {
   font-family: var(--font-mono, 'Fira Mono', monospace);
-  font-size: 12px;
+  font-size: 13px;
   background: var(--bg-terminal);
   border-radius: 6px;
   padding: 10px 12px;
@@ -1541,7 +1541,7 @@ body {
 
 .workspace__section {
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .workspace__section-header {
@@ -1614,7 +1614,7 @@ body {
 }
 
 .workspace__preview-empty {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -1623,7 +1623,7 @@ body {
 }
 
 .workspace__preview-info {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -1631,7 +1631,7 @@ body {
 }
 
 .workspace__preview-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   overflow: hidden;
@@ -1702,7 +1702,7 @@ body {
 /* Rendered markdown */
 .workspace__preview-markdown {
   padding: 8px 4px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--text);
   overflow-wrap: break-word;
@@ -2246,7 +2246,7 @@ body {
 }
 
 .search-panel__item-text {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   line-height: 1.4;
   display: -webkit-box;
@@ -2262,7 +2262,7 @@ body {
 
 .search-panel__empty {
   padding: 16px 12px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   text-align: center;
 }
