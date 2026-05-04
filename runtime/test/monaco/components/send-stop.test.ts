@@ -59,8 +59,8 @@ describe("Send/Stop cycle regression (#265)", () => {
     expect(css).toContain("stopPulse");
   });
 
-  test("10) CSS textarea min-height 60px", () => {
-    expect(read(shellCssUrl)).toContain("min-height: 60px");
+  test("10) CSS textarea fixed height", () => {
+    expect(read(shellCssUrl)).toContain("height: 80px");
   });
 
   test("11) CSS textarea focus ring", () => {
