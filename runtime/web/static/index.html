@@ -6,6 +6,11 @@
   <!-- CSP is set by the backend via HTTP header (security.ts). Do not add a meta tag CSP here
        — dual CSPs create a more restrictive intersection that breaks terminal WASM loading. -->
   <title>PiClaw Monaco</title>
+  <!-- Preload critical fonts to eliminate render-blocking chain and CLS -->
+  <link rel="preload" href="/static/fonts/ibm-plex-sans/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/static/fonts/ibm-plex-sans/IBMPlexSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/static/fonts/jetbrains-mono-nf/JetBrainsMonoNFM-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/static/fonts/codicons/codicon.ttf" as="font" type="font/ttf" crossorigin />
   <link rel="stylesheet" href="/static/css/fonts.css" />
   <link rel="stylesheet" href="/static/css/codicons.css" />
   <link rel="stylesheet" href="/static/css/shell.css" />
