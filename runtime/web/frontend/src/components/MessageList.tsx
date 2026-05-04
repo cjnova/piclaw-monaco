@@ -1,6 +1,5 @@
 import { useSignal } from "@preact/signals";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 import { buildChatUrl } from "../api/chat-jid";
 import { useScrollManager } from "./message-list/useScrollManager";
 import { useTimelineFetch } from "./message-list/useTimelineFetch";
@@ -12,6 +11,7 @@ import type { Interaction } from "./message-list/types";
 export function MessageList() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [draft, setDraft] = useState<string>("");
+
   const timelineError = useSignal<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -157,11 +157,9 @@ export function MessageList() {
               </span>
               <span className="message-list__draft-indicator">● typing</span>
             </div>
-            <div
-              className="message-list__content"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
-              dangerouslySetInnerHTML={{ __html: renderThinkingMarkdown(draft) }}
-            />
+            <div className="message-list__content message-list__content--draft">
+              {draft}
+            </div>
           </div>
         </div>
       )}

@@ -3898,20 +3898,6 @@ ${code}
     html = sanitizeHtml(html, options);
     return html;
   }
-  function renderThinkingMarkdown(text) {
-    if (!text) return "";
-    const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const decoded = decodeEntitiesDeep(normalized, 2);
-    const normalizedHtml = normalizeHtmlCodeTags(decoded);
-    const escaped = normalizedHtml.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const safeHtml = restoreAllowedHtmlTags(escaped);
-    const m5 = getMarked();
-    let html = m5 ? m5.parse(safeHtml, { headerIds: false, mangle: false }) : safeHtml.replace(/\n/g, "<br>");
-    html = decodeCodeEntities(html);
-    html = decodeTextEntities(html);
-    html = sanitizeHtml(html);
-    return html;
-  }
 
   // runtime/web/frontend/src/panels/workspace/WorkspaceActions.tsx
   var OPENABLE_EXTS = /* @__PURE__ */ new Set([
@@ -6758,13 +6744,7 @@ ${code}
             /* @__PURE__ */ u4("span", { className: "message-list__name message-list__name--agent", children: "PiClaw" }),
             /* @__PURE__ */ u4("span", { className: "message-list__draft-indicator", children: "\u25CF typing" })
           ] }),
-          /* @__PURE__ */ u4(
-            "div",
-            {
-              className: "message-list__content",
-              dangerouslySetInnerHTML: { __html: renderThinkingMarkdown(draft) }
-            }
-          )
+          /* @__PURE__ */ u4("div", { className: "message-list__content message-list__content--draft", children: draft })
         ] })
       ] }),
       /* @__PURE__ */ u4("div", { ref: bottomRef })
