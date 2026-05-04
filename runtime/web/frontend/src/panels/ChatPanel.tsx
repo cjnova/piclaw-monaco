@@ -24,6 +24,9 @@ interface Attachment {
   file?: File;
 }
 
+const HISTORY_KEY = "piclaw:compose-history";
+const MAX_HISTORY = 50;
+
 export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +40,18 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   attachmentsRef.current = attachments;
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
+
+  // Command history (ArrowUp/Down)
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef(-1);
+  const historyDraftRef = useRef("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (raw) historyRef.current = JSON.parse(raw);
+    } catch {}
+  }, []);
 
 
   useEffect(() => {
@@ -255,6 +270,15 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
       }
 
       // Only clear draft after confirmed success
+      if (content) {
+        const history = historyRef.current;
+        if (history[history.length - 1] !== content) {
+          history.push(content);
+          if (history.length > MAX_HISTORY) history.shift();
+          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+        }
+        historyIndexRef.current = -1;
+      }
       el.value = "";
       el.style.height = "auto";
       sendError.value = null;
@@ -363,6 +387,41 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
                   }
                   if (e.key === "Escape" && isAgentRunning.value) {
                     abortAgent();
+                  }
+                  // Command history navigation
+                  const el = e.target as HTMLTextAreaElement;
+                  const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
+                  const atEnd = el.selectionStart === el.value.length;
+                  if (e.key === "ArrowUp" && atStart) {
+                    const history = historyRef.current;
+                    if (!history.length) return;
+                    e.preventDefault();
+                    let idx = historyIndexRef.current;
+                    if (idx === -1) {
+                      historyDraftRef.current = el.value;
+                      idx = history.length - 1;
+                    } else if (idx > 0) {
+                      idx--;
+                    }
+                    historyIndexRef.current = idx;
+                    el.value = history[idx] || "";
+                    hasText.value = el.value.trim().length > 0;
+                  }
+                  if (e.key === "ArrowDown" && atEnd) {
+                    const history = historyRef.current;
+                    if (historyIndexRef.current === -1) return;
+                    e.preventDefault();
+                    let idx = historyIndexRef.current;
+                    if (idx < history.length - 1) {
+                      idx++;
+                      historyIndexRef.current = idx;
+                      el.value = history[idx] || "";
+                    } else {
+                      historyIndexRef.current = -1;
+                      el.value = historyDraftRef.current || "";
+                      historyDraftRef.current = "";
+                    }
+                    hasText.value = el.value.trim().length > 0;
                   }
                 }}
               />

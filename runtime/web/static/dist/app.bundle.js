@@ -5844,6 +5844,11 @@ ${code}
     if (text.length <= maxChars) return { visible: text, truncated: false };
     return { visible: text.slice(0, maxChars), truncated: true };
   }
+  function sanitizeSvg(raw) {
+    if (!raw || typeof raw !== "string") return "";
+    const cleaned = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/on\w+\s*=\s*"[^"]*"/gi, "").replace(/on\w+\s*=\s*'[^']*'/gi, "").replace(/javascript:/gi, "").replace(/data:/gi, "");
+    return cleaned;
+  }
   function AgentStatusPanel() {
     const prefs = loadPanelPrefs();
     const [draft, setDraftState] = d2({ text: "", expanded: prefs.draftExpanded });
@@ -5906,14 +5911,15 @@ ${code}
         const detail = e5.detail;
         if (detail.type === "tool_call") {
           if (!toolsStartRef.current) toolsStartRef.current = Date.now();
+          const id = detail.title || detail.tool_name || "unknown";
           setTools((prev) => {
-            const id = detail.title || detail.tool_name || "unknown";
             if (prev.some((t4) => t4.id === id && t4.status === "running")) return prev;
             return [...prev, {
               id,
               name: detail.tool_name || "tool",
               title: detail.title || detail.tool_name || "Running tool...",
-              status: "running"
+              status: "running",
+              hints: Array.isArray(detail.status_hints) ? detail.status_hints : []
             }];
           });
         } else if (detail.type === "tool_status") {
@@ -5943,11 +5949,13 @@ ${code}
         setStatusText("");
         setTools([]);
       };
+      let mounted = true;
       window.addEventListener("piclaw:agent-draft", handleDraft);
       window.addEventListener("piclaw:agent-thought", handleThought);
       window.addEventListener("piclaw:agent-status", handleStatus);
       window.addEventListener("piclaw:agent-turn-end", handleTurnEnd);
       return () => {
+        mounted = false;
         window.removeEventListener("piclaw:agent-draft", handleDraft);
         window.removeEventListener("piclaw:agent-thought", handleThought);
         window.removeEventListener("piclaw:agent-status", handleStatus);
@@ -5986,8 +5994,14 @@ ${code}
           ] })
         ] }),
         tools.map((tool) => /* @__PURE__ */ u4("div", { className: `agent-status-panel__tool agent-status-panel__tool--${tool.status}`, children: [
-          tool.status === "running" ? /* @__PURE__ */ u4("div", { className: "agent-status-panel__spinner" }) : /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-check", children: "\u2713" }),
-          /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-title", children: tool.title })
+          /* @__PURE__ */ u4("div", { className: "agent-status-panel__tool-indicator", children: tool.status === "running" ? /* @__PURE__ */ u4("div", { className: "agent-status-panel__spinner" }) : /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-check", children: "\u2713" }) }),
+          /* @__PURE__ */ u4("div", { className: "agent-status-panel__tool-info", children: [
+            /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-title", children: tool.title }),
+            tool.hints.length > 0 && /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-context", children: tool.hints.map((hint) => /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-hint", title: hint.title || hint.label, children: [
+              /* @__PURE__ */ u4("span", { className: "agent-status-panel__tool-hint-icon", dangerouslySetInnerHTML: { __html: sanitizeSvg(hint.icon_svg) } }),
+              /* @__PURE__ */ u4("span", { children: hint.label })
+            ] }, hint.key)) })
+          ] })
         ] }, tool.id))
       ] }),
       thought.text && /* @__PURE__ */ u4(
@@ -6206,7 +6220,7 @@ ${code}
   }
 
   // runtime/web/frontend/src/utils/mermaid-render.ts
-  function sanitizeSvg(svg) {
+  function sanitizeSvg2(svg) {
     const purify = window.DOMPurify;
     if (!purify) return svg;
     return purify.sanitize(svg, {
@@ -6316,7 +6330,7 @@ ${code}
         const code = decodeEntitiesDeep2(raw, 2);
         let svg = await bm.renderMermaid(code, { ...theme, transparent: true });
         svg = roundPolylineCorners(svg);
-        el.innerHTML = sanitizeSvg(svg);
+        el.innerHTML = sanitizeSvg2(svg);
         el.removeAttribute("data-mermaid");
       } catch (e5) {
         console.error("[mermaid] Render error:", e5);
@@ -7393,6 +7407,8 @@ ${code}
   }
 
   // runtime/web/frontend/src/panels/ChatPanel.tsx
+  var HISTORY_KEY = "piclaw:compose-history";
+  var MAX_HISTORY = 50;
   function ChatPanel({ onOpenPalette } = {}) {
     const textareaRef = A2(null);
     const fileInputRef = A2(null);
@@ -7406,6 +7422,16 @@ ${code}
     attachmentsRef.current = attachments;
     const [isDragOver, setIsDragOver] = d2(false);
     const dragCounterRef = A2(0);
+    const historyRef = A2([]);
+    const historyIndexRef = A2(-1);
+    const historyDraftRef = A2("");
+    y2(() => {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        if (raw) historyRef.current = JSON.parse(raw);
+      } catch {
+      }
+    }, []);
     y2(() => {
       const agentStatusHandler = (e5) => {
         const detail = e5.detail;
@@ -7592,6 +7618,18 @@ ${code}
           isSending.value = false;
           return;
         }
+        if (content) {
+          const history = historyRef.current;
+          if (history[history.length - 1] !== content) {
+            history.push(content);
+            if (history.length > MAX_HISTORY) history.shift();
+            try {
+              localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+            } catch {
+            }
+          }
+          historyIndexRef.current = -1;
+        }
         el.value = "";
         el.style.height = "auto";
         sendError.value = null;
@@ -7698,6 +7736,40 @@ ${code}
                       }
                       if (e5.key === "Escape" && isAgentRunning.value) {
                         abortAgent();
+                      }
+                      const el = e5.target;
+                      const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
+                      const atEnd = el.selectionStart === el.value.length;
+                      if (e5.key === "ArrowUp" && atStart) {
+                        const history = historyRef.current;
+                        if (!history.length) return;
+                        e5.preventDefault();
+                        let idx = historyIndexRef.current;
+                        if (idx === -1) {
+                          historyDraftRef.current = el.value;
+                          idx = history.length - 1;
+                        } else if (idx > 0) {
+                          idx--;
+                        }
+                        historyIndexRef.current = idx;
+                        el.value = history[idx] || "";
+                        hasText.value = el.value.trim().length > 0;
+                      }
+                      if (e5.key === "ArrowDown" && atEnd) {
+                        const history = historyRef.current;
+                        if (historyIndexRef.current === -1) return;
+                        e5.preventDefault();
+                        let idx = historyIndexRef.current;
+                        if (idx < history.length - 1) {
+                          idx++;
+                          historyIndexRef.current = idx;
+                          el.value = history[idx] || "";
+                        } else {
+                          historyIndexRef.current = -1;
+                          el.value = historyDraftRef.current || "";
+                          historyDraftRef.current = "";
+                        }
+                        hasText.value = el.value.trim().length > 0;
                       }
                     }
                   }
