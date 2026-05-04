@@ -1,3 +1,4 @@
+import { AgentStatusPanel } from "../components/AgentStatusPanel";
 import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -125,6 +126,8 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           <div className="chat__messages">
             <MessageList />
           </div>
+
+          <AgentStatusPanel />
 
           <div className="chat__compose">
             <textarea

@@ -16,10 +16,13 @@ interface UseTimelineStreamParams {
 /**
  * Manages the SSE connection lifecycle:
  * - EventSource creation and cleanup
- * - Handles: new_post, agent_draft_delta, agent_draft, agent_response, agent_status
+ * - Handles: new_post, agent_draft_delta, agent_draft, agent_response, agent_status,
+ *   agent_thought_delta, agent_thought
  * - Reconnection logic (triggers refetchTimelineOnReconnect on re-open)
  * - Draft state updates
  * - Connection status dispatch
+ * - Relays agent events to AgentStatusPanel via window.dispatchEvent:
+ *   piclaw:agent-draft, piclaw:agent-thought, piclaw:agent-turn-end
  */
 export function useTimelineStream({
   setMessages,
@@ -61,6 +64,7 @@ export function useTimelineStream({
         } else if (parsed.text !== undefined) {
           setDraft(parsed.text);
         }
+        window.dispatchEvent(new CustomEvent("piclaw:agent-draft", { detail: { delta: parsed.delta, text: parsed.text } }));
         scrollToBottom();
       } catch (err) {
         console.warn("[MessageList] SSE parse error:", err);
@@ -72,9 +76,29 @@ export function useTimelineStream({
         const parsed = JSON.parse(e.data);
         const text = parsed.text ?? parsed.content ?? "";
         setDraft(text);
+        window.dispatchEvent(new CustomEvent("piclaw:agent-draft", { detail: { text } }));
         scrollToBottom();
       } catch (err) {
         console.warn("[MessageList] SSE parse error:", err);
+      }
+    });
+
+    es.addEventListener("agent_thought_delta", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("piclaw:agent-thought", { detail: { delta: parsed.delta, text: parsed.text } }));
+      } catch (err) {
+        console.warn("[MessageList] SSE thought parse error:", err);
+      }
+    });
+
+    es.addEventListener("agent_thought", (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        const text = parsed.text ?? parsed.content ?? "";
+        window.dispatchEvent(new CustomEvent("piclaw:agent-thought", { detail: { text } }));
+      } catch (err) {
+        console.warn("[MessageList] SSE thought parse error:", err);
       }
     });
 
@@ -89,6 +113,7 @@ export function useTimelineStream({
         setDraft("");
         scrollToBottom(true);
         // Signal that agent turn is complete (clears compaction badge, etc.)
+        window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
         );
@@ -96,6 +121,7 @@ export function useTimelineStream({
         console.warn("[MessageList] SSE parse error:", err);
         setDraft("");
         scrollToBottom(true);
+        window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
         );

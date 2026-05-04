@@ -3898,20 +3898,6 @@ ${code}
     html = sanitizeHtml(html, options);
     return html;
   }
-  function renderThinkingMarkdown(text) {
-    if (!text) return "";
-    const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const decoded = decodeEntitiesDeep(normalized, 2);
-    const normalizedHtml = normalizeHtmlCodeTags(decoded);
-    const escaped = normalizedHtml.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const safeHtml = restoreAllowedHtmlTags(escaped);
-    const m5 = getMarked();
-    let html = m5 ? m5.parse(safeHtml, { headerIds: false, mangle: false }) : safeHtml.replace(/\n/g, "<br>");
-    html = decodeCodeEntities(html);
-    html = decodeTextEntities(html);
-    html = sanitizeHtml(html);
-    return html;
-  }
 
   // runtime/web/frontend/src/panels/workspace/WorkspaceActions.tsx
   var OPENABLE_EXTS = /* @__PURE__ */ new Set([
@@ -5837,6 +5823,155 @@ ${code}
     return /* @__PURE__ */ u4("div", { className: "panel-placeholder", children: text });
   }
 
+  // runtime/web/frontend/src/components/AgentStatusPanel.tsx
+  var COLLAPSED_MAX_CHARS = 800;
+  function truncate(text, maxChars) {
+    if (text.length <= maxChars) return { visible: text, truncated: false };
+    return { visible: text.slice(0, maxChars), truncated: true };
+  }
+  function AgentStatusPanel() {
+    const [draft, setDraftState] = d2({ text: "", expanded: false });
+    const [thought, setThoughtState] = d2({ text: "", expanded: false });
+    const [status, setStatus] = d2(null);
+    const [statusText, setStatusText] = d2("");
+    const draftBufferRef = A2("");
+    const thoughtBufferRef = A2("");
+    const draftRafRef = A2(null);
+    const thoughtRafRef = A2(null);
+    const flushDraft = q2(() => {
+      draftRafRef.current = null;
+      setDraftState((prev) => ({ ...prev, text: draftBufferRef.current }));
+    }, []);
+    const flushThought = q2(() => {
+      thoughtRafRef.current = null;
+      setThoughtState((prev) => ({ ...prev, text: thoughtBufferRef.current }));
+    }, []);
+    y2(() => {
+      const handleDraft = (e5) => {
+        const detail = e5.detail;
+        if (detail.delta) {
+          draftBufferRef.current += detail.delta;
+        } else if (detail.text !== void 0) {
+          draftBufferRef.current = detail.text;
+        }
+        if (!draftRafRef.current) {
+          draftRafRef.current = requestAnimationFrame(flushDraft);
+        }
+      };
+      const handleThought = (e5) => {
+        const detail = e5.detail;
+        if (detail.delta) {
+          thoughtBufferRef.current += detail.delta;
+        } else if (detail.text !== void 0) {
+          thoughtBufferRef.current = detail.text;
+        }
+        if (!thoughtRafRef.current) {
+          thoughtRafRef.current = requestAnimationFrame(flushThought);
+        }
+      };
+      const handleStatus = (e5) => {
+        const detail = e5.detail;
+        if (detail.type) setStatus(detail.type);
+        if (detail.text || detail.message) setStatusText(detail.text || detail.message || "");
+      };
+      const handleTurnEnd = () => {
+        draftBufferRef.current = "";
+        thoughtBufferRef.current = "";
+        if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
+        if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
+        draftRafRef.current = null;
+        thoughtRafRef.current = null;
+        setDraftState({ text: "", expanded: false });
+        setThoughtState({ text: "", expanded: false });
+        setStatus(null);
+        setStatusText("");
+      };
+      window.addEventListener("piclaw:agent-draft", handleDraft);
+      window.addEventListener("piclaw:agent-thought", handleThought);
+      window.addEventListener("piclaw:agent-status", handleStatus);
+      window.addEventListener("piclaw:agent-turn-end", handleTurnEnd);
+      return () => {
+        window.removeEventListener("piclaw:agent-draft", handleDraft);
+        window.removeEventListener("piclaw:agent-thought", handleThought);
+        window.removeEventListener("piclaw:agent-status", handleStatus);
+        window.removeEventListener("piclaw:agent-turn-end", handleTurnEnd);
+        if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
+        if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
+      };
+    }, [flushDraft, flushThought]);
+    const hasContent = draft.text || thought.text || status && status !== "idle" && status !== "done";
+    if (!hasContent) return null;
+    const toggleDraftExpand = () => setDraftState((prev) => ({ ...prev, expanded: !prev.expanded }));
+    const toggleThoughtExpand = () => setThoughtState((prev) => ({ ...prev, expanded: !prev.expanded }));
+    return /* @__PURE__ */ u4("div", { className: "agent-status-panel", children: [
+      status && status !== "idle" && status !== "done" && /* @__PURE__ */ u4("div", { className: "agent-status-panel__status", children: [
+        /* @__PURE__ */ u4("div", { className: "agent-status-panel__spinner" }),
+        /* @__PURE__ */ u4("span", { className: "agent-status-panel__status-text", children: statusText || status })
+      ] }),
+      thought.text && /* @__PURE__ */ u4(
+        AgentPanel2,
+        {
+          title: "Thoughts",
+          titleClass: "agent-status-panel__title--thought",
+          text: thought.text,
+          expanded: thought.expanded,
+          onToggle: toggleThoughtExpand
+        }
+      ),
+      draft.text && /* @__PURE__ */ u4(
+        AgentPanel2,
+        {
+          title: "Draft",
+          titleClass: "agent-status-panel__title--draft",
+          text: draft.text,
+          expanded: draft.expanded,
+          onToggle: toggleDraftExpand
+        }
+      )
+    ] });
+  }
+  function AgentPanel2({ title, titleClass, text, expanded, onToggle }) {
+    const contentRef = A2(null);
+    const { visible, truncated } = expanded ? { visible: text, truncated: false } : truncate(text, COLLAPSED_MAX_CHARS);
+    y2(() => {
+      if (contentRef.current) {
+        contentRef.current.textContent = "";
+        const pre = document.createElement("div");
+        pre.className = "agent-status-panel__body-text";
+        pre.textContent = visible;
+        contentRef.current.appendChild(pre);
+      }
+    }, [visible]);
+    return /* @__PURE__ */ u4("div", { className: "agent-status-panel__section", children: [
+      /* @__PURE__ */ u4("div", { className: `agent-status-panel__title ${titleClass || ""}`, onClick: onToggle, style: { cursor: "pointer" }, children: [
+        /* @__PURE__ */ u4(
+          "button",
+          {
+            type: "button",
+            className: "agent-status-panel__toggle",
+            onClick: (e5) => {
+              e5.stopPropagation();
+              onToggle();
+            },
+            "aria-label": `${expanded ? "Collapse" : "Expand"} ${title}`,
+            children: /* @__PURE__ */ u4("svg", { viewBox: "0 0 16 16", width: "12", height: "12", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: expanded ? /* @__PURE__ */ u4("polyline", { points: "4 6 8 10 12 6" }) : /* @__PURE__ */ u4("polyline", { points: "6 4 10 8 6 12" }) })
+          }
+        ),
+        /* @__PURE__ */ u4("span", { className: "agent-status-panel__dot", "aria-hidden": "true" }),
+        /* @__PURE__ */ u4("span", { children: title })
+      ] }),
+      /* @__PURE__ */ u4(
+        "div",
+        {
+          className: `agent-status-panel__body ${expanded ? "agent-status-panel__body--expanded" : ""}`,
+          ref: contentRef
+        }
+      ),
+      !expanded && truncated && /* @__PURE__ */ u4("button", { type: "button", className: "agent-status-panel__more", onClick: onToggle, children: "\u25B8 more" }),
+      expanded && text.length > COLLAPSED_MAX_CHARS && /* @__PURE__ */ u4("button", { type: "button", className: "agent-status-panel__more", onClick: onToggle, children: "\u25B4 show less" })
+    ] });
+  }
+
   // runtime/web/frontend/src/utils/mermaid-render.ts
   function sanitizeSvg(svg) {
     const purify = window.DOMPurify;
@@ -6262,6 +6397,7 @@ ${code}
           } else if (parsed.text !== void 0) {
             setDraft(parsed.text);
           }
+          window.dispatchEvent(new CustomEvent("piclaw:agent-draft", { detail: { delta: parsed.delta, text: parsed.text } }));
           scrollToBottom();
         } catch (err) {
           console.warn("[MessageList] SSE parse error:", err);
@@ -6272,9 +6408,27 @@ ${code}
           const parsed = JSON.parse(e5.data);
           const text = parsed.text ?? parsed.content ?? "";
           setDraft(text);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-draft", { detail: { text } }));
           scrollToBottom();
         } catch (err) {
           console.warn("[MessageList] SSE parse error:", err);
+        }
+      });
+      es.addEventListener("agent_thought_delta", (e5) => {
+        try {
+          const parsed = JSON.parse(e5.data);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-thought", { detail: { delta: parsed.delta, text: parsed.text } }));
+        } catch (err) {
+          console.warn("[MessageList] SSE thought parse error:", err);
+        }
+      });
+      es.addEventListener("agent_thought", (e5) => {
+        try {
+          const parsed = JSON.parse(e5.data);
+          const text = parsed.text ?? parsed.content ?? "";
+          window.dispatchEvent(new CustomEvent("piclaw:agent-thought", { detail: { text } }));
+        } catch (err) {
+          console.warn("[MessageList] SSE thought parse error:", err);
         }
       });
       es.addEventListener("agent_response", (e5) => {
@@ -6287,6 +6441,7 @@ ${code}
           });
           setDraft("");
           scrollToBottom(true);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
           );
@@ -6294,6 +6449,7 @@ ${code}
           console.warn("[MessageList] SSE parse error:", err);
           setDraft("");
           scrollToBottom(true);
+          window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
           window.dispatchEvent(
             new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
           );
@@ -6744,29 +6900,6 @@ ${code}
         },
         msg.id
       )),
-      draft && /* @__PURE__ */ u4("div", { className: "message-list__draft", children: [
-        /* @__PURE__ */ u4(
-          "div",
-          {
-            className: "message-list__avatar-circle message-list__avatar-circle--agent",
-            "aria-hidden": "true",
-            children: "P"
-          }
-        ),
-        /* @__PURE__ */ u4("div", { className: "message-list__body message-list__body--draft", children: [
-          /* @__PURE__ */ u4("div", { className: "message-list__header", children: [
-            /* @__PURE__ */ u4("span", { className: "message-list__name message-list__name--agent", children: "PiClaw" }),
-            /* @__PURE__ */ u4("span", { className: "message-list__draft-indicator", children: "\u25CF typing" })
-          ] }),
-          /* @__PURE__ */ u4(
-            "div",
-            {
-              className: "message-list__content",
-              dangerouslySetInnerHTML: { __html: renderThinkingMarkdown(draft) }
-            }
-          )
-        ] })
-      ] }),
       /* @__PURE__ */ u4("div", { ref: bottomRef })
     ] });
   }
@@ -6865,6 +6998,7 @@ ${code}
       ] }),
       activeTab.value === "chat" ? /* @__PURE__ */ u4(S, { children: [
         /* @__PURE__ */ u4("div", { className: "chat__messages", children: /* @__PURE__ */ u4(MessageList, {}) }),
+        /* @__PURE__ */ u4(AgentStatusPanel, {}),
         /* @__PURE__ */ u4("div", { className: "chat__compose", children: [
           /* @__PURE__ */ u4(
             "textarea",
