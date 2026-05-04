@@ -1,7 +1,7 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-03
-Total open issues: 30
+Updated: 2026-05-04
+Total open issues: 37
 
 ## Vision
 
@@ -148,6 +148,14 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | #195 TTS + copy | ✅ |
 | #209 message collapse + delete | ✅ |
 | #245 Fleet iframe fix | ✅ |
+| #230 real-time agent turn progress | ✅ |
+| #252 thoughts panel | ✅ |
+| #253 tool call progress | ✅ |
+| #254 panel polish | ✅ |
+| #229 CI test expansion | ✅ |
+| #148 adaptive cards renderer | ✅ |
+| #149 widget iframe host | ✅ |
+| #265 send/stop cycle | ✅ |
 | #147 streaming improvements | ❌ closed (superseded by #230) |
 | #145 tool lifecycle events | ❌ closed (superseded by #230) |
 
@@ -227,18 +235,32 @@ Technical debt cleanup. Each PR includes regression tests.
 
 | Task | Description | Status |
 |---|---|---|
-| real-time-agent-turn-progress | Unified AgentProgressPanel — thoughts, draft, tools, MCP progress (positioned between timeline and compose box, like upstream). Requires lifting SSE state out of MessageList. Sub-issues #252-254 exist but need redesign. | ⏳ |
-| #252 | (PR #255 closed — needs redesign as part of unified panel) | ⏳ |
+| real-time-agent-turn-progress | Unified AgentProgressPanel — thoughts, draft, tools, MCP progress (positioned between timeline and compose box, like upstream). Requires lifting SSE state out of MessageList. Sub-issues #252-254 exist but need redesign. | ✅ |
+| #252 | (PR #255 closed — needs redesign as part of unified panel) | ✅ |
 | message-collapse-delete-actions | Message collapse + delete actions (#209) | ✅ |
 | message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ✅ |
-| separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ⏳ (partially done) |
+| separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ✅ (307 tests across 31 files) |
+
+### Wave 11c — Compose Bar Redesign (#141)
+
+| Task | Description | Status |
+|---|---|---|
+| #265 | Send/Stop cycle | ✅ |
+| #266 | Attachment pills | ⏳ |
+| #272 | Session pill | ⏳ |
+| #267 | Image paste | ⏳ |
+| #268 | File drag & drop | ⏳ |
+| #269 | Workspace file attach | ⏳ |
+| #270 | Steer | ⏳ |
+| #271 | Queued followups | ⏳ |
 
 ### Wave 11 — Full Functionality (after UX polish)
 
 | Task | Description | Status |
 |---|---|---|
-| 018-task-adaptive-cards-renderer | Adaptive cards in chat (#148) | ⏳ |
-| 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ⏳ |
+| 018-task-adaptive-cards-renderer | Adaptive cards in chat (#148) | ✅ |
+| 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ✅ |
+| widget pane not opening | Bug (#264) | ⏳ |
 | full-compose-bar-redesign | Full compose bar redesign — send/stop, attachments, paste images, workspace file attach, queue, steer button (depends on #230) | ⏳ |
 | central-pane-tab-bar | Chat / Dashboards / Terminal tabs (#89) | ⏳ |
 | 024-task-terminal-tabs | Multi-tab terminal (#150) | ⏳ |
