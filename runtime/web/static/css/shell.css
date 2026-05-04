@@ -902,13 +902,12 @@ body {
 }
 
 .chat__compose {
-  background: var(--bg-sidebar);
+  background: var(--bg);
   border-top: 1px solid var(--border);
-  padding: 12px;
+  padding: 10px 14px;
   display: flex;
   gap: 10px;
-  align-items: flex-end;
-  flex-shrink: 0;
+  align-items: center;
 }
 
 .chat__input {
@@ -917,29 +916,79 @@ body {
   border: 1px solid var(--input-border);
   background: var(--input-bg);
   color: var(--text);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
   outline: none;
   resize: none;
-  line-height: 1.4;
-  max-height: 25vh;
-  overflow-y: hidden;
+  line-height: 1.5;
+  min-height: 60px;
+  max-height: 30vh;
+  overflow-y: auto;
   font-family: inherit;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
+.chat__input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .chat__send-btn {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--bg-terminal);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: #a6e3a1;
+  color: #1e1e2e;
+  border-radius: 50%;
   cursor: pointer;
-  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.15s, transform 0.1s, opacity 0.15s;
+}
+
+.chat__send-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+}
+
+.chat__send-btn:active {
+  transform: scale(0.95);
+}
+
+.chat__send-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+.chat__stop-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--error, #f38ba8);
+  background: transparent;
+  color: var(--error, #f38ba8);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.15s, transform 0.1s;
+  animation: stopPulse 1.5s ease-in-out infinite;
+}
+
+.chat__stop-btn:hover {
+  background: rgba(243, 139, 168, 0.15);
+  transform: scale(1.05);
+}
+
+@keyframes stopPulse {
+  0%, 100% { border-color: var(--error, #f38ba8); }
+  50% { border-color: rgba(243, 139, 168, 0.4); }
 }
 
 .chat__send-btn--sending {

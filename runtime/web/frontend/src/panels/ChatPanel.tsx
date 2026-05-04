@@ -22,8 +22,19 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const extensionPages = useSignal<ExtensionRoute[]>([]);
   const isSending = useSignal(false);
   const sendError = useSignal<string | null>(null);
+  const isAgentRunning = useSignal(false);
 
   useEffect(() => {
+    const agentStatusHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.type === "done" || detail?.type === "idle") {
+        isAgentRunning.value = false;
+      } else if (detail?.type === "thinking" || detail?.type === "running" || detail?.type === "tool_call" || detail?.type === "tool_status") {
+        isAgentRunning.value = true;
+      }
+    };
+    window.addEventListener("piclaw:agent-status", agentStatusHandler);
+
     fetch("/api/extension-routes", { credentials: "include" })
       .then((res) => res.json())
       .then((routes: ExtensionRoute[]) => {
@@ -47,7 +58,10 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     }
   };
   window.addEventListener("piclaw:widget-submission", widgetSubmissionHandler);
-  return () => window.removeEventListener("piclaw:widget-submission", widgetSubmissionHandler);
+  return () => {
+    window.removeEventListener("piclaw:agent-status", agentStatusHandler);
+    window.removeEventListener("piclaw:widget-submission", widgetSubmissionHandler);
+  };
   }, []);
 
   const handleInput = (e: Event) => {
@@ -64,6 +78,30 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
     el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
   };
+
+  const abortAgent = async () => {
+    try {
+      await fetch(getMessageUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ content: "/abort" }),
+      });
+    } catch {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to abort", type: "error" } }));
+    }
+  };
+
+  // Global Escape key to abort agent
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isAgentRunning.value) {
+        abortAgent();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const sendMessage = async () => {
     const el = textareaRef.current;
@@ -152,24 +190,44 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               ref={textareaRef}
               className="chat__input"
               placeholder="Type a message..."
-              rows={1}
+              rows={3}
               onInput={handleInput}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   sendMessage();
                 }
+                if (e.key === "Escape" && isAgentRunning.value) {
+                  abortAgent();
+                }
               }}
             />
-            <button
-              type="button"
-              className={`chat__send-btn${isSending.value ? " chat__send-btn--sending" : ""}`}
-              onClick={sendMessage}
-              disabled={isSending.value}
-              aria-label={isSending.value ? "Sending..." : "Send message"}
-            >
-              {isSending.value ? "Sending..." : "Send"}
-            </button>
+            {isAgentRunning.value ? (
+              <button
+                type="button"
+                className="chat__stop-btn"
+                onClick={abortAgent}
+                aria-label="Stop response"
+                title="Stop response (Escape)"
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="chat__send-btn"
+                onClick={sendMessage}
+                disabled={isSending.value}
+                aria-label={isSending.value ? "Sending..." : "Send message"}
+                title="Send (Enter)"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            )}
           </div>
           {sendError.value && (
             <div className="chat__send-error">
