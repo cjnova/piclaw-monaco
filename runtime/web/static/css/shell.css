@@ -4199,3 +4199,25 @@ pre.frontmatter-block {
   font-size: 13px;
   text-align: center;
 }
+
+/* ── Inline Media ─────────────────────────────── */
+.message-list__media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.message-list__media-img {
+  max-width: 300px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: zoom-in;
+  border: 1px solid var(--border);
+  transition: opacity 0.15s;
+}
+
+.message-list__media-img:hover {
+  opacity: 0.85;
+}

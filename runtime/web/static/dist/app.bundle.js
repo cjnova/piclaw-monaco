@@ -6367,6 +6367,7 @@ ${code}
       type: rawType === "user" || rawType === "user_message" ? "user" : "agent",
       content: String(raw.content ?? data?.content ?? ""),
       content_blocks: raw.content_blocks ?? data?.content_blocks,
+      media_ids: raw.media_ids ?? data?.media_ids,
       created_at: String(raw.created_at ?? raw.timestamp ?? ""),
       data
     };
@@ -7258,7 +7259,17 @@ ${code}
                 dangerouslySetInnerHTML: isUser ? void 0 : { __html: renderMarkdown(interaction.content) },
                 children: isUser ? interaction.content : void 0
               }
-            )
+            ),
+            interaction.media_ids && interaction.media_ids.length > 0 && /* @__PURE__ */ u4("div", { className: "message-list__media", children: interaction.media_ids.map((id) => /* @__PURE__ */ u4(
+              "img",
+              {
+                className: "message-list__media-img",
+                src: `/media/${id}`,
+                alt: "attachment",
+                loading: "lazy"
+              },
+              id
+            )) })
           ] })
         ]
       }

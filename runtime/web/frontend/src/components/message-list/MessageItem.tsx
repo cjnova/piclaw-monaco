@@ -223,6 +223,19 @@ export function MessageItem({
             {isUser ? interaction.content : undefined}
           </div>
         )}
+        {interaction.media_ids && interaction.media_ids.length > 0 && (
+          <div className="message-list__media">
+            {interaction.media_ids.map((id) => (
+              <img
+                key={id}
+                className="message-list__media-img"
+                src={`/media/${id}`}
+                alt="attachment"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

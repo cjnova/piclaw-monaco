@@ -34,6 +34,7 @@ export function normalizePost(raw: Record<string, unknown>): Interaction {
     content_blocks: (raw.content_blocks ?? data?.content_blocks) as
       | ContentBlock[]
       | undefined,
+    media_ids: (raw.media_ids ?? data?.media_ids) as number[] | undefined,
     created_at: String(raw.created_at ?? raw.timestamp ?? ""),
     data,
   };

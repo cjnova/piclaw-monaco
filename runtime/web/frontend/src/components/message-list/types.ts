@@ -22,6 +22,7 @@ export interface Interaction {
   type: "user" | "agent";
   content: string;
   content_blocks?: ContentBlock[];
+  media_ids?: number[];
   created_at: string;
   data?: Record<string, unknown>;
 }
