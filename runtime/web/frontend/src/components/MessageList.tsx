@@ -1,6 +1,5 @@
 import { useSignal } from "@preact/signals";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 import { buildChatUrl } from "../api/chat-jid";
 import { useScrollManager } from "./message-list/useScrollManager";
 import { useTimelineFetch } from "./message-list/useTimelineFetch";
@@ -141,30 +140,6 @@ export function MessageList() {
           onDelete={() => handleDeleteMessage(msg.id)}
         />
       ))}
-
-      {draft && (
-        <div className="message-list__draft">
-          <div
-            className="message-list__avatar-circle message-list__avatar-circle--agent"
-            aria-hidden="true"
-          >
-            P
-          </div>
-          <div className="message-list__body message-list__body--draft">
-            <div className="message-list__header">
-              <span className="message-list__name message-list__name--agent">
-                PiClaw
-              </span>
-              <span className="message-list__draft-indicator">● typing</span>
-            </div>
-            <div
-              className="message-list__content"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
-              dangerouslySetInnerHTML={{ __html: renderThinkingMarkdown(draft) }}
-            />
-          </div>
-        </div>
-      )}
 
       <div ref={bottomRef} />
     </div>
