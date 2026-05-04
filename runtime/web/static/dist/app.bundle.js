@@ -6676,6 +6676,210 @@ ${code}
     ] });
   }
 
+  // runtime/web/frontend/src/components/message-list/AdaptiveCardRenderer.tsx
+  var sdkLoaded = false;
+  var sdkLoadPromise = null;
+  async function ensureSdk() {
+    if (sdkLoaded) return;
+    if (globalThis.AdaptiveCards) {
+      sdkLoaded = true;
+      return;
+    }
+    if (sdkLoadPromise) return sdkLoadPromise;
+    sdkLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector(
+        'script[src="/static/js/vendor/adaptivecards.min.js"]'
+      );
+      if (existing) {
+        existing.addEventListener("load", () => {
+          sdkLoaded = true;
+          resolve();
+        });
+        existing.addEventListener(
+          "error",
+          () => reject(new Error("adaptivecards SDK failed to load"))
+        );
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "/static/js/vendor/adaptivecards.min.js";
+      script.onload = () => {
+        sdkLoaded = true;
+        resolve();
+      };
+      script.onerror = () => reject(new Error("Failed to load adaptivecards SDK"));
+      document.head.appendChild(script);
+    });
+    return sdkLoadPromise;
+  }
+  function getAC() {
+    return globalThis.AdaptiveCards;
+  }
+  function buildHostConfig() {
+    const style = globalThis.getComputedStyle?.(document.documentElement);
+    const get = (v5, fallback) => style?.getPropertyValue(v5)?.trim() || fallback;
+    const bg = get("--sidebarBg", "#1e1e2e");
+    const fg = get("--text-primary", "#cdd6f4");
+    const accent = get("--accent-color", "#89b4fa");
+    const border = get("--border-color", "#45475a");
+    const fgMuted = get("--text-secondary", "#a6adc8");
+    return {
+      $schema: "http://adaptivecards.io/schemas/host-config.json",
+      fontFamily: "var(--font-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)",
+      containerStyles: {
+        default: { backgroundColor: bg, foregroundColors: { default: { default: fg, subtle: fgMuted } } },
+        emphasis: { backgroundColor: bg, foregroundColors: { default: { default: fg, subtle: fgMuted } } }
+      },
+      actions: {
+        actionAlignment: "left",
+        buttonSpacing: 8,
+        showCard: { actionMode: "inline", inlineTopMargin: 8 },
+        actionsOrientation: "horizontal"
+      },
+      adaptiveCard: { allowCustomStyle: true },
+      separator: { lineThickness: 1, lineColor: border },
+      imageSizes: { small: 40, medium: 80, large: 160 },
+      inputs: {
+        label: { requiredInputs: { weight: "bolder", color: "attention" }, optionalInputs: {} },
+        errorMessage: { spacing: "small", size: "small", weight: "bolder", color: "attention" }
+      },
+      // Accent color is used for buttons/links
+      hostCapabilities: {}
+    };
+  }
+  var SUPPORTED_VERSIONS = /* @__PURE__ */ new Set(["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6"]);
+  function isAdaptiveCardBlock(block) {
+    return block.type === "adaptive_card" && typeof block.card_id === "string" && typeof block.schema_version === "string" && typeof block.payload === "object" && block.payload !== null;
+  }
+  function extractCardBlocks(blocks) {
+    return blocks.filter(isAdaptiveCardBlock);
+  }
+  async function renderCard(cardEl, block, postId, chatJid) {
+    try {
+      await ensureSdk();
+    } catch (err) {
+      console.error("[AdaptiveCard] SDK load failed:", err);
+      const el = document.createElement("div");
+      el.className = "adaptive-card-fallback";
+      el.textContent = block.fallback_text ?? "Card could not be rendered (SDK unavailable).";
+      cardEl.appendChild(el);
+      return;
+    }
+    if (!SUPPORTED_VERSIONS.has(block.schema_version)) {
+      console.warn(`[AdaptiveCard] Unsupported schema version ${block.schema_version}`);
+      const el = document.createElement("div");
+      el.className = "adaptive-card-fallback";
+      el.textContent = block.fallback_text ?? `Unsupported card version: ${block.schema_version}`;
+      cardEl.appendChild(el);
+      return;
+    }
+    try {
+      const AC = getAC();
+      if (!AC?.AdaptiveCard) {
+        throw new Error("AdaptiveCards global not found");
+      }
+      if (!AC.AdaptiveCard.onProcessMarkdown) {
+        AC.AdaptiveCard.onProcessMarkdown = (text, result) => {
+          result.outputHtml = text;
+          result.didProcess = true;
+        };
+      }
+      const card = new AC.AdaptiveCard();
+      card.hostConfig = new AC.HostConfig(buildHostConfig());
+      card.parse(block.payload);
+      card.onExecuteAction = (action) => {
+        const type = (typeof action?.getJsonTypeName === "function" ? action.getJsonTypeName() : "") || action?.constructor?.name || "Unknown";
+        const title = typeof action?.title === "string" ? action.title : "";
+        const url = typeof action?.url === "string" ? action.url : void 0;
+        const data = action?.data ?? void 0;
+        if (type === "Action.OpenUrl") {
+          const safeUrl = url ?? "";
+          if (safeUrl && /^https?:\/\/|^\//i.test(safeUrl)) {
+            window.open(safeUrl, "_blank", "noopener,noreferrer");
+          }
+          return;
+        }
+        if (type === "Action.Submit") {
+          cardEl.classList.add("adaptive-card-busy");
+          fetch("/agent/card-action", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({
+              post_id: postId,
+              thread_id: postId,
+              chat_jid: chatJid ?? "web:default",
+              card_id: block.card_id,
+              action: { type, title, data }
+            })
+          }).catch((err) => console.error("[AdaptiveCard] Submit failed:", err)).finally(() => cardEl.classList.remove("adaptive-card-busy"));
+          return;
+        }
+        console.warn("[AdaptiveCard] Unsupported action:", type);
+      };
+      const rendered = card.render();
+      if (!rendered) {
+        throw new Error("card.render() returned null");
+      }
+      cardEl.classList.add("adaptive-card-container");
+      if (block.state !== "active") {
+        cardEl.classList.add("adaptive-card-finished");
+        const label = block.state === "completed" ? "Submitted" : block.state === "cancelled" ? "Cancelled" : "Failed";
+        const banner = document.createElement("div");
+        banner.className = `adaptive-card-status adaptive-card-status-${block.state}`;
+        banner.textContent = label;
+        if (block.completed_at) {
+          const detail = document.createElement("span");
+          detail.className = "adaptive-card-status-detail";
+          try {
+            detail.textContent = " \xB7 " + new Intl.DateTimeFormat(void 0, {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit"
+            }).format(new Date(block.completed_at));
+          } catch {
+          }
+          banner.appendChild(detail);
+        }
+        cardEl.appendChild(banner);
+        const inputs = rendered.querySelectorAll("input, select, textarea, button");
+        for (const el of inputs) {
+          el.setAttribute("disabled", "");
+        }
+      }
+      cardEl.appendChild(rendered);
+    } catch (err) {
+      console.error("[AdaptiveCard] Render error:", err);
+      const el = document.createElement("div");
+      el.className = "adaptive-card-fallback";
+      el.textContent = block.fallback_text ?? "Card failed to render.";
+      cardEl.appendChild(el);
+    }
+  }
+  function AdaptiveCardRenderer({ blocks, postId, chatJid }) {
+    const containerRef = A2(null);
+    const cardBlocks = T2(() => extractCardBlocks(blocks), [blocks]);
+    const cardBlocksKey = T2(
+      () => cardBlocks.map((b5) => `${b5.card_id}:${b5.state}`).join("|"),
+      [cardBlocks]
+    );
+    y2(() => {
+      if (!containerRef.current || cardBlocks.length === 0) return;
+      const container = containerRef.current;
+      container.innerHTML = "";
+      void (async () => {
+        for (const block of cardBlocks) {
+          const cardEl = document.createElement("div");
+          container.appendChild(cardEl);
+          await renderCard(cardEl, block, postId, chatJid);
+        }
+      })();
+    }, [cardBlocksKey, postId, chatJid]);
+    if (cardBlocks.length === 0) return null;
+    return /* @__PURE__ */ u4("div", { className: "message-list__adaptive-cards", ref: containerRef });
+  }
+
   // runtime/web/frontend/src/components/message-list/MessageItem.tsx
   function ToolCallBlock({ useBlock, resultBlock }) {
     const [open, setOpen] = d2(false);
@@ -6837,6 +7041,13 @@ ${code}
               },
               getBlockKey(pair.use, i6)
             )) }),
+            interaction.content_blocks && extractCardBlocks(interaction.content_blocks).length > 0 && /* @__PURE__ */ u4(
+              AdaptiveCardRenderer,
+              {
+                blocks: interaction.content_blocks,
+                postId: interaction.id
+              }
+            ),
             interaction.content && /* @__PURE__ */ u4(
               "div",
               {
