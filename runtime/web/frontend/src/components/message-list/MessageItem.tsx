@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
+import { ImageLightbox } from "../ImageLightbox";
 import { relativeTime, getBlockKey } from "./helpers";
 import { MessageActionBar } from "./MessageActionBar";
 import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer";
@@ -78,6 +79,15 @@ export function MessageItem({
   onDelete,
 }: MessageItemProps) {
   const isUser = interaction.type === "user";
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
+  const handleContentClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "IMG") {
+      const src = (target as HTMLImageElement).src;
+      if (src) setLightboxSrc(src);
+    }
+  };
 
   // Pair tool_use with their tool_result blocks
   const toolPairs: { use: ContentBlock; result?: ContentBlock }[] = [];
@@ -213,6 +223,7 @@ export function MessageItem({
         {interaction.content && (
           <div
             className="message-list__content"
+            onClick={handleContentClick}
             // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
             dangerouslySetInnerHTML={
               isUser
@@ -222,6 +233,9 @@ export function MessageItem({
           >
             {isUser ? interaction.content : undefined}
           </div>
+        )}
+        {lightboxSrc && (
+          <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
         )}
       </div>
     </div>
