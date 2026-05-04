@@ -139,6 +139,49 @@ export function useTimelineStream({
       }
     });
 
+    es.addEventListener("generated_widget_open", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("piclaw:widget-open", { detail: data }));
+      } catch (err) {
+        console.warn("[MessageList] SSE widget parse error:", err);
+      }
+    });
+
+    es.addEventListener("generated_widget_delta", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("piclaw:widget-delta", { detail: data }));
+      } catch (err) {
+        console.warn("[MessageList] SSE widget parse error:", err);
+      }
+    });
+
+    es.addEventListener("generated_widget_final", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("piclaw:widget-final", { detail: data }));
+      } catch (err) {
+        console.warn("[MessageList] SSE widget parse error:", err);
+      }
+    });
+
+    es.addEventListener("generated_widget_close", (e: MessageEvent) => {
+      try {
+        window.dispatchEvent(new CustomEvent("piclaw:widget-close", { detail: JSON.parse(e.data) }));
+      } catch (err) {
+        console.warn("[MessageList] SSE widget parse error:", err);
+      }
+    });
+
+    es.addEventListener("generated_widget_error", (e: MessageEvent) => {
+      try {
+        window.dispatchEvent(new CustomEvent("piclaw:widget-error", { detail: JSON.parse(e.data) }));
+      } catch (err) {
+        console.warn("[MessageList] SSE widget parse error:", err);
+      }
+    });
+
     es.onopen = () => {
       setConnected(true);
       window.dispatchEvent(new Event("piclaw:sse-connected"));
