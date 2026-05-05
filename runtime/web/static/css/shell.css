@@ -1366,7 +1366,6 @@ body {
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior: contain;
   padding: 16px 16px 8px;
   display: flex;
   flex-direction: column;
@@ -1537,7 +1536,6 @@ body {
   line-height: 1.6;
   color: var(--text);
   word-break: break-word;
-  overflow-wrap: break-word;
   white-space: pre-wrap;
   overflow-x: hidden;
   max-width: 100%;
