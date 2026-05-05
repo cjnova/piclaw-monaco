@@ -25,13 +25,140 @@ function chatName(entry: { jid: string; name?: string; display_name?: string }):
 
 // ─── Tasks Tab ────────────────────────────────────────────────────────────────
 
+interface ScheduledTask {
+  id: string;
+  task_kind: "agent" | "shell";
+  schedule_type: "cron" | "interval" | "once";
+  schedule_value: string;
+  status: "active" | "paused" | "completed";
+  prompt?: string;
+  command?: string;
+  created_at?: string;
+  last_run_at?: string;
+  next_run_at?: string;
+  run_count?: number;
+}
+
 function TasksTab() {
+  const [tasks, setTasks] = useState<ScheduledTask[]>([]);
+  const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await fetch("/agent/scheduled-tasks", { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setTasks(data.tasks || []);
+      setStatus("done");
+    } catch {
+      setStatus("error");
+    }
+  }, []);
+
+  useEffect(() => { void fetchTasks(); }, [fetchTasks]);
+
+  const handleAction = useCallback(async (taskId: string, action: "pause" | "resume" | "delete") => {
+    setActionBusy(taskId);
+    try {
+      const res = await fetch("/agent/scheduled-tasks/action", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId, action }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchTasks();
+    } catch {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", {
+        detail: { message: `Failed to ${action} task`, type: "error" },
+      }));
+    } finally {
+      setActionBusy(null);
+    }
+  }, [fetchTasks]);
+
+  if (status === "loading") {
+    return (
+      <div className="tasks-panel__list">
+        <div className="tasks-panel__empty">Loading tasks…</div>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className="tasks-panel__list">
+        <div className="tasks-panel__empty">
+          <span>Failed to load tasks</span>
+          <button className="tasks-panel__retry-btn" onClick={() => { setStatus("loading"); void fetchTasks(); }}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <div className="tasks-panel__list">
+        <div className="tasks-panel__empty">
+          <i className="codicon codicon-tasklist" />
+          <span>No scheduled tasks</span>
+          <span className="tasks-panel__hint">Use /schedule in chat to create one.</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="tasks-panel__list">
-      <div className="tasks-panel__empty">
-        <i className="codicon codicon-tasklist" />
-        <span>No scheduled tasks</span>
-      </div>
+      {tasks.map((task) => (
+        <div key={task.id} className={`tasks-panel__item tasks-panel__item--${task.status}`}>
+          <div className="tasks-panel__item-header">
+            <span className={`tasks-panel__status-dot tasks-panel__status-dot--${task.status}`} />
+            <span className="tasks-panel__item-kind">{task.task_kind}</span>
+            <span className="tasks-panel__item-schedule">{task.schedule_type}: {task.schedule_value}</span>
+          </div>
+          <div className="tasks-panel__item-content">
+            {task.prompt || task.command || task.id}
+          </div>
+          {task.last_run_at && (
+            <div className="tasks-panel__item-meta">
+              Last run: {new Date(task.last_run_at).toLocaleString()}
+              {task.run_count != null && ` (×${task.run_count})`}
+            </div>
+          )}
+          <div className="tasks-panel__item-actions">
+            {task.status === "active" && (
+              <button
+                className="tasks-panel__action-icon"
+                disabled={actionBusy === task.id}
+                onClick={() => handleAction(task.id, "pause")}
+                title="Pause"
+              >
+                <i className="codicon codicon-debug-pause" />
+              </button>
+            )}
+            {task.status === "paused" && (
+              <button
+                className="tasks-panel__action-icon"
+                disabled={actionBusy === task.id}
+                onClick={() => handleAction(task.id, "resume")}
+                title="Resume"
+              >
+                <i className="codicon codicon-play" />
+              </button>
+            )}
+            <button
+              className="tasks-panel__action-icon tasks-panel__action-icon--delete"
+              disabled={actionBusy === task.id}
+              onClick={() => handleAction(task.id, "delete")}
+              title="Delete"
+            >
+              <i className="codicon codicon-trash" />
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
