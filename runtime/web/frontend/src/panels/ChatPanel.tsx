@@ -44,6 +44,11 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   attachmentsRef.current = attachments;
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    try { return localStorage.getItem("piclaw:notifications") === "on"; } catch { return false; }
+  });
 
   // Command history (ArrowUp/Down)
   const historyRef = useRef<string[]>([]);
@@ -243,6 +248,104 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Speech-to-text
+  const hasSpeechSupport = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+
+    // Track the text before STT started so we can append cleanly
+    const baseText = textareaRef.current?.value || "";
+
+    recognition.onresult = (event: any) => {
+      const el = textareaRef.current;
+      if (!el) return;
+      let interim = "";
+      let final = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += text;
+        } else {
+          interim += text;
+        }
+      }
+      // Show interim results live in textarea
+      if (final) {
+        const current = el.value;
+        el.value = current.replace(/\u200B.*$/, "") + (current && !current.endsWith(" ") ? " " : "") + final;
+        hasText.value = el.value.trim().length > 0;
+      } else if (interim) {
+        // Show interim with zero-width space marker (replaced on next update)
+        const current = el.value.replace(/\u200B.*$/, "");
+        el.value = current + (current && !current.endsWith(" ") ? " " : "") + "\u200B" + interim;
+        hasText.value = el.value.trim().length > 0;
+      }
+    };
+    recognition.onerror = (event: any) => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      const msg = event.error === "not-allowed"
+        ? "Microphone permission denied"
+        : event.error === "no-speech"
+        ? "No speech detected"
+        : `Speech error: ${event.error}`;
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: msg, type: "error" } }));
+    };
+    recognition.onend = () => {
+      // Clean up interim markers
+      const el = textareaRef.current;
+      if (el) el.value = el.value.replace(/\u200B.*$/, "");
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsListening(true);
+  };
+
+  // Browser notifications
+  const toggleNotifications = async () => {
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false);
+      try { localStorage.setItem("piclaw:notifications", "off"); } catch {}
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Notifications disabled", type: "success" } }));
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      setNotificationsEnabled(true);
+      try { localStorage.setItem("piclaw:notifications", "on"); } catch {}
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Notifications enabled", type: "success" } }));
+    } else {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Notification permission denied", type: "error" } }));
+    }
+  };
+
+  // Fire notification on new agent message when tab is not focused
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+    const handler = (e: Event) => {
+      if (document.hasFocus()) return;
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      const body = typeof detail.content === "string" ? detail.content.slice(0, 100) : "New message";
+      try { new Notification("PiClaw", { body, icon: "/static/img/favicon.png" }); } catch {}
+    };
+    window.addEventListener("piclaw:new-message", handler);
+    return () => window.removeEventListener("piclaw:new-message", handler);
+  }, [notificationsEnabled]);
+
   const sendMessage = async () => {
     const el = textareaRef.current;
     if (!el || isSending.value) return;
@@ -393,15 +496,39 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               onDragOver={handleDragOver as any}
               onDrop={handleDrop as any}
             >
-              <button
-                type="button"
-                className="chat__clip-btn"
-                onClick={handleClipClick}
-                aria-label="Attach file"
-                title="Attach file"
-              >
-                <i className="codicon codicon-attach" />
-              </button>
+              <div className="chat__toolbar">
+                <button
+                  type="button"
+                  className="chat__toolbar-btn"
+                  onClick={handleClipClick}
+                  aria-label="Attach file"
+                  title="Attach file"
+                >
+                  <i className="codicon codicon-attach" />
+                </button>
+                {hasSpeechSupport && (
+                  <button
+                    type="button"
+                    className={`chat__toolbar-btn${isListening ? " chat__toolbar-btn--active" : ""}`}
+                    onClick={toggleListening}
+                    aria-label={isListening ? "Stop listening" : "Speech to text"}
+                    title={isListening ? "Stop listening" : "Speech to text"}
+                  >
+                    <i className={`codicon codicon-${isListening ? "debug-stop" : "mic"}`} />
+                  </button>
+                )}
+                {"Notification" in window && (
+                  <button
+                    type="button"
+                    className={`chat__toolbar-btn${notificationsEnabled ? " chat__toolbar-btn--notif-on" : ""}`}
+                    onClick={toggleNotifications}
+                    aria-label={notificationsEnabled ? "Disable notifications" : "Enable notifications"}
+                    title={notificationsEnabled ? "Notifications on" : "Notifications off"}
+                  >
+                    <i className={`codicon codicon-${notificationsEnabled ? "bell" : "bell-slash"}`} />
+                  </button>
+                )}
+              </div>
               {attachments.length > 0 && (
                 <div className="chat__attachments">
                   {attachments.map((att, i) => (

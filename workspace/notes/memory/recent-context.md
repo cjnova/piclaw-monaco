@@ -1,16 +1,16 @@
 # Agent-ready recent context
 
-Generated: 2026-05-04T07:12:40.277Z
+Generated: 2026-05-05T08:14:31.641Z
 
 Source: `/workspace/piclaw-monaco/workspace/notes/daily`
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 4
+- Complete days: 5
 - Partial days: 0
 - Unsummarised days: 0
-- Latest complete day: 2026-05-03
+- Latest complete day: 2026-05-04
 
 ## Recent complete days
 
@@ -61,3 +61,15 @@ Source: `/workspace/piclaw-monaco/workspace/notes/daily`
 #### Summary
 
 - Afternoon UI testing session (15:35–16:34 UTC). User tested web frontend rendering: multiple greeting messages for connectivity, a comprehensive Markdown features test (tables, KaTeX math equations, task lists, blockquotes, nested lists), and a Bicep code syntax highlighting check. No project decisions or substantive work — purely QA/rendering verification.
+
+### 2026-05-04
+
+- State: complete
+- Summarised until: 2026-05-04T16:19:15.200Z
+- Messages: 49
+- Session trees: 1
+- Session chats: 1
+
+#### Summary
+
+- Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ repeated "Write 5 paragraphs about TypeScript" requests — stress-testing long-form content generation and rendering. Mid-session: workspace exploration commands, attempted file/image uploads that arrived empty (attachment handling appears broken on the UI side), and elapsed-time alignment checks. Afternoon phase: active feature development on branch `feat/276-tool-context` — repeated `git status` monitoring showing ChatPanel.tsx edits, creation of `runtime/test/monaco/components/send-stop.test.ts`, and bundle rebuilds. No substantive project decisions; mix of UI stress-testing and active coding.

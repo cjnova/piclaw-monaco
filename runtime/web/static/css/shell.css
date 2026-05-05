@@ -952,6 +952,53 @@ body {
   max-width: 150px;
 }
 
+/* Compose toolbar */
+.chat__toolbar {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  z-index: 1;
+}
+
+.chat__toolbar-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  transition: color 0.15s, background-color 0.15s;
+  opacity: 0.7;
+}
+
+.chat__toolbar-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 1;
+}
+
+.chat__toolbar-btn--active {
+  color: var(--error, #f38ba8);
+  opacity: 1;
+  animation: pulse-mic 1s infinite;
+}
+
+.chat__toolbar-btn--notif-on {
+  color: var(--accent);
+  opacity: 1;
+}
+
+@keyframes pulse-mic {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .chat__clip-btn {
   position: absolute;
   top: 4px;
