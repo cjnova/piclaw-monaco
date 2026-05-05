@@ -1460,17 +1460,20 @@ body {
   overflow-x: auto;
   display: block;
   max-width: 100%;
+}
+
+.message-list__content table {
   border-collapse: collapse;
 }
 
-.message-list__item--agent th,
-.message-list__item--agent td {
+.message-list__content th,
+.message-list__content td {
   border: 1px solid var(--border);
   padding: 6px 10px;
   text-align: left;
 }
 
-.message-list__item--agent th {
+.message-list__content th {
   background: var(--overlay-white-05, rgba(255,255,255,0.05));
   font-weight: 600;
 }
