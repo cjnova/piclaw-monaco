@@ -71,47 +71,42 @@ export function WorkspaceActions({ node, downloadUrl, isDeleting, onDelete }: Wo
   return (
     <div className="workspace__preview-actions">
       <button
-        className="workspace__preview-action-btn"
+        className="workspace__action-icon workspace__action-icon--attach"
         onClick={attachToChat}
-        title="Attach file to chat message"
+        title="Attach to chat"
       >
         <span className="codicon codicon-attach" />
-        Attach to chat
       </button>
       <button
-        className="workspace__preview-action-btn"
+        className="workspace__action-icon workspace__action-icon--copy"
         onClick={copyPath}
         title="Copy path"
       >
         <span className="codicon codicon-copy" />
-        Copy path
       </button>
       <a
-        className="workspace__preview-action-btn"
+        className="workspace__action-icon workspace__action-icon--download"
         href={downloadUrl}
         title="Download"
       >
         <span className="codicon codicon-cloud-download" />
-        Download
       </a>
       {OPENABLE_EXTS.has(ext) && (
         <button
-          className="workspace__preview-action-btn"
+          className="workspace__action-icon workspace__action-icon--open"
           onClick={() => void handleOpenFile()}
-          title="Open in central pane"
+          title="Open preview"
         >
           <span className="codicon codicon-open-preview" />
-          Open
         </button>
       )}
       <button
-        className="workspace__preview-action-btn workspace__preview-action-btn--danger"
+        className="workspace__action-icon workspace__action-icon--delete"
         disabled={isDeleting}
         onClick={onDelete}
-        title="Delete file"
+        title={isDeleting ? "Deleting…" : "Delete file"}
       >
         <span className="codicon codicon-trash" />
-        {isDeleting ? "Deleting…" : "Delete"}
       </button>
     </div>
   );

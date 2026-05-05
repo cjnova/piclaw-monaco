@@ -1581,14 +1581,8 @@ body {
 
 .workspace__pane-top {
   flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-}
-
-.workspace__pane-top::-webkit-scrollbar {
-  width: 0;
-  display: none;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
 }
 
 .workspace__section {
@@ -1605,23 +1599,24 @@ body {
 }
 
 .workspace__drag-handle {
-  height: 6px;
+  height: 4px;
   cursor: row-resize;
-  background: var(--handle);
+  background: transparent;
   flex-shrink: 0;
   transition: background 0.1s;
 }
 
 .workspace__drag-handle:hover {
-  background: var(--handle-hover);
+  background: var(--accent);
 }
 
 .workspace__pane-bottom {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
 }
 
 .workspace__pane-bottom,
@@ -1634,8 +1629,8 @@ body {
 .workspace__pane-bottom::-webkit-scrollbar,
 .workspace__preview-content::-webkit-scrollbar,
 .file-tree::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .workspace__pane-bottom::-webkit-scrollbar-track,
@@ -1662,12 +1657,14 @@ body {
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
 }
 
 .workspace__preview-empty {
   font-size: 13px;
   color: var(--text-muted);
+  padding: 8px 12px;
 }
 
 .workspace__section-header--padded {
@@ -1680,6 +1677,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 12px;
 }
 
 .workspace__preview-name {
@@ -1730,9 +1731,10 @@ body {
 /* Preview content area — scrollable independently */
 .workspace__preview-content {
   margin-top: 8px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: 400px;
   border-radius: 4px;
 }
 
@@ -1815,61 +1817,52 @@ body {
 /* Action buttons row */
 .workspace__preview-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   margin-top: 8px;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
-/* Individual action button */
-.workspace__preview-action-btn,
-.workspace__folder-action-btn {
+/* Icon-only action buttons */
+.workspace__action-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 10px;
-  min-height: 30px;
-  min-width: 110px;
-  font-size: 12px;
-  background: var(--bg-elevated, rgba(255,255,255,0.07));
-  color: var(--text);
-  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  background: none;
+  color: var(--text-muted);
+  border: none;
   border-radius: 6px;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background-color 0.15s;
+  opacity: 0.7;
 }
 
-.workspace__preview-action-btn:hover:not(:disabled),
-.workspace__folder-action-btn:hover:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
+.workspace__action-icon:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.workspace__preview-action-btn:disabled,
-.workspace__folder-action-btn:disabled {
-  opacity: 0.5;
+.workspace__action-icon:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.workspace__preview-action-btn--danger {
-  color: var(--error, #e06c75);
-  border-color: rgba(224,108,117,0.4);
-}
-
-.workspace__preview-action-btn--danger:hover:not(:disabled) {
-  background: var(--error, #e06c75);
-  border-color: var(--error, #e06c75);
-}
+.workspace__action-icon--attach:hover { color: var(--accent); }
+.workspace__action-icon--copy:hover { color: #a6e3a1; }
+.workspace__action-icon--download:hover { color: #89b4fa; }
+.workspace__action-icon--open:hover { color: #f9e2af; }
+.workspace__action-icon--delete:hover:not(:disabled) { color: var(--error, #f38ba8); }
 
 /* Folder preview action buttons */
 .workspace__folder-actions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   margin: 6px 0 2px;
 }
 

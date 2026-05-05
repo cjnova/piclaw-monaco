@@ -40,8 +40,9 @@ describe("Workspace file attach (#269)", () => {
     expect(CHAT_PANEL).toContain("codicon codicon-file");
   });
 
-  test("WorkspaceActions has Attach to chat button", () => {
+  test("WorkspaceActions has Attach to chat icon button", () => {
     expect(WORKSPACE_ACTIONS).toContain("Attach to chat");
+    expect(WORKSPACE_ACTIONS).toContain("workspace__action-icon--attach");
     expect(WORKSPACE_ACTIONS).toContain("codicon codicon-attach");
   });
 

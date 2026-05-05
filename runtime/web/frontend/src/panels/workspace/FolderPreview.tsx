@@ -362,22 +362,19 @@ export function FolderPreview({ node, onMutate }: FolderPreviewProps) {
       </div>
 
       <div className="workspace__folder-actions">
-        <button className="workspace__folder-action-btn" disabled={actionBusy !== null} onClick={handleCreateFile} title="New file">
+        <button className="workspace__action-icon workspace__action-icon--copy" disabled={actionBusy !== null} onClick={handleCreateFile} title={actionBusy === "create" ? "Creating…" : "New file"}>
           <span className="codicon codicon-new-file" />
-          {actionBusy === "create" ? "Creating…" : "New file"}
         </button>
         <button
-          className="workspace__folder-action-btn"
+          className="workspace__action-icon workspace__action-icon--attach"
           disabled={actionBusy !== null}
           onClick={() => uploadInputRef.current?.click()}
-          title="Upload files"
+          title={actionBusy === "upload" ? "Uploading…" : "Upload files"}
         >
           <span className="codicon codicon-cloud-upload" />
-          {actionBusy === "upload" ? "Uploading…" : "Upload"}
         </button>
-        <a className="workspace__folder-action-btn" href={zipUrl} title="Download as zip">
+        <a className="workspace__action-icon workspace__action-icon--download" href={zipUrl} title="Download as zip">
           <span className="codicon codicon-cloud-download" />
-          Download zip
         </a>
         <input
           ref={uploadInputRef}
