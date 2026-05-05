@@ -16,9 +16,9 @@ describe("Compose enhancements regression (#266 + #272)", () => {
     expect(read(chatPanelUrl)).toContain("setAttachments");
   });
 
-  test("3) Clip button with codicon-attach", () => {
+  test("3) Clip button with codicon-attach in toolbar", () => {
     const src = read(chatPanelUrl);
-    expect(src).toContain("chat__clip-btn");
+    expect(src).toContain("chat__toolbar-btn");
     expect(src).toContain("codicon-attach");
   });
 

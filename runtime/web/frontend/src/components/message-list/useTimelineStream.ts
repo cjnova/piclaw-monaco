@@ -112,6 +112,8 @@ export function useTimelineStream({
         });
         setDraft("");
         scrollToBottom(true);
+        // Notify for browser notifications
+        window.dispatchEvent(new CustomEvent("piclaw:new-message", { detail: { content: interaction.content, type: "agent" } }));
         // Signal that agent turn is complete (clears compaction badge, etc.)
         window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
         window.dispatchEvent(
