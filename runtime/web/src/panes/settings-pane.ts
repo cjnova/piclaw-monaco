@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * settings-pane.ts — Settings pane extension.
  *

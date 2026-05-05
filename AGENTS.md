@@ -1,11 +1,4 @@
-# piclaw-monaco
-
-## Project
-
-- **Repo**: `cjnova/piclaw-monaco` (fork of `rcarmo/piclaw`)
-- **Backlog**: `docs/BACKLOG.md` — prioritized execution order, current state, all issues
-- **Stack**: Preact + Signals + esbuild frontend, untouched piclaw backend
-- **Dev instance**: `cd /workspace/piclaw-monaco && bun run runtime/src/index.ts --port 9090 --workspace ./workspace`
+# piclaw
 
 ## Git workflow
 
@@ -28,45 +21,7 @@
 - `bun run typecheck` — type-check the runtime
 - `bun run build:web` — build the web frontend
 - `bun test <path>` — run tests
-- `bun test runtime/test/monaco/` — run Monaco frontend regression tests
 - `make ci-fast` — full CI gate
-
-### Code transformation rules
-
-- **Never use `sed` for code changes** — fragile, breaks on edge cases
-- Use `code_rewrite` (ast-grep) for structural find-and-replace — AST-safe, pattern-based
-- Use `code_search` to find patterns before rewriting
-- Always run `code_rewrite` with `dry_run: true` first to preview changes
-- Use `edit` tool for targeted small changes (exact text replacement)
-- Use `delegate` or `fleet_spawn` for large multi-file refactors
-
-### Testing rules (mandatory)
-
-1. **Every PR must include regression tests** for the changes it introduces
-2. Monaco frontend tests go in `runtime/test/monaco/` — organized by area:
-   - `utils/` — pure function tests (code-highlighting, markdown-pipeline, etc.)
-   - `api/` — API utility tests (chat-jid, etc.)
-   - `static/` — HTML regression tests (index.html, terminal.html)
-3. Tests must be **pure** — no browser globals (`window`, `document`). Test exported functions only.
-4. For component logic that needs browser globals, test the extracted utility functions instead.
-5. CI runs `ci:fast:monaco` (our tests) + `ci:fast:tests` (backend tests, excludes upstream frontend tests)
-6. **Fleet agents must use `delegate` with `task_category='judge'`** to double-check their work before committing — the judge uses a **different model family** (cross-family review)
-7. **Tests must be written by a different model** than the one that wrote the code — use `delegate` or a separate fleet agent with a different `model` to write tests, avoiding self-review bias
-8. Run `bun test runtime/test/monaco/` locally before pushing
-
-### CI architecture
-
-- **Backend tests**: upstream's `runtime/test/channels/`, `runtime/test/*.test.ts` (excludes `test/web/` — upstream frontend)
-- **Monaco tests**: `runtime/test/monaco/` — our frontend regression suite
-- **Build check**: `make build-web` — frontend typecheck + bundle
-- Upstream frontend tests (`runtime/test/web/`) are **excluded** — they test upstream's SPA, not ours
-
-### Backend modifications
-
-- Avoid backend (`runtime/src/`) changes when possible — frontend-only changes are preferred
-- When backend changes are unavoidable, mark with `// FORK-MODIFIED: cjnova/piclaw-monaco` comment
-- Document in the PR body why the backend change is necessary
-- On upstream rebase, `grep -rn 'FORK-MODIFIED' runtime/src/` to find all fork-specific changes
 
 ## Release process
 

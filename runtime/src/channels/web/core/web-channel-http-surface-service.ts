@@ -285,8 +285,8 @@ export class WebChannelHttpSurfaceService {
     return this.channel.remoteInterop.handleRequest(req);
   }
 
-  async serveStatic(relPath: string): Promise<Response> {
-    return this.channel.responses.serveStatic(relPath);
+  async serveStatic(relPath: string, req?: Request): Promise<Response> {
+    return this.channel.responses.serveStatic(relPath, req);
   }
 
   async serveDocsStatic(relPath: string): Promise<Response> {

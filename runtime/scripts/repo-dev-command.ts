@@ -63,6 +63,33 @@ export function createRepoDevCommandPlan(commandName: string, projectDir = proce
         args: ["--noEmit", "-p", "tsconfig.json"],
         requiredBinaries: ["tsc"],
       };
+    case "typecheck:scripts":
+      return {
+        packageDir,
+        runtimeDir,
+        cwd: runtimeDir,
+        binaryPath: resolveRepoBinary(packageDir, "tsc"),
+        args: ["--noEmit", "-p", "tsconfig.scripts.json"],
+        requiredBinaries: ["tsc"],
+      };
+    case "typecheck:web-settings":
+      return {
+        packageDir,
+        runtimeDir,
+        cwd: runtimeDir,
+        binaryPath: resolveRepoBinary(packageDir, "tsc"),
+        args: ["--noEmit", "-p", "tsconfig.web-settings.json"],
+        requiredBinaries: ["tsc"],
+      };
+    case "typecheck:web-panes":
+      return {
+        packageDir,
+        runtimeDir,
+        cwd: runtimeDir,
+        binaryPath: resolveRepoBinary(packageDir, "tsc"),
+        args: ["--noEmit", "-p", "tsconfig.web-panes.json"],
+        requiredBinaries: ["tsc"],
+      };
     case "lint":
       return {
         packageDir,
@@ -148,7 +175,7 @@ export function runRepoDevCommandCli(argv = process.argv.slice(2)): never {
   try {
     const commandName = argv[0];
     if (!commandName) {
-      throw new Error("Usage: bun run runtime/scripts/repo-dev-command.ts <build|typecheck|lint>");
+      throw new Error("Usage: bun run runtime/scripts/repo-dev-command.ts <build|typecheck|typecheck:scripts|typecheck:web-settings|typecheck:web-panes|lint>");
     }
     process.exit(runRepoDevCommand(commandName));
   } catch (error) {

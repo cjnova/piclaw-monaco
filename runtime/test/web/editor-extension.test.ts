@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * test/web/editor-extension.test.ts — Tests for the standalone editor extension.
  *

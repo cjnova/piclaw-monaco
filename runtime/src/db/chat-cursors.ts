@@ -78,6 +78,11 @@ export interface FailedRunRecord {
   createdAt: string;
 }
 
+export interface StalePreflightRecoveryRecord extends FailedRunRecord {
+  chatJid: string;
+  reason: string;
+}
+
 /** Deferred queued follow-up items persisted outside the timeline. */
 export interface DeferredQueuedFollowupRecord {
   rowId: number;
@@ -87,6 +92,7 @@ export interface DeferredQueuedFollowupRecord {
   mediaIds?: number[];
   contentBlocks?: unknown[];
   linkPreviews?: unknown[];
+  screenHint?: string;
   /** Number of times materializeNextDeferredFollowup has failed for this item. */
   materializeRetries?: number;
 }
@@ -141,6 +147,7 @@ function sanitizeDeferredQueuedFollowupRecord(value: unknown): DeferredQueuedFol
       : undefined,
     contentBlocks: Array.isArray(record.contentBlocks) ? [...record.contentBlocks] : undefined,
     linkPreviews: Array.isArray(record.linkPreviews) ? [...record.linkPreviews] : undefined,
+    screenHint: typeof record.screenHint === "string" && record.screenHint.trim() ? record.screenHint.trim() : undefined,
     materializeRetries: Number.isFinite(record.materializeRetries) ? Number(record.materializeRetries) : 0,
   };
 }
@@ -174,6 +181,7 @@ export function setDeferredQueuedFollowups(chatJid: string, items: DeferredQueue
     mediaIds: item.mediaIds ? [...item.mediaIds] : undefined,
     contentBlocks: Array.isArray(item.contentBlocks) ? [...item.contentBlocks] : undefined,
     linkPreviews: Array.isArray(item.linkPreviews) ? [...item.linkPreviews] : undefined,
+    screenHint: typeof item.screenHint === "string" && item.screenHint.trim() ? item.screenHint.trim() : undefined,
     materializeRetries: item.materializeRetries || 0,
   })));
   db.prepare(`
@@ -604,6 +612,70 @@ export function getPreflightRuns(): PreflightRun[] {
     messageId: r.preflight_message_id,
     startedAt: r.preflight_started_at,
   }));
+}
+
+/**
+ * Mark an old preflight as failed and advance the cursor past its user
+ * message. This is intentionally narrower than normal failed-run handling:
+ * preflight happens before prompt execution, so there is no assistant output to
+ * preserve or delete. It is used only by startup recovery when re-running the
+ * same pending preflight would risk another compaction hang/restart loop.
+ */
+export function quarantineStalePreflightRun(
+  preflight: PreflightRun,
+  options: { createdAt: string; reason: string; backoffUntil?: string | null },
+): StalePreflightRecoveryRecord | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT rowid, timestamp, thread_id
+    FROM messages
+    WHERE chat_jid = ? AND id = ?
+  `).get(preflight.chatJid, preflight.messageId) as { rowid: number; timestamp: string; thread_id: number | null } | undefined;
+
+  if (!row?.timestamp) return null;
+
+  const threadRootId = row.thread_id ?? row.rowid ?? null;
+  db.prepare(`
+    UPDATE chat_cursors
+    SET cursor_ts                 = ?,
+        preflight_prev_ts         = NULL,
+        preflight_message_id      = NULL,
+        preflight_started_at      = NULL,
+        inflight_prev_ts          = NULL,
+        inflight_message_id       = NULL,
+        inflight_started_at       = NULL,
+        failed_prev_ts            = ?,
+        failed_ts                 = ?,
+        failed_message_id         = ?,
+        failed_thread_root        = ?,
+        failed_created_at         = ?,
+        compaction_failure_count  = COALESCE(compaction_failure_count, 0) + 1,
+        compaction_last_failed_at = ?,
+        compaction_backoff_until  = COALESCE(?, compaction_backoff_until),
+        compaction_last_error     = ?
+    WHERE chat_jid = ?
+  `).run(
+    row.timestamp,
+    preflight.prevTs,
+    row.timestamp,
+    preflight.messageId,
+    threadRootId,
+    options.createdAt,
+    options.createdAt,
+    options.backoffUntil ?? null,
+    options.reason,
+    preflight.chatJid,
+  );
+
+  return {
+    chatJid: preflight.chatJid,
+    prevTs: preflight.prevTs,
+    failedTs: row.timestamp,
+    messageId: preflight.messageId,
+    threadRootId,
+    createdAt: options.createdAt,
+    reason: options.reason,
+  };
 }
 
 /** Return every chat that has an active inflight marker. */

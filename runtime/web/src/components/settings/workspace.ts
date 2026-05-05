@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import { saveWorkspaceSettings } from '../../api.js';
 import {
@@ -7,7 +6,7 @@ import {
 } from '../../ui/workspace-settings.js';
 import { NumberStepper } from './number-stepper.js';
 
-function normalizeWorkspaceSettings(data = {}) {
+function normalizeWorkspaceSettings(data: Record<string, any> = {}) {
     const workspace = data.workspaceSettings || {};
     return {
         webTerminalEnabled: workspace.webTerminalEnabled !== false,

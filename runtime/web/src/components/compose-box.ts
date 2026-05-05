@@ -192,6 +192,20 @@ export function resolveComposeSubmitButtonState(isAgentActive, canSend, _isCompa
     };
 }
 
+export function shouldStartSpeechPushToTalk(event, value, options = {}) {
+    if (!event || options.searchMode) return false;
+    if (!(event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space')) return false;
+    if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return false;
+    if (!options.speechButtonVisible || options.speechButtonActive) return false;
+    if (!options.canStartSpeech) return false;
+    return String(value || '').trim().length === 0;
+}
+
+export function shouldStopSpeechPushToTalk(event, active) {
+    if (!active || !event) return false;
+    return event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space';
+}
+
 export function resolveComposeAbortButtonState(isAgentActive, isCompacting = false) {
     if (!isAgentActive) return null;
     if (isCompacting) {
@@ -592,6 +606,38 @@ function extractQueuedFileRefs(value) {
     return { content: cleaned, fileRefs: refs };
 }
 
+function extractQueuedFolderRefs(value) {
+    if (!value) return { content: value, folderRefs: [] };
+    const normalized = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalized.split('\n');
+    let start = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+        if (lines[i].trim() === 'Folders:' && lines[i + 1] && /^\s*-\s+/.test(lines[i + 1])) {
+            start = i;
+            break;
+        }
+    }
+    if (start === -1) return { content: value, folderRefs: [] };
+    const refs = [];
+    let end = start + 1;
+    for (; end < lines.length; end += 1) {
+        const line = lines[end];
+        if (/^\s*-\s+/.test(line)) {
+            const normalizedRef = normalizeQueuedFileRef(line.replace(/^\s*-\s+/, '').trim());
+            if (normalizedRef) refs.push(normalizedRef);
+        } else if (!line.trim()) {
+            break;
+        } else {
+            break;
+        }
+    }
+    if (refs.length === 0) return { content: value, folderRefs: [] };
+    const before = lines.slice(0, start);
+    const after = lines.slice(end);
+    const cleaned = [...before, ...after].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    return { content: cleaned, folderRefs: refs };
+}
+
 function extractQueuedMessageRefs(value) {
     if (!value) return { content: value, messageRefs: [] };
     const normalized = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -666,11 +712,13 @@ function extractQueuedAttachmentRefs(value) {
 export function parseQueuedContent(value) {
     const unwrapped = unwrapQueuedTranscriptContent(value || '');
     const withFiles = extractQueuedFileRefs(unwrapped || '');
-    const withMessages = extractQueuedMessageRefs(withFiles.content || '');
+    const withFolders = extractQueuedFolderRefs(withFiles.content || '');
+    const withMessages = extractQueuedMessageRefs(withFolders.content || '');
     const withAttachments = extractQueuedAttachmentRefs(withMessages.content || '');
     return {
         text: withAttachments.content || '',
         fileRefs: withFiles.fileRefs,
+        folderRefs: withFolders.folderRefs,
         messageRefs: withMessages.messageRefs,
         attachmentRefs: withAttachments.attachmentRefs,
     };
@@ -685,6 +733,7 @@ export function buildReturnedQueuedDraft(value) {
     return {
         content: [text, attachmentBlock].filter(Boolean).join('\n\n').trim(),
         fileRefs: [...parsed.fileRefs],
+        folderRefs: [...parsed.folderRefs],
         messageRefs: [...parsed.messageRefs],
         attachmentRefs: [...parsed.attachmentRefs],
     };
@@ -699,6 +748,7 @@ export function returnQueuedFollowupToEditor(options) {
         setSubmitNotice,
         setMediaFiles,
         onSetFileRefs,
+        onSetFolderRefs,
         onSetMessageRefs,
         setContent,
         textareaRef,
@@ -714,6 +764,7 @@ export function returnQueuedFollowupToEditor(options) {
     logger?.info?.('[compose-box] Returning queued item to editor', {
         text: text?.slice(0, 80),
         fileRefs: restored.fileRefs?.length,
+        folderRefs: restored.folderRefs?.length,
         messageRefs: restored.messageRefs?.length,
     });
 
@@ -721,6 +772,7 @@ export function returnQueuedFollowupToEditor(options) {
     setSubmitNotice?.(null);
     setMediaFiles?.([]);
     onSetFileRefs?.(restored.fileRefs);
+    onSetFolderRefs?.(restored.folderRefs);
     onSetMessageRefs?.(restored.messageRefs);
     setContent?.(text);
 
@@ -766,7 +818,7 @@ export function QueuedFollowupStack({
             ${items.map((item, index) => {
                 const rowText = typeof item?.content === 'string' ? item.content : '';
                 const parsed = parseQueuedContent(rowText);
-                if (!parsed.text.trim() && parsed.fileRefs.length === 0 && parsed.messageRefs.length === 0 && parsed.attachmentRefs.length === 0) return null;
+                if (!parsed.text.trim() && parsed.fileRefs.length === 0 && parsed.folderRefs.length === 0 && parsed.messageRefs.length === 0 && parsed.attachmentRefs.length === 0) return null;
                 const canMoveUp = index > 0;
                 const canMoveDown = index < items.length - 1;
                 const canReturnToEditor = true;
@@ -774,7 +826,7 @@ export function QueuedFollowupStack({
                     <div class="compose-queue-stack-item" data-testid="queue-item" role="listitem">
                         <div class="compose-queue-stack-content" title=${rowText}>
                             ${parsed.text.trim() && html`<div class="compose-queue-stack-text">${parsed.text}</div>`}
-                            ${(parsed.messageRefs.length > 0 || parsed.fileRefs.length > 0 || parsed.attachmentRefs.length > 0) && html`
+                            ${(parsed.messageRefs.length > 0 || parsed.fileRefs.length > 0 || parsed.folderRefs.length > 0 || parsed.attachmentRefs.length > 0) && html`
                                 <div class="compose-queue-stack-refs">
                                     ${parsed.messageRefs.map((id) => html`
                                         <${FilePill}
@@ -793,6 +845,19 @@ export function QueuedFollowupStack({
                                                 prefix="compose"
                                                 label=${label}
                                                 title=${path}
+                                                onClick=${() => onOpenFilePill?.(path)}
+                                            />
+                                        `;
+                                    })}
+                                    ${parsed.folderRefs.map((path) => {
+                                        const label = path.split('/').pop() || path;
+                                        return html`
+                                            <${FilePill}
+                                                key=${'queue-folder-' + path}
+                                                prefix="compose"
+                                                label=${label}
+                                                title=${path}
+                                                icon="folder"
                                                 onClick=${() => onOpenFilePill?.(path)}
                                             />
                                         `;
@@ -901,6 +966,9 @@ export function ComposeBox({
     fileRefs = [],
     onRemoveFileRef,
     onClearFileRefs,
+    folderRefs = [],
+    onRemoveFolderRef,
+    onClearFolderRefs,
     messageRefs = [],
     onRemoveMessageRef,
     onClearMessageRefs,
@@ -929,7 +997,9 @@ export function ComposeBox({
     activeChatAgents = [],
     currentChatJid = 'web:default',
     connectionStatus = 'connected',
+    stateAccessFailed = false,
     onSetFileRefs,
+    onSetFolderRefs,
     onSetMessageRefs,
     onSubmitError,
     onSwitchChat,
@@ -989,6 +1059,8 @@ export function ComposeBox({
     const speechInterimTranscriptRef = useRef('');
     const speechLastErrorRef = useRef('');
     const speechPendingStopRef = useRef(false);
+    const speechPushToTalkActiveRef = useRef(false);
+    const suppressNextSpeechClickRef = useRef(false);
     const dragCounterRef = useRef(0);
     const renameSessionInProgressRef = useRef(false);
     const historyMax = 200;
@@ -1083,7 +1155,7 @@ export function ComposeBox({
         setSpeechSupport(getSpeechInputSupport());
     }, []);
 
-    const canSend = content.trim() || mediaFiles.length > 0 || fileRefs.length > 0 || messageRefs.length > 0;
+    const canSend = content.trim() || mediaFiles.length > 0 || fileRefs.length > 0 || folderRefs.length > 0 || messageRefs.length > 0;
     const speechUiVisible = speechUiState.kind !== 'idle';
     const speechUiPulsing = speechUiState.kind === 'requesting_permission' || speechUiState.kind === 'listening';
     const speechButtonVisible = !searchMode && Boolean(speechSupport?.showButton);
@@ -1113,8 +1185,8 @@ export function ComposeBox({
         ? extensionWorkingState.indicator
         : null;
     const notificationTitle = notificationActive ? 'Disable notifications' : 'Enable notifications';
-    const hasAttachments = mediaFiles.length > 0 || fileRefs.length > 0 || messageRefs.length > 0;
-    const connectionStatusPresentation = useConnectionStatusPresentation(connectionStatus);
+    const hasAttachments = mediaFiles.length > 0 || fileRefs.length > 0 || folderRefs.length > 0 || messageRefs.length > 0;
+    const connectionStatusPresentation = useConnectionStatusPresentation(stateAccessFailed ? connectionStatus : 'connected');
     const connectionStatusLabel = connectionStatusPresentation.label;
     const connectionStatusTitle = connectionStatusPresentation.title;
     const submitButtonState = resolveComposeSubmitButtonState(isAgentActive, canSend, statusNoticeIsCompaction);
@@ -1715,6 +1787,39 @@ export function ComposeBox({
         }
     };
 
+    const handleSpeechButtonPointerDown = (e) => {
+        if (e.pointerType === 'mouse') return;
+        const currentValue = textareaRef.current?.value ?? (searchMode ? searchText : content);
+        if (!shouldStartSpeechPushToTalk(e, currentValue, {
+            searchMode,
+            speechButtonVisible,
+            speechButtonActive,
+            canStartSpeech: Boolean(speechSupport?.canStart && speechSupport?.recognitionCtor),
+        })) return;
+        e.preventDefault();
+        speechPushToTalkActiveRef.current = true;
+        suppressNextSpeechClickRef.current = true;
+        handleSpeechToggle();
+    };
+
+    const stopSpeechButtonPushToTalk = (e) => {
+        if (!speechPushToTalkActiveRef.current) return;
+        e?.preventDefault?.();
+        speechPushToTalkActiveRef.current = false;
+        if (speechRecognitionRef.current) {
+            stopSpeechRecognition();
+        }
+    };
+
+    const handleSpeechButtonClick = (e) => {
+        if (suppressNextSpeechClickRef.current) {
+            suppressNextSpeechClickRef.current = false;
+            e.preventDefault();
+            return;
+        }
+        handleSpeechToggle();
+    };
+
     const handleCycleModel = async () => {
         await runModelCommand('/cycle-model');
     };
@@ -1782,6 +1887,7 @@ export function ComposeBox({
         await handleSubmit('/compact', null, {
             includeMedia: false,
             includeFileRefs: false,
+            includeFolderRefs: false,
             includeMessageRefs: false,
             clearAfterSubmit: false,
             recordHistory: false,
@@ -1814,6 +1920,7 @@ export function ComposeBox({
         const {
             includeMedia = true,
             includeFileRefs = true,
+            includeFolderRefs = true,
             includeMessageRefs = true,
             clearAfterSubmit = true,
             recordHistory = true,
@@ -1829,6 +1936,7 @@ export function ComposeBox({
             !currentContent.trim() &&
             (includeMedia ? mediaFiles.length === 0 : true) &&
             (includeFileRefs ? fileRefs.length === 0 : true) &&
+            (includeFolderRefs ? folderRefs.length === 0 : true) &&
             (includeMessageRefs ? messageRefs.length === 0 : true)
         ) return;
 
@@ -1848,6 +1956,7 @@ export function ComposeBox({
         // Capture media/refs before clearing so the async send can use them
         const capturedMediaFiles = includeMedia ? [...mediaFiles] : [];
         const capturedFileRefs = includeFileRefs ? [...fileRefs] : [];
+        const capturedFolderRefs = includeFolderRefs ? [...folderRefs] : [];
         const capturedMessageRefs = includeMessageRefs ? [...messageRefs] : [];
         const baseContent = currentContent.trim();
 
@@ -1868,6 +1977,7 @@ export function ComposeBox({
         const restoreDraft = () => {
             if (includeMedia) setMediaFiles([...capturedMediaFiles]);
             if (includeFileRefs) onSetFileRefs?.(capturedFileRefs);
+            if (includeFolderRefs) onSetFolderRefs?.(capturedFolderRefs);
             if (includeMessageRefs) onSetMessageRefs?.(capturedMessageRefs);
             setContent(baseContent);
             requestAnimationFrame(() => resizeTextarea());
@@ -1878,6 +1988,7 @@ export function ComposeBox({
             setContent('');
             setMediaFiles([]);
             onClearFileRefs?.();
+            onClearFolderRefs?.();
             onClearMessageRefs?.();
         }
 
@@ -1888,6 +1999,7 @@ export function ComposeBox({
                     content: baseContent,
                     submitMode,
                     fileRefs: capturedFileRefs,
+                    folderRefs: capturedFolderRefs,
                     messageRefs: capturedMessageRefs,
                     mediaFiles: capturedMediaFiles,
                 });
@@ -1906,6 +2018,9 @@ export function ComposeBox({
                 const fileBlock = capturedFileRefs.length
                     ? `Files:\n${capturedFileRefs.map((path) => `- ${path}`).join('\n')}`
                     : '';
+                const folderBlock = capturedFolderRefs.length
+                    ? `Folders:\n${capturedFolderRefs.map((path) => `- ${path}`).join('\n')}`
+                    : '';
                 const messageRefBlock = capturedMessageRefs.length
                     ? `Referenced messages:\n${capturedMessageRefs.map((id) => `- message:${id}`).join('\n')}`
                     : '';
@@ -1916,7 +2031,7 @@ export function ComposeBox({
                         return `- attachment:${id} (${label})`;
                     }).join('\n')}`
                     : '';
-                const message = [baseContent, fileBlock, messageRefBlock, mediaBlock].filter(Boolean).join('\n\n');
+                const message = [baseContent, fileBlock, folderBlock, messageRefBlock, mediaBlock].filter(Boolean).join('\n\n');
                 const response = await sendAgentMessage('default', message, null, mediaIds, resolveSubmitMode(submitMode), currentChatJid);
                 onMessageResponse?.(response);
 
@@ -1960,12 +2075,13 @@ export function ComposeBox({
             setSubmitNotice,
             setMediaFiles,
             onSetFileRefs,
+            onSetFolderRefs,
             onSetMessageRefs,
             setContent,
             textareaRef,
             resizeTextarea,
         });
-    }, [onRemoveQueuedFollowup, onSetFileRefs, onSetMessageRefs, resizeTextarea]);
+    }, [onRemoveQueuedFollowup, onSetFileRefs, onSetFolderRefs, onSetMessageRefs, resizeTextarea]);
 
     const handlePopupKeyboardEvent = useCallback((e) => {
         if (searchMode || (!showModelPopup && !showSessionPopup) || e?.isComposing) return false;
@@ -2063,6 +2179,17 @@ export function ComposeBox({
             return;
         }
         const currentValue = textareaRef.current?.value ?? (searchMode ? searchText : content);
+        if (shouldStartSpeechPushToTalk(e, currentValue, {
+            searchMode,
+            speechButtonVisible,
+            speechButtonActive,
+            canStartSpeech: Boolean(speechSupport?.canStart && speechSupport?.recognitionCtor),
+        })) {
+            e.preventDefault();
+            speechPushToTalkActiveRef.current = true;
+            handleSpeechToggle();
+            return;
+        }
         if (shouldOpenSessionSwitcherFromBlankCompose(e, currentValue, {
             searchMode,
             showSessionSwitcherButton,
@@ -2219,6 +2346,16 @@ export function ComposeBox({
         }
     };
 
+    const handleKeyUp = (e) => {
+        if (shouldStopSpeechPushToTalk(e, speechPushToTalkActiveRef.current)) {
+            e.preventDefault();
+            speechPushToTalkActiveRef.current = false;
+            if (speechRecognitionRef.current) {
+                stopSpeechRecognition();
+            }
+        }
+    };
+
     const addMediaFiles = (files) => {
         const list = Array.from(files || []).filter((file) => file instanceof File && !String(file.name || '').startsWith('.DS_Store'));
         if (!list.length) return;
@@ -2288,6 +2425,7 @@ export function ComposeBox({
         setSubmitError(null);
         setMediaFiles([]);
         onClearFileRefs?.();
+        onClearFolderRefs?.();
         onClearMessageRefs?.();
     };
 
@@ -2655,6 +2793,26 @@ export function ComposeBox({
                 onDragLeave=${handleDragLeave}
                 onDrop=${handleDrop}
             >
+                ${showSessionSwitcherButton && html`
+                    <div
+                        ref=${sessionTriggerRef}
+                        class="compose-session-trigger-group compose-session-trigger-top"
+                    >
+                        <button
+                            type="button"
+                            class=${`compose-session-trigger compose-session-trigger-pill${showSessionPopup ? ' active' : ''}`}
+                            data-testid="session-switcher"
+                            onClick=${toggleSessionPopup}
+                            title=${currentSessionAgent?.chat_jid || currentChatJid}
+                            aria-label=${currentSessionAgent?.agent_name
+                                ? `Manage sessions for @${currentSessionAgent.agent_name}`
+                                : 'Manage Sessions/Agents'}
+                            aria-expanded=${showSessionPopup ? 'true' : 'false'}
+                        >
+                            <span class="compose-current-agent-label active">${currentSessionAgent?.agent_name ? `@${currentSessionAgent.agent_name}` : 'Sessions'}</span>
+                        </button>
+                    </div>
+                `}
                 <div class="compose-input-main">
                     ${hasAttachments && html`
                         <div class="compose-file-refs">
@@ -2681,6 +2839,20 @@ export function ComposeBox({
                                         onClick=${() => onOpenFilePill?.(path)}
                                         removeTitle="Remove file"
                                         onRemove=${() => onRemoveFileRef?.(path)}
+                                    />
+                                `;
+                            })}
+                            ${folderRefs.map((path) => {
+                                const label = path.split('/').pop() || path;
+                                return html`
+                                    <${FilePill}
+                                        prefix="compose"
+                                        label=${label}
+                                        title=${path}
+                                        icon="folder"
+                                        onClick=${() => onOpenFilePill?.(path)}
+                                        removeTitle="Remove folder hint"
+                                        onRemove=${() => onRemoveFolderRef?.(path)}
                                     />
                                 `;
                             })}
@@ -2715,6 +2887,7 @@ export function ComposeBox({
                         value=${searchMode ? searchText : content}
                         onInput=${handleInput}
                         onKeyDown=${handleKeyDown}
+                        onKeyUp=${handleKeyUp}
                         onPaste=${handlePaste}
                         onFocus=${onFocus}
                         onClick=${onFocus}
@@ -2944,6 +3117,11 @@ export function ComposeBox({
                     `}
                 </div>
                 <div class="compose-footer" ref=${footerRef}>
+                    ${connectionStatusPresentation.show && html`
+                        <span class="compose-connection-status connection-status ${connectionStatusPresentation.statusClass}" title=${connectionStatusTitle}>
+                            ${connectionStatusLabel}
+                        </span>
+                    `}
                     ${showComposeMetaRow && html`
                     <div class="compose-meta-row">
                         ${showModelPickerHint && html`
@@ -2979,44 +3157,6 @@ export function ComposeBox({
                     </div>
                     `}
                     <div class="compose-actions ${searchMode ? 'search-mode' : ''}">
-                    ${showSessionSwitcherButton && html`
-                        <div
-                            ref=${sessionTriggerRef}
-                            class="compose-session-trigger-group"
-                        >
-                            ${currentSessionAgent?.agent_name && html`
-                                <button
-                                    type="button"
-                                    class=${`compose-session-trigger compose-session-trigger-pill${showSessionPopup ? ' active' : ''}`}
-                                    data-testid="session-switcher"
-                                    onClick=${toggleSessionPopup}
-                                    title=${currentSessionAgent?.chat_jid || currentChatJid}
-                                    aria-label=${`Manage sessions for @${currentSessionAgent.agent_name}`}
-                                    aria-expanded=${showSessionPopup ? 'true' : 'false'}
-                                >
-                                    <span class="compose-current-agent-label active">@${currentSessionAgent.agent_name}</span>
-                                </button>
-                            `}
-                            <button
-                                type="button"
-                                class=${`compose-session-trigger compose-session-trigger-icon-btn${showSessionPopup ? ' active' : ''}`}
-                                data-testid="session-switcher"
-                                onClick=${toggleSessionPopup}
-                                title=${currentSessionAgent?.chat_jid || currentChatJid}
-                                aria-label=${currentSessionAgent?.agent_name
-                                    ? `Manage sessions for @${currentSessionAgent.agent_name}`
-                                    : 'Manage Sessions/Agents'}
-                                aria-expanded=${showSessionPopup ? 'true' : 'false'}
-                            >
-                                <span class="compose-session-trigger-icon" aria-hidden="true">
-                                    <svg class="compose-mention-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" focusable="false">
-                                        <circle cx="12" cy="12" r="4.25" />
-                                        <path d="M16.25 7.75v5.4a2.1 2.1 0 0 0 4.2 0V12a8.45 8.45 0 1 0-4.2 7.33" />
-                                    </svg>
-                                </span>
-                            </button>
-                        </div>
-                    `}
                     ${searchMode && html`
                         <label class="compose-search-scope-wrap" title="Search scope">
                             <span class="compose-search-scope-label">Scope</span>
@@ -3089,7 +3229,11 @@ export function ComposeBox({
                     ${speechButtonVisible && html`
                         <button
                             class=${`icon-btn voice-input-btn${speechButtonActive ? ' active' : ''}${speechSupport.mode === 'fallback' ? ' fallback' : ''}`}
-                            onClick=${handleSpeechToggle}
+                            onClick=${handleSpeechButtonClick}
+                            onPointerDown=${handleSpeechButtonPointerDown}
+                            onPointerUp=${stopSpeechButtonPushToTalk}
+                            onPointerCancel=${stopSpeechButtonPushToTalk}
+                            onPointerLeave=${stopSpeechButtonPushToTalk}
                             title=${speechButtonTitle}
                             aria-label=${speechButtonTitle}
                             type="button"
@@ -3131,14 +3275,8 @@ export function ComposeBox({
                             <input type="file" multiple hidden onChange=${handleFileChange} />
                         </label>
                     `}
-                    ${(connectionStatus !== 'connected' || !searchMode) && html`
+                    ${!searchMode && html`
                         <div class="compose-send-stack">
-                            ${connectionStatus !== 'connected' && html`
-                                <span class="compose-connection-status connection-status ${connectionStatusPresentation.statusClass}" title=${connectionStatusTitle}>
-                                    ${connectionStatusLabel}
-                                </span>
-                            `}
-                            ${!searchMode && html`
                                 <button 
                                     class=${submitButtonState.className}
                                     data-testid="send-button"
@@ -3159,7 +3297,7 @@ export function ComposeBox({
                                         type="button"
                                         onClick=${() => {
                                             if (isComposeSubmitAbortMode(abortButtonState.mode)) {
-                                                void handleSubmit('/abort', 'steer', { clearAfterSubmit: false, includeMedia: false, includeFileRefs: false, includeMessageRefs: false, recordHistory: false });
+                                                void handleSubmit('/abort', 'steer', { clearAfterSubmit: false, includeMedia: false, includeFileRefs: false, includeFolderRefs: false, includeMessageRefs: false, recordHistory: false });
                                             }
                                         }}
                                         disabled=${abortButtonState.disabled}
@@ -3178,7 +3316,6 @@ export function ComposeBox({
                                             : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2.5"/></svg>`}
                                     </button>
                                 `}
-                            `}
                         </div>
                     `}
                 </div>

@@ -39,7 +39,7 @@ import { GeneralSection } from './settings/general.js';
 perf('imports-done');
 
 type SettingsSectionComponent = unknown;
-type BuiltinSectionId = 'general' | 'sessions' | 'compaction' | 'keyboard' | 'workspace' | 'environment' | 'providers' | 'models' | 'theme' | 'quick-actions' | 'keychain' | 'tools' | 'addons';
+type BuiltinSectionId = 'general' | 'sessions' | 'compaction' | 'keyboard' | 'workspace' | 'environment' | 'providers' | 'models' | 'theme' | 'scheduled-tasks' | 'quick-actions' | 'keychain' | 'tools' | 'addons';
 
 const builtinSectionComponentCache = new Map<BuiltinSectionId, SettingsSectionComponent>();
 const builtinSectionLoadPromiseCache = new Map<BuiltinSectionId, Promise<SettingsSectionComponent>>();
@@ -57,6 +57,7 @@ const BUILTIN_SECTION_LOADERS: Record<BuiltinSectionId, () => Promise<SettingsSe
     providers: () => import('./settings/providers.js').then(mod => mod.ProvidersSection),
     models: () => import('./settings/models.js').then(mod => mod.ModelsSection),
     theme: () => import('./settings/appearance.js').then(mod => mod.ThemeSection),
+    'scheduled-tasks': () => import('./settings/scheduled-tasks.js').then(mod => mod.ScheduledTasksSection),
     'quick-actions': () => import('./settings/quick-actions.js').then(mod => mod.QuickActionsSection),
     keychain: () => import('./settings/keychain.js').then(mod => mod.KeychainSection),
     tools: () => import('./settings/tools.js').then(mod => mod.ToolsSection),
@@ -116,6 +117,7 @@ const iconKeyboard = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="
 const iconProviders = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`;
 const iconModels = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="14" height="10" rx="2"/><circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none"/><line x1="12" y1="9" x2="12" y2="5"/><circle cx="12" cy="4" r="1.5"/></svg>`;
 const iconAppearance = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 2-.9 2-2 0-.53-.21-1.01-.55-1.36-.34-.36-.55-.84-.55-1.37 0-1.1.9-2 2-2h2.36c3.08 0 5.64-2.56 5.64-5.64C22.9 5.85 18.05 2 12 2z"/><circle cx="8" cy="10" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="16" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+const iconScheduledTasks = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M7 3.5 4 6"/><path d="m17 3.5 3 2.5"/></svg>`;
 const iconTools = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
 const iconQuickActions = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
 const iconKeychain = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="14" r="3"/><path d="M11 14h9"/><path d="M16 14v-2"/><path d="M19 14v2"/></svg>`;
@@ -132,6 +134,7 @@ const BUILTIN_SECTIONS = [
     { id: 'providers', label: 'Providers', icon: iconProviders, searchable: false, order: 20 },
     { id: 'models', label: 'Models', icon: iconModels, searchable: true, placeholder: 'Filter models…', order: 30 },
     { id: 'theme', label: 'Appearance', icon: iconAppearance, searchable: false, order: 40 },
+    { id: 'scheduled-tasks', label: 'Scheduled Tasks', icon: iconScheduledTasks, searchable: true, placeholder: 'Filter scheduled tasks…', order: 65 },
     { id: 'quick-actions', label: 'Quick Actions', icon: iconQuickActions, searchable: true, placeholder: 'Filter quick actions…', order: 70 },
     { id: 'keychain', label: 'Keychain', icon: iconKeychain, searchable: true, placeholder: 'Filter entries…', order: 75 },
     { id: 'tools', label: 'Tools', icon: iconTools, searchable: true, placeholder: 'Filter tools…', order: 80 },
@@ -305,6 +308,7 @@ export function SettingsDialogContent({ onClose }) {
             case 'providers': return html`<${Comp} providers=${settingsData?.providers} setStatus=${setStatus} />`;
             case 'models': return html`<${Comp} filter=${filter} />`;
             case 'theme': return html`<${Comp} themes=${settingsData?.themes} colorKeys=${settingsData?.colorKeys} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
+            case 'scheduled-tasks': return html`<${Comp} filter=${filter} setStatus=${setStatus} />`;
             case 'quick-actions': return html`<${Comp} filter=${filter} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'keychain': return html`<${Comp} filter=${filter} />`;
             case 'tools': return html`<${Comp} toolsets=${settingsData?.toolsets} filter=${filter} settingsData=${settingsData} mergeSettingsData=${mergeSettingsData} />`;

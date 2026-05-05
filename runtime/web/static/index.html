@@ -28,6 +28,13 @@
   <script src="/static/js/vendor/codemirror-highlight.min.js" defer></script>
   <script src="/static/js/vendor/adaptivecards.min.js" defer></script>
   <!-- Mermaid is huge (~1.5MB) — loaded on demand, NOT via script tag -->
+  <script type="importmap">
+  {
+    "imports": {
+      "#editor-vendor/codemirror": "/editor-vendor/codemirror.js"
+    }
+  }
+  </script>
   <script type="module" src="/static/dist/app.bundle.js"></script>
 </body>
 </html>

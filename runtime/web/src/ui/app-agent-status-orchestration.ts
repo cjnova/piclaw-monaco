@@ -57,12 +57,14 @@ export async function refreshAgentStatusForChat(options: RefreshAgentStatusForCh
     setActiveTurn,
     noteAgentActivity,
     clearLastActivityFlag,
+    onStateAccessResult,
   } = options;
 
   const targetChatJid = currentChatJid;
 
   try {
     const response = await getAgentStatus(targetChatJid);
+    onStateAccessResult?.(false);
     if (activeChatJidRef.current !== targetChatJid) {
       return null;
     }
@@ -119,6 +121,7 @@ export async function refreshAgentStatusForChat(options: RefreshAgentStatusForCh
 
     return response;
   } catch (error) {
+    onStateAccessResult?.(true);
     console.warn('Failed to fetch agent status:', error);
     return null;
   }

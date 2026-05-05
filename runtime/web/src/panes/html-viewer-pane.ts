@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * html-viewer-pane.ts — WebPaneExtension for HTML file preview.
  *

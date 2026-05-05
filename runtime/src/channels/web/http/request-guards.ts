@@ -121,7 +121,7 @@ export async function enforceRequestGuards(
     }
 
     if (flags.isLoginPage) {
-      return await serveLoginPageResponse(channel.endpointContexts.auth());
+      return await serveLoginPageResponse(channel.endpointContexts.auth(), req);
     }
 
     if (!skipAuthCheck && !channel.authGateway.isAuthenticated(req)) {
@@ -132,7 +132,7 @@ export async function enforceRequestGuards(
         path: pathname,
       });
       if (flags.isIndex) {
-        return await serveLoginPageResponse(channel.endpointContexts.auth());
+        return await serveLoginPageResponse(channel.endpointContexts.auth(), req);
       }
       if (flags.isGetOrHead) {
         return redirectToLoginResponse();

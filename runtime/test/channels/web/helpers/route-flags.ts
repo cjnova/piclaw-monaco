@@ -10,6 +10,7 @@ export function buildRouteFlags(overrides: Partial<RouteFlags> = {}): RouteFlags
     isGetOrHead: false,
     isLoginPage: false,
     isAuthVerify: false,
+    isE2eBootstrap: false,
     isWebauthnLoginStart: false,
     isWebauthnLoginFinish: false,
     isWebauthnRegisterStart: false,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * pane-registry.ts — Singleton registry for WebPaneExtension instances.
  *

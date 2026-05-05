@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { handleAuthRoutes } from "../../../src/channels/web/http/dispatch-auth.js";
+import { closeDbQuietly, importFresh, withTempWorkspaceEnv } from "../../helpers.js";
 import { buildRouteFlags } from "./helpers/route-flags.js";
 
 describe("web http auth dispatch", () => {
@@ -36,6 +37,41 @@ describe("web http auth dispatch", () => {
     const postReq = new Request("https://example.com/auth/webauthn/enrol", { method: "POST" });
     const postFlags = buildRouteFlags({ isWebauthnEnrollPage: true });
     expect((await handleAuthRoutes(channel, postReq, postFlags))?.status).toBe(401);
+  });
+
+  test("E2E bootstrap accepts remote requests authorized by the internal secret", async () => {
+    await withTempWorkspaceEnv("piclaw-e2e-bootstrap-", {
+      PICLAW_INTERNAL_SECRET: "test-secret",
+      PICLAW_WEB_INTERNAL_SECRET: undefined,
+    }, async () => {
+      const db = await importFresh<typeof import("../../../src/db.js")>("../src/db.js");
+      const config = await importFresh<typeof import("../../../src/core/config.js")>("../src/core/config.js");
+      db.initDatabase();
+      const previousSecret = config.WEB_RUNTIME_CONFIG.internalSecret;
+      config.WEB_RUNTIME_CONFIG.internalSecret = "test-secret";
+      try {
+        const auth = await importFresh<typeof import("../../../src/channels/web/http/dispatch-auth.js")>(
+          "../src/channels/web/http/dispatch-auth.js",
+        );
+        const channel = {
+          authGateway: { isTotpSession: () => false },
+          endpointContexts: { auth: () => ({}) },
+          json: (_payload: unknown, status: number) => new Response(null, { status }),
+        } as any;
+        const req = new Request("https://microvm.example.test/auth/e2e/bootstrap", {
+          method: "POST",
+          headers: { "x-piclaw-internal-secret": "test-secret" },
+        });
+
+        const response = await auth.handleAuthRoutes(channel, req, buildRouteFlags({ isE2eBootstrap: true }));
+
+        expect(response?.status).toBe(200);
+        expect(response?.headers.get("set-cookie") || "").toContain("piclaw_session=");
+      } finally {
+        config.WEB_RUNTIME_CONFIG.internalSecret = previousSecret;
+        closeDbQuietly(db);
+      }
+    });
   });
 
   test("dispatches webauthn start/finish routes", async () => {

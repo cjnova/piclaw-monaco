@@ -18,6 +18,8 @@ export interface ScheduledTaskQuery {
   status?: ScheduledTaskStatus | null;
   limit?: number;
   include_latest_run_log?: boolean;
+  include_run_logs?: boolean;
+  run_log_limit?: number;
 }
 
 export interface ScheduledTaskRunLogSummary {
@@ -43,10 +45,15 @@ export interface ScheduledTaskInspectionRecord {
   last_result: string | null;
   created_at: string;
   model: string | null;
+  prompt: string | null;
+  command: string | null;
+  cwd: string | null;
+  timeout_sec: number | null;
   prompt_summary: string | null;
   command_summary: string | null;
   summary: string;
   latest_run_log?: ScheduledTaskRunLogSummary | null;
+  recent_run_logs?: ScheduledTaskRunLogSummary[];
 }
 
 export interface ScheduledTaskCounts {
@@ -106,11 +113,7 @@ function getTaskCounts(): ScheduledTaskCounts {
   };
 }
 
-function getLatestRunLog(taskId: string): ScheduledTaskRunLogSummary | null {
-  const row = getDb()
-    .prepare("SELECT task_id, run_at, duration_ms, status, result, error FROM task_run_logs WHERE task_id = ? ORDER BY run_at DESC LIMIT 1")
-    .get(taskId) as TaskRunLog | undefined;
-  if (!row) return null;
+function mapRunLogRow(row: TaskRunLog): ScheduledTaskRunLogSummary {
   return {
     task_id: row.task_id,
     run_at: row.run_at,
@@ -123,7 +126,19 @@ function getLatestRunLog(taskId: string): ScheduledTaskRunLogSummary | null {
   };
 }
 
-function mapTaskRow(row: ScheduledTask, includeLatestRunLog: boolean): ScheduledTaskInspectionRecord {
+function getRecentRunLogs(taskId: string, limit = 5): ScheduledTaskRunLogSummary[] {
+  const boundedLimit = Math.min(Math.max(limit, 1), 20);
+  const rows = getDb()
+    .prepare("SELECT task_id, run_at, duration_ms, status, result, error FROM task_run_logs WHERE task_id = ? ORDER BY run_at DESC LIMIT ?")
+    .all(taskId, boundedLimit) as TaskRunLog[];
+  return rows.map(mapRunLogRow);
+}
+
+function getLatestRunLog(taskId: string): ScheduledTaskRunLogSummary | null {
+  return getRecentRunLogs(taskId, 1)[0] ?? null;
+}
+
+function mapTaskRow(row: ScheduledTask, includeLatestRunLog: boolean, includeRunLogs: boolean, runLogLimit: number): ScheduledTaskInspectionRecord {
   const summary = summarizeTask(row);
   return {
     id: row.id,
@@ -137,10 +152,15 @@ function mapTaskRow(row: ScheduledTask, includeLatestRunLog: boolean): Scheduled
     last_result: row.last_result,
     created_at: row.created_at,
     model: row.model ?? null,
+    prompt: row.prompt ?? null,
+    command: row.command ?? null,
+    cwd: row.cwd ?? null,
+    timeout_sec: row.timeout_sec ?? null,
     prompt_summary: summary.prompt_summary,
     command_summary: summary.command_summary,
     summary: summary.summary,
     latest_run_log: includeLatestRunLog ? getLatestRunLog(row.id) : undefined,
+    recent_run_logs: includeRunLogs ? getRecentRunLogs(row.id, runLogLimit) : undefined,
   };
 }
 
@@ -152,7 +172,9 @@ export function listScheduledTasks(query: ScheduledTaskQuery = {}): ScheduledTas
   const chatJid = query.chat_jid?.trim() || null;
   const taskId = query.id?.trim() || null;
   const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-  const includeLatestRunLog = query.include_latest_run_log === true;
+  const includeLatestRunLog = query.include_latest_run_log === true || query.include_run_logs === true;
+  const includeRunLogs = query.include_run_logs === true;
+  const runLogLimit = Math.min(Math.max(query.run_log_limit ?? 5, 1), 20);
 
   if (taskId) {
     filters.push("id = ?");
@@ -175,7 +197,7 @@ export function listScheduledTasks(query: ScheduledTaskQuery = {}): ScheduledTas
 
   return {
     counts: getTaskCounts(),
-    tasks: rows.map((row) => mapTaskRow(row, includeLatestRunLog)),
+    tasks: rows.map((row) => mapTaskRow(row, includeLatestRunLog, includeRunLogs, runLogLimit)),
   };
 }
 

@@ -29,6 +29,7 @@ const DATA_AGENT_QUEUE_LIMIT = 30;
 const DATA_AGENT_BRANCH_LIMIT = 20;
 const DATA_AGENT_PEER_LIMIT = 30;
 const DATA_AGENT_UI_LIMIT = 30;
+const DATA_AGENT_TASK_LIMIT = 30;
 const DATA_AGENT_SIDE_PROMPT_LIMIT = 20;
 
 /** Rate-limit rule returned for a specific method/path endpoint. */
@@ -82,6 +83,13 @@ export function getDataRateLimitRule(method: string, pathname: string): DataRate
       bucket: "data/agent_peer",
       limit: DATA_AGENT_PEER_LIMIT,
       message: "Too many peer-agent messages. Slow down.",
+    };
+  }
+  if (method === "POST" && pathname === "/agent/scheduled-tasks/action") {
+    return {
+      bucket: "data/agent_scheduled_tasks",
+      limit: DATA_AGENT_TASK_LIMIT,
+      message: "Too many scheduled-task actions. Slow down.",
     };
   }
   if (method === "POST" && (

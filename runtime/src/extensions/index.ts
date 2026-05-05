@@ -51,7 +51,6 @@ import { openWorkspaceFile } from "./open-workspace-file.js";
 import { envTools } from "./env-tools.js";
 import { exitProcess } from "./exit-process.js";
 import { imageProcessing } from "./image-processing.js";
-import { remotePair } from "./remote-pair.js";
 import { sessionStatus } from "./session-status.js";
 import { providerResponseDiagnostics } from "./provider-response-diagnostics.js";
 
@@ -80,7 +79,7 @@ export function createBuiltinExtensionFactories(options?: {
     envTools,
     exitProcess,
     imageProcessing,
-    remotePair,
+    // remotePair moved to extensions/integrations/remote-pair/ (lazy, env-gated)
     sessionStatus,
     providerResponseDiagnostics,
   ];

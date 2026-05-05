@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * developer-settings.ts — Developer mode settings pane.
  */

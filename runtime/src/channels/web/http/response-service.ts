@@ -50,8 +50,8 @@ export class ResponseService {
    * @param relPath Relative asset path inside the static directory.
    * @returns Static-file response, or a 404 JSON error wrapper.
    */
-  async serveStatic(relPath: string): Promise<Response> {
-    return serveStatic(relPath, () => this.error("Not found", 404));
+  async serveStatic(relPath: string, req?: Request): Promise<Response> {
+    return serveStatic(relPath, () => this.error("Not found", 404), req);
   }
 
   /**

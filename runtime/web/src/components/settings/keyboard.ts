@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useEffect, useMemo, useState } from '../../vendor/preact-htm.js';
 import {
     KEYBOARD_SHORTCUT_ACTIONS,

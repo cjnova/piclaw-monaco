@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
-// @ts-nocheck
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, type Browser } from 'playwright';
 
 import { cleanupVncHarnessReport, probeHarnessHealth } from './vnc-harness-report-helpers.ts';
 
@@ -14,7 +13,65 @@ const DEFAULT_PORT = 8791;
 const DEFAULT_LIVE_WAIT_MS = 15000;
 const DEFAULT_ENCODINGS = '16,5,2,1,0,-223';
 
-function parseEncodingList(raw) {
+type VncHarnessSyntheticResult = {
+    cases?: Array<{ name: string; pass?: boolean; detail?: string }>;
+    summary?: { passed?: number; total?: number };
+};
+
+type VncHarnessStats = {
+    bytesIn?: number;
+    bytesOut?: number;
+    frames?: number;
+    rects?: number;
+    protocolEvents?: Record<string, number>;
+};
+
+type VncHarnessSnapshot = {
+    connectedAt?: string | null;
+    firstDisplayInitAt?: string | null;
+    firstFramebufferAt?: string | null;
+    protocolState?: string | null;
+    lastError?: string | null;
+    stats?: VncHarnessStats;
+};
+
+type VncHarnessLiveRun = {
+    requested: string;
+    effective: string;
+    passed: boolean;
+    connectedAt: string;
+    firstDisplayInitAt: string;
+    firstFramebufferAt: string;
+    lastError: string;
+    protocolState: string;
+    frames: number;
+    rects: number;
+};
+
+type VncHarnessProbeResult = {
+    requestedEncoding: string;
+    currentEncoding: string;
+    connectedAt?: string | null;
+    firstDisplayInitAt?: string | null;
+    firstFramebufferAt?: string | null;
+    lastError?: string | null;
+    protocolState?: string | null;
+    stats?: VncHarnessStats;
+};
+
+type VncHarnessApi = {
+    runSyntheticSuite: () => Promise<VncHarnessSyntheticResult>;
+    runEncodingProbeWithWait: (encoding: string, timeoutMs: number) => Promise<VncHarnessProbeResult>;
+    snapshot: () => VncHarnessSnapshot;
+};
+
+declare global {
+    interface Window {
+        __VNC_HARNESS__?: VncHarnessApi;
+    }
+}
+
+function parseEncodingList(raw: unknown): string[] {
     const text = String(raw || '').trim();
     return text
         .split(',')
@@ -91,7 +148,18 @@ async function waitForHealth(baseUrl: string, timeoutMs = 10000) {
     return false;
 }
 
-function buildMarkdownReport({ args, baseUrl, liveRuns, synthetic, snapshot, consoleLines, screenshotPath, startedAt, finishedAt, liveWaitMs }) {
+function buildMarkdownReport({ args, baseUrl, liveRuns, synthetic, snapshot, consoleLines, screenshotPath, startedAt, finishedAt, liveWaitMs }: {
+    args: ReturnType<typeof parseArgs>;
+    baseUrl: string;
+    liveRuns: VncHarnessLiveRun[];
+    synthetic: VncHarnessSyntheticResult | null;
+    snapshot: VncHarnessSnapshot | null;
+    consoleLines: string[];
+    screenshotPath: string;
+    startedAt: string;
+    finishedAt: string;
+    liveWaitMs: number;
+}) {
     const syntheticRows = (synthetic?.cases || []).map((item) => `| ${item.name} | ${item.pass ? 'PASS' : 'FAIL'} | ${String(item.detail || '').replace(/\|/g, '\\|')} |`).join('\n');
     const protocolRows = Object.entries(snapshot?.stats?.protocolEvents || {}).map(([name, count]) => `| ${name} | ${count} |`).join('\n');
     const liveRows = (liveRuns || []).map((entry) => `| ${entry.requested} | ${entry.effective} | ${entry.passed ? 'PASS' : 'FAIL'} | ${entry.firstFramebufferAt || 'n/a'} | ${entry.lastError || 'none'} | ${entry.frames || 0} |`).join('\n');
@@ -179,11 +247,11 @@ async function main() {
     const procStdoutPromise = new Response(harnessProc.stdout).text();
     const procStderrPromise = new Response(harnessProc.stderr).text();
 
-    let browser = null;
+    let browser: Browser | null = null;
     const consoleLines: string[] = [];
-    let synthetic = null;
-    let snapshot = null;
-    const liveRuns = [];
+    let synthetic: VncHarnessSyntheticResult | null = null;
+    let snapshot: VncHarnessSnapshot | null = null;
+    const liveRuns: VncHarnessLiveRun[] = [];
     let screenshotPath = '';
 
     try {
@@ -210,13 +278,13 @@ async function main() {
         const encodingSequence = parseEncodingList(args.encodings);
 
         synthetic = await page.evaluate(async () => {
-            return await window.__VNC_HARNESS__.runSyntheticSuite();
+            return await window.__VNC_HARNESS__!.runSyntheticSuite();
         });
 
         for (const candidate of encodingSequence) {
             const requestedSequence = Array.from(new Set([candidate, ...encodingSequence])).filter((value) => value && Number.isFinite(Number(value)));
-            const runResult = await page.evaluate(async ({ encoding: requestedEncoding, timeoutMs }) => {
-                const result = await window.__VNC_HARNESS__.runEncodingProbeWithWait(requestedEncoding, timeoutMs);
+            const runResult = await page.evaluate(async ({ encoding: requestedEncoding, timeoutMs }: { encoding: string; timeoutMs: number }) => {
+                const result = await window.__VNC_HARNESS__!.runEncodingProbeWithWait(requestedEncoding, timeoutMs);
                 return {
                     requestedEncoding: result.requestedEncoding,
                     effectiveEncoding: result.currentEncoding,
@@ -242,7 +310,7 @@ async function main() {
             });
         }
 
-        snapshot = await page.evaluate(() => window.__VNC_HARNESS__.snapshot());
+        snapshot = await page.evaluate(() => window.__VNC_HARNESS__!.snapshot());
 
         mkdirSync(reportDir, { recursive: true });
         const stamp = new Date().toISOString().replace(/[.:]/g, '-');

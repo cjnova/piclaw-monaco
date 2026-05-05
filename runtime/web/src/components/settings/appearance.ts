@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { html, useState, useEffect, useCallback, useMemo, useRef } from '../../vendor/preact-htm.js';
 import { applyThemeFromEvent } from '../../ui/theme.js';
 
-function normalizeAppearanceSettings(data = {}) {
+function normalizeAppearanceSettings(data: Record<string, any> = {}) {
     return {
         uiTheme: typeof data.uiTheme === 'string' && data.uiTheme.trim() ? data.uiTheme.trim() : 'default',
         uiTint: typeof data.uiTint === 'string' && data.uiTint.trim() ? data.uiTint.trim() : '',

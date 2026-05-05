@@ -13,12 +13,14 @@ import {
   getMessageThreadRootIdById,
   getMessagesSince,
   getPreflightRuns,
+  quarantineStalePreflightRun,
   rollbackInflightRun,
   storeMessage,
   type AgentReplyState,
   type DeferredQueuedFollowupRecord,
   type InflightRun,
   type PreflightRun,
+  type StalePreflightRecoveryRecord,
 } from "../../../db.js";
 import { createUuid } from "../../../utils/ids.js";
 import { createLogger } from "../../../utils/logger.js";
@@ -114,6 +116,7 @@ export interface WebRecoveryStore {
   transaction(run: () => void): void;
   getAgentReplyStateAfter(chatJid: string, prevTs: string): AgentReplyState;
   clearChatPreflight?(chatJid: string): void;
+  quarantineStalePreflightRun?(preflight: PreflightRun, options: { createdAt: string; reason: string; backoffUntil?: string | null }): StalePreflightRecoveryRecord | null;
   clearInflightMarker(chatJid: string): void;
   rollbackInflightRun(chatJid: string, prevTs: string): void;
   getAllChatCursors(): Record<string, string>;
@@ -144,6 +147,7 @@ const defaultStore: WebRecoveryStore = {
   },
   getAgentReplyStateAfter,
   clearChatPreflight,
+  quarantineStalePreflightRun,
   clearInflightMarker,
   rollbackInflightRun,
   getAllChatCursors,
@@ -161,6 +165,26 @@ const defaultStore: WebRecoveryStore = {
  */
 const MAX_INFLIGHT_AGE_MS = 30 * 60 * 1000;
 const RUNTIME_STALE_INFLIGHT_GRACE_MS = 15_000;
+const DEFAULT_STALE_PREFLIGHT_AGE_MS = 4 * 60 * 1000;
+const DEFAULT_STALE_PREFLIGHT_BACKOFF_MS = 4 * 60 * 60 * 1000;
+
+function parsePositiveDurationMs(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(String(value || "").trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getStalePreflightAgeMs(): number {
+  return parsePositiveDurationMs(process.env.PICLAW_STALE_PREFLIGHT_RECOVERY_MS, DEFAULT_STALE_PREFLIGHT_AGE_MS);
+}
+
+function getStalePreflightBackoffMs(): number {
+  return parsePositiveDurationMs(process.env.PICLAW_STALE_PREFLIGHT_BACKOFF_MS, DEFAULT_STALE_PREFLIGHT_BACKOFF_MS);
+}
+
+function getRunAgeMs(startedAt: string, nowMs: number): number {
+  const startedMs = Date.parse(startedAt);
+  return Number.isFinite(startedMs) ? nowMs - startedMs : Number.POSITIVE_INFINITY;
+}
 
 export interface RecoverStaleInflightRunOptions {
   hasActiveStatus?: boolean;
@@ -254,14 +278,45 @@ export function recoverInflightRuns(
 ): void {
   const preflights = store.getPreflightRuns?.() ?? [];
   if (preflights.length > 0) {
+    const now = typeof ctx.now === "function" ? ctx.now() : Date.now();
+    const staleAgeMs = getStalePreflightAgeMs();
+    const backoffUntil = new Date(now + getStalePreflightBackoffMs()).toISOString();
+    const recoveredAt = new Date(now).toISOString();
     try {
       store.transaction(() => {
         for (const preflight of preflights) {
-          log.info("Preflight run never reached prompt execution; clearing marker", {
-            operation: "recover_preflight_runs.clear_pending",
-            chatJid: preflight.chatJid,
-            startedAt: preflight.startedAt,
-          });
+          const preflightAgeMs = getRunAgeMs(preflight.startedAt, now);
+          if (preflightAgeMs >= staleAgeMs && store.quarantineStalePreflightRun) {
+            const reason = `Stale preflight recovered after ${Math.round(preflightAgeMs / 1000)}s; skipping pending message to avoid startup compaction loop`;
+            const recovered = store.quarantineStalePreflightRun(preflight, { createdAt: recoveredAt, reason, backoffUntil });
+            if (recovered) {
+              log.warn("Stale preflight exceeded recovery age; quarantined pending message", {
+                operation: "recover_preflight_runs.quarantine_stale",
+                chatJid: preflight.chatJid,
+                messageId: preflight.messageId,
+                startedAt: preflight.startedAt,
+                preflightAgeSeconds: Math.round(preflightAgeMs / 1000),
+                staleAgeSeconds: Math.round(staleAgeMs / 1000),
+                failedTs: recovered.failedTs,
+                backoffUntil,
+              });
+              continue;
+            }
+            log.warn("Stale preflight exceeded recovery age but message was unavailable; clearing marker only", {
+              operation: "recover_preflight_runs.clear_missing_stale",
+              chatJid: preflight.chatJid,
+              messageId: preflight.messageId,
+              startedAt: preflight.startedAt,
+              preflightAgeSeconds: Math.round(preflightAgeMs / 1000),
+            });
+          } else {
+            log.info("Preflight run never reached prompt execution; clearing marker", {
+              operation: "recover_preflight_runs.clear_pending",
+              chatJid: preflight.chatJid,
+              startedAt: preflight.startedAt,
+              preflightAgeSeconds: Math.round(preflightAgeMs / 1000),
+            });
+          }
           store.clearChatPreflight?.(preflight.chatJid);
         }
       });

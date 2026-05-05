@@ -111,6 +111,7 @@ export {
   getFailedRun,
   clearFailedRun,
   getPreflightRuns,
+  quarantineStalePreflightRun,
   getInflightRuns,
   rollbackInflightRun,
   clearInflightMarker,
@@ -129,6 +130,7 @@ export type {
   DeferredQueuedFollowupRecord,
   AgentReplyState,
   ChatCompactionBackoffState,
+  StalePreflightRecoveryRecord,
 } from "./db/chat-cursors.js";
 export {
   storeTokenUsage,

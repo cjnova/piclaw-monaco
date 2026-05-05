@@ -124,12 +124,14 @@ export function watchZenModeShortcuts(callbacks: ZenModeShortcutCallbacks, runti
     : () => Boolean(callbacks?.zenMode);
 
   const onKeyDown = (event: { ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean; key?: string; preventDefault?: () => void; target?: unknown }) => {
-    if (isEditableKeyboardTarget(event?.target)) return;
+    // Ctrl+Shift+Z must work even when focus is in the compose editor; otherwise
+    // the primary zen-mode shortcut is swallowed by the editable-target guard.
     if (matchesKeyboardShortcutAction(event, 'toggleZenMode')) {
       event.preventDefault?.();
       toggleZenMode?.();
       return;
     }
+    if (isEditableKeyboardTarget(event?.target)) return;
     if (event?.key === 'Escape' && isZenModeActive()) {
       event.preventDefault?.();
       exitZenMode?.();

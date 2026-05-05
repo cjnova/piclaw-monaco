@@ -915,6 +915,54 @@ test("web channel queues normal message as follow-up when no mode is provided", 
   expect(timeline[0].data.content).toBe("root turn");
 });
 
+test("web channel queues normal message as follow-up when session is active for compaction but not streaming", async () => {
+  const ws = createTempWorkspace("piclaw-web-channel-");
+  cleanupWorkspace = ws.cleanup;
+  restoreEnv = setEnv({ PICLAW_WORKSPACE: ws.workspace, PICLAW_STORE: ws.store, PICLAW_DATA: ws.data });
+
+  const db = await import("../../../src/db.js");
+  db.initDatabase();
+  db.getDb().exec("DELETE FROM message_media; DELETE FROM messages; DELETE FROM chats; DELETE FROM chat_cursors;");
+  db.storeChatMetadata("web:default", new Date().toISOString(), "Web");
+
+  let runCalls = 0;
+
+  const webMod = await import("../../../src/channels/web.js");
+  const web = new (webMod.WebChannel as any)({
+    queue: { enqueue: () => {} },
+    agentPool: {
+      isStreaming: () => false,
+      isActive: () => true,
+      runAgent: async () => {
+        runCalls += 1;
+        return { status: "success", result: "ok" };
+      },
+      getContextUsageForChat: async () => null,
+    },
+  });
+
+  const req = new Request("http://test/agent/default/message", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: "Queue this while compaction is active" }),
+  });
+
+  const res = await (web as any).handleRequest(req);
+  expect(res.status).toBe(201);
+  const payload = await res.json();
+  expect(payload.queued).toBe("followup");
+  expect(payload.thread_id).toBe(null);
+  expect(runCalls).toBe(0);
+
+  const queueStateRes = await (web as any).handleRequest(new Request("http://test/agent/queue-state"));
+  const queueState = await queueStateRes.json();
+  expect(queueState.count).toBe(1);
+  expect(queueState.items[0].content).toBe("Queue this while compaction is active");
+
+  const timeline = db.getTimeline("web:default", 10);
+  expect(timeline).toHaveLength(0);
+});
+
 test("web channel processes messages normally when a turn is inflight but not actively streaming", async () => {
   const ws = createTempWorkspace("piclaw-web-channel-");
   cleanupWorkspace = ws.cleanup;

@@ -10,7 +10,7 @@ import {
 } from "../../src/addons/runtime-contributions.js";
 import { withTempWorkspaceEnv } from "../helpers.js";
 
-test("installed addon runtime entries register status panel and card-intent handlers", async () => {
+test("installed addon runtime entries register status panel, card-intent, and stream-session handlers", async () => {
   resetAddonRuntimeContributionsForTests();
   await withTempWorkspaceEnv("piclaw-addon-runtime-", {}, async (workspace) => {
     const addonDir = join(workspace.workspace, ".pi", "extensions", "node_modules", "piclaw-addon-example");
@@ -39,6 +39,17 @@ api?.registerStatusPanelProvider?.({
 api?.registerAdaptiveCardIntentHandler?.("example-intent", async (context) => {
   await context.sendMessage("handled:" + String(context.rawSubmissionData.value || ""), { threadId: context.threadId });
 });
+const stream = api?.streamSessions?.open?.({
+  chatJid: "web:test",
+  kind: "portainer.logs.follow",
+  label: "Follow container logs",
+  toolName: "portainer",
+  metadata: { endpoint_id: 2, container: "demo" },
+  timeoutMs: 5000,
+});
+stream?.write?.("line one", { kind: "stdout" });
+stream?.write?.("line two", { kind: "stdout", metadata: { seq: 2 } });
+stream?.complete?.("finished");
 export {};
 `);
 
@@ -69,6 +80,64 @@ export {};
 
     expect(handled).toBe(true);
     expect(messages).toEqual(["handled:ok"]);
+
+    const runtimeApi = (globalThis as any).__piclaw_runtime;
+    const sessions = runtimeApi.streamSessions.list({ chatJid: "web:test", toolName: "portainer" });
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      chatJid: "web:test",
+      kind: "portainer.logs.follow",
+      label: "Follow container logs",
+      toolName: "portainer",
+      status: "completed",
+      reason: "finished",
+      metadata: { endpoint_id: 2, container: "demo" },
+      frameCount: 2,
+    });
+    expect(sessions[0].frames.map((frame: any) => frame.data)).toEqual(["line one", "line two"]);
+    expect(runtimeApi.streamSessions.get(sessions[0].id)?.frames[1].metadata).toEqual({ seq: 2 });
   });
+  resetAddonRuntimeContributionsForTests();
+});
+
+test("runtime stream sessions support cancellation and timeout cleanup", async () => {
+  resetAddonRuntimeContributionsForTests();
+  const runtimeApi = (await import("../../src/addons/runtime-contributions.js")).installAddonRuntimeApi();
+  const cancellations: string[] = [];
+  const cleaned: string[] = [];
+  const events: string[] = [];
+  const unsubscribe = runtimeApi.streamSessions.subscribe((event: any) => {
+    events.push(event.type);
+  });
+
+  const cancellable = runtimeApi.streamSessions.open({
+    chatJid: "web:test",
+    kind: "portainer.exec.attach",
+    label: "Attach shell",
+    timeoutMs: 5000,
+    onCancel: (reason: string) => cancellations.push(reason),
+    onCleanup: (snapshot: any) => cleaned.push(snapshot.status),
+  });
+  cancellable.write("ready", { kind: "status" });
+  const cancelled = runtimeApi.streamSessions.cancel(cancellable.id, "user abort");
+  expect(cancelled?.status).toBe("cancelled");
+  expect(cancellable.signal.aborted).toBe(true);
+  expect(cancellations).toEqual(["user abort"]);
+  expect(cleaned).toEqual(["cancelled"]);
+
+  const timedOut = runtimeApi.streamSessions.open({
+    chatJid: "web:test",
+    kind: "portainer.logs.follow",
+    timeoutMs: 1,
+    onCancel: (reason: string) => cancellations.push(reason),
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(runtimeApi.streamSessions.get(timedOut.id)?.status).toBe("timed_out");
+  expect(cancellations).toContain("timeout");
+  expect(events).toContain("created");
+  expect(events).toContain("frame");
+  expect(events).toContain("cancelled");
+  expect(events).toContain("timed_out");
+  unsubscribe();
   resetAddonRuntimeContributionsForTests();
 });

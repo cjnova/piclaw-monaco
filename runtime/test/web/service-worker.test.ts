@@ -31,6 +31,50 @@ afterAll(() => {
   delete (globalThis as any).self;
 });
 
+test('service worker handles same-origin GET fetches for Android PWA installability', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchedUrl = '';
+  try {
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      fetchedUrl = input instanceof Request ? input.url : String(input);
+      return new Response('ok');
+    };
+
+    let pending: Promise<Response> | null = null;
+    handlers.get('fetch')?.({
+      request: new Request('https://example.com/static/app.js', { method: 'GET' }),
+      respondWith(promise: Promise<Response>) {
+        pending = promise;
+      },
+    });
+
+    const response = await pending;
+    expect(await response?.text()).toBe('ok');
+    expect(fetchedUrl).toBe('https://example.com/static/app.js');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('service worker ignores non-GET and cross-origin fetches', () => {
+  let responded = false;
+
+  handlers.get('fetch')?.({
+    request: new Request('https://example.com/api/messages', { method: 'POST' }),
+    respondWith() {
+      responded = true;
+    },
+  });
+  handlers.get('fetch')?.({
+    request: new Request('https://cdn.example.net/static/app.js', { method: 'GET' }),
+    respondWith() {
+      responded = true;
+    },
+  });
+
+  expect(responded).toBe(false);
+});
+
 test('service worker reuses an existing root app tab for relative notification targets', async () => {
   let focused = false;
   let navigatedTo = '';

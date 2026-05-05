@@ -79,6 +79,7 @@ interface UseAgentStatusLifecycleOptions {
   };
 
   setConnectionStatus: (status: string) => void;
+  setStateAccessFailed: (failed: boolean) => void;
   setPendingRequestForConnection: (next: any) => void;
   hasConnectedOnceRef: RefBox<boolean>;
 }
@@ -125,6 +126,7 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
     isCompactionStatus,
     serverVersionContext,
     setConnectionStatus,
+    setStateAccessFailed,
     setPendingRequestForConnection,
     hasConnectedOnceRef,
   } = options;
@@ -206,10 +208,11 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
           setActiveTurn,
           noteAgentActivity,
           clearLastActivityFlag,
+          onStateAccessResult: setStateAccessFailed,
         });
       },
     });
-  }, [activeChatJidRef, agentStatusRef, clearAgentRunState, clearLastActivityFlag, currentChatJid, draftBufferRef, getAgentStatus, noteAgentActivity, pendingRequestRef, refreshTimeline, setActiveTurn, setAgentDraft, setAgentPlan, setAgentStatus, setAgentThought, setPendingRequest, thoughtBufferRef, viewStateRef, wasAgentActiveRef]);
+  }, [activeChatJidRef, agentStatusRef, clearAgentRunState, clearLastActivityFlag, currentChatJid, draftBufferRef, getAgentStatus, noteAgentActivity, pendingRequestRef, refreshTimeline, setActiveTurn, setAgentDraft, setAgentPlan, setAgentStatus, setAgentThought, setPendingRequest, setStateAccessFailed, thoughtBufferRef, viewStateRef, wasAgentActiveRef]);
 
   const reconcileSilentTurn = useCallback(async () => {
     return await reconcileSilentTurnState({
@@ -254,6 +257,7 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
   }, [serverVersionContext]);
 
   const handleConnectionStatusChange = useCallback((status: string) => {
+    if (status === 'connected') setStateAccessFailed(false);
     handleConnectionStatusChangeEvent({
       currentChatJid,
       status,
@@ -272,7 +276,7 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
       refreshQueueState,
       refreshContextUsage,
     });
-  }, [clearAgentRunState, currentChatJid, hasConnectedOnceRef, pendingRequestRef, refreshAgentStatus, refreshContextUsage, refreshQueueState, refreshTimeline, setAgentDraft, setAgentPlan, setAgentStatus, setAgentThought, setConnectionStatus, setPendingRequestForConnection, viewStateRef]);
+  }, [clearAgentRunState, currentChatJid, hasConnectedOnceRef, pendingRequestRef, refreshAgentStatus, refreshContextUsage, refreshQueueState, refreshTimeline, setAgentDraft, setAgentPlan, setAgentStatus, setAgentThought, setConnectionStatus, setPendingRequestForConnection, setStateAccessFailed, viewStateRef]);
 
   return {
     refreshQueueState,

@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * settings/compaction.ts — Compaction and watchdog settings pane.
  */
 import { html, useState, useEffect, useCallback, useMemo, useRef } from '../../vendor/preact-htm.js';
 import { NumberStepper } from './number-stepper.js';
 
-function normalizeCompactionSettings(data = {}) {
+function normalizeCompactionSettings(data: Record<string, any> = {}) {
     return {
         compactionTimeoutSec: data.compactionTimeoutSec ?? 180,
         compactionBackoffBaseMin: data.compactionBackoffBaseMin ?? 15,

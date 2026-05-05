@@ -52,7 +52,7 @@ export function resolveConnectionStatusPresentation(status, options = {}) {
             title: 'Reconnecting',
         }
         : {
-            show: true,
+            show: false,
             statusClass: 'connecting',
             label: 'Connecting',
             title: 'Connecting',
@@ -81,10 +81,24 @@ export function useConnectionStatusPresentation(status, options = {}) {
         if (status !== 'disconnected' || disconnectedAtMs === null) return undefined;
         const remainingMs = delayMs - (Date.now() - disconnectedAtMs);
         if (remainingMs <= 0) return undefined;
+        let frameOne = 0;
+        let frameTwo = 0;
         const timeoutId = setTimeout(() => {
-            setDisplayNowMs(Date.now());
+            if (typeof requestAnimationFrame !== 'function') {
+                setDisplayNowMs(Date.now());
+                return;
+            }
+            frameOne = requestAnimationFrame(() => {
+                frameTwo = requestAnimationFrame(() => {
+                    setDisplayNowMs(Date.now());
+                });
+            });
         }, remainingMs);
-        return () => clearTimeout(timeoutId);
+        return () => {
+            clearTimeout(timeoutId);
+            if (frameOne) cancelAnimationFrame(frameOne);
+            if (frameTwo) cancelAnimationFrame(frameTwo);
+        };
     }, [status, disconnectedAtMs, delayMs]);
 
     return useMemo(() => resolveConnectionStatusPresentation(status, {

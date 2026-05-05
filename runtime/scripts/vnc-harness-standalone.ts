@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// @ts-nocheck
 
 import { createConnection, type Socket } from 'node:net';
 import { dirname, resolve } from 'node:path';
@@ -104,7 +103,7 @@ async function buildHarnessBundle(entry: string) {
     return await result.outputs[0].text();
 }
 
-function buildHarnessHtml({ target, password }) {
+function buildHarnessHtml({ target, password }: { target: string; password: string }) {
     const encodedTarget = encodeURIComponent(target);
     const encodedPassword = encodeURIComponent(password || '');
     return `<!doctype html>

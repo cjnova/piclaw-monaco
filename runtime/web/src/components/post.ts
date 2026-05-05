@@ -708,6 +708,39 @@ function extractFileRefs(content) {
     return { content: cleaned, fileRefs: refs };
 }
 
+function extractFolderRefs(content) {
+    if (!content) return { content, folderRefs: [] };
+    const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalized.split('\n');
+    let start = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+        if (lines[i].trim() === 'Folders:' && lines[i + 1] && /^\s*-\s+/.test(lines[i + 1])) {
+            start = i;
+            break;
+        }
+    }
+    if (start === -1) return { content, folderRefs: [] };
+    const refs = [];
+    let end = start + 1;
+    for (; end < lines.length; end += 1) {
+        const line = lines[end];
+        if (/^\s*-\s+/.test(line)) {
+            const normalizedRef = normalizeFileRef(line.replace(/^\s*-\s+/, '').trim());
+            if (normalizedRef) refs.push(normalizedRef);
+        } else if (!line.trim()) {
+            break;
+        } else {
+            break;
+        }
+    }
+    if (refs.length === 0) return { content, folderRefs: [] };
+    const before = lines.slice(0, start);
+    const after = lines.slice(end);
+    let cleaned = [...before, ...after].join('\n');
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+    return { content: cleaned, folderRefs: refs };
+}
+
 function extractMessageRefs(content) {
     if (!content) return { content, messageRefs: [] };
     const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -890,7 +923,8 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
     let displayContent = getDisplayContent(data.content, data.link_previews);
     displayContent = getPeerMessageDisplayContent(displayContent, blocks);
     const { content: cleanedContent, fileRefs } = extractFileRefs(displayContent);
-    const { content: cleanedWithMsgRefs, messageRefs } = extractMessageRefs(cleanedContent);
+    const { content: cleanedWithFolderRefs, folderRefs } = extractFolderRefs(cleanedContent);
+    const { content: cleanedWithMsgRefs, messageRefs } = extractMessageRefs(cleanedWithFolderRefs);
     const handleActivateMessageRef = (e) => {
         e?.preventDefault?.();
         e?.stopPropagation?.();
@@ -1258,7 +1292,7 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
                         </div>
                     </div>
                 `}
-                ${(fileRefs.length > 0 || messageRefs.length > 0 || attachmentPills.length > 0) && html`
+                ${(fileRefs.length > 0 || folderRefs.length > 0 || messageRefs.length > 0 || attachmentPills.length > 0) && html`
                     <div class="post-file-refs">
                         ${messageRefs.map((id) => {
                             const scrollToRef = (e) => {
@@ -1295,6 +1329,17 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
                                     label=${label}
                                     title=${ref}
                                     onClick=${() => onFileRef?.(ref)}
+                                />
+                            `;
+                        })}
+                        ${folderRefs.map((ref) => {
+                            const label = ref.split('/').pop() || ref;
+                            return html`
+                                <${FilePill}
+                                    prefix="post"
+                                    label=${label}
+                                    title=${ref}
+                                    icon="folder"
                                 />
                             `;
                         })}
@@ -1385,10 +1430,10 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
                             const isSvg = typeof mimeType === 'string' && mimeType.toLowerCase().startsWith('image/svg');
                             const imageSrc = isSvg ? getMediaUrl(id) : getThumbnailUrl(id);
                             return html`
-                                <img 
-                                    key=${id} 
-                                    src=${imageSrc} 
-                                    alt="Media" 
+                                <img
+                                    key=${id}
+                                    src=${imageSrc}
+                                    alt="Media"
                                     loading="lazy"
                                     decoding="async"
                                     onClick=${(e) => handleImageClick(e, id)}

@@ -21,6 +21,7 @@ import {
 import { getCompactionSettingsData, resetCompactionBackoff, saveCompactionSettings } from "../handlers/compaction-settings.js";
 import { getGeneralSettingsData, rotateWidgetTokenSettings, saveGeneralSettings } from "../handlers/general-settings.js";
 import { getQuickActionsSettingsData, saveQuickActionsSettings } from "../handlers/quick-actions-settings.js";
+import { handleScheduledTasksManagementAction, handleScheduledTasksManagementList } from "../handlers/scheduled-tasks-management.js";
 import { getWorkspaceSettingsData, saveWorkspaceSettings } from "../handlers/workspace-settings.js";
 import { getServerUiState, setServerUiMetersConfig, setServerUiThemeConfig } from "../ui-state.js";
 import {
@@ -140,6 +141,16 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
     method: "GET",
     path: "/agent/system-metrics",
     handle: (channel, req) => channel.handleSystemMetrics(req),
+  },
+  {
+    method: "GET",
+    path: "/agent/scheduled-tasks",
+    handle: (channel, req, url) => handleScheduledTasksManagementList(channel, req, url),
+  },
+  {
+    method: "POST",
+    path: "/agent/scheduled-tasks/action",
+    handle: (channel, req) => handleScheduledTasksManagementAction(channel, req),
   },
   {
     method: "GET",

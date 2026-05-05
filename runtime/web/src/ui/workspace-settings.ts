@@ -36,7 +36,7 @@ export function readWorkspaceClientSettings(): WorkspaceClientSettings {
     };
 }
 
-export function applyWorkspaceClientSettings(patch = {}): WorkspaceClientSettings {
+export function applyWorkspaceClientSettings(patch: Partial<WorkspaceClientSettings> = {}): WorkspaceClientSettings {
     const current = readWorkspaceClientSettings();
     const next = {
         refreshIntervalSec: clampWorkspaceRefreshIntervalSec(

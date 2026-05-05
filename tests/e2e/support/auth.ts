@@ -1,17 +1,61 @@
-/**
- * E2E auth helpers — kept as a stub.
- *
- * The CI test instance runs without auth, so the authenticatedContext
- * helper is no longer used by the world fixture. This file exists only
- * so that any stale imports don't break the build.
- */
+import type { APIRequestContext, Browser, BrowserContext, Page } from '@playwright/test';
 
-import type { Browser, BrowserContext } from '@playwright/test';
+export type E2eAuthBootstrapResult = {
+  attempted: boolean;
+  authenticated: boolean;
+  status?: number;
+  error?: string;
+  cookieHeader?: string;
+};
+
+function resolveInternalSecret(): string {
+  return (process.env.PICLAW_INTERNAL_SECRET || process.env.PICLAW_WEB_INTERNAL_SECRET || '').trim();
+}
+
+function normalizeBaseUrl(baseURL: string): string {
+  return String(baseURL || 'http://localhost:8080').replace(/\/+$/, '');
+}
+
+export async function bootstrapE2eAuth(
+  _request: APIRequestContext,
+  baseURL: string,
+): Promise<E2eAuthBootstrapResult> {
+  const secret = resolveInternalSecret();
+  if (!secret) return { attempted: false, authenticated: false };
+
+  try {
+    // Use the runtime fetch implementation instead of Playwright's
+    // APIRequestContext: browser-context request can throw URL parsing errors
+    // after a successful Set-Cookie response on authenticated remote targets.
+    const response = await fetch(`${normalizeBaseUrl(baseURL)}/auth/e2e/bootstrap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-piclaw-internal-secret': secret,
+      },
+    });
+    if (!response.ok) {
+      return { attempted: true, authenticated: false, status: response.status, error: await response.text().catch(() => '') };
+    }
+    return { attempted: true, authenticated: true, status: response.status, cookieHeader: response.headers.get('set-cookie') || '' };
+  } catch (error) {
+    return { attempted: true, authenticated: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function authenticatePage(page: Page, baseURL: string): Promise<E2eAuthBootstrapResult> {
+  return await bootstrapE2eAuth(page.context().request, baseURL);
+}
 
 export async function authenticatedContext(
   browser: Browser,
   baseURL: string,
 ): Promise<BrowserContext> {
-  // No-auth mode: just create a plain context
-  return browser.newContext();
+  const context = await browser.newContext();
+  const result = await bootstrapE2eAuth(context.request, baseURL);
+  if (result.attempted && !result.authenticated) {
+    await context.close();
+    throw new Error(`E2E auth bootstrap failed${result.status ? ` with HTTP ${result.status}` : ''}${result.error ? `: ${result.error}` : ''}`);
+  }
+  return context;
 }

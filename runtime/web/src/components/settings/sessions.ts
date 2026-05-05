@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * settings/sessions.ts — Session management settings section.
  */
 import { html, useState, useEffect, useCallback, useMemo, useRef } from '../../vendor/preact-htm.js';
 import { NumberStepper } from './number-stepper.js';
 
-function normalizeSessionSettings(data = {}) {
+function normalizeSessionSettings(data: Record<string, any> = {}) {
     return {
         sessionAutoRotate: data.sessionAutoRotate !== false,
         sessionMaxSizeMb: data.sessionMaxSizeMb ?? 16,

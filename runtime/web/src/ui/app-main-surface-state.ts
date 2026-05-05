@@ -60,12 +60,14 @@ export function useMainAppSurfaceState(options: {
   } = options;
 
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [stateAccessFailed, setStateAccessFailed] = useState(false);
   const [isWebAppMode, setIsWebAppMode] = useState(() => isStandaloneWebAppMode());
   const [currentHashtag, setCurrentHashtag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchScope, setSearchScope] = useState('current');
   const [fileRefs, setFileRefs] = useState<string[]>([]);
+  const [folderRefs, setFolderRefs] = useState<string[]>([]);
   const [messageRefs, setMessageRefs] = useState<string[]>([]);
   const [intentToast, setIntentToast] = useState<any>(null);
   const [agents, setAgents] = useState<Record<string, unknown>>({});
@@ -160,6 +162,8 @@ export function useMainAppSurfaceState(options: {
   return {
     connectionStatus,
     setConnectionStatus,
+    stateAccessFailed,
+    setStateAccessFailed,
     isWebAppMode,
     setIsWebAppMode,
     currentHashtag,
@@ -172,6 +176,8 @@ export function useMainAppSurfaceState(options: {
     setSearchScope,
     fileRefs,
     setFileRefs,
+    folderRefs,
+    setFolderRefs,
     messageRefs,
     setMessageRefs,
     intentToast,

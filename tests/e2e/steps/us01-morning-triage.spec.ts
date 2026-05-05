@@ -56,25 +56,22 @@ test.describe('US-01: Morning Triage', () => {
     await expect(compose).toBeEditable();
   });
 
-  test('/tint command works from compose', async ({ authedPage: page }) => {
+  test('/tint and /theme commands work — see theme-tint-commands.spec.ts for full coverage', async ({ authedPage: page }) => {
+    // Smoke check only — full validation in dedicated spec
     const compose = page.locator(sel.composeInput);
     await compose.click();
-    await compose.fill('/tint blue');
+    await compose.fill('/theme monokai');
     await page.keyboard.press('Enter');
-    // Should not produce an error — command is handled locally
-    await page.waitForTimeout(500);
-    // No error toast or failure bubble
-    const errors = await page.locator('.error-toast, .failure-bubble').count();
-    expect(errors).toBe(0);
-  });
+    await page.waitForTimeout(1500);
 
-  test('/theme command works from compose', async ({ authedPage: page }) => {
-    const compose = page.locator(sel.composeInput);
+    // data-theme should switch to dark (monokai is dark)
+    const dataTheme = await page.locator('html').getAttribute('data-theme');
+    expect(dataTheme).toBe('dark');
+
+    // Restore
     await compose.click();
-    await compose.fill('/theme dark');
+    await compose.fill('/theme default');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
-    const errors = await page.locator('.error-toast, .failure-bubble').count();
-    expect(errors).toBe(0);
   });
 });

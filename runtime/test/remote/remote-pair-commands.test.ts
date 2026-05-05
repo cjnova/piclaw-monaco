@@ -193,7 +193,7 @@ describe("remote pair commands", () => {
       configMod.WEB_RUNTIME_CONFIG.trustProxy = previousTrustProxy;
     };
 
-    const pairMod = await importFresh("../src/extensions/remote-pair.js");
+    const pairMod = await importFresh("../extensions/integrations/remote-pair/index.ts");
     getMyBaseUrl = pairMod.getMyBaseUrl;
     runPairFlow = pairMod.runPairFlow;
     runUnpairFlow = pairMod.runUnpairFlow;

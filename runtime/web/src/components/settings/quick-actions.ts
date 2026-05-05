@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useMemo, useState } from '../../vendor/preact-htm.js';
 import { getAgentCommands, getQuickActionsSettings, saveQuickActionsSettings } from '../../api.js';
 import {

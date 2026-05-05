@@ -50,6 +50,7 @@ export interface ActiveToolInfo {
 export interface SessionActivity {
   chatJid: string;
   isStreaming: boolean;
+  isCompacting: boolean;
   model: string | null;
   thinkingLevel: string | null;
   activeTools: ActiveToolInfo[];
@@ -63,6 +64,7 @@ function getActivity(chatJid: string): SessionActivity {
     activityMap.set(chatJid, {
       chatJid,
       isStreaming: false,
+      isCompacting: false,
       model: null,
       thinkingLevel: null,
       activeTools: [],
@@ -79,6 +81,12 @@ export function updateSessionStreaming(chatJid: string, isStreaming: boolean): v
   if (!isStreaming) {
     a.activeTools = [];
   }
+}
+
+export function updateSessionCompacting(chatJid: string, isCompacting: boolean): void {
+  const a = getActivity(chatJid);
+  a.isCompacting = isCompacting;
+  a.lastEventAt = Date.now();
 }
 
 export function updateSessionModel(chatJid: string, model: string | null, thinkingLevel?: string | null): void {
@@ -108,7 +116,7 @@ export function getActiveSessionCount(excludeChatJid?: string): number {
   let count = 0;
   for (const [jid, activity] of activityMap) {
     if (excludeChatJid && jid === excludeChatJid) continue;
-    if (activity.isStreaming) count++;
+    if (activity.isStreaming || activity.isCompacting) count++;
   }
   return count;
 }
@@ -117,7 +125,7 @@ export function getActiveSessions(excludeChatJid?: string): SessionActivity[] {
   const result: SessionActivity[] = [];
   for (const [jid, activity] of activityMap) {
     if (excludeChatJid && jid === excludeChatJid) continue;
-    if (activity.isStreaming || activity.activeTools.length > 0) {
+    if (activity.isStreaming || activity.isCompacting || activity.activeTools.length > 0) {
       result.push(activity);
     }
   }
@@ -179,6 +187,7 @@ export const sessionStatus: ExtensionFactory = (pi: ExtensionAPI) => {
         const base: Record<string, unknown> = {
           chat: s.chatJid,
           streaming: s.isStreaming,
+          compacting: s.isCompacting,
           model: s.model,
         };
 
@@ -205,7 +214,7 @@ export const sessionStatus: ExtensionFactory = (pi: ExtensionAPI) => {
         const toolStr = tools.length > 0
           ? ` — running: ${tools.map((t) => `${t.name} (${Math.round(t.running_for_ms / 1000)}s)`).join(", ")}`
           : "";
-        return `- ${s.chat}: ${s.model || "unknown model"}${s.streaming ? " [streaming]" : ""}${toolStr}`;
+        return `- ${s.chat}: ${s.model || "unknown model"}${s.streaming ? " [streaming]" : ""}${s.compacting ? " [compacting]" : ""}${toolStr}`;
       });
 
       return {

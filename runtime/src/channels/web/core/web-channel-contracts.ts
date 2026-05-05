@@ -67,6 +67,7 @@ export interface WebChannelLike
       contentBlocks?: unknown[];
       linkPreviews?: unknown[];
       threadId?: number;
+      screenHint?: string | null;
       isTerminalAgentReply?: boolean;
       isSteeringMessage?: boolean;
     }
@@ -130,7 +131,7 @@ export interface WebChannelLike
   lastCommandInteractionId: number | null;
 
   /** General endpoint handlers. */
-  serveStatic(relPath: string): Promise<Response>;
+  serveStatic(relPath: string, req?: Request): Promise<Response>;
   serveDocsStatic(relPath: string): Promise<Response>;
   handleRemote(req: Request): Promise<Response>;
   handleManifest(req: Request): Promise<Response>;

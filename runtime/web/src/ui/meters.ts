@@ -35,7 +35,7 @@ export function readStoredMetersCollapsed(defaultValue = false) {
     return getLocalStorageBoolean(METERS_COLLAPSED_STORAGE_KEY, defaultValue);
 }
 
-export function applyMetersEnabled(enabled, options = {}) {
+export function applyMetersEnabled(enabled, options: { persist?: boolean; persistServer?: boolean } = {}) {
     const persist = options.persist !== false;
     const persistServer = options.persistServer !== false;
     const next = Boolean(enabled);
@@ -52,7 +52,7 @@ export function toggleMetersEnabled() {
     return applyMetersEnabled(next);
 }
 
-export function applyMetersCollapsed(collapsed, options = {}) {
+export function applyMetersCollapsed(collapsed, options: { persist?: boolean; persistServer?: boolean } = {}) {
     const persist = options.persist !== false;
     const persistServer = options.persistServer !== false;
     const next = Boolean(collapsed);

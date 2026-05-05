@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import * as loader from '@assemblyscript/loader';
 import { collectAssemblyScriptGarbageBestEffort } from './remote-display-gc.js';
@@ -48,9 +47,9 @@ let pipelinePromise: Promise<WasmDisplayPipeline | null> | null = null;
 function normalizeInput(bytes: Uint8Array | ArrayBuffer): ArrayBuffer {
     if (bytes instanceof ArrayBuffer) return bytes;
     if (bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength) {
-        return bytes.buffer;
+        return bytes.buffer as ArrayBuffer;
     }
-    return bytes.slice().buffer;
+    return bytes.slice().buffer as ArrayBuffer;
 }
 
 export async function loadRemoteDisplayWasmDecoder(): Promise<WasmDisplayPipeline | null> {
@@ -63,7 +62,7 @@ export async function loadRemoteDisplayWasmDecoder(): Promise<WasmDisplayPipelin
             const instantiated = typeof loader.instantiateStreaming === 'function'
                 ? await loader.instantiateStreaming(response, {})
                 : await loader.instantiate(await response.arrayBuffer(), {});
-            const ex = instantiated.exports;
+            const ex = instantiated.exports as Record<string, any>;
 
             // Verify expected exports
             for (const fn of [
@@ -78,7 +77,7 @@ export async function loadRemoteDisplayWasmDecoder(): Promise<WasmDisplayPipelin
 
             // Helper: call a process* function that takes (dataBuffer, x, y, w, h, pf...)
             // Allocates input in WASM, calls the function, then frees the input.
-            function callProcess(fnName, data, x, y, w, h, pf) {
+            function callProcess(fnName: string, data: Uint8Array, x: number, y: number, w: number, h: number, pf: any) {
                 const input = normalizeInput(data);
                 const ptr = ex.__pin(ex.__newArrayBuffer(input));
                 try {

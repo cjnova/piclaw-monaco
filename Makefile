@@ -10,6 +10,7 @@
 #   local-install  – Pack and install globally (no restart).
 #   lint/test      – Run ESLint and bun test suite.
 #   ci-fast        – Run the canonical fast CI guardrails + web build.
+#   install-git-hooks – Install local Git hooks that run fast CI before main pushes.
 #   publish-smoke  – Smoke-test a published piclaw image via env-provided args.
 #   up/down/enter  – Docker Compose lifecycle helpers.
 #   sync-version   – Sync package.json version to VERSION file.
@@ -40,7 +41,7 @@ PI_AGENT_VERSION ?= $(shell jq -r '.dependencies["@mariozechner/pi-coding-agent"
 WEB_BUILD_TEST_TIMEOUT_MS ?= 20000
 
 .PHONY: help up down enter build build-piclaw build-web build-ts build-desktop vendor update-mermaid-vendor pack \
-        local-install restart lint test test-coverage ci-fast ci-integration publish-smoke \
+        local-install restart lint test test-coverage ci-fast ci-integration install-git-hooks pre-push-ci publish-smoke \
         dual-tag tag-ghcr sync-version bump-minor bump-patch push
 
 help: ## Show this help
@@ -182,6 +183,17 @@ test-coverage: ## Run piclaw tests with coverage
 
 ci-fast: ## Run the canonical fast CI contract used by GitHub Actions
 	bun run ci:fast
+
+pre-push-ci: ## Run the pre-push CI guard against the current HEAD in a clean worktree
+	./scripts/git-pre-push-ci-fast.sh --current
+
+install-git-hooks: ## Install local Git hooks that run fast CI before main pushes
+	@set -e; \
+	chmod +x scripts/git-pre-push-ci-fast.sh; \
+	mkdir -p .git/hooks; \
+	printf '%s\n' '#!/usr/bin/env bash' 'exec "$$(git rev-parse --show-toplevel)/scripts/git-pre-push-ci-fast.sh" "$$@"' > .git/hooks/pre-push; \
+	chmod +x .git/hooks/pre-push; \
+	echo "Installed .git/hooks/pre-push"
 
 ci-integration: ## Run the full integration gate (lint + all tests + static analysis + build + Playwright)
 	bun run ci:integration

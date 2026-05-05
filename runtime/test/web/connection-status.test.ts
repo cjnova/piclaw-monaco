@@ -14,12 +14,12 @@ test('resolveConnectionStatusPresentation hides the pill when connected', () => 
   });
 });
 
-test('resolveConnectionStatusPresentation keeps brief disconnects in connecting state', () => {
+test('resolveConnectionStatusPresentation hides brief disconnects before showing a pill', () => {
   expect(resolveConnectionStatusPresentation('disconnected', {
     disconnectedAtMs: 1_000,
     nowMs: 1_000 + RECONNECTING_HINT_DELAY_MS - 1,
   })).toEqual({
-    show: true,
+    show: false,
     statusClass: 'connecting',
     label: 'Connecting',
     title: 'Connecting',

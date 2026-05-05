@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * mindmap-settings.ts — Mind Map editor settings pane (extension-contributed).
  */

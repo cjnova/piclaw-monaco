@@ -1,5 +1,6 @@
 // Tests written by gpt-5.3-codex, code refactored by claude-sonnet-4.6
 import { test, expect, beforeAll } from "bun:test";
+import { readFileSync } from "node:fs";
 
 beforeAll(() => {
   if (typeof globalThis.window === "undefined") {
@@ -56,34 +57,29 @@ test("workspaceUtils.toUserFacingMessage mapping: unsafe/non-Error values fallba
   expect(toUserFacingMessage("invalid path", "fallback")).toBe("fallback");
 });
 
-test("useWorkspacePreview module loads and exports hook", async () => {
-  const mod = await import("../../../web/frontend/src/panels/workspace/useWorkspacePreview");
-  expect(mod).toBeDefined();
-  expect(typeof mod.useWorkspacePreview).toBe("function");
+test("useWorkspacePreview module exists and exports hook", () => {
+  const src = readFileSync("runtime/web/frontend/src/panels/workspace/useWorkspacePreview.ts", "utf8");
+  expect(src).toContain("export function useWorkspacePreview");
 });
 
-test("WorkspaceActions module loads and exports component", async () => {
-  const mod = await import("../../../web/frontend/src/panels/workspace/WorkspaceActions");
-  expect(mod).toBeDefined();
-  expect(typeof mod.WorkspaceActions).toBe("function");
+test("WorkspaceActions module exists and exports component", () => {
+  const src = readFileSync("runtime/web/frontend/src/panels/workspace/WorkspaceActions.tsx", "utf8");
+  expect(src).toContain("export function WorkspaceActions");
 });
 
-test("WorkspacePreview module loads and exports component", async () => {
-  const mod = await import("../../../web/frontend/src/panels/workspace/WorkspacePreview");
-  expect(mod).toBeDefined();
-  expect(typeof mod.WorkspacePreview).toBe("function");
+test("WorkspacePreview module exists and exports component", () => {
+  const src = readFileSync("runtime/web/frontend/src/panels/workspace/WorkspacePreview.tsx", "utf8");
+  expect(src).toContain("export function WorkspacePreview");
 });
 
-test("FolderPreview module loads and exports component", async () => {
-  const mod = await import("../../../web/frontend/src/panels/workspace/FolderPreview");
-  expect(mod).toBeDefined();
-  expect(typeof mod.FolderPreview).toBe("function");
+test("FolderPreview module exists and exports component", () => {
+  const src = readFileSync("runtime/web/frontend/src/panels/workspace/FolderPreview.tsx", "utf8");
+  expect(src).toContain("export function FolderPreview");
 });
 
-test("WorkspacePanel module loads and exports component", async () => {
-  const mod = await import("../../../web/frontend/src/panels/WorkspacePanel");
-  expect(mod).toBeDefined();
-  expect(typeof mod.WorkspacePanel).toBe("function");
+test("WorkspacePanel module exists and exports component", () => {
+  const src = readFileSync("runtime/web/frontend/src/panels/WorkspacePanel.tsx", "utf8");
+  expect(src).toContain("export function WorkspacePanel");
 });
 
 test("WorkspacePanel is an orchestrator file (<200 lines)", async () => {

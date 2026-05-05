@@ -89,6 +89,7 @@ interface UseComposeReferenceOrchestrationOptions {
   resolvePane: (context: Record<string, unknown>) => unknown;
   tabStripActiveId: string | null;
   setFileRefs: StateSetter<string[]>;
+  setFolderRefs: StateSetter<string[]>;
   setMessageRefs: StateSetter<string[]>;
   currentChatJid: string;
   currentHashtag: string | null;
@@ -113,6 +114,7 @@ export function useComposeReferenceOrchestration(options: UseComposeReferenceOrc
     resolvePane,
     tabStripActiveId,
     setFileRefs,
+    setFolderRefs,
     setMessageRefs,
     currentChatJid,
     currentHashtag,
@@ -157,6 +159,22 @@ export function useComposeReferenceOrchestration(options: UseComposeReferenceOrc
   const setFileRefsFromCompose = useCallback((next: unknown) => {
     setFileRefs(normalizeComposeRefs(next));
   }, [setFileRefs]);
+
+  const addFolderRef = useCallback((path: unknown) => {
+    setFolderRefs((prev) => appendUniqueStringRef(prev, path));
+  }, [setFolderRefs]);
+
+  const removeFolderRef = useCallback((path: unknown) => {
+    setFolderRefs((prev) => removeStringRef(prev, path));
+  }, [setFolderRefs]);
+
+  const clearFolderRefs = useCallback(() => {
+    setFolderRefs([]);
+  }, [setFolderRefs]);
+
+  const setFolderRefsFromCompose = useCallback((next: unknown) => {
+    setFolderRefs(normalizeComposeRefs(next));
+  }, [setFolderRefs]);
 
   const showIntentToast = useCallback((title: string, detail: string | null = null, kind = 'info', durationMs = 3000) => {
     clearIntentToast();
@@ -246,6 +264,10 @@ export function useComposeReferenceOrchestration(options: UseComposeReferenceOrc
     removeFileRef,
     clearFileRefs,
     setFileRefsFromCompose,
+    addFolderRef,
+    removeFolderRef,
+    clearFolderRefs,
+    setFolderRefsFromCompose,
     showIntentToast,
     openFileFromPill,
     openTimelineFileFromPill,

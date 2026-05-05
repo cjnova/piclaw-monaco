@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * editor-settings.ts — Editor settings pane (extension-contributed).
  *

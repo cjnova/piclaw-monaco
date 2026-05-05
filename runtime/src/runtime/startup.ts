@@ -28,7 +28,7 @@ import { startExternalProgressWatchdogMonitor } from "./progress-watchdog-superv
 import type { RuntimeState } from "./state.js";
 import { launchWorkspaceIndexProcess } from "../workspace-index-process.js";
 import { SystemMetricsSampler } from "../channels/web/agent/system-metrics.js";
-import { registerLazyViewerRoutes } from "../channels/web/http/lazy-viewer-routes.js";
+// import { registerLazyViewerRoutes } from "../channels/web/http/lazy-viewer-routes.js"; // removed: office-viewer is now @rcarmo/piclaw-addon-office-viewer
 
 const log = createLogger("runtime.startup");
 const WORKSPACE_SKEL_DIR = resolve(process.env.PICLAW_SKEL_DIR || resolve(import.meta.dir, "../../../skel"));
@@ -309,7 +309,7 @@ export function runWebStartupRecoveryBootstrap(web: StartupRecoveryWebChannel): 
 export async function startWebChannel(queue: AgentQueue, agentPool: AgentPool): Promise<WebChannel> {
   const web = new WebChannel({ queue, agentPool });
   await web.start();
-  registerLazyViewerRoutes();
+  // office-viewer route removed: now registered by @rcarmo/piclaw-addon-office-viewer
   // Do not freeze extension routes here: workspace/add-on extension factories
   // register their HTTP routes during the first session resource reload.
   // createSessionInDir() freezes the registry after that initial load pass.

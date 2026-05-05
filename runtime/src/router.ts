@@ -48,11 +48,20 @@ function normalizePromptSenderName(message: NewMessage): string {
   return sender || "User";
 }
 
+function normalizePromptScreenHint(message: NewMessage): string {
+  const raw = normalizePromptHeaderValue(message.screen_hint).toLowerCase();
+  if (!raw) return "";
+  if (!/^[a-z][a-z0-9_-]{0,31}$/.test(raw)) return "";
+  return raw;
+}
+
 function formatPromptMessage(message: NewMessage): string {
   const sender = normalizePromptSenderName(message);
   const timestamp = normalizePromptHeaderValue(message.timestamp);
+  const screenHint = normalizePromptScreenHint(message);
+  const screenSuffix = screenHint ? ` (from ${screenHint})` : "";
   const content = typeof message.content === "string" ? message.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n") : "";
-  const header = timestamp ? `${sender} @ ${timestamp}:` : `${sender}:`;
+  const header = timestamp ? `${sender} @ ${timestamp}${screenSuffix}:` : `${sender}${screenSuffix}:`;
   if (!content) return header;
   const indented = content.split("\n").map((line) => `  ${line}`).join("\n");
   return `${header}\n${indented}`;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * panes/index.ts — Pane system barrel export.
  *

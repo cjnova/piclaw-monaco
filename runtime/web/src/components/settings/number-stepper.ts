@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useCallback, useRef, useState, useEffect } from '../../vendor/preact-htm.js';
 
 function toFiniteNumber(value, fallback) {

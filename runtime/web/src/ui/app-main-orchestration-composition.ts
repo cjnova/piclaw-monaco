@@ -138,6 +138,7 @@ export function composeMainAppLifecycleCompositionOptions(options: UseMainAppOrc
       showIntentToast,
     },
     setConnectionStatus: setters.setConnectionStatus,
+    setStateAccessFailed: setters.setStateAccessFailed,
     hasConnectedOnceRef: refs.hasConnectedOnceRef,
     getAgents: services.getAgents,
     setAgents: setters.setAgents,

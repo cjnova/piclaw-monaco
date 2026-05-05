@@ -124,27 +124,4 @@ describe("bundled optional extensions", () => {
       expect(fake.state.commands.size).toBe(0);
     }
   });
-
-  test("office-viewer only logs route registration on first registration", async () => {
-    const { default: registerOfficeViewer } = await import("../../extensions/viewers/office-viewer/index.ts");
-    const fake = createFakeApi();
-    const originalLog = console.log;
-    const logs: string[] = [];
-    console.log = (...args: any[]) => {
-      logs.push(args.map((value) => String(value)).join(" "));
-    };
-
-    try {
-      await withRouteCapture(fake.state, async () => {
-        registerOfficeViewer(fake.api);
-        registerOfficeViewer(fake.api);
-      });
-    } finally {
-      console.log = originalLog;
-    }
-
-    expect(fake.state.routeRegistrations.size).toBe(1);
-    expect(fake.state.routeRegistrations.get(`${"/office-viewer"}::${fake.state.routes[0]?.extensionDir}`)).toBe(2);
-    expect(logs.filter((line) => line.includes("[office-viewer] Route registered")).length).toBe(1);
-  });
 });

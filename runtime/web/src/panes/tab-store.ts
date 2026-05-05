@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * tab-store.ts — Tab state management for the pane system.
  *

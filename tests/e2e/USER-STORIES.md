@@ -125,7 +125,7 @@
 - Explorer: responsive to touch, no stuck drag states
 
 ### US-11: PWA Manifest and Home Screen Icons
-> As a user adding PiClaw to my iOS home screen, I want the manifest to always be correct and supply high-resolution versions of the avatar icons, so that the desktop icon looks sharp and branded.
+> As a user adding PiClaw to my iOS or Android home screen, I want the manifest and service worker to always be correct and supply high-resolution versions of the avatar icons, so that the installed app looks sharp and behaves like a real PWA.
 
 **Acceptance criteria:**
 - `/manifest.json` returns valid JSON with `name`, `icons`, `start_url`, `display`
@@ -137,6 +137,143 @@
 - HTML head contains `<link rel="apple-touch-icon">` tags with correct sizes
 - When avatar changes, manifest icon URLs get a new version parameter
 - Icons use the custom agent avatar when configured, not generic defaults
+- Android Chrome sees an active service worker with a same-origin GET fetch handler
+
+### US-12: Thoughts Panel Scroll Behaviour
+> As a user monitoring agent reasoning, I want the thoughts panel to become scrollable when I click "N more lines" and revert to non-scrollable when I collapse it, so that I can read long reasoning without the panel taking over the screen.
+
+**Acceptance criteria:**
+- Collapsed: `overflow-y: hidden`, `max-height` clamped to N lines, "X more lines" button visible
+- Expanded (thought panel): `overflow-y: auto`, `max-height: min(52vh, 34rem)`, scrollbar appears if content exceeds
+- `data-expanded` attribute toggles between "true" and "false"
+- Clicking "show less" returns to collapsed state with hidden overflow
+- Content is preserved across expand/collapse round-trips
+- Scroll position resets to top on re-expand
+
+### US-13: Terminal Standalone
+> As a user, I want to open a terminal pane standalone without garbled display, execute commands like `ls -al`, close it cleanly via click or tap, and pop it out to a separate window on desktop.
+
+**Acceptance criteria:**
+- Terminal opens without garbled characters or mojibake
+- Blinking cursor visible on open
+- `ls -al` produces column-aligned output with permissions
+- Close button on tab works via click and tap
+- Pop-out button opens terminal in separate window (desktop)
+- Terminal background/foreground updates when UI theme changes
+
+### US-14: Terminal Dock (beneath editor)
+> As a user editing files, I want a terminal docked below the editor that I can toggle, resize, and use alongside the editor without focus conflicts.
+
+**Acceptance criteria:**
+- Ctrl+` toggles dock visibility
+- Tab strip dock toggle button works
+- Dock splitter is draggable (resizes terminal vs editor)
+- Terminal and editor have independent focus
+- Dock is hidden in zen mode
+- Terminal in dock is interactive (can type and see output)
+
+### US-15: Terminal Zen Mode
+> As a user wanting focused terminal or editor work, I want zen mode to hide all chrome and provide a permanently visible exit indicator in the top-right corner.
+
+**Acceptance criteria:**
+- Zen mode hides workspace sidebar, chat container, dock
+- Editor/terminal fills viewport
+- Zen exit indicator permanently visible (not hover-dependent) in top-right corner
+- Clicking indicator exits zen mode
+- Escape key exits zen mode
+- Tab strip hidden by default, revealed on hover near top edge
+- Minimum 44×44px tap target on exit indicator for touch devices
+
+### US-16: Message Deletion from Timeline
+> As a user managing conversation history, I want to delete messages and their cascading thread replies correctly, so that cleanup doesn't leave orphaned replies or lose data unexpectedly.
+
+**Acceptance criteria:**
+- Delete button visible on message hover
+- Single message (no replies): deletes immediately, no confirmation
+- Parent with replies: shows confirmation dialog mentioning reply count
+- Confirming cascade: removes parent and ALL thread replies
+- Cancelling: preserves all messages unchanged
+- Server fallback: if backend detects replies client missed, shows second confirmation
+- No orphaned replies remain after cascade delete
+- Deleted messages stay gone after page refresh
+- Media attachments cleaned up on delete (not leaked)
+- Delete animation (`.removing` class) plays before removal
+- No accidental deletion from drag/swipe gestures
+
+### US-17: Compose Submission Instant Visibility
+> As a user sending messages, I want my submitted text to appear instantly in the timeline without waiting for the agent to respond, so that I have immediate confirmation my message was received.
+
+**Acceptance criteria:**
+- Message appears in timeline within 1 second of pressing Enter
+- Compose box clears immediately after submission
+- Compose box stays focused and editable after send
+- Multiple rapid submissions all appear in correct order
+- Long multi-line messages appear completely (not truncated)
+- Timeline auto-scrolls to bottom to show new message
+- User message visible before agent response arrives (SSE `new_post` event)
+- Message with file attachment shows attachment indicator immediately
+
+### US-18: Compaction Indicator Instant Updates
+> As a user, I want the compaction indicator to update instantly during and after compaction, so that I always know the current state of my context window.
+
+**Acceptance criteria:**
+- Context pie shows `.is-compacting` class during compaction
+- Elapsed timer (0:05, 1:23) counts in real-time on the pie
+- Aria-label mentions "Smart compaction" during active compaction
+- Abort/stop button shows compacting spinner during compaction
+- Indicator clears immediately when compaction_end SSE arrives
+- Context usage percentage updates after successful compaction
+- Suppressed compaction shows backoff notice with failure count / retry timing
+
+### US-19: Model Switching After Compaction
+> As a user, I want to switch to a smaller context model immediately after compaction, so that I can continue working with a model appropriate for my reduced context.
+
+**Acceptance criteria:**
+- Model button in compose bar is clickable during and after compaction
+- Clicking model button opens model selector/settings
+- `/model` command shows current model or available list
+- Model switch shows "Switching…" transition label
+- Compose bar updates to new model name after switch
+- Context usage recalculates for the new model's context window
+- No delay or blocked state between compaction end and model switch
+
+### US-20: Lightbox Dismissal
+> As a user viewing attachments in the lightbox, I want to dismiss it by any key press, click, or tap anywhere, so that I can quickly return to the conversation without hunting for a close button.
+
+**Acceptance criteria:**
+- Escape key dismisses (already works)
+- Any other key press (Space, Enter, letters, arrows) dismisses
+- Click on dark backdrop dismisses (already works)
+- Click directly on the image/content itself dismisses (currently blocked by stopPropagation)
+- Tap anywhere on touch device dismisses
+- Close button still works as explicit fallback
+- Lightbox stays closed after dismissal (no flicker/re-render)
+
+### US-21: Session Swipe Independence
+> As a mobile user, I want to swipe between sessions regardless of which UI elements are visible, so that session navigation works consistently no matter what pane is open.
+
+**Acceptance criteria:**
+- Swipe works on the timeline regardless of which panes are open (workspace, editor, dock)
+- Workspace explorer being visible does NOT prevent swipe on the timeline
+- Editor pane being visible does NOT prevent swipe on the timeline
+- Terminal dock being visible does NOT prevent swipe on the timeline
+- Swipe IS blocked inside actual interactive controls (compose box, text inputs, contenteditable)
+- Swipe IS blocked inside the editor content area (which handles its own horizontal gestures)
+- Swipe passes through agent thinking/status panels
+- Apple Pencil does not trigger swipe
+- Visual indicator shows adjacent session name during gesture
+
+### US-22: Settings Dialog Layering
+> As a user opening settings while the workspace pane is visible, I want the settings backdrop to be partially opaque and above all other elements, so that only the settings dialog is interactive and the rest is dimmed.
+
+**Acceptance criteria:**
+- Semi-transparent backdrop covers entire viewport when settings opens
+- Backdrop is above workspace pane (z-index: 2400 > workspace z-index)
+- Backdrop opacity is between 0.3 and 0.8 (dimmed but visible behind)
+- Workspace pane is not clickable through the backdrop
+- Settings dialog is fully visible (not clipped by workspace or any other pane)
+- Closing settings removes backdrop and restores workspace interactivity
+- No stacking context leakage from workspace tooltips (z-index: 9999)
 
 ---
 
@@ -155,6 +292,17 @@
 | US-09 Session lifecycle | ★★ | ★ | ★★ | Medium | Medium |
 | US-10 Workspace files | ★★ | ★ | ★★ | Low-Medium | Medium |
 | US-11 PWA manifest | ★★★ | ★★★ | ★ | Every install | Medium |
+| US-12 Thoughts panel | ★★★ | ★★ | ★★★ | Every turn with thinking | Medium |
+| US-13 Terminal standalone | ★★★ | ★★ | ★★★ | Frequent | High |
+| US-14 Terminal dock | ★★ | ★ | ★★★ | Frequent (desktop) | Medium |
+| US-15 Terminal zen mode | ★★ | ★ | ★★★ | Occasional | Medium |
+| US-16 Message deletion | ★★★ | ★★ | ★★ | Frequent | High |
+| US-17 Compose instant visibility | ★★★ | ★★★ | ★★★ | Every message | Very high |
+| US-18 Compaction indicator | ★★★ | ★★ | ★★★ | Every compaction | High |
+| US-19 Model switching | ★★★ | ★★ | ★★★ | Frequent (dev) | High |
+| US-20 Lightbox dismissal | ★★★ | ★★★ | ★★ | Every image view | Medium |
+| US-21 Swipe independence | ★★★ | ★★★ | ★ | Every session switch (touch) | High |
+| US-22 Settings layering | ★★★ | ★★ | ★★★ | Every settings open | Medium |
 
 ## Test implementation priority
 
@@ -169,3 +317,14 @@
 9. **US-09** — Session lifecycle
 10. **US-10** — Workspace files
 11. **US-11** — PWA manifest & icons
+12. **US-12** — Thoughts panel scroll behaviour
+13. **US-13** — Terminal standalone
+14. **US-14** — Terminal dock (beneath editor)
+15. **US-15** — Terminal zen mode
+16. **US-16** — Message deletion from timeline
+17. **US-17** — Compose submission instant visibility
+18. **US-18** — Compaction indicator instant updates
+19. **US-19** — Model switching after compaction
+20. **US-20** — Lightbox dismissal (any key/click/tap)
+21. **US-21** — Session swipe independence from visible elements
+22. **US-22** — Settings dialog layering above workspace

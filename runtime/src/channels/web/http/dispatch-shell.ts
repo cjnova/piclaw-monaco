@@ -35,7 +35,7 @@ export async function handleShellRoutes(
   serveStaticAsset: ServeStaticAsset
 ): Promise<Response | null> {
   if (flags.isIndex) {
-    return channel.serveStatic("index.html");
+    return channel.serveStatic("index.html", req);
   }
 
   if (flags.isManifest) {
@@ -66,16 +66,16 @@ export async function handleShellRoutes(
   }
 
   if (flags.isServiceWorker) {
-    return channel.serveStatic("sw.js");
+    return channel.serveStatic("sw.js", req);
   }
 
   if (req.method === "GET" && pathname === "/ghostty-vt.wasm") {
-    return channel.serveStatic("js/vendor/ghostty-vt.wasm");
+    return channel.serveStatic("js/vendor/ghostty-vt.wasm", req);
   }
 
   if (flags.isStaticAsset) {
     const rel = pathname.replace("/static/", "");
-    return channel.serveStatic(rel);
+    return channel.serveStatic(rel, req);
   }
 
   if (flags.isDocsAsset) {

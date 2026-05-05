@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * video-viewer-pane.ts — WebPaneExtension for workspace video viewing.
  *

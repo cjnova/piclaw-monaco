@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * pdf-viewer-pane.ts — WebPaneExtension for PDF viewing.
  *

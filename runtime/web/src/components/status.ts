@@ -392,6 +392,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                 class="agent-thinking"
                 data-expanded=${isExpanded ? 'true' : 'false'}
                 data-collapsible=${isCollapsible ? 'true' : 'false'}
+                data-panel-key=${panelKey || ''}
                 style=${turnColor ? `--turn-color: ${turnColor};` : ''}
             >
                 <div class="agent-thinking-title ${titleClass || ''}">

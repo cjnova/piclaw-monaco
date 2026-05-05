@@ -40,6 +40,7 @@ interface StoredMessageRow {
   sender: string;
   sender_name: string;
   content: string;
+  screen_hint: string | null;
   content_blocks: string | null;
   link_previews: string | null;
   thread_id: number | null;
@@ -48,7 +49,7 @@ interface StoredMessageRow {
 }
 
 /** Column list used in SELECT queries to ensure a consistent shape. */
-const MESSAGE_COLUMNS = "rowid, chat_jid, sender, sender_name, content, content_blocks, link_previews, thread_id, timestamp, is_bot_message";
+const MESSAGE_COLUMNS = "rowid, chat_jid, sender, sender_name, content, screen_hint, content_blocks, link_previews, thread_id, timestamp, is_bot_message";
 
 function ensureMonotonicMessageTimestamp(chatJid: string, requestedTimestamp: string): string {
   const requestedMs = Date.parse(requestedTimestamp);
@@ -93,6 +94,7 @@ function buildInteraction(row: StoredMessageRow, mediaIds: number[] = []): Inter
     agent_id: "default",
     media_ids: mediaIds,
   };
+  if (row.screen_hint) data.screen_hint = row.screen_hint;
   if (contentBlocks?.length) data.content_blocks = contentBlocks;
   if (linkPreviews?.length) data.link_previews = linkPreviews;
   if (row.thread_id !== null && row.thread_id !== undefined) data.thread_id = row.thread_id;
@@ -167,14 +169,15 @@ export function storeMessage(msg: NewMessage): number {
 
   db.prepare(
     `INSERT INTO messages (
-      id, chat_jid, sender, sender_name, content, content_blocks, link_previews,
+      id, chat_jid, sender, sender_name, content, screen_hint, content_blocks, link_previews,
       thread_id, timestamp, is_from_me, is_bot_message, is_terminal_agent_reply, is_steering_message
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id, chat_jid) DO UPDATE SET
        sender = excluded.sender,
        sender_name = excluded.sender_name,
        content = excluded.content,
+       screen_hint = excluded.screen_hint,
        content_blocks = excluded.content_blocks,
        link_previews = excluded.link_previews,
        thread_id = excluded.thread_id,
@@ -189,6 +192,7 @@ export function storeMessage(msg: NewMessage): number {
     msg.sender,
     msg.sender_name,
     msg.content,
+    msg.screen_hint ?? null,
     contentBlocks,
     linkPreviews,
     msg.thread_id ?? null,
@@ -455,7 +459,7 @@ function searchMessagesInternal(chatJids: string[] | null, query: string, limit:
   try {
     const rows = db
       .prepare(
-        `SELECT messages.rowid, messages.chat_jid, messages.sender, messages.sender_name, messages.content, messages.content_blocks, messages.link_previews, messages.thread_id, messages.timestamp, messages.is_bot_message
+        `SELECT messages.rowid, messages.chat_jid, messages.sender, messages.sender_name, messages.content, messages.screen_hint, messages.content_blocks, messages.link_previews, messages.thread_id, messages.timestamp, messages.is_bot_message
          FROM messages
          JOIN messages_fts ON messages_fts.rowid = messages.rowid
          WHERE ${ftsChatClause}messages_fts MATCH ?
@@ -498,7 +502,7 @@ export function getNewMessages(
 
   const placeholders = jids.map(() => "?").join(",");
   const sql = `
-    SELECT id, chat_jid, sender, sender_name, content, timestamp
+    SELECT id, chat_jid, sender, sender_name, content, screen_hint, timestamp
     FROM messages
     WHERE timestamp > ? AND chat_jid IN (${placeholders})
       AND is_bot_message = 0 AND content NOT LIKE ?
@@ -528,7 +532,7 @@ export function getMessagesSince(
 ): NewMessage[] {
   const db = getDb();
   const sql = `
-    SELECT id, chat_jid, sender, sender_name, content, timestamp, thread_id
+    SELECT id, chat_jid, sender, sender_name, content, screen_hint, timestamp, thread_id
     FROM messages
     WHERE chat_jid = ? AND timestamp > ?
       AND is_bot_message = 0 AND content NOT LIKE ?

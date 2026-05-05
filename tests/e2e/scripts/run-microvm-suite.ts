@@ -1,0 +1,128 @@
+#!/usr/bin/env bun
+/**
+ * Run the full E2E UX test suite against the microVM test instance.
+ *
+ * Usage: bun run scripts/run-microvm-suite.ts [--project desktop-chrome]
+ *
+ * Handles:
+ * 1. Verifies microVM is reachable
+ * 2. Obtains E2E auth session cookie
+ * 3. Runs all Playwright specs against the remote URL
+ * 4. Generates PDF report
+ */
+
+import { execSync, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+
+const MICROVM_URL = process.env.PICLAW_E2E_URL || "http://192.168.1.78:8080";
+const PROJECT = process.argv.includes("--project")
+  ? process.argv[process.argv.indexOf("--project") + 1]
+  : "desktop-chrome";
+const WORKERS = process.argv.includes("--workers")
+  ? process.argv[process.argv.indexOf("--workers") + 1]
+  : (process.env.PICLAW_E2E_WORKERS || "1");
+const RUN_TIMEOUT_MS = Number.parseInt(process.env.PICLAW_E2E_RUN_TIMEOUT_MS || "900000", 10);
+
+console.log(`\n=== PiClaw E2E Suite — microVM ===`);
+console.log(`Target: ${MICROVM_URL}`);
+console.log(`Project: ${PROJECT}`);
+console.log(`Workers: ${WORKERS}`);
+console.log(`Time: ${new Date().toISOString()}\n`);
+
+// 1. Verify reachable
+console.log("1. Checking microVM reachability...");
+try {
+  const resp = await fetch(MICROVM_URL, { redirect: "manual" });
+  console.log(`   ✓ HTTP ${resp.status}`);
+} catch (err) {
+  console.error(`   ✗ Cannot reach ${MICROVM_URL}: ${(err as Error).message}`);
+  process.exit(1);
+}
+
+// 2. Get internal secret from the microVM config
+console.log("2. Resolving auth...");
+let internalSecret = process.env.PICLAW_INTERNAL_SECRET || "";
+if (!internalSecret) {
+  // Try to read from microVM via SSH
+  try {
+    const result = spawnSync("ssh", [
+      "-o", "StrictHostKeyChecking=no",
+      "-i", "/tmp/microvm_key",
+      "root@192.168.1.78",
+      "cat /root/.piclaw/config.json 2>/dev/null || echo '{}'"
+    ], { timeout: 10000, encoding: "utf-8" });
+    if (result.stdout) {
+      const config = JSON.parse(result.stdout);
+      internalSecret = config.internalSecret || config.webInternalSecret || "";
+    }
+  } catch {}
+}
+
+if (!internalSecret) {
+  // Try env file
+  try {
+    const result = spawnSync("ssh", [
+      "-o", "StrictHostKeyChecking=no",
+      "-i", "/tmp/microvm_key",
+      "root@192.168.1.78",
+      "grep PICLAW_INTERNAL_SECRET /root/.piclaw/.env 2>/dev/null || grep PICLAW_WEB_INTERNAL_SECRET /root/.piclaw/.env 2>/dev/null || echo ''"
+    ], { timeout: 10000, encoding: "utf-8" });
+    const match = result.stdout?.match(/=(.+)/);
+    if (match) internalSecret = match[1].trim();
+  } catch {}
+}
+
+if (internalSecret) {
+  console.log("   ✓ Internal secret resolved");
+} else {
+  console.log("   ⚠ No internal secret found — auth-dependent tests will skip");
+}
+
+// 3. Run Playwright
+console.log(`\n3. Running Playwright tests (project: ${PROJECT})...\n`);
+
+const env = {
+  ...process.env,
+  PICLAW_E2E_URL: MICROVM_URL,
+  PICLAW_INTERNAL_SECRET: internalSecret,
+  PICLAW_E2E_WORKERS: WORKERS,
+  PLAYWRIGHT_BROWSERS_PATH: "/workspace/.cache/ms-playwright",
+};
+
+const testResult = spawnSync("bunx", [
+  "playwright", "test",
+  "--project", PROJECT,
+  "--workers", WORKERS,
+  "--reporter", "json,list",
+  "--output", "reports/results.json",
+], {
+  cwd: "/workspace/piclaw/tests/e2e",
+  env,
+  stdio: "inherit",
+  timeout: Number.isFinite(RUN_TIMEOUT_MS) ? RUN_TIMEOUT_MS : 900000, // default 15 minutes
+});
+
+console.log(`\nPlaywright exit code: ${testResult.status}`);
+
+// 4. Generate report
+console.log("\n4. Generating report...");
+try {
+  spawnSync("bun", ["run", "scripts/generate-report.ts"], {
+    cwd: "/workspace/piclaw/tests/e2e",
+    env,
+    stdio: "inherit",
+    timeout: 30000,
+  });
+} catch (err) {
+  console.log(`   Report generation failed: ${(err as Error).message}`);
+}
+
+const pdfPath = "/workspace/piclaw/tests/e2e/reports/piclaw-e2e-report.pdf";
+const htmlPath = "/workspace/piclaw/tests/e2e/reports/piclaw-e2e-report.html";
+const reportPath = existsSync(pdfPath) ? pdfPath : existsSync(htmlPath) ? htmlPath : null;
+
+console.log(`\n=== Done ===`);
+console.log(`Exit code: ${testResult.status}`);
+if (reportPath) console.log(`Report: ${reportPath}`);
+
+process.exit(testResult.status || 0);

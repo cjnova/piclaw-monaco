@@ -67,3 +67,43 @@ export function parseTimestamp(value: string | null): number | null {
   const parsed = Date.parse(trimmed);
   return Number.isNaN(parsed) ? null : parsed;
 }
+
+import { randomUUID } from "crypto";
+import { loadOrCreateIdentity } from "./identity.js";
+
+/**
+ * Build signed HTTP request headers for outbound remote-interop calls.
+ * Moved here from extensions/remote-pair so src/ consumers can import it
+ * without crossing the rootDir boundary.
+ */
+export function buildSignedRequestHeaders(
+  identity: ReturnType<typeof loadOrCreateIdentity>,
+  path: string,
+  bodyBytes: Uint8Array,
+  trustEpoch: number = 1,
+): Record<string, string> {
+  const timestamp = new Date().toISOString();
+  const nonce = randomUUID();
+  const epochStr = String(trustEpoch);
+  const canonical = buildCanonicalRequest({
+    method: "POST",
+    pathWithQuery: path,
+    contentType: "application/json",
+    bodyHash: hashBody(bodyBytes),
+    timestamp,
+    nonce,
+    instanceId: identity.instance_id,
+    sigVersion: "v1",
+    trustEpoch: epochStr,
+  });
+  const signature = signRequest(identity, canonical);
+  return {
+    "Content-Type": "application/json",
+    "X-Instance-Id": identity.instance_id,
+    "X-Timestamp": timestamp,
+    "X-Nonce": nonce,
+    "X-Sig-Version": "v1",
+    "X-Signature": signature,
+    "X-Trust-Epoch": epochStr,
+  };
+}

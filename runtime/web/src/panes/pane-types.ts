@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * pane-types.ts — Core type definitions for the WebPaneExtension system.
  *
