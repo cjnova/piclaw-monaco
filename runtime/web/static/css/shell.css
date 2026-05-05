@@ -1458,7 +1458,6 @@ body {
 
 .message-list__item--agent table {
   overflow-x: auto;
-  display: block;
   max-width: 100%;
 }
 
