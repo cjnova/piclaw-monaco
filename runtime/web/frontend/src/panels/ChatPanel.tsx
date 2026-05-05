@@ -22,6 +22,10 @@ interface Attachment {
   type: string;
   size: number;
   file?: File;
+  /** Workspace file reference (path-based, not uploaded) */
+  isFileRef?: boolean;
+  /** Workspace-relative path for file references */
+  path?: string;
 }
 
 const HISTORY_KEY = "piclaw:compose-history";
@@ -132,6 +136,27 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Listen for workspace file attach events from FileTree
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.path || !detail?.name) return;
+      // Avoid duplicates
+      setAttachments((prev) => {
+        if (prev.some((a) => a.isFileRef && a.path === detail.path)) return prev;
+        return [...prev, {
+          name: detail.name,
+          type: "workspace/file",
+          size: detail.size || 0,
+          isFileRef: true,
+          path: detail.path,
+        }];
+      });
+    };
+    window.addEventListener("piclaw:file-attach", handler);
+    return () => window.removeEventListener("piclaw:file-attach", handler);
+  }, []);
+
   // Attachment handlers
   const handleClipClick = () => {
     fileInputRef.current?.click();
@@ -227,9 +252,10 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     isSending.value = true;
     sendError.value = null;
 
-    // Upload pending attachments
+    // Upload pending attachments (skip file refs — those are path-based)
     const mediaIds: number[] = [];
     for (const att of attachmentsRef.current) {
+      if (att.isFileRef) continue;
       if (att.id) {
         mediaIds.push(att.id);
       } else if (att.file) {
@@ -260,6 +286,13 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         return `- attachment:${id} (${label})`;
       }).join("\n");
       messageContent = [content, `Attachments:\n${mediaBlock}`].filter(Boolean).join("\n\n");
+    }
+
+    // Append workspace file references
+    const fileRefs = attachmentsRef.current.filter((a) => a.isFileRef && a.path);
+    if (fileRefs.length > 0) {
+      const filesBlock = fileRefs.map((a) => `- ${a.path}`).join("\n");
+      messageContent = [messageContent, `Files:\n${filesBlock}`].filter(Boolean).join("\n\n");
     }
 
     try {
@@ -372,8 +405,9 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               {attachments.length > 0 && (
                 <div className="chat__attachments">
                   {attachments.map((att, i) => (
-                    <span key={att.id ?? i} className="chat__attachment-pill">
-                      <span className="chat__attachment-name">{att.name}</span>
+                    <span key={att.path ?? att.id ?? i} className={`chat__attachment-pill${att.isFileRef ? " chat__attachment-pill--fileref" : ""}`}>
+                      {att.isFileRef && <i className="codicon codicon-file" style="margin-right:4px;font-size:12px" />}
+                      <span className="chat__attachment-name" title={att.path || att.name}>{att.name}</span>
                       <button
                         type="button"
                         className="chat__attachment-remove"

@@ -28,6 +28,15 @@ export function WorkspaceActions({ node, downloadUrl, isDeleting, onDelete }: Wo
     });
   }, [node.path]);
 
+  const attachToChat = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("piclaw:file-attach", {
+      detail: { path: node.path, name: node.name, size: node.size ?? 0 },
+    }));
+    window.dispatchEvent(new CustomEvent("piclaw:status-flash", {
+      detail: { message: `Attached ${node.name} to chat`, type: "success" },
+    }));
+  }, [node.path, node.name, node.size]);
+
   const handleOpenFile = useCallback(async () => {
     const encoded = encodeURIComponent(node.path);
     const name = node.path.split('/').pop() ?? node.name;
@@ -61,6 +70,14 @@ export function WorkspaceActions({ node, downloadUrl, isDeleting, onDelete }: Wo
 
   return (
     <div className="workspace__preview-actions">
+      <button
+        className="workspace__preview-action-btn"
+        onClick={attachToChat}
+        title="Attach file to chat message"
+      >
+        <span className="codicon codicon-attach" />
+        Attach to chat
+      </button>
       <button
         className="workspace__preview-action-btn"
         onClick={copyPath}
