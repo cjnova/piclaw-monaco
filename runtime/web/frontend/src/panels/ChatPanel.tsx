@@ -1,4 +1,5 @@
 import { AgentStatusPanel } from "../components/AgentStatusPanel";
+import { QueueStack, type QueueItem } from "../components/QueueStack";
 import { WidgetPane } from "../components/WidgetPane";
 import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
@@ -248,6 +249,15 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Return queued item to compose for editing
+  const handleQueueEdit = (item: QueueItem) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.value = item.content;
+    hasText.value = item.content.trim().length > 0;
+    el.focus();
+  };
+
   // Speech-to-text
   const hasSpeechSupport = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
 
@@ -352,6 +362,9 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     const content = el.value.trim();
     if (!content && attachmentsRef.current.length === 0) return;
 
+    // Auto-queue when agent is busy (backend handles steer/queue logic)
+    const mode = isAgentRunning.value ? "queue" : undefined;
+
     isSending.value = true;
     sendError.value = null;
 
@@ -405,7 +418,11 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: messageContent, media_ids: mediaIds.length > 0 ? mediaIds : undefined }),
+        body: JSON.stringify({
+          content: messageContent,
+          media_ids: mediaIds.length > 0 ? mediaIds : undefined,
+          ...(mode ? { mode } : {}),
+        }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -415,6 +432,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         isSending.value = false;
         return;
       }
+
 
       // Only clear draft after confirmed success
       if (content) {
@@ -478,6 +496,8 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           </div>
 
           <AgentStatusPanel />
+
+          <QueueStack onEdit={handleQueueEdit} />
 
           <WidgetPane />
 
@@ -554,7 +574,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               <textarea
                 ref={textareaRef}
                 className="chat__input"
-                placeholder="Type a message..."
+                placeholder={isAgentRunning.value ? "Type to queue (sent after current turn)" : "Type a message..."}
                 rows={3}
                 onInput={handleInput}
                 onPaste={handlePaste as any}
@@ -605,17 +625,31 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               />
             </div>
             {isAgentRunning.value ? (
-              <button
-                type="button"
-                className="chat__stop-btn"
-                onClick={abortAgent}
-                aria-label="Stop response"
-                title="Stop response (Escape)"
-              >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              </button>
+              <div className="chat__action-group">
+                <button
+                  type="button"
+                  className="chat__send-btn chat__send-btn--queue"
+                  onClick={() => sendMessage()}
+                  disabled={isSending.value || (!hasText.value && attachments.length === 0)}
+                  aria-label="Queue message"
+                  title="Queue (sent after current turn)"
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="chat__stop-btn"
+                  onClick={abortAgent}
+                  aria-label="Stop response"
+                  title="Stop response (Escape)"
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              </div>
             ) : (
               <button
                 type="button"

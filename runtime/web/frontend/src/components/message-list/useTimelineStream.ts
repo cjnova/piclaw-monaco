@@ -184,6 +184,23 @@ export function useTimelineStream({
       }
     });
 
+    // Queue followup events
+    es.addEventListener("agent_followup_queued", (e: MessageEvent) => {
+      try {
+        window.dispatchEvent(new CustomEvent("piclaw:followup-queued", { detail: JSON.parse(e.data) }));
+      } catch {}
+    });
+    es.addEventListener("agent_followup_consumed", (e: MessageEvent) => {
+      try {
+        window.dispatchEvent(new CustomEvent("piclaw:followup-consumed", { detail: JSON.parse(e.data) }));
+      } catch {}
+    });
+    es.addEventListener("agent_followup_removed", (e: MessageEvent) => {
+      try {
+        window.dispatchEvent(new CustomEvent("piclaw:followup-removed", { detail: JSON.parse(e.data) }));
+      } catch {}
+    });
+
     es.onopen = () => {
       setConnected(true);
       window.dispatchEvent(new Event("piclaw:sse-connected"));
