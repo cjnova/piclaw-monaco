@@ -1,7 +1,7 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-04
-Total open issues: 32
+Updated: 2026-05-05
+Total open issues: 20
 
 ## Vision
 
@@ -165,6 +165,15 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | #268 file drag & drop | ✅ |
 | #276 tool card context + icons | ✅ |
 | #281 attachment references fix | ✅ |
+| #282 workspace sidebar single scrollbar + icon-only buttons | ✅ |
+| #289 browser notifications | ✅ (closed, included in #140) |
+| #290 steer queue stack PR | ✅ (closes #270/#271) |
+| #291 steer/edit/move/remove PR | ✅ (part of #270) |
+| #292 upstream sync — merge piclaw v2.2.1 | ✅ |
+| #293 rgba() CSS variables PR | ✅ |
+| #295 upstream sync merge PR | ✅ |
+| #287 workspace file attach from sidebar | ✅ |
+| #288 STT + browser notifications + compose toolbar | ✅ |
 | #147 streaming improvements | ❌ closed (superseded by #230) |
 | #145 tool lifecycle events | ❌ closed (superseded by #230) |
 
@@ -177,7 +186,7 @@ upstream: rcarmo/piclaw (full runtime with web UI)
 | configure-dev-provider | Configure model provider on dev instance for testing | ✅ |
 | verify-all-panels-post-merge | Smoke test all panels after merge | ✅ |
 
-> Wave 10b complete. SSE reconnection, chat_jid URL params, single SSE connection (like upstream), agent responses visible in real-time. Upstream bug reported: rcarmo/piclaw#512.
+> Wave 10b complete. SSE reconnection, chat_jid URL params, single SSE connection (like upstream), agent responses visible in real-time. Upstream sync: merged piclaw v2.2.1 (PR #295). Upstream bug reported: rcarmo/piclaw#512.
 
 ### Wave 10c — Settings Panel
 
