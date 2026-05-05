@@ -1484,6 +1484,7 @@ body {
 .message-list__body {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   background: var(--overlay-white-02);
   padding: 10px 14px;
   border-radius: 2px;
