@@ -416,7 +416,6 @@ body {
   overflow: hidden;
   min-width: 0;
   height: 100%;
-  contain: inline-size;
 }
 
 .app-layout__chat-wrapper {
@@ -1453,28 +1452,6 @@ body {
 .message-list__item--agent {
   flex-direction: row;
   margin-left: 40px;
-  contain: inline-size;
-}
-
-.message-list__item--agent table {
-  overflow-x: auto;
-  max-width: 100%;
-}
-
-.message-list__content table {
-  border-collapse: collapse;
-}
-
-.message-list__content th,
-.message-list__content td {
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  text-align: left;
-}
-
-.message-list__content th {
-  background: var(--overlay-white-05, rgba(255,255,255,0.05));
-  font-weight: 600;
 }
 
 /* Avatar circle */
