@@ -1571,6 +1571,25 @@ body {
 .message-list__content p:last-child { margin-bottom: 0; }
 .message-list__content p { margin: 4px 0; }
 
+.message-list__content table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.message-list__content th,
+.message-list__content td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.message-list__content th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
 .message-list__content ul,
 .message-list__content ol {
   padding-left: 20px;
