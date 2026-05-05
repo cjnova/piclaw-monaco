@@ -25,7 +25,8 @@ export function useScrollManager(
     if (force || !userScrolledRef.current) {
       const doScroll = () => {
         const el = listRef.current;
-        if (el) el.scrollTop = el.scrollHeight;
+        // column-reverse: scrollTop 0 = visual bottom
+        if (el) el.scrollTop = 0;
       };
       doScroll();
       // Double-tap: ensure scroll after Preact render cycle
@@ -38,7 +39,8 @@ export function useScrollManager(
     const el = listRef.current;
     if (!el) return;
     const handleScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      // column-reverse: scrollTop 0 = visual bottom, scrolling up goes negative
+      const atBottom = Math.abs(el.scrollTop) < 60;
       userScrolledRef.current = !atBottom;
     };
     el.addEventListener("scroll", handleScroll, { passive: true });

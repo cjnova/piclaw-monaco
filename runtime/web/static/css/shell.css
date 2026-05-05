@@ -1368,7 +1368,7 @@ body {
   overflow-x: hidden;
   padding: 16px 16px 8px;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--overlay-white-12) transparent;

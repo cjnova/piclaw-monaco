@@ -112,6 +112,23 @@ export function MessageList() {
           ⚠ {timelineError.value}
         </div>
       )}
+
+      {messages.length === 0 && connected === true && (
+        <div className="message-list__empty">
+          <p>No messages yet. Say hello! 👋</p>
+        </div>
+      )}
+
+      {[...messages].reverse().map((msg) => (
+        <MessageItem
+          key={msg.id}
+          interaction={msg}
+          isCollapsed={isCollapsed(msg.id)}
+          onToggleCollapse={() => toggleCollapse(msg.id)}
+          onDelete={() => handleDeleteMessage(msg.id)}
+        />
+      ))}
+
       {hasMore && (
         <div className="message-list__load-more">
           <button
@@ -124,24 +141,6 @@ export function MessageList() {
           </button>
         </div>
       )}
-
-      {messages.length === 0 && connected === true && (
-        <div className="message-list__empty">
-          <p>No messages yet. Say hello! 👋</p>
-        </div>
-      )}
-
-      {messages.map((msg) => (
-        <MessageItem
-          key={msg.id}
-          interaction={msg}
-          isCollapsed={isCollapsed(msg.id)}
-          onToggleCollapse={() => toggleCollapse(msg.id)}
-          onDelete={() => handleDeleteMessage(msg.id)}
-        />
-      ))}
-
-      <div ref={bottomRef} />
     </div>
   );
 }
