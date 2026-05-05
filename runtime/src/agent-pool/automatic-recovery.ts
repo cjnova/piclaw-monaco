@@ -186,6 +186,17 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
     };
   }
 
+  if (input.snapshot.compactionErrorMessage) {
+    return {
+      recover: false,
+      classifier: "compaction_failure",
+      strategy: null,
+      reason: isContextPressureFailure(errorText) || input.snapshot.sawCompactionIntent
+        ? "Compaction itself exceeded the context window; refusing to compact-and-retry again. Start a shorter branch or compact with a larger model."
+        : "Compaction failed; refusing automatic retry to avoid re-entering the same failed compaction path.",
+    };
+  }
+
   if (input.snapshot.hadToolActivity) {
     // Conservative rule: once tool activity happened, automatic recovery is
     // only allowed for clearly context-related failures. Generic retries could

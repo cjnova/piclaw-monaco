@@ -13,7 +13,7 @@ import type { AgentControlCommand, AgentControlResult } from "../agent-control-t
 import { getRemoteInteropConfig } from "../../core/config.js";
 import { getRemotePeer, getRemotePeerByDisplayName, getRemotePeerByFingerprint } from "../../db/remote-interop.js";
 import { loadOrCreateIdentity, deriveFingerprint } from "../../remote/identity.js";
-import { buildSignedRequestHeaders } from "../../extensions/remote-pair.js";
+import { buildSignedRequestHeaders } from "../../remote/signature.js";
 import { randomUUID } from "crypto";
 
 type AskCommand = Extract<AgentControlCommand, { type: "ask" }>;

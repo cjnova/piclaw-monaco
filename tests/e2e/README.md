@@ -14,7 +14,7 @@ tests/e2e/
 │   ├── editor/        # File editing, tabs, zen mode
 │   ├── workspace/     # Explorer, uploads, drag/drop
 │   ├── panes/         # Popouts, VNC, terminal, viewers
-│   └── mobile/        # iPad/iPhone specific (swipe, PWA, touch)
+│   └── mobile/        # iPad/iPhone/Android specific (swipe, PWA, touch)
 ├── steps/             # Step definitions (TypeScript)
 ├── support/           # Hooks, world, helpers
 │   ├── world.ts       # Custom Playwright World
@@ -37,7 +37,8 @@ tests/e2e/
 cd tests/e2e
 bun run test              # all features
 bun run test:compose      # compose area only
-bun run test:mobile       # mobile/iPad scenarios
+bun run test:mobile       # mobile/iPad/iPhone/Android scenarios
+bun run test:android      # Android Chrome scenarios only
 ```
 
 ## CI trigger model

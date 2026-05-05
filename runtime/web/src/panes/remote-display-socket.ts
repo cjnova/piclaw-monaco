@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 export type RemoteDisplaySocketMetrics = {
     bytesIn: number;
@@ -62,7 +61,7 @@ function measureInboundSize(value: unknown): number {
     if (value instanceof Blob) {
         return value.size;
     }
-    return Number(value?.size || 0);
+    return Number((value as { size?: number })?.size || 0);
 }
 
 function closeWebSocketBestEffort(socket: { close?: () => void } | null | undefined): boolean {
@@ -166,7 +165,7 @@ export class WebSocketRemoteDisplayBoundary {
         const size = measureOutboundSize(data);
         this.bytesOut += size;
         this.emitMetrics();
-        socket.send(data);
+        socket.send(data as string | Blob | BufferSource);
     }
 
     private flushPendingOutbound(socket: WebSocket): void {

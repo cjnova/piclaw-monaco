@@ -29,7 +29,7 @@ import {
 } from "./http-utils.js";
 import { logAudit } from "./service-security.js";
 import { loadOrCreateIdentity } from "./identity.js";
-import { buildSignedRequestHeaders } from "../extensions/remote-pair.js";
+import { buildSignedRequestHeaders } from "./signature.js";
 import { RemoteExecuteConcurrency } from "./execute-concurrency.js";
 import { getToolCeilingFilter } from "./policy.js";
 import { createLogger } from "../utils/logger.js";

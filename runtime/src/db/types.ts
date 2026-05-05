@@ -42,6 +42,8 @@ export interface InteractionData {
   agent_id?: string;
   /** Web-channel thread id this interaction belongs to. */
   thread_id?: number | null;
+  /** Optional one-word client screen-size hint supplied by the web UI. */
+  screen_hint?: string | null;
   /** Array of media table IDs attached to this interaction. */
   media_ids?: number[];
   /** Rich content blocks (images, code, etc.) from the web channel. */

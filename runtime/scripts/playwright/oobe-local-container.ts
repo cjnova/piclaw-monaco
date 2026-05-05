@@ -1,10 +1,9 @@
 #!/usr/bin/env bun
-// @ts-nocheck
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
 import {
   OOBE_PROVIDER_MISSING_DISMISSED_KEY,
   OOBE_PROVIDER_READY_COMPLETED_KEY,
@@ -147,17 +146,17 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) fail(message);
 }
 
-async function assertPanelVisible(page, kind: 'provider-missing') {
+async function assertPanelVisible(page: Page, kind: 'provider-missing') {
   const locator = page.locator(`.oobe-panel-${kind}`);
   await locator.waitFor({ state: 'visible', timeout: 15000 });
   return locator;
 }
 
-async function assertPanelHidden(page) {
+async function assertPanelHidden(page: Page) {
   await page.waitForFunction(() => !document.querySelector('.oobe-panel'), undefined, { timeout: 15000 });
 }
 
-async function captureFailureArtifacts(page, options: {
+async function captureFailureArtifacts(page: Page, options: {
   artifactDir: string;
   stamp: string;
   label: string;
@@ -182,7 +181,7 @@ async function captureFailureArtifacts(page, options: {
   try {
     html = await page.content();
     bodyText = await page.locator('body').textContent() || '';
-    state = await page.evaluate(({ missingKey, readyKey }) => ({
+    state = await page.evaluate(({ missingKey, readyKey }: { missingKey: string; readyKey: string }) => ({
       url: window.location.href,
       title: document.title,
       bodyClasses: document.body?.className || '',
@@ -223,7 +222,7 @@ async function main() {
   const hostPort = await getFreePort();
   const baseUrl = `http://127.0.0.1:${hostPort}`;
 
-  let browser = null;
+  let browser: Browser | null = null;
   let runFailed = false;
   const cleanup = async () => {
     try {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * markdown-preview-pane.ts — Example readonly markdown preview pane.
  *
@@ -18,11 +17,17 @@
 
 import type { WebPaneExtension, PaneContext, PaneInstance, PaneCapability } from '../pane-types.js';
 
+type MarkedGlobal = typeof globalThis & {
+    marked?: {
+        parse?: (markdown: string) => string;
+    };
+};
+
 /** Renders markdown to HTML using the global marked library (loaded in index.html). */
 function renderMarkdownToHtml(md: string): string {
-    // @ts-ignore — marked is loaded globally from vendor
-    if (typeof globalThis.marked?.parse === 'function') {
-        return globalThis.marked.parse(md);
+    const marked = (globalThis as MarkedGlobal).marked;
+    if (typeof marked?.parse === 'function') {
+        return marked.parse(md);
     }
     // Fallback: escape HTML and wrap in <pre>
     const escaped = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

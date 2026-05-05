@@ -70,6 +70,7 @@ interface ComposeAgentStatusLifecycleOptionsInput {
     showIntentToast: ToastFn;
   };
   setConnectionStatus: StateSetter<string>;
+  setStateAccessFailed: StateSetter<boolean>;
   hasConnectedOnceRef: RefBox<boolean>;
 }
 
@@ -115,6 +116,7 @@ export function composeAgentStatusLifecycleOptions(input: ComposeAgentStatusLife
     isCompactionStatus: input.isCompactionStatus,
     serverVersionContext: input.serverVersionContext,
     setConnectionStatus: input.setConnectionStatus,
+    setStateAccessFailed: input.setStateAccessFailed,
     setPendingRequestForConnection: input.setPendingRequest,
     hasConnectedOnceRef: input.hasConnectedOnceRef,
   };

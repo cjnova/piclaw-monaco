@@ -112,6 +112,82 @@ test('buildAvatarResponse rejects private-network remote avatar URLs before fetc
   }
 });
 
+test('buildAvatarResponse crops non-square install icons to fill square surfaces', () => {
+  const ws = createTempWorkspace('piclaw-avatar-cover-test-');
+
+  try {
+    const avatarsDir = join(ws.workspace, '.piclaw', 'avatars');
+    mkdirSync(avatarsDir, { recursive: true });
+
+    const sourcePath = join(ws.workspace, 'avatars', 'wide.svg');
+    const cachedFile = join(avatarsDir, 'agent.svg');
+    writeFileSync(
+      cachedFile,
+      '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"><rect width="300" height="100" fill="red"/></svg>',
+      'utf-8',
+    );
+    writeFileSync(
+      join(avatarsDir, 'agent.json'),
+      `${JSON.stringify({
+        source: sourcePath,
+        file: cachedFile,
+        contentType: 'image/svg+xml',
+        updatedAt: '2026-05-03T00:00:00.000Z',
+      }, null, 2)}\n`,
+      'utf-8',
+    );
+
+    const script = `
+      const sharp = (await import('sharp')).default;
+      const avatarService = await import('./src/channels/web/media/avatar-service.js');
+      const response = await avatarService.buildAvatarResponse(
+        'agent',
+        ${JSON.stringify(sourcePath)},
+        new Request('https://example.com/avatar/agent?format=png&size=64'),
+      );
+      if (!response) {
+        console.log(JSON.stringify({ ok: false }));
+        process.exit(0);
+      }
+      const body = Buffer.from(await response.arrayBuffer());
+      const image = await sharp(body).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      const { width, height, channels } = image.info;
+      const alphaAt = (x, y) => image.data[(y * width + x) * channels + 3];
+      console.log(JSON.stringify({
+        ok: true,
+        status: response.status,
+        contentType: response.headers.get('Content-Type'),
+        width,
+        height,
+        cornerAlpha: [alphaAt(0, 0), alphaAt(width - 1, 0), alphaAt(0, height - 1), alphaAt(width - 1, height - 1)],
+      }));
+    `;
+
+    const result = spawnSync(process.execPath, ['-e', script], {
+      cwd: resolve(import.meta.dir, '..', '..', '..', '..'),
+      env: {
+        ...process.env,
+        PICLAW_WORKSPACE: ws.workspace,
+        PICLAW_STORE: ws.store,
+        PICLAW_DATA: ws.data,
+        PICLAW_DB_IN_MEMORY: '1',
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    const output = JSON.parse(result.stdout.trim().split('\n').filter(Boolean).pop() || '{}');
+    expect(output.ok).toBe(true);
+    expect(output.status).toBe(200);
+    expect(output.contentType).toBe('image/png');
+    expect(output.width).toBe(64);
+    expect(output.height).toBe(64);
+    expect(output.cornerAlpha).toEqual([255, 255, 255, 255]);
+  } finally {
+    ws.cleanup();
+  }
+});
+
 test('buildAvatarResponse supports rasterized PNG size variants for install surfaces', () => {
   const ws = createTempWorkspace('piclaw-avatar-size-test-');
 

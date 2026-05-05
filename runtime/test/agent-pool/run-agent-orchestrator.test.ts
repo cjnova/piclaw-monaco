@@ -1852,6 +1852,81 @@ test("runAgentPrompt treats terminal UI tool completion without final prose as i
   }
 });
 
+test("runAgentPrompt treats terminal side-effect tool completion as informational even after earlier tool failures", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",
+    PICLAW_TURN_AUTO_RECOVERY_MAX_ATTEMPTS: "2",
+    PICLAW_TURN_AUTO_RECOVERY_TOTAL_BUDGET_MS: "30000",
+  });
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-terminal-side-effect" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    promptCalls = 0;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.promptCalls += 1;
+      for (const listener of this.listeners) {
+        listener({ type: "tool_execution_start", toolCallId: "tool-fail", toolName: "bash", args: { command: "false" } });
+        listener({ type: "tool_execution_end", toolCallId: "tool-fail", toolName: "bash", isError: true });
+        listener({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            stopReason: "toolUse",
+            content: [{ type: "toolCall", id: "tool-exit", name: "exit_process", arguments: { reason: "restart" } }],
+          },
+        });
+        listener({ type: "tool_execution_start", toolCallId: "tool-exit", toolName: "exit_process", args: { reason: "restart" } });
+        listener({ type: "tool_execution_end", toolCallId: "tool-exit", toolName: "exit_process", isError: false });
+      }
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const recoveryEvents: Array<{ type: string }> = [];
+    const turnCoordinator = new AgentTurnCoordinator({
+      takeAttachments: () => [],
+      touchSession: () => {},
+      recordMessageUsage: () => {},
+    });
+
+    const result = await runAgentPrompt("restart after deploy", "web:default", {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "recovery_start" || event.type === "recovery_end") {
+          recoveryEvents.push({ type: String(event.type) });
+        }
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session, { maxRetries: 5, baseDelayMs: 1, maxDelayMs: 60000 }) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("tool_complete");
+    expect(result.error).toBeUndefined();
+    expect(session.promptCalls).toBe(1);
+    expect(recoveryEvents).toEqual([]);
+  } finally {
+    restoreEnv();
+  }
+});
+
 test("runAgentPrompt retries when provider stops after a read-only tool call without a final reply", async () => {
   const restoreEnv = setEnv({
     PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * workspace-preview-pane.ts — Extension-driven workspace file preview renderers.
  *
@@ -140,10 +139,14 @@ export function renderWorkspacePreviewMarkup(context) {
 }
 
 class WorkspacePreviewInstance implements PaneInstance {
-    constructor(container, context) {
+    private readonly container: HTMLElement;
+    private readonly context: PaneContext;
+    private disposed = false;
+    private readonly host: HTMLElement;
+
+    constructor(container: HTMLElement, context: PaneContext) {
         this.container = container;
         this.context = context;
-        this.disposed = false;
         this.host = document.createElement('div');
         this.host.className = 'workspace-preview-render-host';
         this.host.tabIndex = 0;

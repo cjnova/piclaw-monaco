@@ -20,6 +20,7 @@ export interface WebChannelStoreMessageOptions {
   contentBlocks?: unknown[];
   linkPreviews?: unknown[];
   threadId?: number;
+  screenHint?: string | null;
   isTerminalAgentReply?: boolean;
   isSteeringMessage?: boolean;
 }
@@ -89,6 +90,7 @@ export class WebMessageProcessingStorageService {
         contentBlocks: options.contentBlocks,
         linkPreviews: options.linkPreviews,
         threadId: options.threadId ?? null,
+        screenHint: options.screenHint,
         isTerminalAgentReply: options.isTerminalAgentReply,
         isSteeringMessage: options.isSteeringMessage,
       },

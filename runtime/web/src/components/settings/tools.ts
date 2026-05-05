@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useState, useCallback, useMemo, useEffect, useRef } from '../../vendor/preact-htm.js';
 import { NumberStepper } from './number-stepper.js';
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useState, useEffect, useCallback } from '../../vendor/preact-htm.js';
 
 export function AddonsSection({ setStatus, filter = '' }) {

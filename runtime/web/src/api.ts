@@ -4,6 +4,7 @@
  */
 
 import { recordAppPerfRequest } from './ui/app-perf-tracing.js';
+import { resolveScreenSizeHint } from './ui/screen-size-hint.js';
 
 const API_BASE = '';
 
@@ -144,6 +145,29 @@ export async function getSystemMetrics() {
     return request('/agent/system-metrics');
 }
 
+export async function getScheduledTasks(options = {}) {
+    const params = new URLSearchParams();
+    if (options?.id) params.set('id', String(options.id));
+    if (options?.chatJid) params.set('chat_jid', String(options.chatJid));
+    if (options?.status && options.status !== 'all') params.set('status', String(options.status));
+    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.includeRunLogs) params.set('include_run_logs', '1');
+    if (options?.runLogLimit) params.set('run_log_limit', String(options.runLogLimit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request(`/agent/scheduled-tasks${query}`);
+}
+
+export async function updateScheduledTask(action, id, options = {}) {
+    return request('/agent/scheduled-tasks/action', {
+        method: 'POST',
+        body: JSON.stringify({
+            action,
+            id,
+            allow_internal: options?.allowInternal === true,
+        }),
+    });
+}
+
 export async function saveUiState(payload) {
     return request('/agent/ui-state', {
         method: 'POST',
@@ -187,7 +211,12 @@ export async function deletePost(postId, cascade = false, chatJid = null) {
  */
 export async function sendAgentMessage(agentId, content, threadId = null, mediaIds = [], mode = null, chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    const payload = { content, thread_id: threadId, media_ids: mediaIds };
+    const payload = {
+        content,
+        thread_id: threadId,
+        media_ids: mediaIds,
+        client_context: { screen_hint: resolveScreenSizeHint() },
+    };
     if (mode === 'auto' || mode === 'queue' || mode === 'steer') {
         payload.mode = mode;
     }

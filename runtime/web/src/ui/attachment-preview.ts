@@ -5,7 +5,9 @@ const TEXT_PREVIEW_TYPES = new Set([
   "text/html",
   "text/markdown",
   "text/plain",
+  "text/x-yaml",
   "text/xml",
+  "text/yaml",
 ]);
 
 const MARKDOWN_PREVIEW_TYPES = new Set([
@@ -88,6 +90,8 @@ function isTextFilename(filename: unknown): boolean {
     || name.endsWith(".bash")
     || name.endsWith(".zsh")
     || name.endsWith(".sb")
+    || name.endsWith(".yaml")
+    || name.endsWith(".yml")
   );
 }
 

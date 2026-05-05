@@ -166,6 +166,7 @@ export function composeRenderedMainAppOptions(input: {
       btwSession: input.surface.btwSession,
       floatingWidget: input.surface.floatingWidget,
       fileRefs: input.surface.fileRefs,
+      folderRefs: input.surface.folderRefs,
       messageRefs: input.surface.messageRefs,
       followupQueueCount: input.surface.followupQueueCount,
       attachmentPreview: input.surface.attachmentPreview,
@@ -177,6 +178,7 @@ export function composeRenderedMainAppOptions(input: {
     modelState: {
       activeChatAgents: input.surface.activeChatAgents,
       connectionStatus: input.surface.connectionStatus,
+      stateAccessFailed: input.surface.stateAccessFailed,
       activeModel: input.surface.activeModel,
       agentModelsPayload: input.surface.agentModelsPayload,
       activeModelUsage: input.surface.activeModelUsage,

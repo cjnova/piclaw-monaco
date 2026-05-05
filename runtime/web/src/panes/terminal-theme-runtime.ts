@@ -8,8 +8,8 @@ function runBestEffort(run: () => void): boolean {
 }
 
 export function applyTerminalThemeBestEffort(options: {
-  termEl: { style?: Record<string, unknown> | null } | null | undefined;
-  bodyEl: { style?: Record<string, unknown> | null; querySelector?: (selector: string) => unknown } | null | undefined;
+  termEl: { style?: CSSStyleDeclaration | null } | null | undefined;
+  bodyEl: { style?: CSSStyleDeclaration | null; querySelector?: (selector: string) => unknown } | null | undefined;
   terminal: any;
   theme: { background?: string; foreground?: string };
   themeChanged?: boolean;

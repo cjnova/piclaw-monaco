@@ -31,16 +31,22 @@ test("workspace tree cache reuses responses briefly", async () => {
   );
 
   const service = new WorkspaceService();
-  const first = service.getTree("", "2", false);
-  const second = service.getTree("", "2", false);
-  expect(first.status).toBe(200);
-  expect(second.status).toBe(200);
-  expect(second.body).toBe(first.body);
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 1_000_000;
+    const first = service.getTree("", "2", false);
+    const second = service.getTree("", "2", false);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body).toBe(first.body);
 
-  await new Promise((resolve) => setTimeout(resolve, 1100));
-  const third = service.getTree("", "2", false);
-  expect(third.status).toBe(200);
-  expect(third.body).not.toBe(first.body);
+    Date.now = () => 1_001_101;
+    const third = service.getTree("", "2", false);
+    expect(third.status).toBe(200);
+    expect(third.body).not.toBe(first.body);
+  } finally {
+    Date.now = originalNow;
+  }
 });
 
 test("workspace update throttle delays bursts", async () => {

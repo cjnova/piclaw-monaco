@@ -69,6 +69,17 @@ describe("router", () => {
     expect(result).not.toContain("Formatting:");
   });
 
+  test("formatMessages includes sanitized screen-size hint in headers", () => {
+    const msgs = [
+      { id: "1", chat_jid: "web:default", sender: "user", sender_name: "Alice", content: "hello", screen_hint: "Mobile", timestamp: "2025-01-01T00:00:00Z", is_from_me: false, is_bot_message: false },
+      { id: "2", chat_jid: "web:default", sender: "user", sender_name: "Bob", content: "ignored hint", screen_hint: "bad hint!", timestamp: "2025-01-01T00:00:01Z", is_from_me: false, is_bot_message: false },
+    ];
+    const result = formatMessages(msgs, "web");
+    expect(result).toContain("Alice @ 2025-01-01T00:00:00Z (from mobile):");
+    expect(result).toContain("Bob @ 2025-01-01T00:00:01Z:");
+    expect(result).not.toContain("bad hint");
+  });
+
   test("stripInternalTags removes internal blocks", () => {
     expect(stripInternalTags("before <internal>hidden</internal> after")).toBe("before  after");
     expect(stripInternalTags("<internal>all hidden</internal>")).toBe("");

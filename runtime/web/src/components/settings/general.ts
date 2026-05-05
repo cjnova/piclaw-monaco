@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useState, useEffect, useCallback, useMemo, useRef } from '../../vendor/preact-htm.js';
 import { METERS_EVENT_NAME, applyMetersEnabled, readStoredMetersEnabled } from '../../ui/meters.js';
 import { NumberStepper } from './number-stepper.js';
@@ -45,7 +44,7 @@ function AvatarField({ value, onChange }) {
     `;
 }
 
-function normalizeGeneralSettings(data = {}) {
+function normalizeGeneralSettings(data: Record<string, any> = {}) {
     return {
         userName: data.userName || '',
         userAvatar: data.userAvatar || '',

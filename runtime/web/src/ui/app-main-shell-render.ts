@@ -117,6 +117,7 @@ export function renderMainShell(options: MainShellRenderOptions): any {
     renameBranchDraftState,
     isRenamingBranch,
     addFileRef,
+    addFolderRef,
     openEditor,
     openTerminalTab,
     openVncTab,
@@ -230,6 +231,10 @@ export function renderMainShell(options: MainShellRenderOptions): any {
     removeFileRef,
     clearFileRefs,
     setFileRefsFromCompose,
+    folderRefs,
+    removeFolderRef,
+    clearFolderRefs,
+    setFolderRefsFromCompose,
     messageRefs,
     removeMessageRef,
     clearMessageRefs,
@@ -245,6 +250,7 @@ export function renderMainShell(options: MainShellRenderOptions): any {
     isComposeBoxAgentActive,
     activeChatAgents,
     connectionStatus,
+    stateAccessFailed,
     activeModel,
     agentModelsPayload,
     activeModelUsage,
@@ -322,6 +328,7 @@ export function renderMainShell(options: MainShellRenderOptions): any {
       ${!chatOnlyMode && html`
         <${WorkspaceExplorer}
           onFileSelect=${addFileRef}
+          onFolderSelect=${addFolderRef}
           visible=${workspaceOpen}
           active=${workspaceOpen || editorOpen}
           onOpenEditor=${openEditor}
@@ -563,6 +570,10 @@ export function renderMainShell(options: MainShellRenderOptions): any {
           onRemoveFileRef=${removeFileRef}
           onClearFileRefs=${clearFileRefs}
           onSetFileRefs=${setFileRefsFromCompose}
+          folderRefs=${folderRefs}
+          onRemoveFolderRef=${removeFolderRef}
+          onClearFolderRefs=${clearFolderRefs}
+          onSetFolderRefs=${setFolderRefsFromCompose}
           messageRefs=${messageRefs}
           onRemoveMessageRef=${removeMessageRef}
           onClearMessageRefs=${clearMessageRefs}
@@ -591,6 +602,7 @@ export function renderMainShell(options: MainShellRenderOptions): any {
           activeChatAgents=${activeChatAgents}
           currentChatJid=${currentChatJid}
           connectionStatus=${connectionStatus}
+          stateAccessFailed=${stateAccessFailed}
           activeModel=${activeModel}
           agentModelsPayload=${agentModelsPayload}
           modelUsage=${activeModelUsage}

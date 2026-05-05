@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * editor-loader.ts — Lazy-loading wrapper for the standalone editor extension.
  *

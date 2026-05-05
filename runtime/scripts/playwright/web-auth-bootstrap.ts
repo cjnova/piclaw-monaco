@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// @ts-nocheck
 
 export function resolveInternalSecret(explicitSecret?: string): string {
   const value = String(

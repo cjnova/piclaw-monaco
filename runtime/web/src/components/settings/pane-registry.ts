@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * settings-pane-registry.ts — Registry for extension-contributed settings panes.
  *

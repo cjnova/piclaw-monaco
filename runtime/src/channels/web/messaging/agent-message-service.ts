@@ -20,6 +20,10 @@ export interface AgentMessagePayload {
   mode?: "auto" | "queue" | "steer";
   content_blocks?: unknown[];
   link_previews?: unknown[];
+  screen_hint?: string;
+  client_context?: {
+    screen_hint?: unknown;
+  };
 }
 
 /**
@@ -28,6 +32,13 @@ export interface AgentMessagePayload {
  * Prevents oversized messages from the compose box reaching the agent.
  */
 const MAX_AGENT_MESSAGE_CONTENT_LENGTH = 100 * 1024;
+const VALID_SCREEN_HINTS = new Set(["mobile", "tablet", "desktop"]);
+
+function normalizeScreenHint(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return VALID_SCREEN_HINTS.has(normalized) ? normalized : undefined;
+}
 
 /**
  * Parse and validate an agent message API request body.
@@ -65,6 +76,11 @@ export async function parseAgentMessageRequest(req: Request): Promise<{
     return { error: `Content too large (max ${MAX_AGENT_MESSAGE_CONTENT_LENGTH / 1024} KB)` };
   }
 
+  const screenHint = normalizeScreenHint(data.client_context?.screen_hint ?? data.screen_hint);
+  if (screenHint) data.screen_hint = screenHint;
+  else delete data.screen_hint;
+  delete data.client_context;
+
   return { payload: data };
 }
 
@@ -76,6 +92,7 @@ export function normalizeAgentMessagePayload(payload: AgentMessagePayload): {
   contentBlocks?: unknown[];
   linkPreviews?: unknown[];
   mode?: "auto" | "queue" | "steer";
+  screenHint?: string;
 } {
   return {
     content: payload.content,
@@ -84,6 +101,7 @@ export function normalizeAgentMessagePayload(payload: AgentMessagePayload): {
     contentBlocks: Array.isArray(payload.content_blocks) ? payload.content_blocks : undefined,
     linkPreviews: Array.isArray(payload.link_previews) ? payload.link_previews : undefined,
     mode: payload.mode,
+    screenHint: normalizeScreenHint(payload.screen_hint),
   };
 }
 
@@ -97,11 +115,13 @@ export function storeAgentUserMessage(
     contentBlocks?: unknown[];
     linkPreviews?: unknown[];
     threadId?: number | null;
+    screenHint?: string;
   }
 ): InteractionRow | null {
   return channel.storeMessage(chatJid, payload.content, false, payload.mediaIds, {
     contentBlocks: payload.contentBlocks,
     linkPreviews: payload.linkPreviews,
     threadId: payload.threadId ?? undefined,
+    screenHint: payload.screenHint,
   });
 }

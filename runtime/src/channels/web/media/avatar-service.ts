@@ -348,8 +348,8 @@ export async function buildAvatarResponse(kind: AvatarKind, source: string, req:
       let pipeline = sharp(meta.file);
       if (requestedSize) {
         pipeline = pipeline.resize(requestedSize, requestedSize, {
-          fit: "contain",
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
+          fit: "cover",
+          position: "center",
           withoutEnlargement: false,
         });
       }

@@ -139,6 +139,7 @@ function createSchema(database: Database): void {
       sender TEXT,
       sender_name TEXT,
       content TEXT,
+      screen_hint TEXT,
       content_blocks TEXT,
       link_previews TEXT,
       thread_id INTEGER,
@@ -574,6 +575,7 @@ function ensureMessageColumns(database: Database): void {
   };
   ensureColumn("content_blocks");
   ensureColumn("link_previews");
+  ensureColumn("screen_hint");
   ensureColumn("thread_id", "INTEGER");
   ensureColumn("is_terminal_agent_reply", "INTEGER DEFAULT 0");
   ensureColumn("is_steering_message", "INTEGER DEFAULT 0");

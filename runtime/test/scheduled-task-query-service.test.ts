@@ -80,4 +80,19 @@ describe("scheduled task query service", () => {
     });
     expect(task?.latest_run_log?.error_summary).toContain("Task exploded");
   });
+
+  test("get returns bounded recent run logs for the management UI", () => {
+    insertTask({ id: "t-history" });
+    logTaskRun({ task_id: "t-history", run_at: "2026-04-14T17:00:00.000Z", duration_ms: 100, status: "success", result: "first", error: null });
+    logTaskRun({ task_id: "t-history", run_at: "2026-04-15T17:00:00.000Z", duration_ms: 150, status: "error", result: null, error: "second failed" });
+    logTaskRun({ task_id: "t-history", run_at: "2026-04-16T17:00:00.000Z", duration_ms: 200, status: "success", result: "third", error: null });
+
+    const task = getScheduledTaskInspection("t-history", { include_run_logs: true, run_log_limit: 2 });
+    expect(task?.latest_run_log?.result_summary).toBe("third");
+    expect(task?.recent_run_logs?.map((log) => log.run_at)).toEqual([
+      "2026-04-16T17:00:00.000Z",
+      "2026-04-15T17:00:00.000Z",
+    ]);
+    expect(task?.recent_run_logs?.[1].error_summary).toBe("second failed");
+  });
 });

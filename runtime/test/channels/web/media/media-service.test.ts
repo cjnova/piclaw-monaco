@@ -64,6 +64,34 @@ test("createFromPath stores general file attachments", async () => {
   unlinkSync(mediaPath);
 });
 
+test("createFromPath infers YAML files as text/yaml", async () => {
+  const mediaPath = join(process.env.PICLAW_DATA || "/tmp", `config-${Date.now()}.yaml`);
+  writeFileSync(mediaPath, "name: piclaw\nfeatures:\n  preview: true\n");
+
+  const service = new MediaService();
+  const res = await service.createFromPath(mediaPath);
+
+  expect(res.status).toBe(200);
+  const body = res.body as { contentType?: string };
+  expect(body.contentType).toBe("text/yaml");
+
+  unlinkSync(mediaPath);
+});
+
+test("createFromPath infers .yml files as text/yaml", async () => {
+  const mediaPath = join(process.env.PICLAW_DATA || "/tmp", `config-${Date.now()}.yml`);
+  writeFileSync(mediaPath, "name: piclaw\n");
+
+  const service = new MediaService();
+  const res = await service.createFromPath(mediaPath);
+
+  expect(res.status).toBe(200);
+  const body = res.body as { contentType?: string };
+  expect(body.contentType).toBe("text/yaml");
+
+  unlinkSync(mediaPath);
+});
+
 test("createFromPath infers shell scripts as text/x-shellscript", async () => {
   const mediaPath = join(process.env.PICLAW_DATA || "/tmp", `script-${Date.now()}.sh`);
   writeFileSync(mediaPath, "#!/bin/sh\necho hello\n");

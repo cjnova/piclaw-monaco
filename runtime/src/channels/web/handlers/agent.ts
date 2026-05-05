@@ -588,6 +588,7 @@ export async function handleAgentMessage(
       mediaIds: normalized.mediaIds,
       contentBlocks: normalized.contentBlocks,
       linkPreviews: normalized.linkPreviews,
+      screenHint: normalized.screenHint,
     });
     if (!sourceInteraction) return channel.json({ error: "Failed to store message" }, 500);
 
@@ -611,6 +612,7 @@ export async function handleAgentMessage(
         content_blocks: normalized.contentBlocks,
         link_previews: normalized.linkPreviews,
         mode: requestMode,
+        screen_hint: normalized.screenHint,
       }),
     });
 
@@ -634,7 +636,7 @@ export async function handleAgentMessage(
 
   const queueDeferredFollowup = (
     queuedContent: string,
-    extras?: { mediaIds?: number[]; contentBlocks?: unknown[]; linkPreviews?: unknown[] }
+    extras?: { mediaIds?: number[]; contentBlocks?: unknown[]; linkPreviews?: unknown[]; screenHint?: string }
   ): Response => {
     const queuedAt = new Date().toISOString();
     // Don't inherit the active turn's thread root. Deferred followups are
@@ -874,6 +876,7 @@ export async function handleAgentMessage(
       mediaIds: normalized.mediaIds,
       contentBlocks: normalized.contentBlocks,
       linkPreviews: normalized.linkPreviews,
+      screenHint: normalized.screenHint,
     });
 
     // If we are deferring only because persisted/deferred backlog exists but
@@ -892,6 +895,7 @@ export async function handleAgentMessage(
     contentBlocks: normalized.contentBlocks,
     linkPreviews: normalized.linkPreviews,
     threadId: normalized.threadId,
+    screenHint: normalized.screenHint,
   });
 
   if (!interaction) return channel.json({ error: "Failed to store message" }, 500);
@@ -931,7 +935,10 @@ export async function handleAgentMessage(
     // Web queued follow-ups are managed by the web channel itself rather than
     // AgentSession's internal follow-up queue. This guarantees the current turn
     // finalizes and publishes before the next queued user message begins.
-    if (!isStreaming) {
+    // Treat non-streaming compaction/retry phases as active too: submitting
+    // during compaction must queue behind the current session instead of
+    // starting a competing processChat run.
+    if (!isActive) {
       return null;
     }
 
@@ -1250,6 +1257,7 @@ export async function processChat(
         contentBlocks: Array.isArray(nextQueued.contentBlocks) ? nextQueued.contentBlocks : undefined,
         linkPreviews: Array.isArray(nextQueued.linkPreviews) ? nextQueued.linkPreviews : undefined,
         threadId: nextQueued.threadId ?? undefined,
+        screenHint: nextQueued.screenHint,
       }
     );
 

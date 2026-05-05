@@ -33,6 +33,7 @@ type StoreMessageOptions = {
   contentBlocks?: unknown[];
   linkPreviews?: unknown[];
   threadId?: number;
+  screenHint?: string | null;
   isSteeringMessage?: boolean;
 };
 
@@ -312,6 +313,7 @@ export class WebAgentControlPlaneService {
           contentBlocks: Array.isArray(removed.contentBlocks) ? removed.contentBlocks : undefined,
           linkPreviews: Array.isArray(removed.linkPreviews) ? removed.linkPreviews : undefined,
           threadId: steerThreadId ?? undefined,
+          screenHint: removed.screenHint,
           isSteeringMessage: isStreaming,
         }
       );

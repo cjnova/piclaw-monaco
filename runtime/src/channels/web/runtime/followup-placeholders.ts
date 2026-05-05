@@ -10,6 +10,7 @@ export interface QueuedFollowupItem {
   mediaIds?: number[];
   contentBlocks?: unknown[];
   linkPreviews?: unknown[];
+  screenHint?: string;
   /** Number of times materializeNextDeferredFollowup has failed for this item. */
   materializeRetries?: number;
 }
@@ -24,7 +25,7 @@ export class FollowupPlaceholderStore {
     queuedContent: string,
     threadId?: number | null,
     queuedAt?: string,
-    extras?: Pick<QueuedFollowupItem, "mediaIds" | "contentBlocks" | "linkPreviews">
+    extras?: Pick<QueuedFollowupItem, "mediaIds" | "contentBlocks" | "linkPreviews" | "screenHint">
   ): void {
     const existing = this.queuedFollowupPlaceholders.get(chatJid) ?? [];
     existing.push({
@@ -35,6 +36,7 @@ export class FollowupPlaceholderStore {
       mediaIds: extras?.mediaIds ? [...extras.mediaIds] : undefined,
       contentBlocks: Array.isArray(extras?.contentBlocks) ? [...extras.contentBlocks] : undefined,
       linkPreviews: Array.isArray(extras?.linkPreviews) ? [...extras.linkPreviews] : undefined,
+      screenHint: typeof extras?.screenHint === "string" && extras.screenHint.trim() ? extras.screenHint.trim() : undefined,
     });
     this.queuedFollowupPlaceholders.set(chatJid, existing);
   }
@@ -49,6 +51,7 @@ export class FollowupPlaceholderStore {
       mediaIds: item.mediaIds ? [...item.mediaIds] : undefined,
       contentBlocks: Array.isArray(item.contentBlocks) ? [...item.contentBlocks] : undefined,
       linkPreviews: Array.isArray(item.linkPreviews) ? [...item.linkPreviews] : undefined,
+      screenHint: typeof item.screenHint === "string" && item.screenHint.trim() ? item.screenHint.trim() : undefined,
     });
     this.queuedFollowupPlaceholders.set(chatJid, existing);
   }

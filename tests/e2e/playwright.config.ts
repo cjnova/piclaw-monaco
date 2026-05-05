@@ -1,10 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const workers = Math.max(1, Number.parseInt(process.env.PICLAW_E2E_WORKERS || '1', 10) || 1);
+const timeout = Math.max(10_000, Number.parseInt(process.env.PICLAW_E2E_TEST_TIMEOUT_MS || '30000', 10) || 30_000);
+// Optional internal-secret header for browser-originated E2E requests. Keep it
+// separate from PICLAW_INTERNAL_SECRET so auth bootstrap can opt in explicitly.
+const internalSecret = (process.env.PICLAW_E2E_INTERNAL_SECRET || '').trim();
+
 export default defineConfig({
   testDir: './steps',
-  timeout: 30_000,
+  timeout,
   retries: 1,
-  workers: 1, // serialize for stable UX assertions
+  workers, // default serial for stable UX assertions; override with PICLAW_E2E_WORKERS for split/fast runs
   reporter: [
     ['html', { outputFolder: './reports/html', open: 'never' }],
     ['json', { outputFile: './reports/results.json' }],
@@ -14,6 +20,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
+    ...(internalSecret ? { extraHTTPHeaders: { 'x-piclaw-internal-secret': internalSecret } } : {}),
+    // Use domcontentloaded — SSE keeps networkidle from resolving
+    navigationTimeout: 30_000,
   },
   projects: [
     {
@@ -31,6 +40,10 @@ export default defineConfig({
     {
       name: 'iphone',
       use: { ...devices['iPhone 14 Pro'] },
+    },
+    {
+      name: 'android-chrome',
+      use: { ...devices['Pixel 5'] },
     },
   ],
 });

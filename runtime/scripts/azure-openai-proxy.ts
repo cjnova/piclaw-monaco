@@ -67,6 +67,10 @@ interface TokenCache {
   expiresOnEpoch: number;
 }
 
+type StreamingRequestInit = RequestInit & {
+  duplex?: "half";
+};
+
 let tokenCache: TokenCache | null = null;
 
 function isTokenValid(cache: TokenCache | null): cache is TokenCache {
@@ -210,13 +214,13 @@ const server = Bun.serve({
     // Forward request body
     const hasBody = req.method !== "GET" && req.method !== "HEAD";
     try {
-      const upstream = await fetch(upstreamUrl, {
+      const upstreamInit: StreamingRequestInit = {
         method: req.method,
         headers: fwdHeaders,
         body: hasBody ? req.body : undefined,
-        // @ts-ignore — Bun supports duplex streaming
         duplex: hasBody && req.body ? "half" : undefined,
-      });
+      };
+      const upstream = await fetch(upstreamUrl, upstreamInit);
 
       // Forward response headers
       const respHeaders = new Headers();

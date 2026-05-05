@@ -51,6 +51,8 @@ const EXTENSION_MEDIA_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
   ".txt": "text/plain",
   ".md": "text/markdown",
+  ".yaml": "text/yaml",
+  ".yml": "text/yaml",
   ".csv": "text/csv",
   ".html": "text/html",
   ".xml": "text/xml",

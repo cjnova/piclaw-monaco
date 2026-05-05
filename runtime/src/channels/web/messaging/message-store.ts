@@ -30,6 +30,7 @@ export interface StoreWebMessageOptions {
   contentBlocks?: unknown[];
   linkPreviews?: unknown[];
   threadId?: number | null;
+  screenHint?: string | null;
   isTerminalAgentReply?: boolean;
   isSteeringMessage?: boolean;
 }
@@ -102,6 +103,7 @@ export function storeWebMessage(
     sender: params.isBot ? "web-agent" : "web-user",
     sender_name: params.isBot ? params.agentName : (typeof params.userName === "string" && params.userName.trim() ? params.userName.trim() : "You"),
     content: params.content,
+    screen_hint: typeof options.screenHint === "string" && options.screenHint.trim() ? options.screenHint.trim() : null,
     timestamp: new Date().toISOString(),
     is_from_me: false,
     is_bot_message: params.isBot,
@@ -144,6 +146,7 @@ export function storeWebMessage(
     agent_id: params.agentId,
     media_ids: allMediaIds,
   };
+  if (msg.screen_hint) data.screen_hint = msg.screen_hint;
   if (options.threadId) data.thread_id = options.threadId;
   else if (!params.isBot) data.thread_id = rowId;
   if (contentBlocks?.length) data.content_blocks = contentBlocks;

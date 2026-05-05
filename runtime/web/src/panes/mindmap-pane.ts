@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * mindmap-pane.ts — WebPaneExtension for .mindmap.yaml files.
  *

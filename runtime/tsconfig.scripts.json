@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "../scripts/integration-test-suite.ts",
+    "scripts/vnc-harness-standalone.ts",
+    "scripts/playwright/oobe-local-container.ts",
+    "scripts/playwright/vnc-harness-report.ts",
+    "scripts/playwright/terminal-reopen.ts",
+    "scripts/playwright/web-auth-bootstrap.ts"
+  ]
+}

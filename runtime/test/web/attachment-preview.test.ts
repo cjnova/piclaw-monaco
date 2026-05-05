@@ -15,9 +15,16 @@ describe("attachment preview kind", () => {
     expect(getAttachmentPreviewKind("application/octet-stream", "message.eml")).toBe("eml");
   });
 
-  test("classifies shell scripts and .sb files as text previews by filename", () => {
+  test("classifies shell scripts, scratch buffers, and YAML files as text previews by filename", () => {
     expect(getAttachmentPreviewKind("application/octet-stream", "script.sh")).toBe("text");
     expect(getAttachmentPreviewKind("application/octet-stream", "workflow.sb")).toBe("text");
+    expect(getAttachmentPreviewKind("application/octet-stream", "config.yaml")).toBe("text");
+    expect(getAttachmentPreviewKind("application/octet-stream", "config.yml")).toBe("text");
+  });
+
+  test("classifies YAML content types as text previews", () => {
+    expect(getAttachmentPreviewKind("text/yaml", "config.yaml")).toBe("text");
+    expect(getAttachmentPreviewKind("text/x-yaml", "config.yml")).toBe("text");
   });
 
   test("returns the ZIP archive preview label", () => {

@@ -6,8 +6,8 @@
 
 import { expect, test } from "bun:test";
 import "../../helpers.js";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs";
-import { join } from "path";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "fs";
+import { isAbsolute, join, relative } from "path";
 import { tmpdir } from "os";
 import { gzipSync } from "zlib";
 
@@ -65,6 +65,25 @@ function setupWorkspaceDir() {
   };
 
   return { prefix, base, cleanup, service: new WorkspaceFileService() };
+}
+
+function isPathUnder(parent: string, candidate: string): boolean {
+  const rel = relative(parent, candidate);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+function pickOutsideWorkspaceParent(): string {
+  const workspaceReal = realpathSync(WORKSPACE_DIR);
+  for (const candidate of [tmpdir(), "/workspace/tmp", "/var/tmp"]) {
+    try {
+      mkdirSync(candidate, { recursive: true });
+      const candidateReal = realpathSync(candidate);
+      if (!isPathUnder(workspaceReal, candidateReal)) return candidate;
+    } catch (error) {
+      if (process.env.PICLAW_DEBUG_TEST_TMP === "1") console.warn("[workspace-file-service.test] skipping outside-workspace temp candidate", candidate, error);
+    }
+  }
+  throw new Error(`No writable temp directory outside workspace root ${workspaceReal}`);
 }
 
 test("getFile handles invalid, directory, text/json/image, archive and binary modes", () => {
@@ -228,7 +247,7 @@ test("uploadChunk rejects dot-segment upload IDs before deriving staging paths",
 
 test("workspace file APIs reject symlinks escaping the workspace root", async () => {
   const { prefix, base, cleanup, service } = setupWorkspaceDir();
-  const outside = mkdtempSync(join(tmpdir(), "piclaw-workspace-outside-"));
+  const outside = mkdtempSync(join(pickOutsideWorkspaceParent(), "piclaw-workspace-outside-"));
   try {
     writeFileSync(join(outside, "secret.txt"), "do not read", "utf8");
     mkdirSync(join(outside, "drop"), { recursive: true });

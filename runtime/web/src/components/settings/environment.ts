@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useMemo, useState } from '../../vendor/preact-htm.js';
 import { getEnvironmentSettings, saveEnvironmentOverride } from '../../api.js';
 
-function normalizeEnvironmentSettings(data = {}) {
+function normalizeEnvironmentSettings(data: Record<string, any> = {}) {
     const environment = data.environmentSettings || data.settings || data.environment || {};
     return {
         variables: Array.isArray(environment.variables) ? environment.variables : [],

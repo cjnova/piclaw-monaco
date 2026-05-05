@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * file-conflict-monitor.ts — Reusable external-change detector for editor panes.
  *

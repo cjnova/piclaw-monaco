@@ -17,6 +17,8 @@ import {
   resolveComposePrefillRequest,
   resolveComposeSubmitButtonState,
   resolveComposeAbortButtonState,
+  shouldStartSpeechPushToTalk,
+  shouldStopSpeechPushToTalk,
   isComposeSubmitAbortMode,
   resolveSessionPopupChats,
   isSessionPopupChatEmphasized,
@@ -160,7 +162,7 @@ test('resolveComposePrefillRequest applies new non-search prefill tokens exactly
   });
 });
 
-test('parseQueuedContent extracts file, message, and attachment refs from transcript-wrapped queue items', () => {
+test('parseQueuedContent extracts file, folder, message, and attachment refs from transcript-wrapped queue items', () => {
   const parsed = parseQueuedContent([
     'Channel: web',
     '',
@@ -169,6 +171,9 @@ test('parseQueuedContent extracts file, message, and attachment refs from transc
     '  ',
     '  Files:',
     '  - notes/todo.md',
+    '  ',
+    '  Folders:',
+    '  - runtime/web/src/components',
     '  ',
     '  Referenced messages:',
     '  - message:23123',
@@ -179,6 +184,7 @@ test('parseQueuedContent extracts file, message, and attachment refs from transc
 
   expect(parsed.text).toBe('Please check this later.');
   expect(parsed.fileRefs).toEqual(['notes/todo.md']);
+  expect(parsed.folderRefs).toEqual(['runtime/web/src/components']);
   expect(parsed.messageRefs).toEqual(['23123']);
   expect(parsed.attachmentRefs).toEqual([
     { id: '784', label: 'image.png', raw: 'attachment:784 (image.png)' },
@@ -214,6 +220,9 @@ test('buildReturnedQueuedDraft restores refs and preserves attachment markers in
     '  Files:',
     '  - notes/todo.md',
     '  ',
+    '  Folders:',
+    '  - runtime/web/src/components',
+    '  ',
     '  Referenced messages:',
     '  - message:23123',
     '  ',
@@ -224,6 +233,7 @@ test('buildReturnedQueuedDraft restores refs and preserves attachment markers in
   expect(restored).toEqual({
     content: 'Please check this later.\n\nAttachments:\n- attachment:784 (image.png)',
     fileRefs: ['notes/todo.md'],
+    folderRefs: ['runtime/web/src/components'],
     messageRefs: ['23123'],
     attachmentRefs: [
       { id: '784', label: 'image.png', raw: 'attachment:784 (image.png)' },
@@ -252,12 +262,16 @@ test('returnQueuedFollowupToEditor restores compose state before removing the qu
         '  ',
         '  Files:',
         '  - notes/todo.md',
+        '  ',
+        '  Folders:',
+        '  - runtime/web/src/components',
       ].join('\n'),
     },
     setSubmitError: (value: string | null) => { calls.push(`error:${String(value)}`); },
     setSubmitNotice: (value: string | null) => { calls.push(`notice:${String(value)}`); },
     setMediaFiles: (value: unknown[]) => { calls.push(`media:${Array.isArray(value) ? value.length : 'x'}`); },
     onSetFileRefs: (value: string[]) => { calls.push(`files:${value.join(',')}`); },
+    onSetFolderRefs: (value: string[]) => { calls.push(`folders:${value.join(',')}`); },
     onSetMessageRefs: (value: string[]) => { calls.push(`messages:${value.join(',')}`); },
     setContent: (value: string) => { calls.push(`content:${value}`); },
     textareaRef: { current: textarea },
@@ -274,6 +288,7 @@ test('returnQueuedFollowupToEditor restores compose state before removing the qu
     'notice:null',
     'media:0',
     'files:notes/todo.md',
+    'folders:runtime/web/src/components',
     'messages:',
     'content:Please check this later.',
     'raf',
@@ -413,6 +428,22 @@ test('resolveComposeExtensionWorkingDisplay renders default, custom, and hidden 
     indicatorText: null,
     animateDot: false,
   });
+});
+
+test('speech push-to-talk starts only on blank compose with native speech available', () => {
+  const baseEvent = { key: ' ', code: 'Space', ctrlKey: false, metaKey: false, altKey: false, repeat: false };
+  const baseOptions = { searchMode: false, speechButtonVisible: true, speechButtonActive: false, canStartSpeech: true };
+
+  expect(shouldStartSpeechPushToTalk(baseEvent, '', baseOptions)).toBe(true);
+  expect(shouldStartSpeechPushToTalk(baseEvent, '   ', baseOptions)).toBe(true);
+  expect(shouldStartSpeechPushToTalk(baseEvent, 'hello', baseOptions)).toBe(false);
+  expect(shouldStartSpeechPushToTalk({ ...baseEvent, repeat: true }, '', baseOptions)).toBe(false);
+  expect(shouldStartSpeechPushToTalk(baseEvent, '', { ...baseOptions, speechButtonActive: true })).toBe(false);
+  expect(shouldStartSpeechPushToTalk(baseEvent, '', { ...baseOptions, canStartSpeech: false })).toBe(false);
+
+  expect(shouldStopSpeechPushToTalk({ key: ' ', code: 'Space' }, true)).toBe(true);
+  expect(shouldStopSpeechPushToTalk({ key: 'Enter', code: 'Enter' }, true)).toBe(false);
+  expect(shouldStopSpeechPushToTalk({ key: ' ', code: 'Space' }, false)).toBe(false);
 });
 
 test('resolveComposeSubmitButtonState stays coherent across send and queue states', () => {

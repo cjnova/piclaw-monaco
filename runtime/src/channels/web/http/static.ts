@@ -2,13 +2,14 @@
  * web/http/static.ts – Static file serving for the web UI.
  *
  * Serves the bundled HTML, CSS, JS, and font files from the web/static
- * directory. Handles content-type detection and caching headers.
+ * directory. Handles content-type detection, caching headers, and
+ * transparent response compression for compressible assets.
  *
  * Consumers: web/http/response-service.ts and web/request-router.ts.
  */
 
 import { extname, resolve } from "path";
-import { readFileSync, statSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 
 import { createLogger, debugSuppressedError } from "../../../utils/logger.js";
 import { WEB_RUNTIME_CONFIG } from "../../../core/config.js";
@@ -42,6 +43,24 @@ const NOTIFICATION_SOURCE_LABELS_PLACEHOLDER = "__PICLAW_NOTIFICATION_SOURCE_LAB
 const APP_VERSION_FILES = ["dist/app.bundle.js", "dist/app.bundle.css"];
 const LOGIN_VERSION_FILES = ["dist/login.bundle.js", "dist/login.bundle.css"];
 const TEXT_ASSET_CACHE = new Map<string, { mtimeMs: number; text: string }>();
+const GZIP_ASSET_CACHE = new Map<string, { mtimeMs: number; data: Uint8Array }>();
+
+const SKIP_COMPRESSION_EXTS = new Set([
+  ".avif",
+  ".br",
+  ".gif",
+  ".gz",
+  ".ico",
+  ".jpeg",
+  ".jpg",
+  ".mp4",
+  ".png",
+  ".wasm",
+  ".webm",
+  ".webp",
+  ".woff2",
+  ".zip",
+]);
 
 function readAssetVersion(relPaths: string[]): string {
   let newestMtimeMs = 0;
@@ -87,6 +106,44 @@ function renderHtmlTemplate(relPath: string, html: string): string {
   return renderedWithSharedFlags;
 }
 
+function parseAcceptedEncodings(req?: Request): Set<string> {
+  const header = req?.headers.get("Accept-Encoding") || "";
+  const accepted = new Set<string>();
+  for (const rawPart of header.split(",")) {
+    const [rawEncoding, ...rawParams] = rawPart.trim().split(";");
+    const encoding = rawEncoding.trim().toLowerCase();
+    if (!encoding) continue;
+    const disabled = rawParams.some((param) => {
+      const [key, value] = param.trim().split("=");
+      return key?.trim().toLowerCase() === "q" && Number(value) === 0;
+    });
+    if (!disabled) accepted.add(encoding);
+  }
+  return accepted;
+}
+
+function getAcceptedCompressionEncodings(req: Request | undefined, ext: string): Set<string> {
+  if (SKIP_COMPRESSION_EXTS.has(ext.toLowerCase())) return new Set();
+  return parseAcceptedEncodings(req);
+}
+
+function gzipAsset(filePath: string, mtimeMs: number, raw: Uint8Array): Uint8Array {
+  const cached = GZIP_ASSET_CACHE.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.data;
+  const data = new Uint8Array(Bun.gzipSync(Buffer.from(raw)));
+  GZIP_ASSET_CACHE.set(filePath, { mtimeMs, data });
+  return data;
+}
+
+function buildCompressedHeaders(contentType: string, cacheControl: string, encoding: "br" | "gzip"): Record<string, string> {
+  return {
+    "Content-Type": contentType,
+    "Cache-Control": cacheControl,
+    "Content-Encoding": encoding,
+    "Vary": "Accept-Encoding",
+  };
+}
+
 function readRenderedTextAsset(filePath: string): string {
   const stats = statSync(filePath);
   const cached = TEXT_ASSET_CACHE.get(filePath);
@@ -108,9 +165,10 @@ import { isPathWithin } from "../../../utils/path-safety.js";
  * Serve a file from the web static asset directory.
  * @param relPath Relative path inside `web/static`.
  * @param notFound Callback used when the asset path is invalid or missing.
+ * @param req Optional incoming request, used for Accept-Encoding negotiation.
  * @returns Static-file response with content-type/cache headers, or the provided not-found response.
  */
-export async function serveStatic(relPath: string, notFound: () => Response): Promise<Response> {
+export async function serveStatic(relPath: string, notFound: () => Response, req?: Request): Promise<Response> {
   const filePath = resolve(STATIC_DIR, relPath);
   if (!isPathWithin(STATIC_DIR, filePath)) return notFound();
 
@@ -134,6 +192,13 @@ export async function serveStatic(relPath: string, notFound: () => Response): Pr
           ? "no-cache, no-store, must-revalidate"
           : "public, max-age=3600";
 
+  const acceptedEncodings = getAcceptedCompressionEncodings(req, ext);
+  const acceptsGzip = acceptedEncodings.has("gzip");
+  const sidecarEncodingPreference: Array<"br" | "gzip"> = [
+    ...(acceptedEncodings.has("br") ? ["br" as const] : []),
+    ...(acceptedEncodings.has("gzip") ? ["gzip" as const] : []),
+  ];
+
   if (ext === ".html" || relPath === "sw.js") {
     const rendered = renderHtmlTemplate(relPath, readRenderedTextAsset(filePath));
     const responseHeaders: Record<string, string> = {
@@ -143,8 +208,38 @@ export async function serveStatic(relPath: string, notFound: () => Response): Pr
     if (relPath === "sw.js") {
       responseHeaders["Service-Worker-Allowed"] = "/";
     }
+    if (acceptsGzip) {
+      const stats = statSync(filePath);
+      const compressed = gzipAsset(filePath, stats.mtimeMs || 0, new TextEncoder().encode(rendered));
+      return new Response(Buffer.from(compressed), {
+        headers: {
+          ...responseHeaders,
+          "Content-Encoding": "gzip",
+          "Vary": "Accept-Encoding",
+        },
+      });
+    }
+    if (acceptedEncodings.size > 0) responseHeaders["Vary"] = "Accept-Encoding";
     return new Response(rendered, {
       headers: responseHeaders,
+    });
+  }
+
+  for (const encoding of sidecarEncodingPreference) {
+    const sidecarExt = encoding === "br" ? ".br" : ".gz";
+    const sidecarPath = `${filePath}${sidecarExt}`;
+    if (existsSync(sidecarPath)) {
+      return new Response(Bun.file(sidecarPath), {
+        headers: buildCompressedHeaders(contentType, cacheControl, encoding),
+      });
+    }
+  }
+
+  if (acceptsGzip) {
+    const stats = statSync(filePath);
+    const compressed = gzipAsset(filePath, stats.mtimeMs || 0, new Uint8Array(readFileSync(filePath)));
+    return new Response(Buffer.from(compressed), {
+      headers: buildCompressedHeaders(contentType, cacheControl, "gzip"),
     });
   }
 
@@ -152,6 +247,9 @@ export async function serveStatic(relPath: string, notFound: () => Response): Pr
     "Content-Type": contentType,
     "Cache-Control": cacheControl,
   };
+  if (!SKIP_COMPRESSION_EXTS.has(ext.toLowerCase())) {
+    responseHeaders["Vary"] = "Accept-Encoding";
+  }
 
   return new Response(file, {
     headers: responseHeaders,

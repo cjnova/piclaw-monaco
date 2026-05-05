@@ -602,6 +602,7 @@ export function getWorkspaceTouchStartIntent(event, renamingPath = null) {
 /** Preact component: file tree explorer with upload, rename, and preview. */
 export function WorkspaceExplorer({
     onFileSelect,
+    onFolderSelect,
     visible = true,
     active = undefined,
     onOpenEditor,
@@ -652,6 +653,7 @@ export function WorkspaceExplorer({
     const loadWorkspaceIndexStatusRef = useRef(null);
     const nodeMapRef      = useRef(new Map());
     const onFileSelectRef = useRef(onFileSelect);
+    const onFolderSelectRef = useRef(onFolderSelect);
     const onOpenEditorRef = useRef(onOpenEditor);
     const loadPreviewRef  = useRef(null);
     const loadSubtreeRef  = useRef(null);
@@ -691,6 +693,7 @@ export function WorkspaceExplorer({
 
     // Sync mutable refs each render
     onFileSelectRef.current = onFileSelect;
+    onFolderSelectRef.current = onFolderSelect;
     onOpenEditorRef.current = onOpenEditor;
     useEffect(() => { expandedRef.current = expanded; }, [expanded]);
     useEffect(() => { showHiddenRef.current = showHidden; }, [showHidden]);
@@ -2066,6 +2069,14 @@ export function WorkspaceExplorer({
         uploadInputRef.current?.click();
     }, [uploading]);
 
+    const handleFolderHintClick = useCallback((event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const target = event?.currentTarget?.dataset?.folderHintTarget || selectedPathRef.current || '.';
+        if (!target) return;
+        onFolderSelectRef.current?.(target, nodeMapRef.current.get(target));
+    }, []);
+
     const handleUploadButtonClick = useCallback(() => {
         if (uploading) return;
         const selected = selectedPathRef.current;
@@ -2431,6 +2442,20 @@ export function WorkspaceExplorer({
                                     ${isDir && html`
                                         <button
                                             class="workspace-folder-upload"
+                                            data-folder-hint-target=${node.path}
+                                            title="Add folder hint to compose"
+                                            aria-label=${`Add folder hint for ${node.path}`}
+                                            onClick=${handleFolderHintClick}
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                                <path d="M12 11v6"/>
+                                                <path d="M9 14h6"/>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            class="workspace-folder-upload"
                                             data-upload-target=${node.path}
                                             title="Upload files to this folder"
                                             onClick=${handleFolderUploadClick}
@@ -2493,6 +2518,20 @@ export function WorkspaceExplorer({
                             `}
                             ${selectedIsDir
                                 ? html`
+                                    <button
+                                        class="workspace-download"
+                                        data-folder-hint-target=${selectedPath}
+                                        onClick=${handleFolderHintClick}
+                                        title="Add folder hint to compose"
+                                        aria-label=${`Add folder hint for ${selectedPath}`}
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                            <path d="M12 11v6"/>
+                                            <path d="M9 14h6"/>
+                                        </svg>
+                                    </button>
                                     <button class="workspace-download" onClick=${handleUploadButtonClick}
                                         title="Upload files to this folder" disabled=${uploading}>
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

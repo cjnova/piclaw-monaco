@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * image-viewer-pane.ts — WebPaneExtension for image viewing.
  *

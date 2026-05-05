@@ -11,8 +11,12 @@ describe("web http shell dispatch", () => {
   });
 
   test("dispatches index/manifest/service-worker/static/docs/sse/terminal-session/vnc routes", async () => {
+    const staticRequests: string[] = [];
     const channel = {
-      serveStatic: (rel: string) => new Response(`static:${rel}`),
+      serveStatic: (rel: string, req?: Request) => {
+        staticRequests.push(`${rel}:${req?.url || "missing"}`);
+        return new Response(`static:${rel}`);
+      },
       handleManifest: () => new Response("manifest"),
       serveDocsStatic: (rel: string) => new Response(`docs:${rel}`),
       handleSse: () => new Response("sse"),
@@ -36,6 +40,10 @@ describe("web http shell dispatch", () => {
 
     const staticFlags = buildRouteFlags({ isStaticAsset: true });
     expect(await (await handleShellRoutes(channel, new Request("https://e/static/x.js", { method: "GET" }), "/static/x.js", staticFlags, async () => new Response()))?.text()).toBe("static:x.js");
+    expect(staticRequests).toContain("index.html:https://e/");
+    expect(staticRequests).toContain("sw.js:https://e/sw.js");
+    expect(staticRequests).toContain("js/vendor/ghostty-vt.wasm:https://e/ghostty-vt.wasm");
+    expect(staticRequests).toContain("x.js:https://e/static/x.js");
 
     const docsFlags = buildRouteFlags({ isDocsAsset: true });
     expect(await (await handleShellRoutes(channel, new Request("https://e/docs/a.md", { method: "GET" }), "/docs/a.md", docsFlags, async () => new Response()))?.text()).toBe("docs:a.md");

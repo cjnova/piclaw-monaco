@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useState, useCallback } from '../../vendor/preact-htm.js';
 import { sendAgentMessage } from '../../api.js';
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * settings/keychain.ts — Keychain management panel for the settings dialog.
  * Lists entries (name, type, env var, dates). Supports add, delete, and reveal.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * editor-extension.ts — Standalone editor pane extension.
  *

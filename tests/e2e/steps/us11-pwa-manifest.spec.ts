@@ -118,6 +118,35 @@ test.describe('US-11: PWA Manifest & Icons', () => {
     expect(href).toContain('manifest.json');
   });
 
+  test('Android Chrome has an active fetch-capable service worker for installability', async ({ authedPage: page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'android-chrome', 'Android Chrome-only PWA installability gate');
+
+    const userAgent = await page.evaluate(() => navigator.userAgent);
+    expect(userAgent).toContain('Android');
+
+    const swResp = await page.request.get(`${BASE_URL}/sw.js`);
+    expect(swResp.ok()).toBe(true);
+    expect(swResp.headers()['content-type'] || '').toContain('javascript');
+    const swScript = await swResp.text();
+    expect(swScript).toContain("addEventListener('fetch'");
+    expect(swScript).toContain('event.respondWith(fetch(request))');
+
+    const registration = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return null;
+      const reg = await navigator.serviceWorker.ready;
+      return { scope: reg.scope };
+    });
+    expect(registration?.scope).toContain('/');
+    await expect.poll(async () => page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return null;
+      const reg = await navigator.serviceWorker.ready;
+      return reg.active?.state || null;
+    })).toBe('activated');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect.poll(async () => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  });
+
   test('manifest icon version changes after avatar update', async ({ authedPage: page }) => {
     // Get initial manifest
     const resp1 = await page.request.get(`${BASE_URL}/manifest.json`);

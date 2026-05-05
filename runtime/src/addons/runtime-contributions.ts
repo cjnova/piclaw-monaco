@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { WORKSPACE_DIR } from "../core/config.js";
 import { createMedia } from "../db/media.js";
 import { postMessagesToolMessage } from "../extensions/messages-crud.js";
+import { resetRuntimeStreamSessionsForTests, runtimeStreamSessions } from "./runtime-stream-sessions.js";
 
 export interface AddonStatusPanelProvider {
   key: string;
@@ -26,6 +27,7 @@ export interface PiclawRuntimeAddonApi {
   registerAdaptiveCardIntentHandler: (intent: string, handler: AddonAdaptiveCardIntentHandler) => () => void;
   createMedia: typeof createMedia;
   postMessage: typeof postMessagesToolMessage;
+  streamSessions: typeof runtimeStreamSessions;
 }
 
 type AddonPackageManifest = {
@@ -130,6 +132,7 @@ export function installAddonRuntimeApi(): PiclawRuntimeAddonApi {
     registerAdaptiveCardIntentHandler: registerAddonAdaptiveCardIntentHandler,
     createMedia,
     postMessage: postMessagesToolMessage,
+    streamSessions: runtimeStreamSessions,
   };
 
   runtimeGlobal.__piclaw_runtime = api;
@@ -186,6 +189,7 @@ export async function runAddonAdaptiveCardIntent(
 export function resetAddonRuntimeContributionsForTests(): void {
   statusPanelProviders.clear();
   adaptiveCardIntentHandlers.clear();
+  resetRuntimeStreamSessionsForTests();
   runtimeEntriesLoadPromise = null;
   runtimeApiInstalled = false;
   const runtimeGlobal = globalThis as RuntimeGlobal;

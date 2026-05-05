@@ -20,21 +20,11 @@ import type { RouteFlags } from "./route-flags.js";
 
 const E2E_BOOTSTRAP_TTL_SECONDS = 10 * 60;
 
-function isLoopbackHostname(hostname: string): boolean {
-  const normalized = hostname.trim().toLowerCase();
-  return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1" || normalized === "[::1]";
-}
-
 function handleE2eBootstrapEndpoint(req: Request): Response {
   const config = getWebRuntimeConfig();
-  const url = new URL(req.url);
-  if (!isLoopbackHostname(url.hostname)) {
-    return new Response(JSON.stringify({ error: "Loopback access required" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
-    });
-  }
-
+  // The E2E runner often talks to a remote microVM, so loopback-only access
+  // would make the bootstrap endpoint unusable. Keep this endpoint secret-only,
+  // short-lived, and no-store instead of tying it to the request hostname.
   if (!config.internalSecret.trim() || !isInternalSecretRequestAuthorized(req, config.internalSecret)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,

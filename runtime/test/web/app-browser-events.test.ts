@@ -98,8 +98,27 @@ test('watchZenModeShortcuts toggles on Ctrl+Shift+Z and exits on Escape when act
   expect(toggleEvent.prevented).toBe(true);
   expect(toggles).toBe(1);
 
+  const editableToggleEvent = doc.dispatch('keydown', {
+    ctrlKey: true,
+    shiftKey: true,
+    key: 'z',
+    target: { closest: (selector: string) => selector.includes('textarea') ? ({} as Element) : null },
+  });
+  expect(editableToggleEvent.prevented).toBe(true);
+  expect(toggles).toBe(2);
+
+  doc.dispatch('keydown', { ctrlKey: true, shiftKey: true, key: 'z' });
+  expect(toggles).toBe(3);
+
   const escapeEvent = doc.dispatch('keydown', { key: 'Escape' });
   expect(escapeEvent.prevented).toBe(true);
+  expect(exits).toBe(1);
+
+  const editableEscapeEvent = doc.dispatch('keydown', {
+    key: 'Escape',
+    target: { closest: (selector: string) => selector.includes('textarea') ? ({} as Element) : null },
+  });
+  expect(editableEscapeEvent.prevented).toBeUndefined();
   expect(exits).toBe(1);
 
   dispose();

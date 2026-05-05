@@ -8,7 +8,6 @@ import {
   isExtensionRouteRegistryFrozen,
   registerExtensionRoute,
 } from "../../../src/channels/web/http/extension-routes.js";
-import { registerLazyViewerRoutes } from "../../../src/channels/web/http/lazy-viewer-routes.js";
 
 beforeEach(() => {
   clearExtensionRoutes();
@@ -55,9 +54,7 @@ describe("extension route registry", () => {
     expect(await response?.text()).toBe("second");
   });
 
-  test("keeps registry open after startup viewer routes so workspace extensions can register during session load", async () => {
-    registerLazyViewerRoutes();
-
+  test("keeps registry open until runtime startup freezes it so workspace extensions can register during session load", async () => {
     expect(isExtensionRouteRegistryFrozen()).toBe(false);
 
     const registered = (globalThis as any).__piclaw_registerRoute(

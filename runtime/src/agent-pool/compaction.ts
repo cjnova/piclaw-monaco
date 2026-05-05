@@ -12,6 +12,7 @@ import {
   type ChatCompactionBackoffState,
 } from "../db.js";
 import { formatTimeoutDuration } from "./prompt-utils.js";
+import { updateSessionCompacting } from "../extensions/session-status.js";
 
 export interface CompactionLifecycleOptions {
   onInfo?: (message: string, details: Record<string, unknown>) => void;
@@ -20,6 +21,11 @@ export interface CompactionLifecycleOptions {
 
 const DEFAULT_IDLE_AUTO_COMPACTION_DELAY_MS = 5_000;
 const idleAutoCompactionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+type CompactionOutcome<T> = { ok: true; result: T } | { ok: false; errorMessage: string };
+type ActiveCompaction = { outcome: Promise<CompactionOutcome<unknown>> };
+
+const activeCompactions = new Map<string, ActiveCompaction>();
 
 type AutoCompactionReason = "threshold" | "idle";
 
@@ -64,10 +70,20 @@ function estimateMessageTokens(message: any): number {
 }
 
 export function estimateContextTokensFromSession(session: AgentSession): number {
-  const usage = session.getContextUsage?.();
-  if (typeof usage?.tokens === "number") return usage.tokens;
-
   const context = session.sessionManager.buildSessionContext();
+  const hasCompactionSummary = context.messages.some((message: any) => message?.role === "compactionSummary");
+
+  // Assistant usage metadata is scoped to the prompt that produced that
+  // assistant message. After a compaction, kept assistant messages can still
+  // carry pre-compaction usage totals, so trusting getContextUsage()/last usage
+  // makes the freshly compacted context look huge and triggers repeated idle
+  // compactions. Once a compacted summary is present, estimate the resolved
+  // compacted context directly from the messages instead.
+  if (!hasCompactionSummary) {
+    const usage = session.getContextUsage?.();
+    if (typeof usage?.tokens === "number") return usage.tokens;
+  }
+
   return context.messages.reduce((total: number, message: any) => total + estimateMessageTokens(message), 0);
 }
 
@@ -198,39 +214,72 @@ export async function runCompactionWithTimeout<T>(
   chatJid: string,
   options: Pick<CompactionLifecycleOptions, "onWarn">,
   runCompact: () => Promise<T>,
-): Promise<{ ok: true; result: T } | { ok: false; errorMessage: string }> {
+): Promise<CompactionOutcome<T>> {
+  const existing = activeCompactions.get(chatJid);
+  if (existing) {
+    options.onWarn?.("Compaction already in progress; joining existing compaction", {
+      operation: "run_agent.join_active_compaction",
+      chatJid,
+    });
+    return await existing.outcome as CompactionOutcome<T>;
+  }
+
+  const active: ActiveCompaction = { outcome: Promise.resolve({ ok: false, errorMessage: "Compaction did not start" }) };
+  const clearActive = () => {
+    if (activeCompactions.get(chatJid) === active) activeCompactions.delete(chatJid);
+  };
+  const outcome = runCompactionWithTimeoutExclusive(session, chatJid, options, runCompact, clearActive);
+  active.outcome = outcome as Promise<CompactionOutcome<unknown>>;
+  activeCompactions.set(chatJid, active);
+  return await outcome;
+}
+
+async function runCompactionWithTimeoutExclusive<T>(
+  session: AgentSession,
+  chatJid: string,
+  options: Pick<CompactionLifecycleOptions, "onWarn">,
+  runCompact: () => Promise<T>,
+  clearActive: () => void,
+): Promise<CompactionOutcome<T>> {
   const timeoutMs = getCompactionTimeoutMs();
+  updateSessionCompacting(chatJid, true);
   if (timeoutMs <= 0) {
     try {
       return { ok: true, result: await runCompact() };
     } catch (error) {
       return { ok: false, errorMessage: error instanceof Error ? error.message : String(error) };
+    } finally {
+      updateSessionCompacting(chatJid, false);
+      clearActive();
     }
   }
 
-  const compactionOutcome = new Promise<{ ok: true; result: T } | { ok: false; errorMessage: string }>((resolve) => {
-    void Promise.resolve()
-      .then(() => runCompact())
-      .then((result) => resolve({ ok: true, result }))
-      .catch((error) => resolve({
-        ok: false,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      }));
-  });
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const compactionOutcome = Promise.resolve()
+    .then(() => runCompact())
+    .then((result): CompactionOutcome<T> => ({ ok: true, result }))
+    .catch((error): CompactionOutcome<T> => ({
+      ok: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }))
+    .finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+      updateSessionCompacting(chatJid, false);
+      clearActive();
+    });
 
   const timedOut = Symbol("compaction-timeout");
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeoutOutcome = new Promise<typeof timedOut>((resolve) => {
     timeoutId = setTimeout(() => resolve(timedOut), timeoutMs);
   });
 
   const outcome = await Promise.race([compactionOutcome, timeoutOutcome]);
-  if (timeoutId) clearTimeout(timeoutId);
   if (outcome !== timedOut) {
     return outcome;
   }
 
   await abortCompactionBestEffort(session, chatJid, options);
+  updateSessionCompacting(chatJid, false);
   return {
     ok: false,
     errorMessage: `Compaction timed out after ${formatTimeoutDuration(timeoutMs)}`,

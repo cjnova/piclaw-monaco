@@ -188,7 +188,7 @@ export function createWebChannelEndpointContexts(
           createTotpContext: () => channel.authGateway.createTotpContext(),
           createWebauthnContext: () => channel.authGateway.createWebauthnContext(),
           createWebauthnEnrolPageContext: () => channel.authGateway.createWebauthnEnrolPageContext(),
-          serveStatic: (relPath) => channel.serveStatic(relPath),
+          serveStatic: (relPath, req) => channel.serveStatic(relPath, req),
         };
       }
       return authContext;

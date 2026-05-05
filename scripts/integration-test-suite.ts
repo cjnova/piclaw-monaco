@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// @ts-nocheck
 /**
  * scripts/integration-test-suite.ts – Full integration validation gate.
  *

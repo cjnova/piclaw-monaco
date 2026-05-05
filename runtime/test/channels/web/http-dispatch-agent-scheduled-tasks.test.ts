@@ -1,0 +1,94 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import "../../helpers.js";
+import { createTask, getDb, initDatabase } from "../../../src/db.js";
+import { handleAgentRoutes } from "../../../src/channels/web/http/dispatch-agent.js";
+
+function jsonChannel() {
+  return {
+    json: (payload: unknown, status = 200) => new Response(JSON.stringify(payload), {
+      status,
+      headers: { "content-type": "application/json" },
+    }),
+  } as any;
+}
+
+function insertTask(overrides: Record<string, any> = {}) {
+  createTask({
+    id: "task-web-ui",
+    chat_jid: "web:default",
+    prompt: "Summarize the day",
+    model: null,
+    task_kind: "agent",
+    command: null,
+    cwd: null,
+    timeout_sec: null,
+    schedule_type: "once",
+    schedule_value: "2026-05-05T09:00:00.000Z",
+    next_run: "2026-05-05T09:00:00.000Z",
+    status: "active",
+    created_at: "2026-05-04T09:00:00.000Z",
+    ...overrides,
+  });
+}
+
+describe("scheduled task web management routes", () => {
+  beforeEach(() => {
+    initDatabase();
+  });
+
+  afterEach(() => {
+    try {
+      getDb().close();
+    } catch (_error) {
+      void _error;
+    }
+  });
+
+  test("lists scheduled tasks with counts for the settings pane", async () => {
+    insertTask();
+    insertTask({ id: "task-paused", status: "paused", next_run: "2026-05-06T09:00:00.000Z" });
+
+    const req = new Request("https://example.com/agent/scheduled-tasks?include_run_logs=1", { method: "GET" });
+    const response = await handleAgentRoutes(jsonChannel(), req, "/agent/scheduled-tasks", new URL(req.url));
+    expect(response?.status).toBe(200);
+    const body = await response!.json() as any;
+    expect(body.ok).toBe(true);
+    expect(body.counts).toEqual({ active: 1, paused: 1, completed: 0 });
+    expect(body.tasks.map((task: any) => task.id)).toContain("task-web-ui");
+  });
+
+  test("pauses and resumes non-internal scheduled tasks", async () => {
+    insertTask();
+
+    const pauseReq = new Request("https://example.com/agent/scheduled-tasks/action", {
+      method: "POST",
+      body: JSON.stringify({ action: "pause", id: "task-web-ui" }),
+    });
+    const pauseResponse = await handleAgentRoutes(jsonChannel(), pauseReq, "/agent/scheduled-tasks/action", new URL(pauseReq.url));
+    expect(pauseResponse?.status).toBe(200);
+    expect((await pauseResponse!.json() as any).task.status).toBe("paused");
+
+    const resumeReq = new Request("https://example.com/agent/scheduled-tasks/action", {
+      method: "POST",
+      body: JSON.stringify({ action: "resume", id: "task-web-ui" }),
+    });
+    const resumeResponse = await handleAgentRoutes(jsonChannel(), resumeReq, "/agent/scheduled-tasks/action", new URL(resumeReq.url));
+    expect(resumeResponse?.status).toBe(200);
+    expect((await resumeResponse!.json() as any).task.status).toBe("active");
+  });
+
+  test("protects internal tasks unless explicitly allowed", async () => {
+    insertTask({ id: "task-internal", task_kind: "internal", prompt: "/dream" });
+
+    const req = new Request("https://example.com/agent/scheduled-tasks/action", {
+      method: "POST",
+      body: JSON.stringify({ action: "delete", id: "task-internal" }),
+    });
+    const response = await handleAgentRoutes(jsonChannel(), req, "/agent/scheduled-tasks/action", new URL(req.url));
+    expect(response?.status).toBe(403);
+    const body = await response!.json() as any;
+    expect(body.protected).toBe(true);
+    expect(getDb().prepare("SELECT id FROM scheduled_tasks WHERE id = ?").get("task-internal")).toBeTruthy();
+  });
+});

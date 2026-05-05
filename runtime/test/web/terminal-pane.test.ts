@@ -5,7 +5,7 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { tryRun } from "../helpers.js";
 
-import { buildTerminalTheme, getOrCreateAnonymousTerminalClientToken, relocateTerminalPaneRoot } from '../../web/src/panes/terminal-pane.js';
+import { buildTerminalTheme, focusTerminalCleanly, getOrCreateAnonymousTerminalClientToken, relocateTerminalPaneRoot, resetTerminalImeState } from '../../web/src/panes/terminal-pane.js';
 
 function parseHexColor(input: string) {
     const raw = String(input || '').trim().replace('#', '');
@@ -287,6 +287,59 @@ test('relocateTerminalPaneRoot moves the existing terminal shell into a new host
     expect(host.innerHTML).toBe('');
     expect(children).toEqual([root]);
     expect(relocateTerminalPaneRoot(root, null as any)).toBe(false);
+});
+
+test('resetTerminalImeState clears ghostty composition state and emits compositionend', () => {
+    const events: string[] = [];
+    const textarea: any = {
+        ownerDocument: {
+            defaultView: {
+                CompositionEvent: class {
+                    type: string;
+                    data: string;
+                    constructor(type: string, init: { data?: string } = {}) {
+                        this.type = type;
+                        this.data = init.data || '';
+                    }
+                },
+            },
+        },
+        dispatchEvent(event: { type: string }) {
+            events.push(event.type);
+            return true;
+        },
+    };
+    const terminal: any = {
+        isComposing: true,
+        pendingKeyAfterComposition: 'a',
+        compositionJustEnded: true,
+        inputElement: textarea,
+    };
+
+    resetTerminalImeState(terminal, null as any);
+
+    expect(events).toEqual(['compositionend']);
+    expect(terminal.isComposing).toBe(false);
+    expect(terminal.pendingKeyAfterComposition).toBeNull();
+    expect(terminal.compositionJustEnded).toBe(false);
+});
+
+test('focusTerminalCleanly blurs previous focus before focusing terminal', () => {
+    const events: string[] = [];
+    const ownerDocument: any = {
+        body: {},
+        documentElement: {},
+        activeElement: { blur: () => events.push('blur') },
+    };
+    const terminal: any = {
+        isComposing: true,
+        focus: () => events.push('focus'),
+    };
+
+    focusTerminalCleanly({ terminal, ownerDocument });
+
+    expect(events).toEqual(['blur', 'focus']);
+    expect(terminal.isComposing).toBe(false);
 });
 
 test('getOrCreateAnonymousTerminalClientToken persists a stable client token', () => {

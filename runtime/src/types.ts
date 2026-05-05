@@ -36,6 +36,8 @@ export interface NewMessage {
   sender_name: string;
   /** Text content of the message. */
   content: string;
+  /** Optional one-word client screen-size hint for agent prompt context. */
+  screen_hint?: string | null;
   /** ISO-8601 timestamp of when the message was sent. */
   timestamp: string;
   /** True if the message was sent by the bot itself. */

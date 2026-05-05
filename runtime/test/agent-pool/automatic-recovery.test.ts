@@ -138,6 +138,25 @@ test("treats tool-use budget exhaustion as compact-then-retry tool-history press
   expect(decision.strategy).toBe("compact_then_retry");
 });
 
+test("does not compact-and-retry again after compaction itself overflows context", () => {
+  const decision = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "invalid_request_error: context_length_exceeded: Your input exceeds the context window of this model",
+    recoveryAttemptsUsed: 1,
+    elapsedMs: 2000,
+    snapshot: {
+      hadToolActivity: false,
+      hadPartialOutput: false,
+      compactionErrorMessage: "context_length_exceeded during compaction",
+      sawCompactionIntent: true,
+    },
+  });
+
+  expect(decision.recover).toBe(false);
+  expect(decision.classifier).toBe("compaction_failure");
+  expect(decision.strategy).toBeNull();
+});
+
 test("stops recovery after the configured attempt budget", () => {
   const decision = decideAutomaticRecovery({
     config: { ...DEFAULT_AUTOMATIC_RECOVERY_CONFIG, maxAttempts: 2, totalBudgetMs: 30_000, enabled: true },

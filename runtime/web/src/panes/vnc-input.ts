@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -56,7 +55,7 @@ export function shouldReleaseVncPointerContact(event) {
     const pointerType = String(event?.pointerType || '').toLowerCase();
     const pressure = Number(event?.pressure);
     if ((pointerType === 'touch' || pointerType === 'pen')) {
-        if ((type === 'pointerleave' || type === 'pointerout') && type !== 'pointerdown') {
+        if (type === 'pointerleave' || type === 'pointerout') {
             return true;
         }
         if (Number.isFinite(pressure) && pressure <= 0 && type !== 'pointerdown') {

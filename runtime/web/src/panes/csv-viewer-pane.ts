@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * csv-viewer-pane.ts — WebPaneExtension for CSV/TSV preview + readonly tab viewing.
  *

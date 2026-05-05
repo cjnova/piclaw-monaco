@@ -20,7 +20,7 @@ export interface AuthEndpointsContext {
   createTotpContext(): TotpAuthContext;
   createWebauthnContext(): WebauthnAuthContext;
   createWebauthnEnrolPageContext(): WebauthnEnrolPageContext;
-  serveStatic(relPath: string): Promise<Response>;
+  serveStatic(relPath: string, req?: Request): Promise<Response>;
 }
 
 /** Delegate TOTP auth verification request handling. */
@@ -71,8 +71,8 @@ export async function handleWebauthnEnrollPageEndpoint(
 }
 
 /** Serve login page from static assets. */
-export async function serveLoginPageResponse(ctx: AuthEndpointsContext): Promise<Response> {
-  return await ctx.serveStatic("login.html");
+export async function serveLoginPageResponse(ctx: AuthEndpointsContext, req?: Request): Promise<Response> {
+  return await ctx.serveStatic("login.html", req);
 }
 
 /** Build an auth redirect response to /login. */

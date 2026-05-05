@@ -727,11 +727,17 @@ async function runPromptAttempt(
         // missing closing assistant text is informational, not a failed turn.
         // Read-only tool-only stops remain recoverable so we can retry and ask
         // the provider for the final prose reply.
-        const isToolOnlyCompletion = hadToolActivity
+        const isTerminalSideEffectCompletion = hadToolActivity
+          && !hadPartialOutput
+          && !isBlankTurnSessionDelta(blankTurnDelta)
+          && sawTerminalSideEffectToolActivity;
+        const isRecoverableToolOnlyStop = hadToolActivity
           && !hadPartialOutput
           && !hadToolFailure
           && !isBlankTurnSessionDelta(blankTurnDelta)
-          && (sawTerminalSideEffectToolActivity || (!onlyReadOnlyToolActivity && detail.includes("provider stopped after tool use")));
+          && !onlyReadOnlyToolActivity
+          && detail.includes("provider stopped after tool use");
+        const isToolOnlyCompletion = isTerminalSideEffectCompletion || isRecoverableToolOnlyStop;
         output = isToolOnlyCompletion
           ? {
             status: "tool_complete" as const,

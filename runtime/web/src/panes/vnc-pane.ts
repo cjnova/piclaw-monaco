@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * vnc-pane.ts — WebPaneExtension scaffold for a VNC viewer/proxy tab.
  *
@@ -226,7 +225,7 @@ function parseDirectVncTargetReference(value) {
     };
 }
 
-export function getVncTargetsEmptyStateCopy(options = {}) {
+export function getVncTargetsEmptyStateCopy(options: Record<string, any> = {}) {
     const enabled = Boolean(options?.enabled);
     const directConnectEnabled = Boolean(options?.directConnectEnabled);
     const targetCount = Array.isArray(options?.targets) ? options.targets.length : Number(options?.targetCount || 0);
@@ -562,7 +561,7 @@ class VncPaneInstance implements PaneInstance {
             openDirectTarget();
         });
         this.bodyEl.querySelector('[data-direct-open-tab]')?.addEventListener('click', () => openDirectTarget());
-        for (const button of Array.from(this.bodyEl.querySelectorAll('[data-target-open-tab]'))) {
+        for (const button of Array.from(this.bodyEl.querySelectorAll('[data-target-open-tab]')) as HTMLElement[]) {
             button.addEventListener('click', () => {
                 const targetId = button.getAttribute('data-target-open-tab');
                 const label = button.getAttribute('data-target-label') || targetId || 'VNC';
@@ -687,7 +686,7 @@ class VncPaneInstance implements PaneInstance {
         this.displayMetaEl.textContent = `${protocolState} · framebuffer=${size}${name}${scale}${suffix}`;
     }
 
-    private ensureCanvasSize(width, height, options = {}) {
+    private ensureCanvasSize(width, height, options: { reveal?: boolean } = {}) {
         if (!this.canvas || !this.canvasCtx || !width || !height) return;
         if (this.canvas.width !== width || this.canvas.height !== height) {
             this.canvas.width = width;
@@ -850,7 +849,7 @@ class VncPaneInstance implements PaneInstance {
             this.sendPointerEvent(0, fallbackPoint.x, fallbackPoint.y);
         };
 
-        const releasePointer = (event, options = {}) => {
+        const releasePointer = (event, options: { resetAll?: boolean } = {}) => {
             if (options.resetAll) {
                 const pointerId = Number(event?.pointerId);
                 clearIdleReleaseTimer(pointerId);
@@ -897,7 +896,7 @@ class VncPaneInstance implements PaneInstance {
             this.sendPointerEvent(this.pointerButtonMask, pendingTouch.lastPoint.x, pendingTouch.lastPoint.y);
         };
 
-        const finalizeDeferredTouch = (pointerId, point, options = {}) => {
+        const finalizeDeferredTouch = (pointerId, point, options: { clientX?: number; clientY?: number; cancelled?: boolean } = {}) => {
             const pendingTouch = pendingTouchByPointer.get(pointerId);
             if (!pendingTouch) return false;
             const fallbackPoint = point || pendingTouch.lastPoint || { x: 0, y: 0 };
@@ -1137,7 +1136,7 @@ class VncPaneInstance implements PaneInstance {
             }
             releaseAllPointers(point);
         };
-        const releaseFromWindowPointerEvent = (event, options = {}) => {
+        const releaseFromWindowPointerEvent = (event, options: { resetAll?: boolean } = {}) => {
             if (!pressedMaskByPointer.size && !this.pointerButtonMask && !pendingTouchByPointer.has(event?.pointerId)) return;
             if (!shouldReleaseVncPointerContact(event)) return;
             event?.preventDefault?.();

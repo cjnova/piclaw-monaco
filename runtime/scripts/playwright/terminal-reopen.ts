@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
-// @ts-nocheck
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 
 import { bootstrapE2EStorageState } from './web-auth-bootstrap.ts';
 
@@ -12,6 +11,29 @@ const DEFAULT_HEADLESS = process.env.PICLAW_E2E_HEADLESS !== '0';
 const DEFAULT_SLOW_MO = Number(process.env.PICLAW_E2E_SLOW_MO || 0);
 const DEFAULT_WAIT_MS = Number(process.env.PICLAW_E2E_WAIT_MS || 250);
 const DEFAULT_EXECUTABLE_PATH = process.env.PICLAW_PLAYWRIGHT_EXECUTABLE_PATH || '';
+
+type E2EEvent = Record<string, unknown> & { t?: number; type?: string };
+type TerminalDebugHost = Element & {
+  __terminal?: {
+    cols?: number;
+    rows?: number;
+    viewportY?: number;
+    currentTitle?: string;
+    __piclawSessionMeta?: unknown;
+    wasmTerm?: {
+      getLine?: (row: number) => Array<{ width?: number; codepoint?: number } | null> | null;
+    };
+  };
+};
+
+declare global {
+  interface Window {
+    __PICLAW_E2E__?: {
+      events: E2EEvent[];
+      snapshot?: () => unknown;
+    };
+  }
+}
 
 function parseArgs(argv: string[]) {
   const args = {
@@ -80,10 +102,10 @@ async function wait(ms: number) {
   await new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-async function installPageInstrumentation(page) {
+async function installPageInstrumentation(page: Page) {
   await page.addInitScript(() => {
     const target = (window.__PICLAW_E2E__ = window.__PICLAW_E2E__ || { events: [] });
-    const push = (type, extra = {}) => {
+    const push = (type: string, extra: Record<string, unknown> = {}) => {
       try {
         target.events.push({ t: Number(performance.now().toFixed(1)), type, ...extra });
       } catch (error) {
@@ -91,7 +113,7 @@ async function installPageInstrumentation(page) {
       }
     };
 
-    const summarize = (node) => ({
+    const summarize = (node: Element | null) => ({
       tag: node?.tagName || null,
       className: typeof node?.className === 'string' ? node.className : null,
       text: typeof node?.textContent === 'string' ? node.textContent.slice(0, 120) : null,
@@ -133,9 +155,10 @@ async function installPageInstrumentation(page) {
           parentClassName: canvas.parentElement?.className || '',
         }));
         const liveHost = document.querySelector('.terminal-live-host');
-        const terminalDebug = liveHost && liveHost.__terminal ? (() => {
+        const terminalHost = liveHost as TerminalDebugHost | null;
+        const terminalDebug = terminalHost?.__terminal ? (() => {
           try {
-            const term = liveHost.__terminal;
+            const term = terminalHost.__terminal!;
             const lines = [];
             const count = Math.min(8, term.rows || 0);
             for (let row = 0; row < count; row += 1) {
@@ -144,7 +167,7 @@ async function installPageInstrumentation(page) {
                 lines.push(null);
                 continue;
               }
-              const text = line.map((cell) => {
+              const text = line.map((cell: { width?: number; codepoint?: number } | null) => {
                 if (!cell || cell.width === 0) return '';
                 return String.fromCodePoint(cell.codepoint || 32);
               }).join('');
@@ -194,7 +217,7 @@ async function installPageInstrumentation(page) {
   });
 }
 
-async function capture(page, artifactDir: string, name: string, meta: Record<string, unknown> = {}) {
+async function capture(page: Page, artifactDir: string, name: string, meta: Record<string, unknown> = {}) {
   const screenshotPath = join(artifactDir, `${name}.png`);
   const jsonPath = join(artifactDir, `${name}.json`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -206,17 +229,17 @@ async function capture(page, artifactDir: string, name: string, meta: Record<str
   writeFileSync(jsonPath, JSON.stringify(snapshot, null, 2));
 }
 
-async function toggleTerminal(page) {
+async function toggleTerminal(page: Page) {
   await page.keyboard.press('Control+`');
 }
 
-async function openTerminal(page) {
+async function openTerminal(page: Page) {
   if (await page.locator('.terminal-live-host').count()) return;
   await toggleTerminal(page);
   await page.locator('.terminal-live-host').first().waitFor({ state: 'visible', timeout: 15000 });
 }
 
-async function closeTerminal(page) {
+async function closeTerminal(page: Page) {
   if (!(await page.locator('.terminal-live-host').count())) return;
   const closeButton = page.locator('button[aria-label="Hide terminal"]:visible').first();
   if (await closeButton.count()) {
@@ -227,7 +250,7 @@ async function closeTerminal(page) {
   await page.waitForFunction(() => document.querySelectorAll('.terminal-live-host').length === 0, undefined, { timeout: 15000 });
 }
 
-async function focusTerminal(page) {
+async function focusTerminal(page: Page) {
   const host = page.locator('.terminal-live-host').first();
   await host.click({ position: { x: 24, y: 24 } });
 }
@@ -241,9 +264,9 @@ async function main() {
 
   const consoleLines: string[] = [];
   const terminalNetwork: Array<Record<string, unknown>> = [];
-  let browser = null;
-  let context = null;
-  let page = null;
+  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
+  let page: Page | null = null;
 
   try {
     const storageState = await bootstrapE2EStorageState({

@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { Unzlib, zlibSync } from 'fflate';
 
@@ -18,7 +17,7 @@ function toEncodingValue(value) {
     return Number(value);
 }
 
-function normalizeEncodings(encodings) {
+function normalizeEncodings(encodings): number[] {
     const raw = Array.isArray(encodings)
         ? encodings
         : typeof encodings === 'string'
@@ -27,7 +26,7 @@ function normalizeEncodings(encodings) {
                 .map((item) => item.trim())
                 .filter((item) => item.length > 0)
             : [];
-    const values = [];
+    const values: number[] = [];
     const seen = new Set();
     for (const item of raw) {
         const value = toEncodingValue(item);
@@ -80,7 +79,7 @@ function createZrleInflater() {
             const chunks = [];
             const inflator = new Unzlib((chunk) => {
                 chunks.push(new Uint8Array(chunk));
-            });
+            }) as Unzlib & { err?: number; msg?: string };
             inflator.push(payload, true);
             if (inflator.err) {
                 throw new Error(inflator.msg || 'zlib decompression error');
@@ -559,7 +558,13 @@ export const DEFAULT_CLIENT_PIXEL_FORMAT: RemoteDisplayPixelFormat = {
 
 export class VncRemoteDisplayProtocol implements RemoteDisplayProtocolAdapter {
     readonly protocol = PROTOCOL;
-    constructor(options = {}) {
+    state: string;
+    framebufferWidth: number;
+    framebufferHeight: number;
+    serverName: string;
+    [key: string]: any;
+
+    constructor(options: Record<string, any> = {}) {
         this.shared = options.shared !== false;
         this.decodeRawRect = typeof options.decodeRawRect === 'function' ? options.decodeRawRect : decodeRawRectToRgba;
         this.pipeline = options.pipeline || null;
@@ -618,7 +623,7 @@ export class VncRemoteDisplayProtocol implements RemoteDisplayProtocolAdapter {
                 }
                 if (this.buffer.byteLength < 1 + count) break;
                 this.consume(1);
-                const types = Array.from(this.consume(count));
+                const types = Array.from(this.consume(count) as Uint8Array) as number[];
                 events.push({ type: 'security-types', protocol: PROTOCOL, types });
                 let selectedType = null;
                 if (types.includes(2) && this.password !== null) {

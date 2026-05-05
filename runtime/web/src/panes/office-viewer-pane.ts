@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * office-viewer-pane.ts — WebPaneExtension for viewing Office documents.
  *

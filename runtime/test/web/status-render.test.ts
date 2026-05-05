@@ -1,4 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { importFresh } from '../helpers.js';
 
@@ -131,6 +133,13 @@ afterEach(() => {
   (globalThis as any).window = originalWindow;
   (globalThis as any).document = originalDocument;
   (globalThis as any).Element = originalElement;
+});
+
+test('expanded thought panels keep a constrained scroll container', () => {
+  const css = readFileSync(join(import.meta.dir, '../../web/static/css/agent.css'), 'utf8');
+  expect(css).toContain('.agent-thinking[data-panel-key="thought"][data-expanded="true"] .agent-thinking-body-collapsible');
+  expect(css).toContain('overflow: hidden auto;');
+  expect(css).toContain('max-height: min(52vh, 34rem);');
 });
 
 test('AgentStatus can toggle between hidden and visible renders without hook-order failures', async () => {

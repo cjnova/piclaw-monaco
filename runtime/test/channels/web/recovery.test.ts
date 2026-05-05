@@ -42,6 +42,54 @@ describe("web recovery helpers", () => {
     expect(clearedInflight).toEqual(["web:inflight"]);
   });
 
+  test("recoverInflightRuns quarantines stale preflight markers instead of requeueing compaction", () => {
+    const clearedPreflight: string[] = [];
+    const quarantined: Array<{ chatJid: string; messageId: string; reason: string; backoffUntil?: string | null }> = [];
+
+    const ctx: WebRecoveryContext = {
+      assistantName: "Pi",
+      defaultAgentId: "default",
+      enqueue: async () => {},
+      processChat: async () => {},
+      now: () => new Date("2026-01-01T00:10:00Z").getTime(),
+    };
+
+    const store: WebRecoveryStore = {
+      getPreflightRuns: () => [{ chatJid: "web:preflight", prevTs: "t0", messageId: "m0", startedAt: "2026-01-01T00:00:00Z" }],
+      getInflightRuns: () => [],
+      transaction: (run) => run(),
+      getAgentReplyStateAfter: () => "none",
+      clearChatPreflight: (chatJid) => { clearedPreflight.push(chatJid); },
+      quarantineStalePreflightRun: (preflight, options) => {
+        quarantined.push({ chatJid: preflight.chatJid, messageId: preflight.messageId, reason: options.reason, backoffUntil: options.backoffUntil });
+        return {
+          chatJid: preflight.chatJid,
+          prevTs: preflight.prevTs,
+          failedTs: "2026-01-01T00:01:00Z",
+          messageId: preflight.messageId,
+          threadRootId: 1,
+          createdAt: options.createdAt,
+          reason: options.reason,
+        };
+      },
+      clearInflightMarker: () => {},
+      rollbackInflightRun: () => {},
+      getAllChatCursors: () => ({}),
+      getKnownChatJids: () => [],
+      getDeferredQueuedFollowups: () => [],
+      getMessagesSince: () => [],
+    };
+
+    recoverInflightRuns(ctx, store);
+
+    expect(clearedPreflight).toEqual([]);
+    expect(quarantined).toHaveLength(1);
+    expect(quarantined[0].chatJid).toBe("web:preflight");
+    expect(quarantined[0].messageId).toBe("m0");
+    expect(quarantined[0].reason).toContain("Stale preflight recovered after 600s");
+    expect(quarantined[0].backoffUntil).toBe("2026-01-01T04:10:00.000Z");
+  });
+
   test("recoverInflightRuns preserves terminal/partial output and marks no-output runs as interrupted without replay", async () => {
     const now = new Date("2026-01-01T00:05:00Z");
     const inflights = [
