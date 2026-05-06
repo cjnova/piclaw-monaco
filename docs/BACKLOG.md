@@ -1,7 +1,8 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-05
-Total open issues: 20
+Updated: 2026-05-06
+Total open issues: 15
+Upstream synced: v2.2.2 (Lothlórien)
 
 ## Vision
 
@@ -269,9 +270,9 @@ Technical debt cleanup. Each PR includes regression tests.
 | #272 | Session pill | ⏳ |
 | #267 | Image paste | ✅ |
 | #268 | File drag & drop | ✅ |
-| #269 | Workspace file attach | ⏳ |
-| #270 | Steer | ⏳ |
-| #271 | Queued followups | ⏳ |
+| #269 | Workspace file attach | ✅ |
+| #270 | Steer | ✅ |
+| #271 | Queued followups | ✅ |
 
 ### Wave 11 — Full Functionality (after UX polish)
 
@@ -281,7 +282,12 @@ Technical debt cleanup. Each PR includes regression tests.
 | 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ✅ |
 | widget pane not opening | Bug (#264) | ⏳ |
 | #278 | Attachment preview lightbox → Wave 11 | ⏳ |
-| full-compose-bar-redesign | Full compose bar redesign — send/stop, attachments, paste images, workspace file attach, queue, steer button (depends on #230) | ⏳ |
+| #141 | Full compose bar redesign | ✅ closed (all sub-features complete) |
+| #269 | Workspace file attach | ✅ |
+| #270 | Steer | ✅ |
+| #271 | Queued followups | ✅ |
+| #272 | Session pill | ⏳ |
+| #296 | CLS column-reverse fix | ✅ |
 | central-pane-tab-bar | Chat / Dashboards / Terminal tabs (#89) | ⏳ |
 | #279 | File preview button alignment → Wave 10e or cleanup | ⏳ |
 | 024-task-terminal-tabs | Multi-tab terminal (#150) | ⏳ |
@@ -303,8 +309,10 @@ Technical debt cleanup. Each PR includes regression tests.
 | LCP: Purge unused CSS | #134 | ❌ closed / won't do |
 | LCP: Preload critical UI fonts | #135 | ✅ closed (no benefit on HTTP/1.1) |
 | LCP: Enable gzip/brotli compression | #136 | ✅ (coming from upstream sync) |
-| CLS: Improve layout stability | #283 | ⏳ |
-| Extract rgba CSS variables | #251 | ⏳ |
+| #283 | CLS: Improve layout stability | ✅ closed (#296 column-reverse fix) |
+| #251 | Extract rgba CSS variables | ✅ |
+| #292 | Upstream sync v2.2.1 | ✅ |
+| #300 | Upstream sync v2.2.2 | ✅ |
 | Virtualize chat timeline | #184 | ⏳ |
 
 ### Wave 13 — A11y & Polish
@@ -313,9 +321,9 @@ Technical debt cleanup. Each PR includes regression tests.
 |---|---|---|
 | Replace custom click targets with semantic controls | #170 | ⏳ |
 | Associate labels with inputs | #171 | ⏳ |
-| Mobile breakpoints | #185 | ⏳ |
-| SEO metadata | #186 | ⏳ |
-| Browser compat fallbacks | #187 | ⏳ |
+| #185 | Mobile responsive UI | ✅ |
+| #186 | SEO metadata | ✅ closed (no benefit for private app) |
+| #187 | Browser compat fallbacks | ✅ closed (no benefit on HTTP/1.1) |
 
 ### Unscheduled
 
