@@ -16,6 +16,8 @@ interface SearchResponse {
   items?: SearchResult[];
 }
 
+type SearchScope = "current" | "root" | "all";
+
 function formatTime(ts: string | undefined): string {
   if (!ts) return "";
   try {
@@ -46,11 +48,14 @@ export function SearchPanel() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [scope, setScope] = useState<SearchScope>("all");
+  const [filterImages, setFilterImages] = useState(false);
+  const [filterAttachments, setFilterAttachments] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const doSearch = useCallback(async (q: string) => {
-    if (!q.trim()) {
+  const doSearch = useCallback(async (q: string, s: SearchScope, images: boolean, attachments: boolean) => {
+    if (!q.trim() && !images && !attachments) {
       setResults([]);
       setStatus("idle");
       return;
@@ -64,8 +69,16 @@ export function SearchPanel() {
 
     setStatus("loading");
     try {
-      const url = `/search?q=${encodeURIComponent(q)}&limit=50&offset=0&scope=all`;
-      const res = await fetch(url, {
+      const params = new URLSearchParams({
+        limit: "50",
+        offset: "0",
+        scope: s,
+      });
+      if (q.trim()) params.set("q", q.trim());
+      if (images) params.set("images", "1");
+      if (attachments) params.set("attachments", "1");
+
+      const res = await fetch(`/search?${params.toString()}`, {
         credentials: "same-origin",
         signal: controller.signal,
       });
@@ -81,14 +94,26 @@ export function SearchPanel() {
     }
   }, []);
 
+  const triggerSearch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      doSearch(query, scope, filterImages, filterAttachments);
+    }, 300);
+  }, [query, scope, filterImages, filterAttachments, doSearch]);
+
   const handleInput = (e: Event) => {
     const val = (e.target as HTMLInputElement).value;
     setQuery(val);
+  };
+
+  // Re-search when query or filters change
+  useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      doSearch(val);
+      doSearch(query, scope, filterImages, filterAttachments);
     }, 300);
-  };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, scope, filterImages, filterAttachments, doSearch]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -99,10 +124,10 @@ export function SearchPanel() {
   }, []);
 
   const renderBody = () => {
-    if (!query.trim()) {
+    if (!query.trim() && !filterImages && !filterAttachments) {
       return (
         <div className="search-panel__empty">
-          Type to search messages
+          Type to search or select a filter
         </div>
       );
     }
@@ -138,8 +163,9 @@ export function SearchPanel() {
             role="button"
             onClick={() => {
               window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } }));
+              window.dispatchEvent(new CustomEvent("piclaw:close-sidebar"));
             }}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } })); } }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.dispatchEvent(new CustomEvent("piclaw:scroll-to-message", { detail: { id: r.id } })); window.dispatchEvent(new CustomEvent("piclaw:close-sidebar")); } }}
           >
             <div className="search-panel__item-header">
               <span className="search-panel__item-type">{((r as unknown as Record<string, unknown>).data as Record<string, unknown>)?.type === "user_message" ? "You" : "Agent"}</span>
@@ -168,6 +194,36 @@ export function SearchPanel() {
           autocomplete="off"
         />
       </div>
+
+      {/* Filter bar */}
+      <div className="search-panel__filters">
+        <select
+          className="search-panel__scope-select"
+          value={scope}
+          onChange={(e) => setScope((e.target as HTMLSelectElement).value as SearchScope)}
+        >
+          <option value="current">Current chat</option>
+          <option value="root">Branch family</option>
+          <option value="all">All chats</option>
+        </select>
+        <label className="search-panel__filter-toggle">
+          <input
+            type="checkbox"
+            checked={filterImages}
+            onChange={(e) => setFilterImages((e.target as HTMLInputElement).checked)}
+          />
+          <span>Images</span>
+        </label>
+        <label className="search-panel__filter-toggle">
+          <input
+            type="checkbox"
+            checked={filterAttachments}
+            onChange={(e) => setFilterAttachments((e.target as HTMLInputElement).checked)}
+          />
+          <span>Files</span>
+        </label>
+      </div>
+
       {renderBody()}
     </div>
   );

@@ -98,6 +98,13 @@ function AppContent() {
     return () => window.removeEventListener('piclaw:open-page', onOpenPage);
   }, [handlePageSelect]);
 
+  // Close sidebar on search result click (mobile UX)
+  useEffect(() => {
+    const onClose = () => { sidebarCollapsed.value = true; };
+    window.addEventListener('piclaw:close-sidebar', onClose);
+    return () => window.removeEventListener('piclaw:close-sidebar', onClose);
+  }, [sidebarCollapsed]);
+
   const connected = connectionStatus.value === "connected";
   const isExtensionPageOpen = (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value;
 

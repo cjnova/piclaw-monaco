@@ -74,9 +74,12 @@ export function useScrollManager(
 
       // Not in DOM — load messages around this ID
       try {
+        // Backend supports 'before' (loads messages with rowid < value)
+        // To get messages around target, use before = id + 26 (gets 50 msgs before that point)
+        const beforeId = Number(id) + 26;
         const res = await fetch(
           buildChatUrl("/timeline", {
-            around_row: String(id),
+            before: String(beforeId),
             limit: "50",
           }),
           { credentials: "include" }

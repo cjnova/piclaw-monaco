@@ -1,3 +1,4 @@
+// FORK-MODIFIED: cjnova/piclaw-monaco — added filter-only search (no query, media filters only)
 /**
  * web/timeline-service.ts – Timeline data access for the web UI.
  *
@@ -22,6 +23,19 @@ import {
 } from "../../db.js";
 
 import type { InteractionRow } from "../../db/types.js";
+
+/** Get recent messages for filter-only search (no FTS query needed). */
+function getRecentMessagesForFilter(
+  chatJid: string,
+  scope: SearchScope,
+  _rootChatJid: string | null | undefined,
+  limit: number,
+  _offset: number,
+): InteractionRow[] {
+  // For filter-only searches, get recent messages from timeline
+  // The media filter is applied afterwards in the caller
+  return getTimeline(chatJid, limit, undefined);
+}
 
 const QUEUE_PLACEHOLDER_MARKER = "\u2063";
 const LEGACY_QUEUE_STATUS = "Queued as a follow-up (one-at-a-time).";
@@ -124,12 +138,17 @@ export function getSearchResponse(
   rootChatJid?: string | null,
   filters?: { images?: boolean; attachments?: boolean } | null,
 ): { status: number; body: unknown } {
-  if (!query) return { status: 400, body: { error: "Missing 'q' parameter" } };
+  // Allow filter-only searches (no text query but media filters active)
+  const hasFilters = filters?.images || filters?.attachments;
+  if (!query && !hasFilters) return { status: 400, body: { error: "Missing 'q' parameter" } };
 
   const effectiveRootChatJid = scope === "root" ? resolveSearchRootChatJid(chatJid, rootChatJid) : null;
 
   let results;
-  if (scope === "all") {
+  if (!query && hasFilters) {
+    // Filter-only: get recent messages without FTS, then apply media filter
+    results = getRecentMessagesForFilter(chatJid, scope, effectiveRootChatJid, limit * 5, offset);
+  } else if (scope === "all") {
     results = searchMessagesAcrossChats(null, query, limit, offset);
   } else if (scope === "root") {
     const branchChatJids = Array.from(new Set(listChatBranches(effectiveRootChatJid).map((branch) => branch.chat_jid)));

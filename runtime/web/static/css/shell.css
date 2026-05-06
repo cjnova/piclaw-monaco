@@ -2420,6 +2420,49 @@ body {
   color: var(--text-muted);
 }
 
+.search-panel__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.search-panel__scope-select {
+  background: var(--overlay-white-05);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+}
+.search-panel__scope-select:focus {
+  border-color: var(--accent);
+}
+
+.search-panel__filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.search-panel__filter-toggle input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.search-panel__filter-toggle:hover {
+  color: var(--text);
+}
+
 .search-panel__results {
   list-style: none;
   margin: 0;
