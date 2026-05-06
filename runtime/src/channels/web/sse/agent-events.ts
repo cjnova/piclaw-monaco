@@ -87,6 +87,44 @@ function truncateErrorDetail(msg: string, maxLen = 120): string {
   return s.length <= maxLen ? s : s.slice(0, maxLen) + "…";
 }
 
+const TOOL_OUTPUT_STATUS_PREVIEW_BYTES = 12 * 1024;
+const TOOL_OUTPUT_STATUS_PREVIEW_LINES = 80;
+
+function readToolOutputText(result: unknown): string {
+  const record = readJsonRecord(result);
+  const content = Array.isArray(record?.content) ? record.content : [];
+  return content
+    .map((block) => {
+      const item = readJsonRecord(block);
+      return item?.type === "text" && typeof item.text === "string" ? item.text : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildToolOutputStatusPreview(result: unknown): Record<string, unknown> {
+  const text = readToolOutputText(result).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!text) return {};
+
+  const allLines = text.split("\n");
+  const lineTrimmed = allLines.length > TOOL_OUTPUT_STATUS_PREVIEW_LINES;
+  const lineWindow = lineTrimmed ? allLines.slice(-TOOL_OUTPUT_STATUS_PREVIEW_LINES).join("\n") : text;
+  const buffer = Buffer.from(lineWindow, "utf8");
+  const byteTrimmed = buffer.length > TOOL_OUTPUT_STATUS_PREVIEW_BYTES;
+  const preview = byteTrimmed
+    ? buffer.subarray(buffer.length - TOOL_OUTPUT_STATUS_PREVIEW_BYTES).toString("utf8")
+    : lineWindow;
+  const details = readJsonRecord(result)?.details as Record<string, unknown> | undefined;
+
+  return {
+    output_preview: preview,
+    output_total_lines: allLines.length,
+    output_preview_lines: preview ? preview.split("\n").length : 0,
+    output_truncated: lineTrimmed || byteTrimmed || Boolean(details?.truncation),
+    ...(typeof details?.fullOutputPath === "string" ? { full_output_path: details.fullOutputPath } : {}),
+  };
+}
+
 function buildGeneratedWidgetPayload(
   args: unknown,
   base: Record<string, unknown>,
@@ -449,13 +487,15 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
     if (event.type === "tool_execution_update") {
       const title = lookup(event.toolCallId, event.toolName, event.args);
       toolExecutionContext.set(event.toolCallId, { toolName: event.toolName, args: event.args });
+      const outputPreview = buildToolOutputStatusPreview((event as { partialResult?: unknown }).partialResult);
       options.emitter.status({
         ...base,
         type: "tool_status",
         title,
-        status: "Working...",
+        status: Object.keys(outputPreview).length > 0 ? "Streaming output..." : "Working...",
         tool_name: event.toolName,
         tool_args: event.args,
+        ...outputPreview,
       });
     }
 

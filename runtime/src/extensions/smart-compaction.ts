@@ -69,6 +69,62 @@ const USER_PREVIEW_MAX_CHARS = 300;
 /** Minimum acceptable summary length (chars). */
 const MIN_SUMMARY_CHARS = 100;
 
+/** Conservative fallback context window for models that do not publish one. */
+const PROGRESSIVE_FALLBACK_CONTEXT_WINDOW = 64_000;
+
+/** Reserve this much of the model context for system prompt, instructions, and output. */
+const PROGRESSIVE_INPUT_CONTEXT_FRACTION = 0.42;
+
+/** Keep chunk prompts smaller than final merge prompts; smaller models need room to answer. */
+const PROGRESSIVE_CHUNK_FRACTION = 0.72;
+
+// ---------------------------------------------------------------------------
+// Live context usage estimates
+// ---------------------------------------------------------------------------
+
+type SmartCompactionUiContext = {
+  ui: {
+    setStatus?: (key: string, text: string | undefined) => void;
+  };
+  model?: { contextWindow?: number; contextLength?: number } | null;
+};
+
+function getContextWindowEstimate(ctx: SmartCompactionUiContext): number | null {
+  const model = ctx.model ?? null;
+  const raw = typeof model?.contextWindow === "number"
+    ? model.contextWindow
+    : typeof model?.contextLength === "number"
+      ? model.contextLength
+      : null;
+  return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : null;
+}
+
+function estimateTokensFromChars(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function publishContextEstimate(
+  ctx: SmartCompactionUiContext,
+  tokens: number | null,
+  phase: string,
+): void {
+  if (typeof ctx.ui.setStatus !== "function") return;
+  const contextWindow = getContextWindowEstimate(ctx);
+  if (!contextWindow) return;
+  const normalizedTokens = typeof tokens === "number" && Number.isFinite(tokens) && tokens >= 0
+    ? Math.round(tokens)
+    : null;
+  const percent = normalizedTokens == null ? null : (normalizedTokens / contextWindow) * 100;
+  ctx.ui.setStatus("context_usage", JSON.stringify({
+    tokens: normalizedTokens,
+    contextWindow,
+    percent,
+    estimated: true,
+    source: "smart_compaction",
+    phase,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -983,6 +1039,373 @@ function buildSelectivePrompt(
 }
 
 // ---------------------------------------------------------------------------
+// Progressive iterative compaction
+// ---------------------------------------------------------------------------
+
+export interface ProgressiveCompactionBudget {
+  contextWindow: number;
+  promptBudgetChars: number;
+  chunkBudgetChars: number;
+  mergeBudgetChars: number;
+  forceProgressive: boolean;
+}
+
+export interface ProgressiveCompactionChunk {
+  index: number;
+  startMessageIndex: number;
+  endMessageIndex: number;
+  text: string;
+  estimatedChars: number;
+}
+
+function parsePositiveEnvInt(name: string): number | null {
+  const parsed = Number.parseInt(String(process.env[name] || "").trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function getProgressiveCompactionBudget(model: unknown): ProgressiveCompactionBudget {
+  const anyModel = model as { contextWindow?: number; contextLength?: number } | null | undefined;
+  const reported = typeof anyModel?.contextWindow === "number" && Number.isFinite(anyModel.contextWindow) && anyModel.contextWindow > 0
+    ? anyModel.contextWindow
+    : typeof anyModel?.contextLength === "number" && Number.isFinite(anyModel.contextLength) && anyModel.contextLength > 0
+      ? anyModel.contextLength
+      : PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
+  const contextWindow = Math.max(8_000, Math.trunc(reported));
+  const envBudget = parsePositiveEnvInt("PICLAW_PROGRESSIVE_COMPACTION_PROMPT_CHARS");
+  const promptBudgetChars = envBudget ?? Math.max(10_000, Math.min(MAX_PROMPT_CHARS, Math.floor(contextWindow * 4 * PROGRESSIVE_INPUT_CONTEXT_FRACTION)));
+  const chunkBudgetChars = Math.max(6_000, Math.floor(promptBudgetChars * PROGRESSIVE_CHUNK_FRACTION));
+  const mergeBudgetChars = Math.max(8_000, promptBudgetChars);
+  return {
+    contextWindow,
+    promptBudgetChars,
+    chunkBudgetChars,
+    mergeBudgetChars,
+    forceProgressive: process.env.PICLAW_PROGRESSIVE_COMPACTION === "1",
+  };
+}
+
+function serializeProgressiveSourceLines(
+  messages: Message[],
+  humanUserIndexes?: Set<number>,
+): Array<{ startMessageIndex: number; endMessageIndex: number; text: string }> {
+  const lines: Array<{ startMessageIndex: number; endMessageIndex: number; text: string }> = [];
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role === "assistant" && Array.isArray((msg as any).content)) {
+      const hasToolCalls = ((msg as any).content as any[]).some((b: any) => b?.type === "toolCall");
+      if (hasToolCalls) {
+        const resultIdx = i + 1 < messages.length && messages[i + 1].role === "toolResult" ? i + 1 : null;
+        const compact = serializeToolCompact(msg, resultIdx !== null ? messages[resultIdx] : null, i);
+        if (compact) {
+          lines.push({
+            startMessageIndex: i,
+            endMessageIndex: resultIdx ?? i,
+            text: compact,
+          });
+          if (resultIdx !== null) i = resultIdx;
+          continue;
+        }
+      }
+    }
+    const text = serializeMessage(msg, i, humanUserIndexes);
+    if (text) lines.push({ startMessageIndex: i, endMessageIndex: i, text });
+  }
+  return lines;
+}
+
+export function buildProgressiveCompactionChunks(
+  messages: Message[],
+  budgetChars: number,
+  humanUserIndexes?: Set<number>,
+): ProgressiveCompactionChunk[] {
+  const sourceLines = serializeProgressiveSourceLines(messages, humanUserIndexes);
+  const chunks: ProgressiveCompactionChunk[] = [];
+  let current: string[] = [];
+  let startMessageIndex = sourceLines[0]?.startMessageIndex ?? 0;
+  let endMessageIndex = sourceLines[0]?.endMessageIndex ?? 0;
+  let chars = 0;
+
+  const flush = () => {
+    if (current.length === 0) return;
+    const text = current.join("\n");
+    chunks.push({
+      index: chunks.length + 1,
+      startMessageIndex,
+      endMessageIndex,
+      text,
+      estimatedChars: text.length,
+    });
+    current = [];
+    chars = 0;
+  };
+
+  for (const line of sourceLines) {
+    const nextChars = line.text.length + (current.length > 0 ? 1 : 0);
+    if (current.length > 0 && chars + nextChars > budgetChars) {
+      flush();
+      startMessageIndex = line.startMessageIndex;
+    } else if (current.length === 0) {
+      startMessageIndex = line.startMessageIndex;
+    }
+    current.push(line.text);
+    chars += nextChars;
+    endMessageIndex = line.endMessageIndex;
+  }
+  flush();
+  return chunks;
+}
+
+function buildChunkSummaryPrompt(chunk: ProgressiveCompactionChunk, totalChunks: number): string {
+  return `You are summarizing one deterministic chunk of a longer conversation for progressive compaction.
+
+Chunk: ${chunk.index}/${totalChunks}
+Message index range: ${chunk.startMessageIndex}-${chunk.endMessageIndex}
+
+Preserve facts in this structured intermediate form:
+
+## Chunk Range
+- ${chunk.startMessageIndex}-${chunk.endMessageIndex}
+
+## Goals / User Intent
+- ...
+
+## Constraints & Preferences
+- ...
+
+## Decisions
+- ...
+
+## Files / Commands / Tool Outcomes
+- ...
+
+## Progress
+- Done: ...
+- In progress: ...
+- Blocked: ...
+
+## Open Questions / Next Steps
+- ...
+
+## Key Continuity Facts
+- ...
+
+Rules:
+- Do not invent completion. If uncertain, say so.
+- Preserve exact file paths, commands, function names, issue numbers, PR numbers, errors, and user corrections.
+- Keep ordering-sensitive facts tied to the chunk range.
+
+<chunk>
+${chunk.text}
+</chunk>`;
+}
+
+function buildMergePrompt(input: {
+  summaries: string[];
+  rangeLabel: string;
+  final: boolean;
+  previousSummary?: string;
+  keptMessagesSummary?: string;
+  turnPrefixSummary?: string;
+  customInstructions?: string;
+  fileOps?: FileOperations;
+}): string {
+  const sections: string[] = [];
+  sections.push(input.final
+    ? "Merge these ordered intermediate compaction summaries into the final continuity state."
+    : "Merge these ordered intermediate compaction summaries into a smaller intermediate summary.");
+  sections.push(`Range: ${input.rangeLabel}`);
+  sections.push("\nRules:");
+  sections.push("- Preserve goals, constraints, decisions, files, commands, open questions, user preferences, and current next steps.");
+  sections.push("- Preserve exact paths, issue/PR numbers, commands, function names, and errors.");
+  sections.push("- Preserve chronological ordering where it matters; newest active work wins over stale background work.");
+  sections.push("- Do not drop user corrections or reported failures.");
+  if (input.previousSummary) {
+    sections.push("\n## Previous Summary To Update");
+    sections.push(input.previousSummary);
+  }
+  if (input.keptMessagesSummary) {
+    sections.push("\n## Kept Messages That Survive Compaction (current work)");
+    sections.push(input.keptMessagesSummary);
+  }
+  if (input.turnPrefixSummary) {
+    sections.push("\n## Split Turn Prefix Context");
+    sections.push(input.turnPrefixSummary);
+  }
+  if (input.customInstructions?.trim()) {
+    sections.push("\n## User Compaction Note");
+    sections.push(input.customInstructions.trim());
+  }
+  sections.push("\n## Ordered Intermediate Summaries");
+  input.summaries.forEach((summary, idx) => {
+    sections.push(`\n<summary index="${idx + 1}">\n${summary}\n</summary>`);
+  });
+  if (input.final) {
+    const files = input.fileOps ? fileListsFromOps(input.fileOps) : { readFiles: [], modifiedFiles: [] };
+    sections.push("\nOutput this exact final format:");
+    sections.push(SYSTEM_PROMPT.replace(/^You are[\s\S]*?Use this EXACT format:\n\n/, ""));
+    sections.push("\nFile facts from deterministic tool analysis:");
+    sections.push(`Modified files:\n${files.modifiedFiles.length ? compressFilePaths(files.modifiedFiles) : "- (none)"}`);
+    sections.push(`Read files:\n${files.readFiles.length ? compressFilePaths(files.readFiles) : "- (none)"}`);
+  } else {
+    sections.push("\nReturn a concise structured intermediate summary with the same headings as the chunk summaries.");
+  }
+  return sections.join("\n");
+}
+
+async function completeCompactionPrompt(
+  model: any,
+  auth: { apiKey?: string; headers?: Record<string, string> },
+  promptText: string,
+  maxTokens: number,
+  abortSignal: AbortSignal,
+): Promise<string> {
+  if (abortSignal.aborted) throw new Error("Compaction cancelled");
+  const response = await completeSimple(
+    model,
+    {
+      systemPrompt: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: [{ type: "text", text: promptText }], timestamp: Date.now() }],
+    },
+    (model as any).reasoning
+      ? { maxTokens, signal: abortSignal, apiKey: auth.apiKey, headers: auth.headers, reasoning: "high" as const }
+      : { maxTokens, signal: abortSignal, apiKey: auth.apiKey, headers: auth.headers },
+  );
+  if ((response as any).stopReason === "error") {
+    throw new Error((response as any).errorMessage || "Progressive compaction LLM error");
+  }
+  const summary = response.content
+    .filter((c: any) => c.type === "text")
+    .map((c: any) => c.text)
+    .join("\n")
+    .trim();
+  if (summary.length < MIN_SUMMARY_CHARS) {
+    throw new Error("Progressive compaction summary too short");
+  }
+  if (abortSignal.aborted) throw new Error("Compaction cancelled");
+  return summary;
+}
+
+async function mergeProgressiveSummaries(input: {
+  summaries: string[];
+  model: any;
+  auth: { apiKey?: string; headers?: Record<string, string> };
+  budget: ProgressiveCompactionBudget;
+  maxTokens: number;
+  abortSignal: AbortSignal;
+  ctx: { ui: { setWorkingMessage?: (msg?: string) => void; notify?: (msg: string, level?: "info" | "warning" | "error") => void } };
+  finalPromptExtras: Omit<Parameters<typeof buildMergePrompt>[0], "summaries" | "rangeLabel" | "final">;
+}): Promise<string> {
+  let summaries = input.summaries;
+  let pass = 1;
+  while (summaries.join("\n\n").length > input.budget.mergeBudgetChars && summaries.length > 1) {
+    const next: string[] = [];
+    let batch: string[] = [];
+    let chars = 0;
+    for (const summary of summaries) {
+      const nextChars = summary.length + 2;
+      if (batch.length > 0 && chars + nextChars > input.budget.mergeBudgetChars) {
+        input.ctx.ui.setWorkingMessage?.(`Smart compaction: merging pass ${pass}, batch ${next.length + 1}…`);
+        next.push(await completeCompactionPrompt(
+          input.model,
+          input.auth,
+          buildMergePrompt({ summaries: batch, rangeLabel: `merge-pass-${pass}`, final: false }),
+          input.maxTokens,
+          input.abortSignal,
+        ));
+        batch = [];
+        chars = 0;
+      }
+      batch.push(summary);
+      chars += nextChars;
+    }
+    if (batch.length > 0) {
+      input.ctx.ui.setWorkingMessage?.(`Smart compaction: merging pass ${pass}, batch ${next.length + 1}…`);
+      next.push(await completeCompactionPrompt(
+        input.model,
+        input.auth,
+        buildMergePrompt({ summaries: batch, rangeLabel: `merge-pass-${pass}`, final: false }),
+        input.maxTokens,
+        input.abortSignal,
+      ));
+    }
+    input.ctx.ui.notify?.(`Progressive compaction: merge pass ${pass} reduced ${summaries.length} → ${next.length} summaries`, "info");
+    summaries = next;
+    pass += 1;
+  }
+
+  input.ctx.ui.setWorkingMessage?.("Smart compaction: final progressive merge…");
+  return await completeCompactionPrompt(
+    input.model,
+    input.auth,
+    buildMergePrompt({
+      summaries,
+      rangeLabel: "final",
+      final: true,
+      ...input.finalPromptExtras,
+    }),
+    input.maxTokens,
+    input.abortSignal,
+  );
+}
+
+async function runProgressiveCompaction(input: {
+  llmMessages: Message[];
+  humanUserIndexes: Set<number>;
+  model: any;
+  auth: { apiKey?: string; headers?: Record<string, string> };
+  settings: { reserveTokens: number };
+  previousSummary?: string;
+  keptMessagesSummary?: string;
+  turnPrefixSummary?: string;
+  customInstructions?: string;
+  fileOps: FileOperations;
+  budget: ProgressiveCompactionBudget;
+  abortSignal: AbortSignal;
+  ctx: { ui: { setWorkingMessage?: (msg?: string) => void; notify?: (msg: string, level?: "info" | "warning" | "error") => void } };
+}): Promise<string> {
+  const chunks = buildProgressiveCompactionChunks(
+    input.llmMessages,
+    input.budget.chunkBudgetChars,
+    input.humanUserIndexes,
+  );
+  const maxTokens = Math.floor(0.8 * input.settings.reserveTokens);
+  input.ctx.ui.notify?.(
+    `Progressive compaction: ${input.llmMessages.length} messages → ${chunks.length} chunks (budget ${Math.round(input.budget.chunkBudgetChars / 1000)}k chars/chunk)`,
+    "info",
+  );
+
+  const chunkSummaries: string[] = [];
+  for (const chunk of chunks) {
+    input.ctx.ui.setWorkingMessage?.(`Smart compaction: summarizing chunk ${chunk.index}/${chunks.length}…`);
+    chunkSummaries.push(await completeCompactionPrompt(
+      input.model,
+      input.auth,
+      buildChunkSummaryPrompt(chunk, chunks.length),
+      maxTokens,
+      input.abortSignal,
+    ));
+    input.ctx.ui.notify?.(`Progressive compaction: chunk ${chunk.index}/${chunks.length} summarized`, "info");
+  }
+
+  return await mergeProgressiveSummaries({
+    summaries: chunkSummaries,
+    model: input.model,
+    auth: input.auth,
+    budget: input.budget,
+    maxTokens,
+    abortSignal: input.abortSignal,
+    ctx: input.ctx,
+    finalPromptExtras: {
+      previousSummary: input.previousSummary,
+      keptMessagesSummary: input.keptMessagesSummary,
+      turnPrefixSummary: input.turnPrefixSummary,
+      customInstructions: input.customInstructions,
+      fileOps: input.fileOps,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // No-op detection
 // ---------------------------------------------------------------------------
 
@@ -1353,6 +1776,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
 
     ctx.ui.setWorkingIndicator({ frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"], intervalMs: 90 });
     ctx.ui.setWorkingMessage(`Smart compaction: scanning ${messagesToSummarize.length} messages…`);
+    publishContextEstimate(ctx, tokensBefore, "scanning");
 
     try {
       // Capture the signal reference from the event. The upstream
@@ -1417,12 +1841,16 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         },
         ctx,
       );
-      if (noOpResult) return noOpResult;
+      if (noOpResult) {
+        publishContextEstimate(ctx, estimateTokensFromChars(noOpResult.compaction.summary) + Math.max(0, Number(settings.keepRecentTokens) || 0), "completed_estimate");
+        return noOpResult;
+      }
 
       // Short conversations → built-in full-pass is fine
       if (messagesToSummarize.length < SELECTIVE_THRESHOLD) return;
 
       ctx.ui.setWorkingMessage(`Smart compaction: extracting signal from ${messagesToSummarize.length} messages…`);
+      publishContextEstimate(ctx, tokensBefore, "extracting");
       ctx.ui.notify(
         `Smart compaction: ${messagesToSummarize.length} msgs → selective extraction`,
         "info",
@@ -1440,6 +1868,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         `Prompt: ${Math.round(promptText.length / 1000)}k chars (vs ~${Math.round(tokensBefore / 1000)}k tokens full)`,
         "info",
       );
+      publishContextEstimate(ctx, estimateTokensFromChars(promptText), "summarizing_prompt");
 
       // Model — use the session's own model (already session-scoped)
       const model = ctx.model;
@@ -1453,6 +1882,53 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         return;
       }
 
+      const budget = getProgressiveCompactionBudget(model);
+      if (budget.forceProgressive || promptText.length > budget.promptBudgetChars) {
+        try {
+          ctx.ui.setWorkingMessage("Smart compaction: progressive iterative mode…");
+          ctx.ui.notify(
+            `Progressive compaction enabled: prompt ${Math.round(promptText.length / 1000)}k chars exceeds ${Math.round(budget.promptBudgetChars / 1000)}k budget for ${budget.contextWindow.toLocaleString()} context`,
+            "info",
+          );
+          const progressiveSummary = await runProgressiveCompaction({
+            llmMessages,
+            humanUserIndexes,
+            model,
+            auth,
+            settings,
+            previousSummary,
+            keptMessagesSummary,
+            turnPrefixSummary,
+            customInstructions,
+            fileOps: preparation.fileOps,
+            budget,
+            abortSignal,
+            ctx,
+          });
+          const fullSummary = progressiveSummary.includes("<read-files>") || progressiveSummary.includes("<modified-files>")
+            ? progressiveSummary
+            : appendFileLists(progressiveSummary, preparation.fileOps);
+          publishContextEstimate(
+            ctx,
+            estimateTokensFromChars(fullSummary) + Math.max(0, Number(settings.keepRecentTokens) || 0),
+            "completed_estimate",
+          );
+          ctx.ui.notify("Progressive compaction complete ✓", "info");
+          return {
+            compaction: {
+              summary: fullSummary,
+              firstKeptEntryId,
+              tokensBefore,
+            } satisfies CompactionResult,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (abortSignal.aborted || /Compaction cancelled/i.test(msg)) return { cancel: true };
+          ctx.ui.notify(`Progressive compaction error: ${msg}; not falling back to single-pass because the prompt already exceeds this model's compaction budget`, "warning");
+          return { cancel: true };
+        }
+      }
+
       const messages: Message[] = [
         {
           role: "user",
@@ -1462,12 +1938,14 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
       ];
 
       const maxTokens = Math.floor(0.8 * settings.reserveTokens);
+      const authForCompletion = auth as { apiKey?: string; headers?: Record<string, string> };
       const completionOptions = (model as any).reasoning
-        ? { maxTokens, signal: abortSignal, apiKey: auth.apiKey, reasoning: "high" as const }
-        : { maxTokens, signal: abortSignal, apiKey: auth.apiKey };
+        ? { maxTokens, signal: abortSignal, apiKey: authForCompletion.apiKey, headers: authForCompletion.headers, reasoning: "high" as const }
+        : { maxTokens, signal: abortSignal, apiKey: authForCompletion.apiKey, headers: authForCompletion.headers };
 
       try {
         ctx.ui.setWorkingMessage("Smart compaction: generating selective summary…");
+        publishContextEstimate(ctx, estimateTokensFromChars(promptText), "generating_summary");
         const response = await completeSimple(
           model,
           { systemPrompt: SYSTEM_PROMPT, messages },
@@ -1519,6 +1997,11 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
           if (parts.length) fullSummary += "\n" + parts.join("\n");
         }
 
+        publishContextEstimate(
+          ctx,
+          estimateTokensFromChars(fullSummary) + Math.max(0, Number(settings.keepRecentTokens) || 0),
+          "completed_estimate",
+        );
         ctx.ui.notify("Smart compaction complete ✓", "info");
 
         return {

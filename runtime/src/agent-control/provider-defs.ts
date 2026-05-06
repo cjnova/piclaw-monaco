@@ -56,6 +56,10 @@ const API_KEY_HINTS: Record<string, string> = {
   openrouter: "sk-or-...",
   "vercel-ai-gateway": "...",
   xai: "xai-...",
+  xiaomi: "XIAOMI_API_KEY",
+  "xiaomi-token-plan-cn": "XIAOMI_TOKEN_PLAN_CN_API_KEY",
+  "xiaomi-token-plan-ams": "XIAOMI_TOKEN_PLAN_AMS_API_KEY",
+  "xiaomi-token-plan-sgp": "XIAOMI_TOKEN_PLAN_SGP_API_KEY",
   zai: "...",
 };
 
@@ -86,12 +90,20 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   openrouter: "OpenRouter",
   "vercel-ai-gateway": "Vercel AI Gateway",
   xai: "xAI",
+  xiaomi: "Xiaomi MiMo (API billing)",
+  "xiaomi-token-plan-cn": "Xiaomi MiMo Token Plan (CN)",
+  "xiaomi-token-plan-ams": "Xiaomi MiMo Token Plan (AMS)",
+  "xiaomi-token-plan-sgp": "Xiaomi MiMo Token Plan (SGP)",
   zai: "ZAI",
 };
 
 const EXTERNAL_AUTH_NOTES: Record<string, string> = {
   "amazon-bedrock": "Configure AWS credentials (AWS_PROFILE, IAM environment variables, bearer token, or instance/task role) and region outside this login flow.",
   "google-vertex": "Configure Google Application Default Credentials plus GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION outside this login flow.",
+  xiaomi: "Uses API billing credentials. Set XIAOMI_API_KEY or save an API key here; token-plan credentials use the regional xiaomi-token-plan-* providers.",
+  "xiaomi-token-plan-cn": "Regional token-plan provider. Use XIAOMI_TOKEN_PLAN_CN_API_KEY or save the regional token-plan key here.",
+  "xiaomi-token-plan-ams": "Regional token-plan provider. Use XIAOMI_TOKEN_PLAN_AMS_API_KEY or save the regional token-plan key here.",
+  "xiaomi-token-plan-sgp": "Regional token-plan provider. Use XIAOMI_TOKEN_PLAN_SGP_API_KEY or save the regional token-plan key here.",
 };
 
 function customProvider(
@@ -131,6 +143,10 @@ export const PROVIDER_DEFS: ProviderDef[] = [
     authNote: "Also set CLOUDFLARE_ACCOUNT_ID in the environment.",
   },
   { id: "xai", name: "xAI", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS.xai },
+  { id: "xiaomi", name: "Xiaomi MiMo (API billing)", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS.xiaomi, authNote: EXTERNAL_AUTH_NOTES.xiaomi },
+  { id: "xiaomi-token-plan-cn", name: "Xiaomi MiMo Token Plan (CN)", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS["xiaomi-token-plan-cn"], authNote: EXTERNAL_AUTH_NOTES["xiaomi-token-plan-cn"] },
+  { id: "xiaomi-token-plan-ams", name: "Xiaomi MiMo Token Plan (AMS)", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS["xiaomi-token-plan-ams"], authNote: EXTERNAL_AUTH_NOTES["xiaomi-token-plan-ams"] },
+  { id: "xiaomi-token-plan-sgp", name: "Xiaomi MiMo Token Plan (SGP)", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS["xiaomi-token-plan-sgp"], authNote: EXTERNAL_AUTH_NOTES["xiaomi-token-plan-sgp"] },
   { id: "openrouter", name: "OpenRouter", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS.openrouter },
   { id: "vercel-ai-gateway", name: "Vercel AI Gateway", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS["vercel-ai-gateway"] },
   { id: "zai", name: "ZAI", hasOAuth: false, hasApiKey: true, apiKeyHint: API_KEY_HINTS.zai },

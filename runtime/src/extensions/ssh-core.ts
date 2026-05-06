@@ -61,6 +61,10 @@ interface RunningCommand {
 export type SshStrictHostKeyCheckingMode = "yes" | "accept-new" | "no";
 
 const DEFAULT_EXEC_TIMEOUT_SECONDS = 300;
+const DEFAULT_SSH_CONNECT_TIMEOUT_SECONDS = 10;
+const DEFAULT_SSH_SERVER_ALIVE_INTERVAL_SECONDS = 15;
+const DEFAULT_SSH_SERVER_ALIVE_COUNT_MAX = 2;
+const SSH_CAPTURE_KILL_GRACE_MS = 3000;
 const PERSISTENT_WRITE_MAX_BYTES = 256 * 1024;
 const DEFAULT_PERSISTENT_INTERRUPT_GRACE_MS = 3000;
 const SSH_WORKING_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -201,6 +205,14 @@ function buildSshBaseArgs(connection: Pick<SshBootstrapConnection, "port" | "pri
     "-o",
     "IdentitiesOnly=yes",
     "-o",
+    `ConnectTimeout=${DEFAULT_SSH_CONNECT_TIMEOUT_SECONDS}`,
+    "-o",
+    "ConnectionAttempts=1",
+    "-o",
+    `ServerAliveInterval=${DEFAULT_SSH_SERVER_ALIVE_INTERVAL_SECONDS}`,
+    "-o",
+    `ServerAliveCountMax=${DEFAULT_SSH_SERVER_ALIVE_COUNT_MAX}`,
+    "-o",
     "ControlMaster=auto",
     "-o",
     "ControlPersist=600",
@@ -233,23 +245,32 @@ async function sshCapture(
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
     let timedOut = false;
+    let hardStopHandle: NodeJS.Timeout | undefined;
+
+    const stopChild = (reason: "timeout" | "abort") => {
+      if (reason === "timeout") timedOut = true;
+      if (!child.killed) child.kill("SIGTERM");
+      if (!hardStopHandle) {
+        hardStopHandle = setTimeout(() => {
+          if (!child.killed) child.kill("SIGKILL");
+        }, SSH_CAPTURE_KILL_GRACE_MS);
+      }
+    };
 
     const timeoutHandle =
       options.timeoutSeconds && options.timeoutSeconds > 0
-        ? setTimeout(() => {
-            timedOut = true;
-            child.kill();
-          }, options.timeoutSeconds * 1000)
+        ? setTimeout(() => stopChild("timeout"), options.timeoutSeconds * 1000)
         : undefined;
 
-    const onAbort = () => child.kill();
+    const onAbort = () => stopChild("abort");
     if (options.signal) {
-      if (options.signal.aborted) child.kill();
+      if (options.signal.aborted) stopChild("abort");
       else options.signal.addEventListener("abort", onAbort, { once: true });
     }
 
     child.on("error", (error) => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (hardStopHandle) clearTimeout(hardStopHandle);
       if (options.signal) options.signal.removeEventListener("abort", onAbort);
       reject(error);
     });
@@ -259,6 +280,7 @@ async function sshCapture(
 
     child.on("close", (exitCode) => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (hardStopHandle) clearTimeout(hardStopHandle);
       if (options.signal) options.signal.removeEventListener("abort", onAbort);
       resolve({
         stdout: Buffer.concat(stdoutChunks),
@@ -647,7 +669,7 @@ class SshTransport implements RemoteTransport {
     await this.queue.enqueue(async () => {
       const remoteDir = remoteDirname(remotePath);
       const command = [`mkdir -p -- ${shellQuote(remoteDir)}`, `cat > ${shellQuote(remotePath)}`].join(" && ");
-      await sshExec(this.connection, command, { stdin: content });
+      await sshExec(this.connection, command, { stdin: content, timeoutSeconds: DEFAULT_EXEC_TIMEOUT_SECONDS });
     });
   }
 

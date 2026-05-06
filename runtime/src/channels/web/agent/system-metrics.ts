@@ -2,6 +2,7 @@
  * web/agent/system-metrics.ts – Lightweight host CPU/RAM/swap metrics for the web HUD.
  */
 
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 
@@ -64,6 +65,11 @@ export interface SystemMetricsSnapshot {
   platform: NodeJS.Platform;
   process_memory: ProcessMemorySnapshot;
   runtime_memory: RuntimeMemorySnapshot | null;
+  vram_percent: number | null;
+  vram_series: number[];
+  vram_total_bytes: number;
+  vram_used_bytes: number;
+  gpu_provider: string | null;
 }
 
 export interface SystemMetricsContext {
@@ -87,6 +93,13 @@ interface SwapUsageSnapshot {
   totalBytes: number;
   usedBytes: number;
   percent: number;
+}
+
+export interface GpuVramUsageSnapshot {
+  totalBytes: number;
+  usedBytes: number;
+  percent: number;
+  provider: string;
 }
 
 interface ProcStatusSnapshot {
@@ -161,6 +174,52 @@ function parseKbLine(text: string, label: string): number | null {
   if (!match) return null;
   const kb = Number(match[1]);
   return Number.isFinite(kb) && kb >= 0 ? kb * 1024 : null;
+}
+
+export function parseNvidiaSmiMemoryCsv(text: string): GpuVramUsageSnapshot | null {
+  const rows = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let usedMiB = 0;
+  let totalMiB = 0;
+  for (const row of rows) {
+    const columns = row.split(",").map((value) => value.trim().replace(/\s*MiB$/i, ""));
+    if (columns.length < 2) return null;
+    const used = Number(columns[0]);
+    const total = Number(columns[1]);
+    if (!Number.isFinite(used) || !Number.isFinite(total) || used < 0 || total <= 0) return null;
+    usedMiB += used;
+    totalMiB += total;
+  }
+
+  if (totalMiB <= 0) return null;
+  const usedBytes = Math.round(usedMiB * 1024 * 1024);
+  const totalBytes = Math.round(totalMiB * 1024 * 1024);
+  return {
+    totalBytes,
+    usedBytes: Math.min(usedBytes, totalBytes),
+    percent: roundPercent((Math.min(usedMiB, totalMiB) / totalMiB) * 100),
+    provider: "nvidia-smi",
+  };
+}
+
+function readGpuVramUsage(): GpuVramUsageSnapshot | null {
+  try {
+    const result = spawnSync("nvidia-smi", [
+      "--query-gpu=memory.used,memory.total",
+      "--format=csv,noheader,nounits",
+    ], {
+      encoding: "utf8",
+      timeout: 1000,
+      windowsHide: true,
+    });
+    if (result.status !== 0 || result.error) return null;
+    return parseNvidiaSmiMemoryCsv(result.stdout || "");
+  } catch {
+    return null;
+  }
 }
 
 function parseIntLine(text: string, label: string): number | null {
@@ -294,6 +353,7 @@ export class SystemMetricsSampler {
   private cpuSeries: number[] = [];
   private ramSeries: number[] = [];
   private swapSeries: number[] = [];
+  private vramSeries: number[] = [];
   private bufferCacheSeriesBytes: number[] = [];
   private processRssSeriesBytes: number[] = [];
   private processHeapUsedSeriesBytes: number[] = [];
@@ -301,6 +361,7 @@ export class SystemMetricsSampler {
   constructor(
     private readonly maxSamples = 30,
     private readonly sampleIntervalMs = 2000,
+    private readonly gpuVramReader: () => GpuVramUsageSnapshot | null = readGpuVramUsage,
   ) {}
 
   readSnapshot(runtimeMemorySnapshot?: AgentPoolMemoryInstrumentationSnapshot | null): SystemMetricsSnapshot {
@@ -315,12 +376,15 @@ export class SystemMetricsSampler {
 
     const ramUsage = readRamUsage();
     const swapUsage = readSwapUsage();
+    const gpuVramUsage = this.gpuVramReader();
     const cpuValue = roundPercent(cpuPercent);
     const ramValue = ramUsage.percent;
     const swapValue = swapUsage ? roundPercent(swapUsage.percent) : null;
+    const vramValue = gpuVramUsage ? roundPercent(gpuVramUsage.percent) : null;
     this.cpuSeries = pushSample(this.cpuSeries, cpuValue, this.maxSamples);
     this.ramSeries = pushSample(this.ramSeries, ramValue, this.maxSamples);
     this.swapSeries = swapValue === null ? [] : pushSample(this.swapSeries, swapValue, this.maxSamples);
+    this.vramSeries = vramValue === null ? [] : pushSample(this.vramSeries, vramValue, this.maxSamples);
     this.bufferCacheSeriesBytes = ramUsage.bufferCacheBytes === null
       ? []
       : pushSample(this.bufferCacheSeriesBytes, ramUsage.bufferCacheBytes, this.maxSamples);
@@ -339,6 +403,11 @@ export class SystemMetricsSampler {
       cpu_series: [...this.cpuSeries],
       ram_series: [...this.ramSeries],
       swap_series: [...this.swapSeries],
+      vram_percent: vramValue,
+      vram_series: [...this.vramSeries],
+      vram_total_bytes: gpuVramUsage?.totalBytes ?? 0,
+      vram_used_bytes: gpuVramUsage?.usedBytes ?? 0,
+      gpu_provider: gpuVramUsage?.provider ?? null,
       buffer_cache_bytes: ramUsage.bufferCacheBytes,
       buffer_cache_series_bytes: [...this.bufferCacheSeriesBytes],
       process_rss_series_bytes: [...this.processRssSeriesBytes],
