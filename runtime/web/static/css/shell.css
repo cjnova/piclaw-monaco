@@ -3,7 +3,7 @@
   --bg-sidebar: #181825;
   --bg-terminal: #11111b;
   --bg-status: #181825;
-  --border: #313244;
+  --border: #45475a;
   --text: #cdd6f4;
   --text-muted: #9399b2;
   --text-soft: #a6adc8;
@@ -50,6 +50,11 @@
   --overlay-black-40: rgba(0, 0, 0, 0.4);
   --overlay-black-50: rgba(0, 0, 0, 0.5);
   --overlay-black-85: rgba(0, 0, 0, 0.85);
+  /* Progressive font sizing */
+  --font-size-sm: clamp(11px, 1.1vw, 13px);
+  --font-size-md: clamp(13px, 1.3vw, 15px);
+  --font-size-lg: clamp(16px, 1.6vw, 20px);
+  --font-size-xl: clamp(20px, 2vw, 24px);
   /* Syntax highlighting (Catppuccin Mocha) */
   --syn-keyword: #cba6f7;
   --syn-operator: #89dceb;
@@ -1532,12 +1537,13 @@ body {
 
 /* Content: plain text, no bubble background */
 .message-list__content {
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: var(--font-size-md);
+  line-height: 1.5;
   color: var(--text);
   word-break: break-word;
+  overflow-wrap: break-word;
   white-space: pre-wrap;
-  overflow-x: hidden;
+  overflow-x: auto;
   max-width: 100%;
 }
 
@@ -1574,20 +1580,26 @@ body {
 
 .message-list__content table {
   border-collapse: collapse;
+  table-layout: auto;
   margin: 8px 0;
+  width: 100%;
   max-width: 100%;
-  overflow-x: auto;
+  font-size: var(--font-size-sm);
 }
 
 .message-list__content th,
 .message-list__content td {
-  border: 1px solid var(--border);
-  padding: 6px 10px;
+  border: 1px solid var(--overlay-white-15);
+  padding: 4px 8px;
   text-align: left;
+  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  font-size: var(--font-size-sm);
 }
 
 .message-list__content th {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-white-10);
   font-weight: 600;
 }
 
@@ -4569,4 +4581,185 @@ pre.frontmatter-block {
 .chat__attachment-clear:hover {
   color: var(--error);
   opacity: 1;
+}
+
+/* ============================================================
+   Mobile responsive (< 639px)
+   ============================================================ */
+@media (max-width: 639px) {
+  :root {
+    --font-size-sm: 11px;
+    --font-size-md: 14px;
+    --font-size-lg: 18px;
+  }
+
+  /* Stack layout vertically on mobile */
+  .app-layout {
+    flex-direction: column;
+  }
+
+  /* Hide non-essential items from top status bar */
+  .sys-stats {
+    display: none;
+  }
+  .status-bar__conn-text {
+    display: none;
+  }
+  /* Hide model + terminal from top bar (moved to bottom toolbar) */
+  .app-layout__status-bar .model-badge-wrapper .model-badge,
+  .app-layout__status-bar .model-badge-wrapper .thinking-badge,
+  .app-layout__status-bar .model-badge-wrapper .model-picker,
+  .app-layout__status-bar .model-badge-wrapper .thinking-picker,
+  .app-layout__status-bar .model-badge-wrapper .usage-badge,
+  .app-layout__status-bar .model-badge-wrapper .compaction-badge {
+    display: none;
+  }
+  .status-bar__terminal-btn {
+    display: none;
+  }
+
+  /* Bottom mobile toolbar */
+  .mobile-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-status);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+
+  .mobile-toolbar__model-slot {
+    flex: 1;
+    min-width: 0;
+    overflow: visible;
+  }
+  .mobile-toolbar__model-slot .model-badge-wrapper {
+    display: flex;
+    font-size: var(--font-size-sm);
+  }
+  .mobile-toolbar__model-slot .context-ring,
+  .mobile-toolbar__model-slot .usage-badge,
+  .mobile-toolbar__model-slot .compaction-badge {
+    display: none;
+  }
+  .mobile-toolbar__terminal-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .mobile-toolbar__terminal-btn:hover {
+    background: var(--overlay-white-08);
+    color: var(--text);
+  }
+
+  /* Activity bar becomes horizontal top bar on mobile */
+  .activity-bar {
+    width: 100%;
+    height: 40px;
+    flex: 0 0 40px;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .activity-bar__button {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+
+  /* Sidebar as full-width overlay when open */
+  .app-layout__sidebar-wrapper {
+    position: fixed;
+    top: 40px;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    background: var(--bg-sidebar);
+    transition: none;
+    max-width: none !important;
+  }
+
+  /* Message list full-width */
+  .message-list {
+    padding: 12px 10px 6px;
+  }
+
+  /* Remove message indenting/threading on mobile */
+  .message-list__item--agent {
+    margin-left: 0;
+  }
+  .message-list__avatar-circle {
+    display: none;
+  }
+  .message-list__item {
+    gap: 0;
+  }
+
+  /* Model/thinking pickers: fixed position on mobile for visibility */
+  .model-picker,
+  .thinking-picker {
+    position: fixed !important;
+    bottom: 90px !important;
+    top: auto !important;
+    left: 12px !important;
+    right: 12px !important;
+    max-width: none;
+    min-width: 0;
+    z-index: 10000;
+    transform: none !important;
+    background: #2a2a3c;
+    border: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
+  }
+
+  /* Settings panel: vertical layout on mobile */
+  .settings-panel {
+    flex-direction: column;
+  }
+  .settings-panel__nav {
+    min-width: 0;
+    width: 100%;
+    flex-direction: row;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 4px 0;
+    flex-shrink: 0;
+  }
+  .settings-panel__nav-item {
+    white-space: nowrap;
+    padding: 6px 12px;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+  }
+  .settings-panel__nav-item--active {
+    border-left-color: transparent;
+    border-bottom-color: var(--accent);
+  }
+  .settings-panel__content {
+    padding: 12px 10px;
+  }
+
+  /* Compose bar full-width */
+  .chat__compose {
+    padding: 8px 10px;
+  }
+}
+
+/* Hide mobile toolbar on desktop */
+@media (min-width: 640px) {
+  .mobile-toolbar {
+    display: none;
+  }
 }

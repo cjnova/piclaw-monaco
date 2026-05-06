@@ -55,8 +55,9 @@ function AppContent() {
 
   const handlePanelChange = useCallback((id: string) => {
     if (id === "settings" && activePanel.value === "settings") {
+      // Closing settings: show chat, hide sidebar
       activePanel.value = previousPanel.value;
-      sidebarCollapsed.value = false;
+      sidebarCollapsed.value = true;
     } else if (id === activePanel.value) {
       sidebarCollapsed.value = !sidebarCollapsed.value;
     } else {
@@ -174,6 +175,19 @@ function AppContent() {
               </span>
             )}
           </span>
+        </div>
+        {/* Mobile bottom toolbar — visible only on <639px via CSS */}
+        <div className="mobile-toolbar">
+          <span className="mobile-toolbar__model-slot">
+            <ModelContextBar />
+          </span>
+          <button
+            type="button"
+            className="mobile-toolbar__terminal-btn"
+            onClick={() => { terminalVisible.value = true; }}
+          >
+            Terminal
+          </button>
         </div>
       </main>
       <CommandPalette visible={paletteVisible.value} onClose={() => { paletteVisible.value = false; }} />

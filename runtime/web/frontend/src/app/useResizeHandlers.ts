@@ -38,9 +38,10 @@ export function useResizeHandlers({
     const el = sidebarWrapperRef.current;
     if (!el) return;
     const isClosed = sidebarCollapsed.value || isSettingsActive;
-    el.style.width = isClosed ? "0px" : `${sidebarWidth.value}px`;
-    el.style.minWidth = isClosed ? "0px" : "150px";
-    el.style.maxWidth = isClosed ? "0px" : "50vw";
+    const isMobile = window.innerWidth < 640;
+    el.style.width = isClosed ? "0px" : (isMobile ? "100vw" : `${sidebarWidth.value}px`);
+    el.style.minWidth = isClosed ? "0px" : (isMobile ? "0px" : "150px");
+    el.style.maxWidth = isClosed ? "0px" : (isMobile ? "100vw" : "50vw");
   }, [sidebarCollapsed.value, isSettingsActive, sidebarWidth.value]);
 
   // Sync terminal DOM dimensions

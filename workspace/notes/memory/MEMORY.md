@@ -2,15 +2,15 @@
 
 Dream-maintained memory index generated from the message database plus human-readable daily notes.
 
-Generated: 2026-05-05T08:14:31.641Z
+Generated: 2026-05-06T05:17:45.115Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 5
+- Complete days: 6
 - Partial days: 0
 - Unsummarised days: 0
-- Latest complete day: 2026-05-04
+- Latest complete day: 2026-05-05
 
 ## Memory types
 
@@ -21,6 +21,8 @@ Generated: 2026-05-05T08:14:31.641Z
 
 ## Recent daily memories
 
+- [2026-05-05](../daily/2026-05-05.md)
+  - Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission chec…
 - [2026-05-04](../daily/2026-05-04.md)
   - Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ rep…
 - [2026-05-03](../daily/2026-05-03.md)
