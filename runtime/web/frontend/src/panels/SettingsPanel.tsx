@@ -25,15 +25,18 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "tools", label: "Tools", icon: "codicon-tools" },
 ];
 
-export function SettingsPanel() {
+export function SettingsPanel({ visible }: { visible?: boolean }) {
   const activeCategory = useSignal<Category>((safeGetItem("piclaw-settings-category") as Category) || "general");
   const settings = useSignal<SettingsData>({});
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
   const saveStatus = useSignal<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
+    if (!visible || hasFetched.current) return;
+    hasFetched.current = true;
     void (async () => {
       try {
         const res = await fetch("/agent/settings-data", { credentials: "same-origin" });
@@ -47,7 +50,7 @@ export function SettingsPanel() {
         loading.value = false;
       }
     })();
-  }, []);
+  }, [visible]);
 
   useEffect(() => {
     return () => {

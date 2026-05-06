@@ -423,6 +423,13 @@ body {
   height: 100%;
 }
 
+.app-layout__settings-slot {
+  display: contents;
+}
+.app-layout__settings-slot--hidden {
+  display: none;
+}
+
 .app-layout__chat-wrapper {
   display: contents;
 }

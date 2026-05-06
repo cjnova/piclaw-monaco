@@ -123,7 +123,9 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            {isSettingsActive && <SettingsPanel />}
+            <div className={isSettingsActive ? "app-layout__settings-slot" : "app-layout__settings-slot app-layout__settings-slot--hidden"}>
+              <SettingsPanel visible={isSettingsActive} />
+            </div>
             {!isSettingsActive && isExtensionPageOpen
               ? <ExtensionFrame
                   extensionPageUrl={extensionPageUrl.value}
