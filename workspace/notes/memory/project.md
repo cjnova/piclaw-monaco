@@ -2,6 +2,10 @@
 
 ## Ongoing work and recent outcomes
 
+### 2026-05-05
+
+- Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message testing (multiple probes confirming steer receipt). Long-form content generation stress tests: history o…
+
 ### 2026-05-04
 
 - Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ repeated "Write 5 paragraphs about TypeScript" requests — stress-testing long-form content generation and rendering. Mid-session: workspace exploration c…
