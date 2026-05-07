@@ -54,7 +54,7 @@ function buildSrcDoc(html: string, title: string): string {
 </html>`;
 }
 
-export function WidgetPane() {
+export function WidgetPane({ tabMode = false }: { tabMode?: boolean }) {
   const [widget, setWidget] = useState<WidgetState | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlBufferRef = useRef("");
@@ -131,9 +131,41 @@ export function WidgetPane() {
     setWidget(null);
   }, []);
 
-  if (!widget) return null;
+  if (!widget && !tabMode) return null;
+  if (!widget) {
+    return <div className="widget-pane__empty">Waiting for widget content...</div>;
+  }
 
   const srcDoc = buildSrcDoc(widget.html, widget.title);
+
+  if (tabMode) {
+    return (
+      <div className="widget-pane widget-pane--tab">
+        <div className="widget-pane__header">
+          <div className="widget-pane__heading">
+            <div className="widget-pane__eyebrow">Widget • {widget.status.toUpperCase()}</div>
+            <div className="widget-pane__title">{widget.title}</div>
+            {widget.subtitle && <div className="widget-pane__subtitle">{widget.subtitle}</div>}
+          </div>
+        </div>
+        <div className="widget-pane__body">
+          {widget.status === "error" ? (
+            <div className="widget-pane__error">{widget.error}</div>
+          ) : srcDoc ? (
+            <iframe
+              ref={iframeRef}
+              className="widget-pane__frame"
+              sandbox="allow-scripts allow-same-origin"
+              srcDoc={srcDoc}
+              title={widget.title}
+            />
+          ) : (
+            <div className="widget-pane__empty">Waiting for widget content...</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="widget-pane__backdrop" onClick={handleClose}>

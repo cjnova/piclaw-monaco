@@ -1,6 +1,6 @@
 ---
 name: close-of-day
-description: Run a daily end-of-day sweep: refresh situation notes, back up state, clean low-value timeline traffic, and run the daily-notes summarisation flow before declaring the day closed.
+description: "Run a daily end-of-day sweep: refresh situation notes, back up state, clean low-value timeline traffic, and run the daily-notes summarisation flow before declaring the day closed."
 distribution: private
 ---
 
