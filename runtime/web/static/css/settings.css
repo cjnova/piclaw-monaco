@@ -2056,6 +2056,34 @@
     opacity: 1;
 }
 
+/* ── General authentication secret fields ─────────────────────────── */
+.settings-widget-token-panel {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.settings-widget-token-field {
+    width: 100%;
+    min-width: 0;
+}
+
+.settings-widget-token-value {
+    min-height: 1.45em;
+}
+
+.settings-widget-token-copied {
+    font-size: 0.82em;
+    font-family: var(--font-mono, monospace);
+}
+
+.settings-widget-token-regenerate {
+    flex-shrink: 0;
+}
+
+.settings-totp-meta input[readonly] {
+    font-family: var(--font-mono, monospace);
+}
+
 /* ── Keychain TOTP prompt ─────────────────────────────────────────── */
 .settings-keychain-totp-row td {
     padding: 0 10px 8px !important;

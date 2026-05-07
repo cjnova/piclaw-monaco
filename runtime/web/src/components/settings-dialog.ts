@@ -31,7 +31,7 @@ let _settingsDataCache: Record<string, unknown> | null = null;
 perf('module-eval-start');
 import { html, useState, useEffect, useCallback, useRef } from '../vendor/preact-htm.js';
 import { BodyPortal } from './body-portal.js';
-import { getRegisteredSettingsPanes } from './settings/pane-registry.js';
+import { compareSettingsPanesAlphabetically, getRegisteredSettingsPanes } from './settings/pane-registry.js';
 import { consumeRequestedSettingsOpenState, normalizeSettingsSectionId, peekRequestedSettingsSection, requestOpenSettingsDialog } from './settings-dialog-events.js';
 // General is statically imported — it's always the first visible section.
 import { GeneralSection } from './settings/general.js';
@@ -217,10 +217,10 @@ export function SettingsDialogContent({ onClose }) {
         return () => window.removeEventListener('resize', updateLayoutMode);
     }, []);
 
+    const builtinSections = [...BUILTIN_SECTIONS].sort((a, b) => (a.order ?? 500) - (b.order ?? 500));
     const extensionPanes = getRegisteredSettingsPanes();
-    const allSections = [
-        ...BUILTIN_SECTIONS,
-        ...extensionPanes.map(p => ({
+    const extensionSections = extensionPanes
+        .map(p => ({
             id: p.id,
             label: p.label,
             icon: p.icon,
@@ -229,8 +229,9 @@ export function SettingsDialogContent({ onClose }) {
             order: p.order ?? 500,
             isExtension: true,
             component: p.component,
-        })),
-    ].sort((a, b) => (a.order ?? 500) - (b.order ?? 500));
+        }))
+        .sort(compareSettingsPanesAlphabetically);
+    const allSections = [...builtinSections, ...extensionSections];
 
     const activeMeta = allSections.find(s => s.id === activeSection) || BUILTIN_SECTIONS.find(s => s.id === activeSection);
 

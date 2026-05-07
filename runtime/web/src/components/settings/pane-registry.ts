@@ -24,12 +24,18 @@ export interface SettingsPaneDefinition {
 
 const registry: SettingsPaneDefinition[] = [];
 
+export function compareSettingsPanesAlphabetically(a: Pick<SettingsPaneDefinition, "label" | "id">, b: Pick<SettingsPaneDefinition, "label" | "id">): number {
+    const labelCompare = String(a.label || '').localeCompare(String(b.label || ''), undefined, { sensitivity: 'base' });
+    if (labelCompare !== 0) return labelCompare;
+    return String(a.id || '').localeCompare(String(b.id || ''), undefined, { sensitivity: 'base' });
+}
+
 export function registerSettingsPane(def: SettingsPaneDefinition): void {
     // Replace if same id exists
     const idx = registry.findIndex(p => p.id === def.id);
     if (idx >= 0) registry[idx] = def;
     else registry.push(def);
-    registry.sort((a, b) => (a.order ?? 500) - (b.order ?? 500));
+    registry.sort(compareSettingsPanesAlphabetically);
 }
 
 export function unregisterSettingsPane(id: string): void {
