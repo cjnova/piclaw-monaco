@@ -11,6 +11,7 @@ import { ModelsSection } from "./settings/ModelsSection";
 import { KeychainSection } from "./settings/KeychainSection";
 import { ToolsSection } from "./settings/ToolsSection";
 import { ProvidersSection } from "./settings/ProvidersSection";
+import { EnvironmentSection } from "./settings/EnvironmentSection";
 import { safeGetItem, safeSetItem } from "../utils/storage";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
@@ -18,6 +19,7 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
   { id: "compaction", label: "Compaction", icon: "codicon-archive" },
   { id: "workspace", label: "Workspace", icon: "codicon-folder" },
+  { id: "environment", label: "Environment", icon: "codicon-symbol-variable" },
   { id: "providers", label: "Providers", icon: "codicon-cloud" },
   { id: "models", label: "Models", icon: "codicon-hubot" },
   { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
@@ -135,6 +137,9 @@ export function SettingsPanel() {
         )}
         {activeCategory.value === "workspace" && (
           <WorkspaceSection data={s} onSaveWorkspace={(field, value) => saveSetting("workspace", field, value)} />
+        )}
+        {activeCategory.value === "environment" && (
+          <EnvironmentSection />
         )}
         {activeCategory.value === "providers" && (
           <ProvidersSection providers={s.providers ?? []} />
