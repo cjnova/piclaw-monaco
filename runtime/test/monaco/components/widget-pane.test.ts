@@ -44,10 +44,11 @@ describe("Widget iframe host regression (#149)", () => {
     expect(src).toContain("widget-pane__backdrop");
   });
 
-  test("6) ChatPanel imports and renders WidgetPane", () => {
-    const src = read(chatPanelUrl);
-    expect(src).toContain("WidgetPane");
-    expect(src).toContain("<WidgetPane");
+  test("6) WidgetPane renders in App.tsx tab viewport (not ChatPanel)", () => {
+    const appUrl = new URL("../../../web/frontend/src/App.tsx", import.meta.url);
+    const appSrc = readFileSync(appUrl, "utf8");
+    expect(appSrc).toContain("WidgetPane");
+    expect(appSrc).toContain("tabMode");
   });
 
   test("7) ChatPanel handles widget submissions", () => {

@@ -1,6 +1,5 @@
 import { AgentStatusPanel } from "../components/AgentStatusPanel";
 import { QueueStack, type QueueItem } from "../components/QueueStack";
-import { WidgetPane } from "../components/WidgetPane";
 import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -498,8 +497,6 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
           <AgentStatusPanel />
 
           <QueueStack onEdit={handleQueueEdit} />
-
-          <WidgetPane />
 
           <div className="chat__compose">
             <input
