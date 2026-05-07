@@ -1471,11 +1471,16 @@ body {
   border-radius: 0;
   border: none;
   box-shadow: none;
-  background: var(--bg);
+  background: transparent;
+  overflow: hidden;
 }
 .widget-pane--tab .widget-pane__body--full {
   flex: 1;
   padding: 0;
+  min-height: 0;
+}
+.widget-pane--tab .widget-pane__frame {
+  border-radius: 0;
 }
 
 @media (max-width: 639px) {
