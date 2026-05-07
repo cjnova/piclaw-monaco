@@ -3149,6 +3149,114 @@ body {
 }
 .tasks-panel__action-btn:hover { background: var(--accent); color: #fff; }
 
+/* ── Tasks filter tabs ── */
+.tasks-panel__filter-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tasks-panel__filter-tabs::-webkit-scrollbar { display: none; }
+.tasks-panel__filter-tab {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.tasks-panel__filter-tab:hover { background: var(--overlay-white-05); color: var(--text); }
+.tasks-panel__filter-tab--active { background: var(--overlay-white-10); color: var(--text); font-weight: 600; }
+
+/* ── Task cards ── */
+.tasks-panel__tasks { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
+.tasks-panel__list { display: flex; flex-direction: column; gap: 8px; }
+.tasks-panel__card {
+  background: var(--overlay-white-03);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.tasks-panel__card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tasks-panel__card-id { font-weight: 600; font-size: 12px; color: var(--text); }
+.tasks-panel__badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.tasks-panel__badge--active { background: #a6e3a133; color: #a6e3a1; }
+.tasks-panel__badge--paused { background: #f9e2af33; color: #f9e2af; }
+.tasks-panel__badge--completed { background: var(--overlay-white-10); color: var(--text-muted); }
+.tasks-panel__badge--kind { background: var(--overlay-white-08); color: var(--text-muted); }
+.tasks-panel__card-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+  flex-wrap: wrap;
+}
+.tasks-panel__card-label { color: var(--text-muted); font-size: 11px; min-width: 55px; }
+.tasks-panel__card-value { color: var(--text); font-size: 11px; }
+.tasks-panel__card-muted { opacity: 0.5; font-size: 10px; }
+.tasks-panel__card-mono { font-family: var(--font-mono); font-size: 10px; }
+
+/* ── Run logs ── */
+.tasks-panel__card-logs { margin-top: 6px; }
+.tasks-panel__logs-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.tasks-panel__logs-toggle:hover { color: var(--text); }
+.tasks-panel__logs-list { margin-top: 4px; }
+.tasks-panel__log-entry {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  padding: 2px 0;
+  color: var(--text-muted);
+  border-top: 1px solid var(--overlay-white-05);
+}
+.tasks-panel__log-entry--success .tasks-panel__log-status { color: #a6e3a1; }
+.tasks-panel__log-entry--error .tasks-panel__log-status { color: #f38ba8; }
+.tasks-panel__log-error { color: #f38ba8; font-size: 10px; }
+
+/* ── Card actions ── */
+.tasks-panel__card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--overlay-white-05);
+}
+.tasks-panel__card-actions button {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tasks-panel__card-actions button:hover { background: var(--overlay-white-08); color: var(--text); }
+.tasks-panel__card-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+
 /* ── SettingsPanel extras ── */
 .settings-panel__select {
   background: var(--bg-elevated);
