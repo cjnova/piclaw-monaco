@@ -72,7 +72,7 @@ import {
 } from "./db.js";
 import { registerExtensionKvStore } from "./extension-kv-registry.js";
 import { setSshToolHandlers } from "./extensions/ssh.js";
-import { applyLiveSshConfig, clearLiveSshConfig, hasLiveChatSshSession, resolveSshCoreConfigFromChatConfig } from "./extensions/ssh-core.js";
+import { applyLiveSshConfig, clearLiveSshConfig, hasLiveChatSshConnection, hasLiveChatSshSession, resolveSshCoreConfigFromChatConfig } from "./extensions/ssh-core.js";
 import { getKeychainEntry } from "./secure/keychain.js";
 import { addLogSink, createLogger, removeLogSink } from "./utils/logger.js";
 
@@ -253,6 +253,7 @@ export class AgentPool {
     this.sideStreamSimple = options.sideStreamSimple;
     setSshToolHandlers({
       get: (chatJid) => this.getSshConfig(chatJid),
+      isActive: (chatJid) => hasLiveChatSshConnection(chatJid),
       set: (chatJid, config) => this.setSshConfig(chatJid, config),
       clear: (chatJid) => this.clearSshConfig(chatJid),
     });

@@ -19,6 +19,7 @@ import { killTrackedProcesses } from "../../utils/process-tracker.js";
 import { pruneOrphanToolResults } from "../../agent-pool/orphan-tool-results.js";
 import {
   clearCompactionFailureBackoff,
+  isCompactionCancellationError,
   noteCompactionFailure,
   runCompactionWithTimeout,
 } from "../../agent-pool/compaction.js";
@@ -165,9 +166,12 @@ export async function handleCompact(session: AgentSession, command: CompactComma
         },
       },
       async () => await session.compact(command.instructions?.trim() || undefined),
+      "manual",
     );
     if (!compactionResult.ok) {
-      noteCompactionFailure(chatJid, compactionResult.errorMessage);
+      if (!isCompactionCancellationError(compactionResult.errorMessage)) {
+        noteCompactionFailure(chatJid, compactionResult.errorMessage);
+      }
       const timedOut = /timed out/i.test(compactionResult.errorMessage);
       return {
         status: "error",

@@ -15,6 +15,7 @@ type SshToolResult = { content: Array<{ type: "text"; text: string }>; details: 
 
 export interface SshToolHandlers {
   get(chatJid: string): SshConfig | null;
+  isActive?(chatJid: string): boolean;
   set(chatJid: string, config: SessionSshConfigInput): Promise<SshConfigSetResult>;
   clear(chatJid: string): Promise<SshConfigClearResult>;
 }
@@ -86,7 +87,8 @@ const SshToolSchema = Type.Object({
 const SSH_TOOL_HINT = [
   "## SSH",
   "Use ssh to inspect or change the SSH profile for the current session.",
-  "When a live session exists, SSH-backed core tools switch immediately.",
+  "When a live session exists, SSH-backed core tools switch immediately for the current turn.",
+  "Live SSH tool redirection clears at the end of each agent turn; stored SSH profiles remain available.",
 ].join("\n");
 
 function normalizeChatJid(value: string | undefined): string {
@@ -101,9 +103,9 @@ function normalizeKnownHostsKeychain(value: string | undefined): string | null {
 }
 
 function formatApplyTiming(value: SshConfigApplyTiming): string {
-  if (value === "immediate") return "Applied immediately to the live session.";
-  if (value === "next_turn") return "Applies on the next turn for the active session.";
-  return "Applies when the next session is created.";
+  if (value === "immediate") return "Applied immediately to the live session for this turn.";
+  if (value === "next_turn") return "Applies on the next turn for the active session, then clears at turn end.";
+  return "Applies when the next session is created, then clears at turn end.";
 }
 
 /** Registers the agent-only session-scoped SSH configuration tool. */
@@ -130,15 +132,16 @@ export const sshTool: ExtensionFactory = (pi: ExtensionAPI) => {
       const chatJid = normalizeChatJid(params.chat_jid);
       if (params.action === "get") {
         const config = handlers.get(chatJid);
+        const liveRedirectionActive = Boolean(handlers.isActive?.(chatJid));
         if (!config) {
           return {
-            content: [{ type: "text", text: `No SSH config stored for ${chatJid}.` }],
-            details: { action: "get", chat_jid: chatJid, configured: false, config: null },
+            content: [{ type: "text", text: `No SSH config stored for ${chatJid}. Live SSH tool redirection is ${liveRedirectionActive ? "active" : "inactive"}.` }],
+            details: { action: "get", chat_jid: chatJid, configured: false, live_redirection_active: liveRedirectionActive, config: null },
           };
         }
         return {
-          content: [{ type: "text", text: `SSH config for ${chatJid}: ${config.ssh_target} (port ${config.ssh_port}, key ${config.private_key_keychain}).` }],
-          details: { action: "get", chat_jid: chatJid, configured: true, config },
+          content: [{ type: "text", text: `SSH config for ${chatJid}: ${config.ssh_target} (port ${config.ssh_port}, key ${config.private_key_keychain}). Live SSH tool redirection is ${liveRedirectionActive ? "active" : "inactive"}.` }],
+          details: { action: "get", chat_jid: chatJid, configured: true, live_redirection_active: liveRedirectionActive, config },
         };
       }
 
@@ -176,6 +179,7 @@ export const sshTool: ExtensionFactory = (pi: ExtensionAPI) => {
             chat_jid: chatJid,
             updated: true,
             apply_timing: result.apply_timing,
+            turn_scoped_redirection: true,
             config: result.config,
           },
         };
@@ -194,6 +198,7 @@ export const sshTool: ExtensionFactory = (pi: ExtensionAPI) => {
           chat_jid: chatJid,
           deleted: result.deleted,
           apply_timing: result.apply_timing,
+          turn_scoped_redirection: true,
         },
       };
     },

@@ -283,12 +283,13 @@ function getBundledExtensionPaths(chatJid?: string): string[] {
 
 function getChannelSystemPromptAppendix(chatJid?: string): string {
   const channel = chatJid ? detectChannel(chatJid) : undefined;
-  const cacheKey = channel ?? "";
+  const normalizedChatJid = typeof chatJid === "string" && chatJid.trim() ? chatJid.trim() : "";
+  const cacheKey = `${channel ?? ""}|${normalizedChatJid}`;
   const cached = CHANNEL_SYSTEM_PROMPT_APPENDIX_CACHE.get(cacheKey);
   if (cached !== undefined) {
     return cached;
   }
-  const appendix = buildChannelSystemPromptAppendix(channel) ?? "";
+  const appendix = buildChannelSystemPromptAppendix(channel, normalizedChatJid) ?? "";
   CHANNEL_SYSTEM_PROMPT_APPENDIX_CACHE.set(cacheKey, appendix);
   return appendix;
 }

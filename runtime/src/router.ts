@@ -55,6 +55,18 @@ function normalizePromptScreenHint(message: NewMessage): string {
   return raw;
 }
 
+function normalizePromptChatJid(value: unknown): string {
+  const raw = normalizePromptHeaderValue(value);
+  if (!raw) return "";
+  if (/\s/.test(raw)) return "";
+  return raw.slice(0, 200);
+}
+
+function inferPromptChatJid(messages: NewMessage[]): string {
+  const chatJids = Array.from(new Set(messages.map((message) => normalizePromptChatJid(message.chat_jid)).filter(Boolean)));
+  return chatJids.length === 1 ? chatJids[0] : "";
+}
+
 function formatPromptMessage(message: NewMessage): string {
   const sender = normalizePromptSenderName(message);
   const timestamp = normalizePromptHeaderValue(message.timestamp);
@@ -72,10 +84,12 @@ function formatPromptMessage(message: NewMessage): string {
  * for the agent prompt. Includes channel metadata when the channel is known,
  * but keeps stable formatting instructions in persistent session context.
  */
-export function formatMessages(messages: NewMessage[], channel?: ChatChannel): string {
+export function formatMessages(messages: NewMessage[], channel?: ChatChannel, chatJid?: string): string {
   const knownChannel = channel && channel !== "unknown" ? channel : undefined;
+  const knownChatJid = normalizePromptChatJid(chatJid) || inferPromptChatJid(messages);
   const sections: string[] = [];
   if (knownChannel) sections.push(`Channel: ${knownChannel}`);
+  if (knownChatJid) sections.push(`Chat: ${knownChatJid}`);
   if (messages.length > 0) {
     const body = messages.map((message) => formatPromptMessage(message)).join("\n\n");
     sections.push(messages.length > 1 ? `Messages:\n${body}` : body);

@@ -9,6 +9,7 @@
  */
 
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import { getOpenAICodexWebSocketDebugStats } from "@mariozechner/pi-ai/openai-codex-responses";
 import { statSync } from "fs";
 import type { AgentControlCommand, AgentControlResult } from "../agent-control-types.js";
 import { formatBytes, formatCompactNumber, formatCurrency } from "../agent-control-helpers.js";
@@ -70,6 +71,26 @@ export async function handleState(session: AgentSession, _command: StateCommand)
 
   if (sessionLineCount !== null) {
     lines.push(`| **File lines** | ${sessionLineCount}${sessionStorageConfig.maxLines > 0 ? ` / ${sessionStorageConfig.maxLines} max` : ""} |`);
+  }
+
+  if (session.model?.provider === "openai-codex") {
+    const stats = getOpenAICodexWebSocketDebugStats(session.sessionId);
+    lines.push(
+      "",
+      "**OpenAI Codex WebSocket diagnostics**",
+      "",
+      "| Metric | Value |",
+      "|---|---|",
+      `| Session id | ${session.sessionId || "none"} |`,
+      `| Requests | ${stats?.requests ?? 0} |`,
+      `| Connections | ${stats ? `${stats.connectionsCreated} created, ${stats.connectionsReused} reused` : "none recorded"} |`,
+      `| Fallback active | ${stats?.websocketFallbackActive ? "yes" : "no"} |`,
+      `| SSE fallbacks | ${stats?.sseFallbacks ?? 0} |`,
+      `| WebSocket failures | ${stats?.websocketFailures ?? 0} |`,
+      `| Last error | ${stats?.lastWebSocketError ? stats.lastWebSocketError.replace(/\|/g, "\\|") : "none"} |`,
+    );
+  } else {
+    lines.push("", "**OpenAI Codex WebSocket diagnostics**", "", "Not applicable for the current provider.");
   }
 
   if (isOversizedSession && sessionFileSize !== null) {
