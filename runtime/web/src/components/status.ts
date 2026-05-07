@@ -139,6 +139,71 @@ export function resolveAgentStatusContent(status, options = {}) {
     return 'Last activity';
 }
 
+function normalizeToolName(payload) {
+    const raw = payload?.tool_name || payload?.toolName || '';
+    return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+}
+
+function extractStatusToolArgs(args) {
+    if (!args) return null;
+    if (typeof args === 'string') {
+        try {
+            const parsed = JSON.parse(args);
+            return extractStatusToolArgs(parsed);
+        } catch {
+            return null;
+        }
+    }
+    if (typeof args === 'object') {
+        const record = args;
+        const nested = record.input || record.params || record.parameters || record.args || record.payload;
+        return nested && typeof nested === 'object' ? nested : record;
+    }
+    return null;
+}
+
+export function resolveBashToolTitleParts(titleText, payload) {
+    const title = typeof titleText === 'string' ? titleText : '';
+    if (!title) return null;
+    const titleMatch = title.match(/^(bash:\s*)(.+)$/is);
+    if (titleMatch) {
+        return { prefix: titleMatch[1], command: titleMatch[2] };
+    }
+
+    if (normalizeToolName(payload) !== 'bash') return null;
+    const args = extractStatusToolArgs(payload?.tool_args || payload?.toolArgs);
+    const command = typeof args?.command === 'string' ? args.command.replace(/\s+/g, ' ').trim() : '';
+    if (!command || !title.includes(command)) return null;
+    const commandStart = title.indexOf(command);
+    return {
+        prefix: title.slice(0, commandStart),
+        command,
+        suffix: title.slice(commandStart + command.length),
+    };
+}
+
+function renderBashCommandInText(text, payload) {
+    const value = typeof text === 'string' ? text : '';
+    const title = typeof payload?.title === 'string' ? payload.title.trim() : '';
+    const parts = resolveBashToolTitleParts(title, payload);
+    if (!parts?.command) return value;
+
+    const commandStart = value.lastIndexOf(parts.command);
+    if (commandStart < 0) return value;
+    const commandEnd = commandStart + parts.command.length;
+    return html`
+        ${value.slice(0, commandStart)}<span class="agent-tool-command-line">${parts.command}</span>${value.slice(commandEnd)}
+    `;
+}
+
+function renderBashToolTitle(titleText, payload) {
+    const parts = resolveBashToolTitleParts(titleText, payload);
+    if (!parts?.command) return titleText;
+    return html`
+        ${parts.prefix}<span class="agent-tool-command-line">${parts.command}</span>${parts.suffix || ''}
+    `;
+}
+
 /** Preact component: agent status bar with draft/thought/plan panels. */
 function formatElapsed(isoString, nowMs = Date.now()) {
     if (!isoString) return null;
@@ -461,7 +526,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
             >
                 <div class="agent-thinking-title intent">
                     ${color && html`<span class=${pulsingDotClass} aria-hidden="true"></span>`}
-                    <span class="agent-thinking-title-text">${titleText}</span>
+                    <span class="agent-thinking-title-text">${renderBashToolTitle(titleText, payload)}</span>
                     ${metaLabel && html`<span class="agent-status-elapsed">${metaLabel}</span>`}
                 </div>
                 ${payload.detail && html`<div class="agent-thinking-body">${payload.detail}</div>`}
@@ -831,7 +896,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                         ? html`<span class="agent-status-error-icon" aria-hidden="true">⚠</span>`
                         : (runningIndicatorMode === 'spinner' && html`<div class="agent-status-spinner"></div>`)}
                     <div class="agent-status-copy">
-                        <span class="agent-status-text">${content}</span>
+                        <span class="agent-status-text">${renderBashCommandInText(content, status)}</span>
                         ${(toolRepoLabel || orderedStatusHints.length > 0 || statusActivityAgeLabel) && html`
                             <span class="agent-status-meta-row">
                                 ${leadingStatusHints.map((hint) => html`

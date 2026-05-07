@@ -164,6 +164,13 @@ function collectInnerHtml(node: FakeNode | null): string[] {
   return [node.innerHTML, ...node.childNodes.flatMap((child) => collectInnerHtml(child))].filter(Boolean);
 }
 
+function collectText(node: FakeNode | null): string {
+  if (!node) return '';
+  if (node instanceof FakeTextNode) return node.data;
+  if (!(node instanceof FakeElement)) return '';
+  return node.childNodes.map((child) => collectText(child)).join('');
+}
+
 function getAttr(node: FakeElement, name: string): string {
   return node.attributes.find((attr) => attr.name === name)?.value || '';
 }
@@ -189,6 +196,50 @@ function installStatusDomStubs(fakeDocument: FakeDocument): void {
     }
   };
 }
+
+test('AgentStatus renders bash tool command lines in monospace spans', async () => {
+  const css = readFileSync(join(import.meta.dir, '../../web/static/css/agent.css'), 'utf8');
+  expect(css).toContain('.agent-tool-command-line');
+  expect(css).toContain('font-family: var(--font-mono, monospace);');
+
+  const fakeDocument = new FakeDocument();
+  installStatusDomStubs(fakeDocument);
+
+  const { AgentStatus } = await importFresh<typeof import('../../web/src/components/status.ts')>('../web/src/components/status.ts');
+  const { h, render } = await import('../../web/src/vendor/preact-htm.js');
+
+  const host = fakeDocument.createElement('div');
+  fakeDocument.body.appendChild(host);
+  const command = 'bun test runtime/test/web/status-render.test.ts';
+
+  render(h(AgentStatus, {
+    status: {
+      type: 'intent',
+      title: `bash: ${command}`,
+      tool_name: 'bash',
+      tool_args: { command },
+    },
+  }), host);
+
+  let commandSpans = findElements(host, (node) => getAttr(node, 'class').includes('agent-tool-command-line'));
+  expect(commandSpans).toHaveLength(1);
+  expect(collectText(commandSpans[0])).toBe(command);
+
+  render(h(AgentStatus, {
+    status: {
+      type: 'tool_call',
+      title: `bash: ${command}`,
+      tool_name: 'bash',
+      tool_args: { command },
+    },
+  }), host);
+
+  commandSpans = findElements(host, (node) => getAttr(node, 'class').includes('agent-tool-command-line'));
+  expect(commandSpans).toHaveLength(1);
+  expect(collectText(commandSpans[0])).toBe(command);
+
+  render(null, host);
+});
 
 test('AgentStatus shows the tail of live tool output while collapsed', async () => {
   const fakeDocument = new FakeDocument();
