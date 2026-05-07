@@ -1618,6 +1618,10 @@ body {
 .message-list__avatar-img {
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  min-height: 24px;
+  max-height: 24px;
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 1px;
