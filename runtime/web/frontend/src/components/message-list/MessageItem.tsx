@@ -112,15 +112,17 @@ export function MessageItem({
 
   const displayName = isUser ? "You" : "PiClaw";
 
+  const [userImgError, setUserImgError] = useState(false);
+
   const AvatarCircle = () => {
     if (isUser) {
       const uavUrl = userAvatarUrl.value;
-      if (uavUrl) {
-        return <img className="message-list__avatar-img" src={uavUrl} alt="" aria-hidden="true" />;
+      if (uavUrl && !userImgError) {
+        return <img className="message-list__avatar-img" src={uavUrl} alt="" aria-hidden="true" onError={() => setUserImgError(true)} />;
       }
       return <div className="message-list__avatar-circle message-list__avatar-circle--user" aria-hidden="true">Y</div>;
     }
-    return <img className="message-list__avatar-img" src={assistantAvatarUrl.value} alt="" aria-hidden="true" />;
+    return <img className="message-list__avatar-img" src={assistantAvatarUrl.value} alt="" aria-hidden="true" onError={(e) => { (e.target as HTMLImageElement).src = "/static/icon-192.png"; }} />;
   };
 
   // ── Collapsed render ───────────────────────────────────────────────────
