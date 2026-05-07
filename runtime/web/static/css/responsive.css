@@ -42,6 +42,17 @@
         font-size: var(--chat-content-font-size);
     }
 
+    .compose-session-trigger-top {
+        position: static;
+        align-self: flex-start;
+        max-width: 100%;
+        margin-bottom: 2px;
+    }
+
+    .compose-session-trigger-top + .compose-input-main textarea {
+        padding-right: calc(var(--spacing-xs) + 28px);
+    }
+
     .compose-queue-stack {
         margin: var(--chat-surface-stack-gap) var(--spacing-md) 0;
     }
@@ -197,6 +208,17 @@
 
     .compose-model-meta {
         min-width: 0;
+    }
+
+    .compose-session-trigger-top {
+        position: static;
+        align-self: flex-start;
+        max-width: 100%;
+        margin-bottom: 2px;
+    }
+
+    .compose-session-trigger-top + .compose-input-main textarea {
+        padding-right: calc(var(--spacing-xs) + 28px);
     }
 
     .compose-model-hint,
