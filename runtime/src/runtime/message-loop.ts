@@ -114,7 +114,7 @@ export async function processMessages(chatJid: string, deps: MessageProcessingDe
     return true;
   }
 
-  const prompt = formatMessages(promptMessages, channel);
+  const prompt = formatMessages(promptMessages, channel, chatJid);
 
   log.info("Processing queued prompt messages", {
     operation: "process_messages.prompt",

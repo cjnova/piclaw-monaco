@@ -1371,7 +1371,7 @@ export async function processChat(
   });
 
   const channelName = detectChannel(chatJid);
-  const prompt = formatMessages([currentMessage], channelName);
+  const prompt = formatMessages([currentMessage], channelName, chatJid);
   const lastMessage = currentMessage;
   const runStartedAt = new Date().toISOString();
   const threadId = lastMessage.timestamp;

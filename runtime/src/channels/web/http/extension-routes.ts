@@ -173,3 +173,55 @@ export function getRegisteredRoutes(): Array<{ prefix: string; extensionPath: st
 // Also expose registerToolStatusHintProvider for addon extensions
 import { registerToolStatusHintProvider } from "../../../tool-status-hints.js";
 (globalThis as any).__piclaw_registerToolStatusHintProvider = registerToolStatusHintProvider;
+
+/**
+ * Generic widget-kind registry.
+ *
+ * Addons call `__piclaw_registerWidgetKind(kind, renderer)` to provide an HTML
+ * renderer for a named widget kind. When a core command (e.g. /tree) builds a
+ * `generated_widget` content block, it checks this registry first. If a renderer
+ * is registered it receives the widget artifact and returns self-contained HTML
+ * (served as `{ kind: "html" }`) — no special-casing in the core web app needed.
+ *
+ * Example:
+ *   __piclaw_registerWidgetKind('session_tree', (artifact) =>
+ *     `<html>...fetch /agent/session-tree...</html>`);
+ */
+type WidgetKindRenderer = (artifact: Record<string, unknown>) => string;
+const _widgetKindRegistry = new Map<string, WidgetKindRenderer>();
+
+export function getWidgetKindRenderer(kind: string): WidgetKindRenderer | null {
+  return _widgetKindRegistry.get(kind) ?? null;
+}
+
+(globalThis as any).__piclaw_registerWidgetKind = (
+  kind: string,
+  renderer: WidgetKindRenderer,
+): void => {
+  if (typeof kind !== "string" || !kind.trim()) return;
+  if (typeof renderer !== "function") return;
+  _widgetKindRegistry.set(kind.trim(), renderer);
+};
+
+// Back-compat: keep the old tree-specific global pointing at the generic registry.
+// Addons should migrate to __piclaw_registerWidgetKind('session_tree', fn).
+(globalThis as any).__piclaw_registerTreeWidgetHtml = (
+  fn: (leafId: string, chatJid: string) => string,
+): void => {
+  (globalThis as any).__piclaw_registerWidgetKind(
+    "session_tree",
+    (artifact: Record<string, unknown>) => {
+      const tree = artifact.tree && typeof artifact.tree === "object"
+        ? artifact.tree as Record<string, unknown>
+        : {};
+      return fn(String(tree.leafId ?? ""), String(artifact.chatJid ?? ""));
+    },
+  );
+};
+
+/** @deprecated Use __piclaw_registerWidgetKind('session_tree', fn) instead. */
+export function getTreeWidgetHtmlProvider(): ((leafId: string, chatJid: string) => string) | null {
+  const renderer = _widgetKindRegistry.get("session_tree");
+  if (!renderer) return null;
+  return (leafId, chatJid) => renderer({ leafId, chatJid });
+}

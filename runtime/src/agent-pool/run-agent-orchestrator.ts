@@ -11,6 +11,7 @@ import {
   updateSessionStreaming,
   updateSessionModel,
 } from "../extensions/session-status.js";
+import { clearLiveSshConfig } from "../extensions/ssh-core.js";
 
 import {
   decideAutomaticRecovery,
@@ -20,7 +21,7 @@ import {
   type RecoveryClassifier,
   type RecoveryStrategy,
 } from "./automatic-recovery.js";
-import { getAgentRuntimeConfig, getSessionStorageConfig, getToolUseMessageBudget } from "../core/config.js";
+import { getAgentRuntimeConfig, getCompactionRuntimeConfig, getSessionStorageConfig, getToolUseMessageBudget } from "../core/config.js";
 import { detectChannel } from "../router.js";
 import { pruneOrphanToolResults } from "./orphan-tool-results.js";
 import { writeAgentLog } from "./logging.js";
@@ -39,6 +40,7 @@ import {
   clearCompactionFailureBackoff,
   estimateContextTokensFromSession,
   getModelContextWindow,
+  isCompactionCancellationError,
   maybeAutoCompactSessionBeforePrompt,
   noteCompactionFailure,
   runCompactionWithTimeout,
@@ -82,6 +84,8 @@ async function sleep(ms: number): Promise<void> {
 
 const MIN_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS = 1_000;
 const MAX_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS = 15_000;
+const MID_TURN_CONTEXT_CHECK_MIN_INTERVAL_MS = 1_000;
+const CONTEXT_USAGE_UPDATE_MIN_INTERVAL_MS = 250;
 
 type ToolExecutionWatchdogEvent = {
   type: "tool_execution_start" | "tool_execution_update" | "tool_execution_end";
@@ -95,6 +99,22 @@ function getToolExecutionWatchdogHeartbeatIntervalMs(timeoutMs = getProgressWatc
     MIN_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS,
     Math.min(MAX_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS, Math.floor(timeoutMs / 3)),
   );
+}
+
+function buildContextUsageUpdateEvent(
+  tokens: number,
+  contextWindow: number,
+  phase: string,
+): AgentSessionEvent {
+  return {
+    type: "context_usage_update",
+    tokens,
+    contextWindow,
+    percent: contextWindow > 0 ? (tokens / contextWindow) * 100 : null,
+    estimated: true,
+    source: "agent_orchestrator",
+    phase,
+  } as unknown as AgentSessionEvent;
 }
 
 export function createToolExecutionWatchdogHeartbeatController(
@@ -346,8 +366,10 @@ async function runRecoveryCompaction(
     "recovery",
   );
   if (!compactionResult.ok) {
-    noteCompactionFailure(chatJid, compactionResult.errorMessage);
-    const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
+    const aborted = isCompactionCancellationError(compactionResult.errorMessage);
+    if (!aborted) {
+      noteCompactionFailure(chatJid, compactionResult.errorMessage);
+    }
     emitAgentSessionEvent(runOptions.onEvent, {
       type: "compaction_end",
       reason: "overflow",
@@ -393,6 +415,9 @@ async function runPromptAttempt(
   let toolUseBudgetExceeded = false;
   let modelResponseSequence = 0;
   let activeModelResponse: { sequence: number; startedAt: number } | null = null;
+  let lastMidTurnContextUpdateAt = 0;
+  let lastContextUsageUpdateAt = 0;
+  let midTurnContextAbortRequested = false;
   const sessionEntryBaseline = snapshotSessionEntryCount(session);
   const toolUseMessageBudget = getToolUseMessageBudget();
   runOptions.sessionLeafId = typeof session.sessionManager?.getLeafId === "function"
@@ -423,6 +448,73 @@ async function runPromptAttempt(
     "exit_process",
   ].includes(toolName);
   let sawTerminalSideEffectToolActivity = false;
+
+  const readContextUsageSnapshot = (): { tokens: number; contextWindow: number; thresholdTokens: number; thresholdPercent: number; overThreshold: boolean } | null => {
+    const contextWindow = getModelContextWindow(session) ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
+    if (!Number.isFinite(contextWindow) || contextWindow <= 0) return null;
+    const tokens = estimateContextTokensFromSession(session);
+    const thresholdPercent = getCompactionRuntimeConfig().thresholdPercent;
+    const thresholdTokens = Math.floor(contextWindow * (thresholdPercent / 100));
+    return {
+      tokens,
+      contextWindow,
+      thresholdTokens,
+      thresholdPercent,
+      overThreshold: tokens > thresholdTokens,
+    };
+  };
+
+  const publishContextUsageUpdate = (phase: string, force = false): ReturnType<typeof readContextUsageSnapshot> => {
+    try {
+      const snapshot = readContextUsageSnapshot();
+      if (!snapshot) return null;
+      const now = Date.now();
+      if (force || now - lastContextUsageUpdateAt >= CONTEXT_USAGE_UPDATE_MIN_INTERVAL_MS) {
+        lastContextUsageUpdateAt = now;
+        runOptions.onEvent?.(buildContextUsageUpdateEvent(snapshot.tokens, snapshot.contextWindow, phase));
+      }
+      return snapshot;
+    } catch (err) {
+      debugSuppressedError(log, "Failed to publish context usage update.", err, { chatJid, phase });
+      return null;
+    }
+  };
+
+  const checkMidTurnContextAfterToolResult = (toolName: unknown, isError: unknown): void => {
+    try {
+      const now = Date.now();
+      const forceUsageUpdate = now - lastMidTurnContextUpdateAt >= MID_TURN_CONTEXT_CHECK_MIN_INTERVAL_MS;
+      if (forceUsageUpdate) lastMidTurnContextUpdateAt = now;
+      const snapshot = publishContextUsageUpdate("mid_turn_tool_result", forceUsageUpdate);
+      if (!snapshot?.overThreshold || midTurnContextAbortRequested) return;
+
+      sawCompactionIntent = true;
+      midTurnContextAbortRequested = true;
+      runOptions.onEvent?.(buildContextUsageUpdateEvent(snapshot.tokens, snapshot.contextWindow, "mid_turn_tool_result_over_threshold"));
+      options.onWarn?.("Mid-turn context pressure detected after tool result; aborting for compaction", {
+        operation: "run_agent.mid_turn_context_pressure",
+        chatJid,
+        contextTokens: snapshot.tokens,
+        contextWindow: snapshot.contextWindow,
+        thresholdTokens: snapshot.thresholdTokens,
+        thresholdPercent: snapshot.thresholdPercent,
+        toolName: typeof toolName === "string" ? toolName : null,
+        toolErrored: isError === true,
+        ...getRunObservabilityDetails(runOptions),
+      });
+      void session.abort().catch((err) => {
+        options.onWarn?.("Failed to abort session after mid-turn context pressure", {
+          operation: "run_agent.mid_turn_context_pressure_abort_failed",
+          chatJid,
+          err,
+          ...getRunObservabilityDetails(runOptions),
+        });
+      });
+    } catch (err) {
+      debugSuppressedError(log, "Failed to check mid-turn context pressure after tool result.", err, { chatJid });
+    }
+  };
+
   const wrappedOnEvent = (event: AgentSessionEvent) => {
     if (event.type === "message_update") {
       heartbeatTrackedPhase(chatJid, "streaming", { eventType: event.type });
@@ -443,6 +535,12 @@ async function runPromptAttempt(
 
     if (event.type === "tool_execution_start" || event.type === "tool_execution_end") {
       toolExecutionWatchdogHeartbeat.handleEvent(event as ToolExecutionWatchdogEvent);
+    }
+
+    if (event.type === "tool_execution_start") {
+      publishContextUsageUpdate("tool_execution_start", true);
+    } else if (event.type === "tool_execution_update") {
+      publishContextUsageUpdate("tool_execution_update");
     }
 
     if (event.type === "thinking_level_changed") {
@@ -542,12 +640,16 @@ async function runPromptAttempt(
       if (event.type === "tool_execution_end" && !(event as { isError?: unknown }).isError && isTerminalSideEffectToolName(toolName)) {
         sawTerminalSideEffectToolActivity = true;
       }
+      if (event.type === "tool_execution_end") {
+        checkMidTurnContextAfterToolResult(toolName, (event as { isError?: unknown }).isError);
+      }
       // If exit_process was called, do NOT abort immediately — let the LLM
       // finish its current text response so the agent's reply is captured and
       // persisted to the DB. The abort happens below in the message_end handler
       // when the LLM tries to issue further tool calls (stopReason === "toolUse").
     }
     if (event.type === "message_end") {
+      publishContextUsageUpdate("message_end", true);
       const message = (event as { message?: { role?: unknown; content?: unknown; stopReason?: unknown; errorMessage?: unknown; usage?: Record<string, unknown> } }).message;
       if (message?.role === "assistant") {
         const durationMs = activeModelResponse ? Math.max(0, Date.now() - activeModelResponse.startedAt) : null;
@@ -619,6 +721,7 @@ async function runPromptAttempt(
   let promptThrownError: string | null = null;
   try {
     heartbeatTrackedPhase(chatJid, "prompt", { eventType: "prompt_start" });
+    publishContextUsageUpdate("prompt_start", true);
     await session.prompt(prompt);
     finishPromptTimeout();
     heartbeatTrackedPhase(chatJid, "prompt", { eventType: "prompt_resolved" });
@@ -1192,6 +1295,16 @@ export async function runAgentPrompt(
     if (sessionCtrl && savedToolNames !== null && originalSetActiveToolsByName) {
       sessionCtrl.setActiveToolsByName = originalSetActiveToolsByName;
       originalSetActiveToolsByName(savedToolNames);
+    }
+    try {
+      await clearLiveSshConfig(chatJid);
+    } catch (error) {
+      options.onWarn?.("Failed to clear turn-scoped SSH tool redirection", {
+        operation: "run_agent.ssh_clear_turn_scope",
+        chatJid,
+        error,
+      });
+      debugSuppressedError(log, "Failed to clear turn-scoped SSH tool redirection.", error, { chatJid });
     }
     options.clearActiveForkBaseLeaf(chatJid);
   }

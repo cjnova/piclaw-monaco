@@ -207,6 +207,7 @@ function buildCard2ApiKey(def: ProviderDef): Record<string, unknown> {
       body: [
         { type: "TextBlock", text: `${def.name} — API Key`, weight: "Bolder", size: "Medium" },
         { type: "TextBlock", text: "Saved to `~/.pi/agent/auth.json` (backup created first).", wrap: true, isSubtle: true },
+        ...(def.authNote ? [{ type: "TextBlock", text: def.authNote, wrap: true, isSubtle: true }] : []),
         { type: "Input.Text", id: "api_key", label: "API Key", placeholder: def.apiKeyHint || "Enter key...", style: "password" },
       ],
       actions: [

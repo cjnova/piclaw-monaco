@@ -141,6 +141,10 @@ function computeCompactionBackoffMs(failureCount: number): number {
   return Math.min(maxMs, baseMs * 2 ** Math.max(0, normalizedFailures - 1));
 }
 
+export function isCompactionCancellationError(message: string | null | undefined): boolean {
+  return /compaction cancelled|aborterror/i.test(String(message || ""));
+}
+
 function formatCompactionBackoffDetail(state: Pick<ChatCompactionBackoffState, "failureCount" | "backoffUntil" | "lastErrorMessage">): string {
   const parts = [
     `Skipping auto-compaction until ${state.backoffUntil}`,
@@ -348,7 +352,26 @@ async function maybeAutoCompactSession(
 
   try {
     const activeBackoff = getActiveCompactionBackoff(chatJid);
-    if (activeBackoff) {
+    if (activeBackoff && isCompactionCancellationError(activeBackoff.lastErrorMessage)) {
+      clearCompactionFailureBackoff(chatJid);
+      options.onWarn?.(
+        reason === "idle"
+          ? "Idle auto-compaction clearing cancellation backoff"
+          : "Pre-prompt auto-compaction clearing cancellation backoff",
+        {
+          operation: reason === "idle"
+            ? "schedule_idle_auto_compaction.backoff_cleared"
+            : "maybe_auto_compact_session_before_prompt.backoff_cleared",
+          chatJid,
+          contextTokens: context.contextTokens,
+          contextWindow: context.contextWindow,
+          reserveTokens: context.reserveTokens,
+          failureCount: activeBackoff.failureCount,
+          backoffUntil: activeBackoff.backoffUntil,
+          lastErrorMessage: activeBackoff.lastErrorMessage,
+        },
+      );
+    } else if (activeBackoff) {
       const detail = formatCompactionBackoffDetail(activeBackoff);
       options.onWarn?.(
         reason === "idle"
@@ -402,8 +425,8 @@ async function maybeAutoCompactSession(
       reason,
     );
     if (!compactionResult.ok) {
-      const failureState = noteCompactionFailure(chatJid, compactionResult.errorMessage);
-      const aborted = /compaction cancelled|aborterror/i.test(compactionResult.errorMessage);
+      const aborted = isCompactionCancellationError(compactionResult.errorMessage);
+      const failureState = aborted ? null : noteCompactionFailure(chatJid, compactionResult.errorMessage);
       onEvent?.({
         type: "compaction_end",
         reason,
@@ -414,20 +437,37 @@ async function maybeAutoCompactSession(
           ? undefined
           : `${reason === "idle" ? "Idle compaction failed" : "Pre-prompt compaction failed"}: ${compactionResult.errorMessage}`,
       } as AgentSessionEvent);
-      options.onWarn?.(
-        reason === "idle"
-          ? "Idle auto-compaction entered backoff for this chat"
-          : "Pre-prompt auto-compaction entered backoff for this chat",
-        {
-          operation: reason === "idle"
-            ? "schedule_idle_auto_compaction.backoff_recorded"
-            : "maybe_auto_compact_session_before_prompt.backoff_recorded",
-          chatJid,
-          failureCount: failureState.failureCount,
-          backoffUntil: failureState.backoffUntil,
-          lastErrorMessage: failureState.lastErrorMessage,
-        },
-      );
+      if (failureState) {
+        options.onWarn?.(
+          reason === "idle"
+            ? "Idle auto-compaction entered backoff for this chat"
+            : "Pre-prompt auto-compaction entered backoff for this chat",
+          {
+            operation: reason === "idle"
+              ? "schedule_idle_auto_compaction.backoff_recorded"
+              : "maybe_auto_compact_session_before_prompt.backoff_recorded",
+            chatJid,
+            failureCount: failureState.failureCount,
+            backoffUntil: failureState.backoffUntil,
+            lastErrorMessage: failureState.lastErrorMessage,
+            aborted,
+          },
+        );
+      } else {
+        options.onWarn?.(
+          reason === "idle"
+            ? "Idle auto-compaction cancelled without entering backoff"
+            : "Pre-prompt auto-compaction cancelled without entering backoff",
+          {
+            operation: reason === "idle"
+              ? "schedule_idle_auto_compaction.cancelled"
+              : "maybe_auto_compact_session_before_prompt.cancelled",
+            chatJid,
+            lastErrorMessage: compactionResult.errorMessage,
+            aborted,
+          },
+        );
+      }
       throw new Error(compactionResult.errorMessage);
     }
     clearCompactionFailureBackoff(chatJid);

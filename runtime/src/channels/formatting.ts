@@ -27,14 +27,24 @@ export function getChannelFormattingInstructions(channel?: string | null): strin
   return CHANNEL_FORMATTING_HINTS[key] ?? null;
 }
 
-export function buildChannelSystemPromptAppendix(channel?: string | null): string | null {
+function normalizeChatJidForPrompt(chatJid?: string | null): string | null {
+  const normalized = typeof chatJid === "string" ? chatJid.replace(/[\r\n\t]+/g, " ").trim() : "";
+  if (!normalized || /\s/.test(normalized)) return null;
+  return normalized.slice(0, 200);
+}
+
+export function buildChannelSystemPromptAppendix(channel?: string | null, chatJid?: string | null): string | null {
   const normalizedChannel = typeof channel === "string" ? channel.trim().toLowerCase() : "";
   if (!normalizedChannel) return null;
   const formatting = getChannelFormattingInstructions(normalizedChannel);
   if (!formatting) return null;
+  const normalizedChatJid = normalizeChatJidForPrompt(chatJid);
   return [
     "## Active delivery channel",
     `Current channel: ${normalizedChannel}`,
+    ...(normalizedChatJid ? [`Current chat: ${normalizedChatJid}`] : []),
+    "",
+    "Use the current channel and chat to scope replies, tool calls, message lookups, and any follow-up delivery.",
     "",
     "When responding to the user, format for this channel:",
     formatting,

@@ -151,7 +151,7 @@ function getPersistedSessionState(chatJid: string): { current: string | null; th
 
 function parseTranscriptPromptEnvelope(raw: string): PromptEnvelopeMessage[] | null {
   const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  if (!normalized || (!normalized.startsWith("Channel:") && !normalized.startsWith("Messages:") && !/^.+\s@\s.+:\n/m.test(normalized))) {
+  if (!normalized || (!normalized.startsWith("Channel:") && !normalized.startsWith("Chat:") && !normalized.startsWith("Messages:") && !/^.+\s@\s.+:\n/m.test(normalized))) {
     return null;
   }
 
@@ -165,7 +165,7 @@ function parseTranscriptPromptEnvelope(raw: string): PromptEnvelopeMessage[] | n
       index += 1;
       continue;
     }
-    if (line.startsWith("Channel:")) {
+    if (line.startsWith("Channel:") || line.startsWith("Chat:")) {
       index += 1;
       continue;
     }

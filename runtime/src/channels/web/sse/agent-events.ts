@@ -638,6 +638,22 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
 
     const customEventType = (event as { type?: string }).type;
 
+    if (customEventType === "context_usage_update") {
+      const e = event as { tokens?: number; contextWindow?: number; percent?: number | null; estimated?: boolean; source?: string; phase?: string };
+      options.emitter.status({
+        ...base,
+        type: "context_usage",
+        context_usage: {
+          tokens: typeof e.tokens === "number" && Number.isFinite(e.tokens) ? e.tokens : null,
+          contextWindow: typeof e.contextWindow === "number" && Number.isFinite(e.contextWindow) ? e.contextWindow : null,
+          percent: typeof e.percent === "number" && Number.isFinite(e.percent) ? e.percent : null,
+          estimated: e.estimated === true,
+          source: typeof e.source === "string" ? e.source : null,
+          phase: typeof e.phase === "string" ? e.phase : null,
+        },
+      });
+    }
+
     if (customEventType === "compaction_suppressed") {
       const e = event as { until?: string; failureCount?: number; detail?: string; errorMessage?: string };
       const failureCount = typeof e.failureCount === "number" && Number.isFinite(e.failureCount) ? e.failureCount : null;

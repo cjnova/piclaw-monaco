@@ -909,6 +909,11 @@ export function hasLiveChatSshSession(chatJid: string): boolean {
   return (liveChatSshStates.get(chatJid)?.refCount ?? 0) > 0;
 }
 
+export function hasLiveChatSshConnection(chatJid: string): boolean {
+  const state = liveChatSshStates.get(chatJid);
+  return Boolean(state?.connection && state.transport);
+}
+
 export async function applyLiveSshConfig(
   chatJid: string,
   config: SshCoreResolvedConfig,

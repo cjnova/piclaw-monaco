@@ -1,6 +1,6 @@
 {
   "name": "piclaw",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Personal pi coding agent assistant. Lightweight nanoclaw-style orchestrator using Bun and pi.",
   "type": "module",
   "license": "MIT",
@@ -112,6 +112,7 @@
     "@lezer/highlight": "1.2.3",
     "@mariozechner/pi-coding-agent": "0.73.0",
     "@simplewebauthn/server": "13.3.0",
+    "@sinclair/typebox": "0.34.49",
     "@whiskeysockets/baileys": "7.0.0-rc.9",
     "adaptivecards": "3.0.6",
     "beautiful-mermaid": "1.1.3",
