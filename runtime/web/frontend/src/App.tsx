@@ -3,9 +3,11 @@ import { useCallback, useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { ActivityBar } from "./components/ActivityBar";
 import { Sidebar } from "./components/Sidebar";
+import { TabBar } from "./components/TabBar";
 import { SystemStats } from "./components/SystemStats";
 import { ModelContextBar } from "./components/ModelContextBar";
 import { CommandPalette } from "./components/CommandPalette";
+import { WidgetPane } from "./components/WidgetPane";
 import { PanelRouter, ChatPanel, SettingsPanel } from "./panels";
 import { ThemeProvider, useThemeControl } from "./theme/ThemeProvider";
 import { useCommands } from "./app/useCommands";
@@ -13,6 +15,7 @@ import { useLayoutPersistence } from "./app/useLayoutPersistence";
 import { useResizeHandlers } from "./app/useResizeHandlers";
 import { useStatusFlash } from "./app/useStatusFlash";
 import { useConnectionStatus } from "./app/useConnectionStatus";
+import { useTabs } from "./app/useTabs";
 import { TerminalPanel } from "./app/TerminalPanel";
 import { ExtensionFrame } from "./app/ExtensionFrame";
 
@@ -20,7 +23,6 @@ const PANEL_NAMES: Record<string, string> = {
   explorer: "Workspace", search: "Search", extensions: "Addons",
   agent: "Dashboards", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings",
 };
-
 const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handler(); }
 };
@@ -41,6 +43,8 @@ function AppContent() {
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
+  const { tabs, activeTabId, closeTab } = useTabs(terminalVisible, terminalMaximized);
+
   const isSettingsActive = activePanel.value === "settings";
 
   const { onTermDragStart, onSidebarMouseDown, onSidebarKeyDown } = useResizeHandlers({
@@ -55,7 +59,6 @@ function AppContent() {
 
   const handlePanelChange = useCallback((id: string) => {
     if (id === "settings" && activePanel.value === "settings") {
-      // Closing settings: show chat, hide sidebar
       activePanel.value = previousPanel.value;
       sidebarCollapsed.value = true;
     } else if (id === activePanel.value) {
@@ -98,7 +101,6 @@ function AppContent() {
     return () => window.removeEventListener('piclaw:open-page', onOpenPage);
   }, [handlePageSelect]);
 
-  // Close sidebar on search result click (mobile UX)
   useEffect(() => {
     const onClose = () => { sidebarCollapsed.value = true; };
     window.addEventListener('piclaw:close-sidebar', onClose);
@@ -107,6 +109,10 @@ function AppContent() {
 
   const connected = connectionStatus.value === "connected";
   const isExtensionPageOpen = (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value;
+  const hasWidgetTab = tabs.value.some((t) => t.type === "widget");
+  const isWidgetActive = hasWidgetTab && tabs.value.some((t) => t.id === activeTabId.value && t.type === "widget");
+  const isTerminalActive = activeTabId.value === "terminal";
+  const hasTerminalTab = tabs.value.some((t) => t.type === "terminal");
 
   return (
     <div className="app-layout">
@@ -130,22 +136,54 @@ function AppContent() {
             />
           )}
           <div className="app-layout__panel">
-            {isSettingsActive && <SettingsPanel />}
-            {!isSettingsActive && isExtensionPageOpen
-              ? <ExtensionFrame
-                  extensionPageUrl={extensionPageUrl.value}
-                  extensionPageName={extensionPageName.value}
-                  extensionPageHtml={extensionPageHtml.value}
-                  onBack={handleBackToChat}
+            {isSettingsActive ? (
+              <SettingsPanel />
+            ) : (
+              <>
+                <TabBar
+                  tabs={tabs.value}
+                  activeTabId={activeTabId.value}
+                  onSelectTab={(id) => { activeTabId.value = id; }}
+                  onCloseTab={closeTab}
                 />
-              : null}
-            <div className={isSettingsActive || isExtensionPageOpen ? "app-layout__chat-wrapper app-layout__chat-wrapper--hidden" : "app-layout__chat-wrapper"}>
-              <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
-            </div>
+                <div className="app-layout__tab-viewport">
+                  {isExtensionPageOpen ? (
+                    <ExtensionFrame
+                      extensionPageUrl={extensionPageUrl.value}
+                      extensionPageName={extensionPageName.value}
+                      extensionPageHtml={extensionPageHtml.value}
+                      onBack={handleBackToChat}
+                    />
+                  ) : (
+                    <>
+                      <div className={isWidgetActive || isTerminalActive ? "app-layout__tab-content--hidden" : "app-layout__tab-content"}>
+                        <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
+                      </div>
+                      {hasTerminalTab && (
+                        <div className={isTerminalActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>
+                          <TerminalPanel
+                            tabMode
+                            terminalMaximized={terminalMaximized}
+                            terminalVisible={terminalVisible}
+                            onDragStart={onTermDragStart}
+                          />
+                        </div>
+                      )}
+                      {hasWidgetTab && (
+                        <div className={isWidgetActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>
+                          <WidgetPane tabMode />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {terminalVisible.value && (
+        {/* Desktop docked terminal (not shown on mobile — mobile uses terminal tab) */}
+        {terminalVisible.value && !hasTerminalTab && (
           <div className="app-layout__terminal" ref={terminalRef}>
             <TerminalPanel
               terminalMaximized={terminalMaximized}
@@ -183,11 +221,9 @@ function AppContent() {
             )}
           </span>
         </div>
-        {/* Mobile bottom toolbar — visible only on <639px via CSS */}
+        {/* Mobile bottom toolbar */}
         <div className="mobile-toolbar">
-          <span className="mobile-toolbar__model-slot">
-            <ModelContextBar />
-          </span>
+          <span className="mobile-toolbar__model-slot"><ModelContextBar /></span>
           <button
             type="button"
             className="mobile-toolbar__terminal-btn"

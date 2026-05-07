@@ -5,6 +5,8 @@ interface TerminalPanelProps {
   terminalMaximized: Signal<boolean>;
   terminalVisible: Signal<boolean>;
   onDragStart: (e: MouseEvent) => void;
+  /** When true, renders as a full-height tab (no drag handle, no close button). */
+  tabMode?: boolean;
 }
 
 const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
@@ -14,16 +16,19 @@ const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
   }
 };
 
-export function TerminalPanel({ terminalMaximized, terminalVisible, onDragStart }: TerminalPanelProps) {
+export function TerminalPanel({ terminalMaximized, terminalVisible, onDragStart, tabMode = false }: TerminalPanelProps) {
   return (
     <>
-      <div
-        className="app-layout__term-drag-handle"
-        onMouseDown={onDragStart}
-      />
-      <div className="terminal__header">
-        <span className="terminal__title">Terminal</span>
-        <div className="terminal__actions">
+      {!tabMode && (
+        <div
+          className="app-layout__term-drag-handle"
+          onMouseDown={onDragStart}
+        />
+      )}
+      {!tabMode && (
+        <div className="terminal__header">
+          <span className="terminal__title">Terminal</span>
+          <div className="terminal__actions">
           <span
             className="terminal__btn"
             role="button"
@@ -70,6 +75,7 @@ export function TerminalPanel({ terminalMaximized, terminalVisible, onDragStart 
           </span>
         </div>
       </div>
+      )}
       <TerminalComponent />
     </>
   );

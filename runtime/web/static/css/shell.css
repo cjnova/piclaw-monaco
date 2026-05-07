@@ -421,6 +421,27 @@ body {
   overflow: hidden;
   min-width: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-layout__tab-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-layout__tab-content {
+  display: contents;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-layout__tab-content--hidden {
+  display: none;
 }
 
 .app-layout__chat-wrapper {
@@ -1362,6 +1383,105 @@ body {
   border: none;
   display: block;
   min-height: 0;
+}
+
+/* ===== Central Pane Tab Bar ===== */
+.tab-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-bar__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 0 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 180px;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.tab-bar__tab:hover {
+  color: var(--text);
+}
+
+.tab-bar__tab--active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.tab-bar__tab__icon {
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tab-bar__tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-bar__tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.tab-bar__tab__close:hover {
+  background: var(--overlay-white-12);
+  color: var(--text);
+}
+
+/* Widget tab: full-height, no modal */
+.widget-pane--tab {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+@media (max-width: 639px) {
+  .tab-bar {
+    height: 32px;
+  }
+
+  .tab-bar__tab {
+    padding: 0 10px;
+    font-size: 11px;
+  }
 }
 
 /* ===== Message List ===== */
@@ -4907,18 +5027,18 @@ pre.frontmatter-block {
     display: none;
   }
   .mobile-toolbar__terminal-btn {
-    background: none;
+    background: #1e66a8;
     border: none;
-    color: var(--text-muted);
-    font-size: 14px;
-    padding: 6px 10px;
+    color: #ffffff;
+    font-size: 12px;
+    padding: 4px 10px;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 3px;
     white-space: nowrap;
+    font-weight: 500;
   }
   .mobile-toolbar__terminal-btn:hover {
-    background: var(--overlay-white-08);
-    color: var(--text);
+    opacity: 0.85;
   }
 
   /* Activity bar becomes horizontal top bar on mobile */
