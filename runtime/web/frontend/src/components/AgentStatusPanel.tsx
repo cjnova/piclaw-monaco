@@ -143,7 +143,7 @@ export function AgentStatusPanel() {
           t.id === id ? { ...t, status: "done" as const, title: detail.title || t.title } : t
         ));
       }
-      if (detail.type) setStatus(detail.type);
+      if (detail.type && detail.type !== "context_usage" && detail.type !== "done") setStatus(detail.type);
       if (detail.text || detail.message) setStatusText(detail.text || detail.message || "");
     };
 

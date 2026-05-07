@@ -169,11 +169,9 @@ function AppContent() {
                           />
                         </div>
                       )}
-                      {hasWidgetTab && (
-                        <div className={isWidgetActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>
+                      <div className={isWidgetActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>
                           <WidgetPane tabMode />
                         </div>
-                      )}
                     </>
                   )}
                 </div>
