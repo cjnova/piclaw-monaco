@@ -110,7 +110,15 @@ export function MessageItem({
   }
 
   const displayName = isUser ? "You" : "PiClaw";
-  const avatarLetter = isUser ? "Y" : "P";
+  const agentAvatarUrl = "/static/icon-192.png";
+
+  const AvatarCircle = ({ className }: { className: string }) => (
+    isUser ? (
+      <div className={`message-list__avatar-circle ${className}`} aria-hidden="true">Y</div>
+    ) : (
+      <img className={`message-list__avatar-img ${className}`} src={agentAvatarUrl} alt="" aria-hidden="true" />
+    )
+  );
 
   // ── Collapsed render ───────────────────────────────────────────────────
   if (isCollapsed) {
@@ -121,16 +129,7 @@ export function MessageItem({
         }`}
         data-message-id={interaction.id}
       >
-        <div
-          className={`message-list__avatar-circle ${
-            isUser
-              ? "message-list__avatar-circle--user"
-              : "message-list__avatar-circle--agent"
-          }`}
-          aria-hidden="true"
-        >
-          {avatarLetter}
-        </div>
+        <AvatarCircle className={isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"} />
         <div className="message-list__body message-list__body--collapsed">
           <MessageActionBar
             messageId={interaction.id}
@@ -170,16 +169,7 @@ export function MessageItem({
       }`}
       data-message-id={interaction.id}
     >
-      <div
-        className={`message-list__avatar-circle ${
-          isUser
-            ? "message-list__avatar-circle--user"
-            : "message-list__avatar-circle--agent"
-        }`}
-        aria-hidden="true"
-      >
-        {avatarLetter}
-      </div>
+      <AvatarCircle className={isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"} />
       <div className="message-list__body">
         <MessageActionBar
           messageId={interaction.id}
