@@ -1,7 +1,7 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-06
-Total open issues: 15
+Updated: 2026-05-07
+Total open issues: 8
 Upstream synced: v2.2.2 (Lothlórien)
 
 ## Vision
@@ -424,3 +424,32 @@ When **file** selected: action bar shows `[+] create [✏️] edit [🗑] delete
 **🧩 Addons**: extension list + details (future)
 **🤖 Agent**: focuses compose box (chat is always visible)
 **⚙️ Settings**: existing piclaw settings panels
+
+### Recently Closed
+
+| Issue | Status |
+|---|---|
+| #185 | Mobile responsive UI | ✅ |
+| #296 | CLS column-reverse fix | ✅ |
+| #297 | INP gear icon (won't fix — marginal gain) | ❌ |
+| #300 | Upstream sync v2.2.2 | ✅ |
+| #133 | Font subset (no gain on localhost) | ❌ |
+| #184 | Virtualize timeline (unnecessary with pagination) | ❌ |
+| #304 | Search scope + media filters (#85) | ✅ |
+| #305 | Dream model bug (upstream issue) | ❌ |
+| #307 | Tasks panel enrich | ✅ |
+| #308 | Upstream sync v2.2.3 | ✅ |
+
+### Open Issues (8)
+
+| # | Issue | Category |
+|---|---|---|
+| 89 | Central pane tab bar | Feature |
+| 264 | Widget pane not opening (blocked by #89) | Bug |
+| 139 | Passkey auth (backend) | Security |
+| 151 | Passkey management UI | Security |
+| 96 | Provider setup form | Feature |
+| 86 | QR code pairing | Feature |
+| 150 | Multi-tab terminal | Nice to have |
+| 144 | Terminal profiles (Shell + Pi TUI) | Nice to have |
+| 306 | Environment settings section | Feature |
