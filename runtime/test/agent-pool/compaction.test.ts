@@ -1,9 +1,15 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 
+import "../helpers.js";
 import {
   estimateContextTokensFromSession,
   runCompactionWithTimeout,
 } from "../../src/agent-pool/compaction.js";
+import { initDatabase } from "../../src/db.js";
+
+beforeEach(() => {
+  initDatabase();
+});
 
 function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;

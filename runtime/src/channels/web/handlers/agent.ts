@@ -65,6 +65,7 @@ import {
 } from "../../../runtime/progress-watchdog.js";
 
 const log = createLogger("web.handlers.agent");
+const DEFAULT_PREPROMPT_COMPACTION_FOREGROUND_MS = 250;
 
 type BrowserObservabilityContext = {
   userId?: string;
@@ -96,6 +97,28 @@ function withObservabilityMetadata(details: Record<string, unknown>, turnId: str
     ...(browserContext?.sessionId ? { sessionId: browserContext.sessionId } : {}),
     ...(browserContext?.clientId ? { clientId: browserContext.clientId } : {}),
   };
+}
+
+function getPrePromptCompactionForegroundMs(): number {
+  const parsed = Number.parseInt(String(process.env.PICLAW_PREPROMPT_COMPACTION_FOREGROUND_MS || "").trim(), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_PREPROMPT_COMPACTION_FOREGROUND_MS;
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function enqueueProcessChatAfterCompaction(
+  channel: WebChannelLike,
+  chatJid: string,
+  agentId: string,
+  messageId: string,
+  threadRootId: number | undefined,
+  browserObservability: BrowserObservabilityContext | undefined,
+): void {
+  channel.queue.enqueue(async () => {
+    await processChat(channel, chatJid, agentId, threadRootId, browserObservability);
+  }, `compaction-resume:${chatJid}:${messageId}`, `chat:${chatJid}`);
 }
 
 function isRateLimitError(errorText: string | null | undefined): boolean {
@@ -1493,20 +1516,52 @@ export async function processChat(
       messageId: lastMessage.id,
       startedAt: runStartedAt,
     });
+    const compactionPromise = maybeAutoCompactSessionBeforePrompt(
+      session,
+      chatJid,
+      {
+        onInfo: (message, details) => log.info(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
+        onWarn: (message, details) => log.warn(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
+      },
+      trackedStreamingHandler,
+    );
+    let deferredForCompaction = false;
     try {
-      await maybeAutoCompactSessionBeforePrompt(
-        session,
-        chatJid,
-        {
-          onInfo: (message, details) => log.info(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
-          onWarn: (message, details) => log.warn(message, withObservabilityMetadata(details || {}, turnId, browserObservability)),
-        },
-        trackedStreamingHandler,
-      );
+      const foregroundMs = getPrePromptCompactionForegroundMs();
+      const foregroundResult = await Promise.race([
+        compactionPromise.then(() => "done" as const),
+        sleepMs(foregroundMs).then(() => "defer" as const),
+      ]);
+      if (foregroundResult === "defer") {
+        deferredForCompaction = true;
+        log.info("Pre-prompt compaction continuing in background", withObservabilityMetadata({
+          operation: "process_chat.preprompt_compaction_deferred",
+          chatJid,
+          messageId: lastMessage.id,
+          foregroundMs,
+        }, turnId, browserObservability));
+        compactionPromise
+          .catch((error) => {
+            log.warn("Background pre-prompt compaction failed before chat resume", withObservabilityMetadata({
+              operation: "process_chat.preprompt_compaction_deferred_failed",
+              chatJid,
+              messageId: lastMessage.id,
+              err: error,
+            }, turnId, browserObservability));
+          })
+          .finally(() => {
+            enqueueProcessChatAfterCompaction(channel, chatJid, agentId, lastMessage.id, effectiveThreadRootId, browserObservability);
+          });
+        return;
+      }
     } catch (error) {
       clearChatPreflight(chatJid);
       endTrackedPhase(chatJid);
       throw error;
+    } finally {
+      if (!deferredForCompaction) {
+        await compactionPromise;
+      }
     }
 
     heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preflight_promoted" });
