@@ -141,14 +141,7 @@ export function WidgetPane({ tabMode = false }: { tabMode?: boolean }) {
   if (tabMode) {
     return (
       <div className="widget-pane widget-pane--tab">
-        <div className="widget-pane__header">
-          <div className="widget-pane__heading">
-            <div className="widget-pane__eyebrow">Widget • {widget.status.toUpperCase()}</div>
-            <div className="widget-pane__title">{widget.title}</div>
-            {widget.subtitle && <div className="widget-pane__subtitle">{widget.subtitle}</div>}
-          </div>
-        </div>
-        <div className="widget-pane__body">
+        <div className="widget-pane__body widget-pane__body--full">
           {widget.status === "error" ? (
             <div className="widget-pane__error">{widget.error}</div>
           ) : srcDoc ? (
