@@ -66,7 +66,7 @@ export function WidgetPane({ tabMode = false }: { tabMode?: boolean }) {
       const title = detail?.title || "Widget";
       const subtitle = detail?.subtitle || detail?.description || "";
       htmlBufferRef.current = html;
-      setWidget({ html, title, subtitle, status: "loading" });
+      setWidget({ html, title, subtitle, status: html ? "final" : "loading" });
     };
 
     const handleDelta = (e: Event) => {

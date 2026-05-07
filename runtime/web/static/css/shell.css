@@ -4872,6 +4872,24 @@ pre.frontmatter-block {
 }
 
 /* ── Inline Media ─────────────────────────────── */
+.message-list__widget-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: var(--overlay-white-08);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.message-list__widget-open-btn:hover {
+  background: var(--overlay-white-15);
+}
+
 .message-list__media {
   display: flex;
   flex-wrap: wrap;

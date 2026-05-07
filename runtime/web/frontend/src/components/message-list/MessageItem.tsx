@@ -234,6 +234,22 @@ export function MessageItem({
             {isUser ? interaction.content : undefined}
           </div>
         )}
+        {interaction.content_blocks?.some((b) => b.type === "generated_widget") && (
+          <button
+            type="button"
+            className="message-list__widget-open-btn"
+            onClick={() => {
+              const block = interaction.content_blocks?.find((b) => b.type === "generated_widget") as Record<string, unknown> | undefined;
+              if (block) {
+                window.dispatchEvent(new CustomEvent("piclaw:widget-open", {
+                  detail: { title: block.title || "Widget", html: block.html, widget_id: block.widget_id }
+                }));
+              }
+            }}
+          >
+            📊 Open Widget
+          </button>
+        )}
         {interaction.media_ids && interaction.media_ids.length > 0 && (
           <div className="message-list__media" onClick={handleContentClick}>
             {interaction.media_ids.map((id) => (
