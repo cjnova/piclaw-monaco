@@ -77,4 +77,4 @@ export interface SettingsData {
   toolsets?: Toolset[];
 }
 
-export type Category = "general" | "sessions" | "workspace" | "models" | "keychain" | "tools" | "appearance" | "compaction" | "providers";
+export type Category = "general" | "sessions" | "workspace" | "environment" | "models" | "keychain" | "tools" | "appearance" | "compaction" | "providers";

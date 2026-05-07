@@ -3257,6 +3257,117 @@ body {
 .tasks-panel__card-actions button:hover { background: var(--overlay-white-08); color: var(--text); }
 .tasks-panel__card-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* ── Environment Section ── */
+.env-section { display: flex; flex-direction: column; gap: 10px; }
+.env-section__header { display: flex; gap: 8px; align-items: center; }
+.env-section__filter {
+  flex: 1;
+  background: var(--overlay-white-05);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+.env-section__filter:focus { border-color: var(--accent); }
+.env-section__filter::placeholder { color: var(--text-muted); }
+.env-section__refresh {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.env-section__refresh:hover { color: var(--text); background: var(--overlay-white-05); }
+.env-section__desc { font-size: 11px; color: var(--text-muted); margin: 0; }
+.env-section__desc code { font-family: var(--font-mono); font-size: 10px; background: var(--overlay-white-05); padding: 1px 4px; border-radius: 2px; }
+.env-section__add-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.env-section__add-name,
+.env-section__add-value {
+  background: var(--overlay-white-05);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  outline: none;
+}
+.env-section__add-name { width: 160px; }
+.env-section__add-value { flex: 1; min-width: 100px; }
+.env-section__add-name:focus,
+.env-section__add-value:focus { border-color: var(--accent); }
+.env-section__add-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.env-section__add-btn:hover { background: var(--accent); color: #fff; }
+.env-section__add-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.env-section__stats { font-size: 10px; color: var(--text-muted); }
+.env-section__list { display: flex; flex-direction: column; gap: 2px; max-height: 400px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
+.env-section__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.env-section__row:hover { background: var(--overlay-white-03); }
+.env-section__row--overridden { background: var(--overlay-white-05); }
+.env-section__var-name { font-family: var(--font-mono); font-size: 10px; color: var(--text); min-width: 140px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
+.env-section__var-value { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-section__var-value:hover { color: var(--text); }
+.env-section__var-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--overlay-white-05);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text);
+  outline: none;
+}
+.env-section__source {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.env-section__source--process { background: var(--overlay-white-08); color: var(--text-muted); }
+.env-section__source--override { background: #a6e3a133; color: #a6e3a1; }
+.env-section__save-btn,
+.env-section__clear-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.env-section__save-btn:hover { background: var(--accent); color: #fff; }
+.env-section__clear-btn:hover { color: var(--error, #f38ba8); border-color: var(--error, #f38ba8); }
+.env-section__empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.env-section__empty-val { color: var(--text-muted); opacity: 0.5; }
+
 /* ── SettingsPanel extras ── */
 .settings-panel__select {
   background: var(--bg-elevated);
