@@ -575,7 +575,10 @@ export class WebAgentControlPlaneService {
 
   private parseRowId(rawRowId: number | string | undefined): number | null {
     const rowId = typeof rawRowId === "string" ? Number(rawRowId) : rawRowId;
-    return Number.isFinite(rowId) ? Number(rowId) : null;
+    if (!Number.isFinite(rowId)) return null;
+    if (!Number.isInteger(rowId)) return null;
+    if (rowId === 0) return null;
+    return Number(rowId);
   }
 
   private async removeQueuedFollowupForAction(
