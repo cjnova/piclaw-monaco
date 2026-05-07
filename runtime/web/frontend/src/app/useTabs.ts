@@ -79,14 +79,9 @@ export function useTabs(terminalVisible: Signal<boolean>, terminalMaximized?: Si
     const handleOpen = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       const title = detail?.title || "Widget";
-      // Reuse existing widget tab — update title and focus
-      const existing = tabs.value.find((t) => t.type === "widget");
-      if (existing) {
-        tabs.value = tabs.value.map((t) => t.id === existing.id ? { ...t, label: title } : t);
-        activeTabId.value = existing.id;
-        return;
-      }
-      const tabId = `widget-${Date.now()}`;
+      const widgetId = detail?.widget_id || `widget-${Date.now()}`;
+      // Each widget gets its own tab
+      const tabId = `widget-${widgetId}`;
       ensureTab({ id: tabId, label: title, icon: "📊", closable: true, type: "widget" });
     };
 

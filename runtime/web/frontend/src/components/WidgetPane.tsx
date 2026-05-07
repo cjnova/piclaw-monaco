@@ -54,7 +54,7 @@ function buildSrcDoc(html: string, title: string): string {
 </html>`;
 }
 
-export function WidgetPane({ tabMode = false }: { tabMode?: boolean }) {
+export function WidgetPane({ tabMode = false, widgetTabId }: { tabMode?: boolean; widgetTabId?: string }) {
   const [widget, setWidget] = useState<WidgetState | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlBufferRef = useRef("");
@@ -62,6 +62,9 @@ export function WidgetPane({ tabMode = false }: { tabMode?: boolean }) {
   useEffect(() => {
     const handleOpen = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      const eventTabId = `widget-${detail?.widget_id || Date.now()}`;
+      // Only handle if this instance matches the widget tab
+      if (widgetTabId && eventTabId !== widgetTabId) return;
       const html = detail?.artifact?.html || detail?.html || "";
       const title = detail?.title || "Widget";
       const subtitle = detail?.subtitle || detail?.description || "";
