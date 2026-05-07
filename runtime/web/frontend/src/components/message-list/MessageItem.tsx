@@ -116,7 +116,7 @@ export function MessageItem({
     isUser ? (
       <div className={`message-list__avatar-circle ${className}`} aria-hidden="true">Y</div>
     ) : (
-      <img className={`message-list__avatar-img ${className}`} src={agentAvatarUrl} alt="" aria-hidden="true" />
+      <img className="message-list__avatar-img" src={agentAvatarUrl} alt="" aria-hidden="true" />
     )
   );
 
