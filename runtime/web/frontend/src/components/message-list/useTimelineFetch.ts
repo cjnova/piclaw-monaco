@@ -38,7 +38,14 @@ export function useTimelineFetch({
     const data = (await res.json()) as {
       posts?: Array<Record<string, unknown>>;
       has_more?: boolean;
+      identity?: { user_avatar_url?: string; assistant_avatar_url?: string };
     };
+    // Populate global identity signals from timeline response
+    if (data.identity) {
+      const { userAvatarUrl: uav, assistantAvatarUrl: aav } = await import("../../api/identity");
+      if (data.identity.user_avatar_url) uav.value = data.identity.user_avatar_url;
+      if (data.identity.assistant_avatar_url) aav.value = data.identity.assistant_avatar_url;
+    }
     const posts = (data.posts ?? []).map(normalizePost);
     return { posts, hasMore: data.has_more ?? false };
   }, [setConnected]);

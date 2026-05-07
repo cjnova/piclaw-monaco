@@ -3,6 +3,7 @@ import { ImageLightbox } from "../ImageLightbox";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
 import { relativeTime, getBlockKey } from "./helpers";
 import { MessageActionBar } from "./MessageActionBar";
+import { userAvatarUrl, assistantAvatarUrl } from "../../api/identity";
 import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer";
 import type { ContentBlock, Interaction } from "./types";
 
@@ -110,15 +111,17 @@ export function MessageItem({
   }
 
   const displayName = isUser ? "You" : "PiClaw";
-  const agentAvatarUrl = "/static/icon-192.png";
 
-  const AvatarCircle = ({ className }: { className: string }) => (
-    isUser ? (
-      <div className={`message-list__avatar-circle ${className}`} aria-hidden="true">Y</div>
-    ) : (
-      <img className="message-list__avatar-img" src={agentAvatarUrl} alt="" aria-hidden="true" />
-    )
-  );
+  const AvatarCircle = () => {
+    if (isUser) {
+      const uavUrl = userAvatarUrl.value;
+      if (uavUrl) {
+        return <img className="message-list__avatar-img" src={uavUrl} alt="" aria-hidden="true" />;
+      }
+      return <div className="message-list__avatar-circle message-list__avatar-circle--user" aria-hidden="true">Y</div>;
+    }
+    return <img className="message-list__avatar-img" src={assistantAvatarUrl.value} alt="" aria-hidden="true" />;
+  };
 
   // ── Collapsed render ───────────────────────────────────────────────────
   if (isCollapsed) {
@@ -129,7 +132,7 @@ export function MessageItem({
         }`}
         data-message-id={interaction.id}
       >
-        <AvatarCircle className={isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"} />
+        <AvatarCircle />
         <div className="message-list__body message-list__body--collapsed">
           <MessageActionBar
             messageId={interaction.id}
@@ -169,7 +172,7 @@ export function MessageItem({
       }`}
       data-message-id={interaction.id}
     >
-      <AvatarCircle className={isUser ? "message-list__avatar-circle--user" : "message-list__avatar-circle--agent"} />
+      <AvatarCircle />
       <div className="message-list__body">
         <MessageActionBar
           messageId={interaction.id}
