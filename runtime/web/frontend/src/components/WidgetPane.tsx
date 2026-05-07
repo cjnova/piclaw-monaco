@@ -54,17 +54,25 @@ function buildSrcDoc(html: string, title: string): string {
 </html>`;
 }
 
-export function WidgetPane({ tabMode = false, widgetTabId }: { tabMode?: boolean; widgetTabId?: string }) {
-  const [widget, setWidget] = useState<WidgetState | null>(null);
+export function WidgetPane({ tabMode = false, widgetHtml, widgetTitle }: { tabMode?: boolean; widgetHtml?: string; widgetTitle?: string }) {
+  const [widget, setWidget] = useState<WidgetState | null>(
+    widgetHtml ? { html: widgetHtml, title: widgetTitle || "Widget", subtitle: "", status: "final" } : null
+  );
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const htmlBufferRef = useRef("");
+  const htmlBufferRef = useRef(widgetHtml || "");
+
+  // Update if props change
+  useEffect(() => {
+    if (widgetHtml) {
+      htmlBufferRef.current = widgetHtml;
+      setWidget({ html: widgetHtml, title: widgetTitle || "Widget", subtitle: "", status: "final" });
+    }
+  }, [widgetHtml, widgetTitle]);
 
   useEffect(() => {
+    if (tabMode) return; // In tab mode, content comes from props
     const handleOpen = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      const eventTabId = `widget-${detail?.widget_id || Date.now()}`;
-      // Only handle if this instance matches the widget tab
-      if (widgetTabId && eventTabId !== widgetTabId) return;
       const html = detail?.artifact?.html || detail?.html || "";
       const title = detail?.title || "Widget";
       const subtitle = detail?.subtitle || detail?.description || "";

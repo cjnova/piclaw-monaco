@@ -78,16 +78,12 @@ export function useTabs(terminalVisible: Signal<boolean>, terminalMaximized?: Si
   useEffect(() => {
     const handleOpen = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?._redispatch) return; // Skip re-dispatched events
+      if (detail?._redispatch) return;
       const title = detail?.title || "Widget";
-      const widgetId = detail?.widget_id || `widget-${Date.now()}`;
-      // Each widget gets its own tab
+      const html = detail?.artifact?.html || detail?.html || "";
+      const widgetId = detail?.widget_id || `w-${Date.now()}`;
       const tabId = `widget-${widgetId}`;
-      ensureTab({ id: tabId, label: title, icon: "📊", closable: true, type: "widget" });
-      // Re-dispatch after render so the WidgetPane instance can receive it
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent("piclaw:widget-open", { detail: { ...detail, _redispatch: true } }));
-      });
+      ensureTab({ id: tabId, label: title, icon: "📊", closable: true, type: "widget", widgetHtml: html });
     };
 
     const handleClose = (e: Event) => {

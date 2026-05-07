@@ -5,4 +5,6 @@ export interface Tab {
   icon?: string;
   closable: boolean;
   type: "chat" | "widget" | "terminal";
+  /** Widget HTML content (only for widget tabs). */
+  widgetHtml?: string;
 }

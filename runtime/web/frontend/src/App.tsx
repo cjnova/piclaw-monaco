@@ -171,7 +171,7 @@ function AppContent() {
                       )}
                       {tabs.value.filter((t) => t.type === "widget").map((t) => (
                         <div key={t.id} className={activeTabId.value === t.id ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>
-                          <WidgetPane tabMode widgetTabId={t.id} />
+                          <WidgetPane tabMode widgetHtml={t.widgetHtml} widgetTitle={t.label} />
                         </div>
                       ))}
                     </>
