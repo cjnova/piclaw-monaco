@@ -204,9 +204,8 @@ function installStatusDomStubs(fakeDocument: FakeDocument): void {
   };
 }
 
-test('AgentStatus renders bash tool command lines in monospace spans', async () => {
+test('AgentStatus renders bash tool command lines as generic monospace tool arguments', async () => {
   const css = readFileSync(join(import.meta.dir, '../../web/static/css/agent.css'), 'utf8');
-  expect(css).toContain('.agent-tool-command-line');
   expect(css).toContain('.agent-tool-argument');
   expect(css).toContain('font-family: var(--font-mono, monospace);');
 
@@ -229,9 +228,9 @@ test('AgentStatus renders bash tool command lines in monospace spans', async () 
     },
   }), host);
 
-  let commandSpans = findElements(host, (node) => getAttr(node, 'class').includes('agent-tool-command-line'));
+  let commandSpans = findElements(host, (node) => getAttr(node, 'class').includes('agent-tool-argument'));
   expect(commandSpans).toHaveLength(1);
-  expect(getAttr(commandSpans[0], 'class')).toContain('agent-tool-argument');
+  expect(getAttr(commandSpans[0], 'class')).not.toContain('agent-tool-command-line');
   expect(collectText(commandSpans[0])).toBe(command);
 
   render(h(AgentStatus, {
@@ -243,8 +242,9 @@ test('AgentStatus renders bash tool command lines in monospace spans', async () 
     },
   }), host);
 
-  commandSpans = findElements(host, (node) => getAttr(node, 'class').includes('agent-tool-command-line'));
+  commandSpans = findElements(host, (node) => getAttr(node, 'class').includes('agent-tool-argument'));
   expect(commandSpans).toHaveLength(1);
+  expect(getAttr(commandSpans[0], 'class')).not.toContain('agent-tool-command-line');
   expect(collectText(commandSpans[0])).toBe(command);
 
   render(null, host);

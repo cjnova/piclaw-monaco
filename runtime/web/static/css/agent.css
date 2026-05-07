@@ -310,15 +310,15 @@
     flex: 0 1 auto;
 }
 
-.agent-tool-command-line,
-.agent-tool-argument {
+.agent-tool-argument,
+.agent-tool-command-line {
     font-family: var(--font-mono, monospace);
     font-size: 0.95em;
     overflow-wrap: anywhere;
 }
 
-.agent-thinking-title-text .agent-tool-command-line,
-.agent-thinking-title-text .agent-tool-argument {
+.agent-thinking-title-text .agent-tool-argument,
+.agent-thinking-title-text .agent-tool-command-line {
     font-weight: 600;
 }
 

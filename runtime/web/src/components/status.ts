@@ -247,24 +247,16 @@ function renderToolArgumentInText(text, payload) {
     if (argumentStart < 0) return value;
     const argumentEnd = argumentStart + parts.argument.length;
     return html`
-        ${value.slice(0, argumentStart)}<span class="agent-tool-command-line agent-tool-argument">${parts.argument}</span>${value.slice(argumentEnd)}
+        ${value.slice(0, argumentStart)}<span class="agent-tool-argument">${parts.argument}</span>${value.slice(argumentEnd)}
     `;
-}
-
-function renderBashCommandInText(text, payload) {
-    return renderToolArgumentInText(text, payload);
 }
 
 function renderToolTitle(titleText, payload) {
     const parts = resolveToolTitleArgumentParts(titleText, payload);
     if (!parts?.argument) return titleText;
     return html`
-        ${parts.prefix}<span class="agent-tool-command-line agent-tool-argument">${parts.argument}</span>${parts.suffix || ''}
+        ${parts.prefix}<span class="agent-tool-argument">${parts.argument}</span>${parts.suffix || ''}
     `;
-}
-
-function renderBashToolTitle(titleText, payload) {
-    return renderToolTitle(titleText, payload);
 }
 
 /** Preact component: agent status bar with draft/thought/plan panels. */
@@ -591,7 +583,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
             >
                 <div class="agent-thinking-title intent">
                     ${color && html`<span class=${pulsingDotClass} aria-hidden="true"></span>`}
-                    <span class="agent-thinking-title-text">${renderBashToolTitle(titleText, payload)}</span>
+                    <span class="agent-thinking-title-text">${renderToolTitle(titleText, payload)}</span>
                     ${metaLabel && html`<span class="agent-status-elapsed">${metaLabel}</span>`}
                 </div>
                 ${payload.detail && html`<div class="agent-thinking-body">${payload.detail}</div>`}
@@ -961,7 +953,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                         ? html`<span class="agent-status-error-icon" aria-hidden="true">⚠</span>`
                         : (runningIndicatorMode === 'spinner' && html`<div class="agent-status-spinner"></div>`)}
                     <div class="agent-status-copy">
-                        <span class="agent-status-text">${renderBashCommandInText(content, status)}</span>
+                        <span class="agent-status-text">${renderToolArgumentInText(content, status)}</span>
                         ${(toolRepoLabel || orderedStatusHints.length > 0 || statusActivityAgeLabel) && html`
                             <span class="agent-status-meta-row">
                                 ${leadingStatusHints.map((hint) => html`
