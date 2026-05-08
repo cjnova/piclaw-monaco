@@ -20,13 +20,9 @@ export function SessionPill() {
   const loadSessions = useCallback(async () => {
     setStatus("loading");
     try {
-      const chatsRes = await fetch("/agent/chats", { credentials: "same-origin" });
-      const chatsFallbackRes = chatsRes.ok ? null : await fetch("/agent/active-chats", { credentials: "same-origin" });
-      const chatsData = chatsRes.ok
-        ? await chatsRes.json()
-        : chatsFallbackRes && chatsFallbackRes.ok
-          ? await chatsFallbackRes.json()
-          : [];
+      const chatsRes = await fetch("/agent/active-chats", { credentials: "same-origin" });
+      if (!chatsRes.ok) throw new Error(`active-chats: HTTP ${chatsRes.status}`);
+      const chatsData = await chatsRes.json();
 
       const branchesRes = await fetch(`/agent/branches?chat_jid=${encodeURIComponent(activeChatJid)}`, {
         credentials: "same-origin",
@@ -133,6 +129,22 @@ export function SessionPill() {
     void runAction("root", "/agent/root-session", { name });
   };
 
+  const handleMergeParent = () => {
+    void runAction("merge", "/agent/branch-merge-parent", { chat_jid: activeChatJid });
+  };
+
+  const handleRename = () => {
+    const name = prompt("Enter new session name:")?.trim();
+    if (!name) return;
+    void runAction("rename", "/agent/branch-rename", { chat_jid: activeChatJid, name });
+  };
+
+  const handleDelete = () => {
+    const confirmed = confirm("Delete current session permanently? This cannot be undone.");
+    if (!confirmed) return;
+    void runAction("delete", "/agent/branch-purge", { chat_jid: activeChatJid });
+  };
+
   return (
     <span ref={rootRef} className="session-pill-wrap">
       <button
@@ -179,7 +191,7 @@ export function SessionPill() {
               disabled={Boolean(actionBusy)}
               onClick={handleFork}
             >
-              Fork
+              New branch
             </button>
             <button
               type="button"
@@ -187,7 +199,31 @@ export function SessionPill() {
               disabled={Boolean(actionBusy)}
               onClick={handleNewRoot}
             >
-              New root
+              New root…
+            </button>
+            <button
+              type="button"
+              className="session-pill__action"
+              disabled={Boolean(actionBusy)}
+              onClick={handleMergeParent}
+            >
+              Merge w/ parent
+            </button>
+            <button
+              type="button"
+              className="session-pill__action"
+              disabled={Boolean(actionBusy)}
+              onClick={handleRename}
+            >
+              Rename…
+            </button>
+            <button
+              type="button"
+              className="session-pill__action session-pill__action--danger"
+              disabled={Boolean(actionBusy)}
+              onClick={handleDelete}
+            >
+              Delete current…
             </button>
           </div>
         </div>

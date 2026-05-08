@@ -540,21 +540,12 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
 type TabId = "tasks" | "sessions";
 
 export function TasksPanel() {
-  const [activeTab, setActiveTab] = useState<TabId>("tasks");
+  const [activeTab, setActiveTab] = useState<TabId>("sessions");
   const activeChatJid = getChatJid();
 
   return (
     <div className="tasks-panel">
       <div className="tasks-panel__tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "tasks"}
-          className={`tasks-panel__tab${activeTab === "tasks" ? " tasks-panel__tab--active" : ""}`}
-          onClick={() => setActiveTab("tasks")}
-        >
-          Tasks
-        </button>
         <button
           type="button"
           role="tab"
@@ -564,11 +555,20 @@ export function TasksPanel() {
         >
           Sessions
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "tasks"}
+          className={`tasks-panel__tab${activeTab === "tasks" ? " tasks-panel__tab--active" : ""}`}
+          onClick={() => setActiveTab("tasks")}
+        >
+          Tasks
+        </button>
       </div>
 
       <div className="tasks-panel__body">
-        {activeTab === "tasks" && <TasksTab />}
         {activeTab === "sessions" && <SessionsTab activeChatJid={activeChatJid} />}
+        {activeTab === "tasks" && <TasksTab />}
       </div>
     </div>
   );

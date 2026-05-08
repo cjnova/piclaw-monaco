@@ -683,6 +683,7 @@ body {
 
 .session-pill__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   border-top: 1px solid var(--border);
   padding: 8px;
@@ -701,6 +702,15 @@ body {
 
 .session-pill__action:hover {
   background: var(--overlay-white-10);
+}
+
+.session-pill__action--danger {
+  color: #f44;
+  border-color: rgba(255, 68, 68, 0.3);
+}
+
+.session-pill__action--danger:hover {
+  background: rgba(255, 68, 68, 0.15);
 }
 
 .session-pill__empty {
