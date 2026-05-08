@@ -365,7 +365,9 @@ body {
   padding: 16px;
 }
 
-.modal-dialog {
+.modal-dialog,
+.modal-dialog:focus,
+.modal-dialog:focus-visible {
   width: min(440px, 92vw);
   background: var(--bg-sidebar);
   border: 1px solid var(--border);
@@ -375,7 +377,7 @@ body {
   flex-direction: column;
   gap: 14px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
-  outline: none;
+  outline: none !important;
 }
 
 .modal-dialog__title {
@@ -438,12 +440,14 @@ body {
 
 .modal-dialog__btn--primary {
   border-color: var(--accent);
-  background: var(--accent);
-  color: #111;
+  background: var(--tint-blue-15);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .modal-dialog__btn--primary:hover {
-  filter: brightness(1.1);
+  background: var(--accent);
+  color: #111;
 }
 
 .modal-dialog__btn--destructive {

@@ -120,6 +120,7 @@ export function ModalDialog({
         className="modal-dialog"
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby={titleIdRef.current}
         aria-describedby={description ? descriptionIdRef.current : undefined}
         onMouseDown={(event) => event.stopPropagation()}
