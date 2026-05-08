@@ -563,21 +563,19 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
 
       <div className="tasks-panel__sessions-footer">
         {actionError && <div className="tasks-panel__sessions-error tasks-panel__sessions-error--inline">{actionError}</div>}
-        <div className="tasks-panel__sessions-footer-actions">
-          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewBranch(); }}>
-            <i className="codicon codicon-repo-forked" /> New branch
+        <div className="tasks-panel__sessions-toolbar">
+          <button type="button" className="tasks-panel__toolbar-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewBranch(); }} title="Fork current session">
+            <i className="codicon codicon-repo-forked" /> Fork
           </button>
-          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
+          <button type="button" className="tasks-panel__toolbar-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }} title="Create new root session">
             <i className="codicon codicon-add" /> New root…
           </button>
-          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}
-            title={currentSession?.parent_jid ? "Merge this branch into its parent" : "Root sessions cannot be merged"}
-          >
-            <i className="codicon codicon-git-merge" /> Merge to parent
+          <button type="button" className="tasks-panel__toolbar-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }} title="Merge current into parent">
+            <i className="codicon codicon-git-merge" /> Merge
           </button>
           {selectedJid && allSessions.find(s => s.jid === selectedJid && (s.archived || s.status === "archived")) && (
-            <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRestore(selectedJid); setSelectedJid(null); }}>
-              <i className="codicon codicon-history" /> Restore selected
+            <button type="button" className="tasks-panel__toolbar-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRestore(selectedJid); setSelectedJid(null); }} title="Restore archived session">
+              <i className="codicon codicon-history" /> Restore
             </button>
           )}
         </div>

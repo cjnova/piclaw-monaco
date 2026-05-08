@@ -3687,23 +3687,43 @@ body {
 
 .tasks-panel__sessions-footer {
   border-top: 1px solid var(--border);
-  padding: 10px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.tasks-panel__sessions-footer-actions {
-  display: flex;
-  flex-wrap: wrap;
   gap: 6px;
 }
 
-.tasks-panel__sessions-footer .settings-panel__provider-btn {
+.tasks-panel__sessions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tasks-panel__toolbar-btn {
+  flex: 1;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 5px 6px;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tasks-panel__toolbar-btn:hover {
+  color: var(--text);
+  background: var(--overlay-white-07);
+}
+
+.tasks-panel__toolbar-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .tasks-panel__sessions-error {
