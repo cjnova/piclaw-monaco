@@ -231,7 +231,7 @@ export function SessionPill() {
               <i className="codicon codicon-edit" /> Rename
             </button>
             <button type="button" className="session-pill__action session-pill__action--danger" disabled={Boolean(actionBusy)} onClick={handleDelete}>
-              <i className="codicon codicon-trash" /> Delete current
+              <i className="codicon codicon-trash" /> Delete current…
             </button>
           </div>
         </div>

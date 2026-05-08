@@ -589,7 +589,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
             onClick={() => { void handleDeleteSession(activeChatJid); }}
             title="Permanently delete this session"
           >
-            <i className="codicon codicon-trash" /> Delete current
+            <i className="codicon codicon-trash" /> Delete current…
           </button>
         </div>
       </div>
