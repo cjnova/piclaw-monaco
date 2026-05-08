@@ -363,7 +363,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     body: Record<string, unknown>,
     errorMessage: string,
   ) => {
-    if (actionBusy) return;
+    if (actionBusy) return null;
     setActionBusy(actionKey);
     setActionError(null);
     try {
@@ -395,6 +395,31 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       setActionBusy(null);
     }
   }, [actionBusy, loadData]);
+
+  const handleRenameSession = useCallback(async (chatJid: string) => {
+    const name = prompt("Enter new session name:")?.trim();
+    if (!name) return;
+    await runSessionAction(
+      `rename-${chatJid}`,
+      "/agent/branch-rename",
+      { chat_jid: chatJid, name },
+      "Couldn't rename session. Please try again.",
+    );
+  }, [runSessionAction]);
+
+  const handleDeleteSession = useCallback(async (chatJid: string) => {
+    const confirmed = confirm("Delete this session permanently? This cannot be undone.");
+    if (!confirmed) return;
+    const nextChatJid = await runSessionAction(
+      `delete-${chatJid}`,
+      "/agent/branch-purge",
+      { chat_jid: chatJid },
+      "Couldn't delete session. Please try again.",
+    );
+    if (chatJid === activeChatJid && nextChatJid) {
+      navigateToChat(nextChatJid);
+    }
+  }, [activeChatJid, runSessionAction]);
 
   const handleNewBranch = useCallback(async () => {
     const nextChatJid = await runSessionAction(
@@ -428,55 +453,31 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     if (nextChatJid) navigateToChat(nextChatJid);
   }, [activeChatJid, runSessionAction]);
 
-  const handleRenameCurrent = useCallback(async () => {
-    const name = prompt("Enter new session name:")?.trim();
-    if (!name) return;
-    await runSessionAction(
-      "rename",
-      "/agent/branch-rename",
-      { chat_jid: activeChatJid, name },
-      "Couldn't rename session. Please try again.",
-    );
-  }, [activeChatJid, runSessionAction]);
-
-  const handleDeleteCurrent = useCallback(async () => {
-    const confirmed = confirm("Delete current session permanently? This cannot be undone.");
-    if (!confirmed) return;
-    const nextChatJid = await runSessionAction(
-      "delete",
-      "/agent/branch-purge",
-      { chat_jid: activeChatJid },
-      "Couldn't delete session. Please try again.",
-    );
-    if (nextChatJid) navigateToChat(nextChatJid);
-  }, [activeChatJid, runSessionAction]);
-
   const handleRestore = useCallback(async (branchJid: string) => {
-    const nextChatJid = await runSessionAction(
+    await runSessionAction(
       `restore-${branchJid}`,
       "/agent/branch-restore",
       { chat_jid: branchJid },
       "Couldn't restore branch. Please try again.",
     );
-    if (nextChatJid && nextChatJid === activeChatJid) {
-      await loadData();
-    }
-  }, [activeChatJid, loadData, runSessionAction]);
+  }, [runSessionAction]);
 
   if (status === "loading") {
     return (
-      <div className="tasks-panel__list">
-        <div className="tasks-panel__empty">Loading sessions…</div>
+      <div className="tasks-panel__sessions">
+        <div className="tasks-panel__list">
+          <div className="tasks-panel__empty">Loading sessions…</div>
+        </div>
       </div>
     );
   }
 
   if (status === "error") {
     return (
-      <div className="tasks-panel__list">
-        <div className="tasks-panel__error">
-          {errorMsg || "Failed to load sessions."}{" "}
-          <button className="tasks-panel__retry" onClick={loadData}>Retry</button>
+      <div className="tasks-panel__sessions">
+        <div className="tasks-panel__sessions-error">
+          <span>{errorMsg || "Failed to load sessions."}</span>
+          <button type="button" className="settings-panel__provider-btn" onClick={() => { void loadData(); }}>Retry</button>
         </div>
       </div>
     );
@@ -484,7 +485,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
 
   return (
     <div className="tasks-panel__sessions">
-      <div className="tasks-panel__list">
+      <div className="tasks-panel__list tasks-panel__sessions-list">
         {allSessions.length === 0 && (
           <div className="tasks-panel__empty">No sessions found.</div>
         )}
@@ -492,58 +493,100 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
         {allSessions.map((session) => {
           const isCurrent = session.jid === activeChatJid;
           const isArchived = session.archived || session.status === "archived";
+          const isInactive = !isArchived && session.status === "inactive";
+          const statusTone = isCurrent ? "current" : isArchived ? "archived" : isInactive ? "inactive" : "active";
+
           return (
-            <div key={session.jid} className="tasks-panel__session-row">
+            <div
+              key={session.jid}
+              className={`tasks-panel__session-row${isCurrent ? " tasks-panel__session-row--current" : ""}${isArchived ? " tasks-panel__session-row--archived" : ""}`}
+            >
               <button
                 type="button"
-                className={`tasks-panel__item${isArchived ? " tasks-panel__item--archived" : ""}${isCurrent ? " tasks-panel__item--active" : ""}`}
+                className="tasks-panel__session-main"
                 onClick={() => navigateToChat(session.jid)}
+                title={session.jid}
               >
-                <span className={`tasks-panel__session-dot${isCurrent ? " tasks-panel__session-dot--active" : isArchived ? " tasks-panel__session-dot--archived" : ""}`} />
-                <span className="tasks-panel__item-name">@{chatName(session)}</span>
-                <span className="tasks-panel__item-sep">—</span>
-                <span className="tasks-panel__item-jid">{session.jid}</span>
-                {isCurrent && (
-                  <span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span>
-                )}
-                {isArchived && (
-                  <span className="tasks-panel__item-badge tasks-panel__item-badge--archived">archived</span>
-                )}
+                <span className={`tasks-panel__session-dot tasks-panel__session-dot--${statusTone}`} />
+                <span className="tasks-panel__session-name">@{chatName(session)}</span>
+                <span className="tasks-panel__session-jid">{session.jid}</span>
+                <span className="tasks-panel__session-badges">
+                  {isCurrent && <span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span>}
+                  {!isArchived && !isInactive && <span className="tasks-panel__item-badge tasks-panel__item-badge--active">active</span>}
+                  {isInactive && <span className="tasks-panel__item-badge tasks-panel__item-badge--inactive">inactive</span>}
+                  {isArchived && <span className="tasks-panel__item-badge tasks-panel__item-badge--archived">archived</span>}
+                </span>
               </button>
-              {isArchived && (
-                <button
-                  type="button"
-                  className="tasks-panel__restore-btn"
-                  disabled={actionBusy === `restore-${session.jid}`}
-                  onClick={() => { void handleRestore(session.jid); }}
-                >
-                  Restore
-                </button>
-              )}
+
+              <div className="tasks-panel__session-actions" aria-label={`Actions for ${chatName(session)}`}>
+                {isArchived ? (
+                  <button
+                    type="button"
+                    className="tasks-panel__action-icon"
+                    disabled={actionBusy === `restore-${session.jid}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleRestore(session.jid);
+                    }}
+                    title="Restore session"
+                  >
+                    <i className="codicon codicon-history" />
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="tasks-panel__action-icon"
+                      disabled={Boolean(actionBusy)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleRenameSession(session.jid);
+                      }}
+                      title="Rename session"
+                    >
+                      <i className="codicon codicon-edit" />
+                    </button>
+                    <button
+                      type="button"
+                      className="tasks-panel__action-icon tasks-panel__action-icon--delete"
+                      disabled={Boolean(actionBusy)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDeleteSession(session.jid);
+                      }}
+                      title="Delete session"
+                    >
+                      <i className="codicon codicon-trash" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="tasks-panel__actions">
-        {actionError && (
-          <div className="tasks-panel__error tasks-panel__error--action">{actionError}</div>
-        )}
-        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewBranch(); }}>
-          New branch
-        </button>
-        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
-          New root…
-        </button>
-        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}>
-          Merge current w/ parent
-        </button>
-        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRenameCurrent(); }}>
-          Rename current…
-        </button>
-        <button type="button" className="tasks-panel__action-btn tasks-panel__action-btn--danger" disabled={Boolean(actionBusy)} onClick={() => { void handleDeleteCurrent(); }}>
-          Delete current…
-        </button>
+      <div className="tasks-panel__sessions-footer">
+        {actionError && <div className="tasks-panel__sessions-error tasks-panel__sessions-error--inline">{actionError}</div>}
+        <div className="tasks-panel__sessions-footer-actions">
+          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewBranch(); }}>
+            <i className="codicon codicon-git-branch" /> New branch
+          </button>
+          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
+            <i className="codicon codicon-add" /> New root
+          </button>
+          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}>
+            <i className="codicon codicon-git-merge" /> Merge to parent
+          </button>
+          <button
+            type="button"
+            className="settings-panel__provider-btn settings-panel__provider-btn--logout"
+            disabled={Boolean(actionBusy)}
+            onClick={() => { void handleDeleteSession(activeChatJid); }}
+          >
+            <i className="codicon codicon-trash" /> Delete current
+          </button>
+        </div>
       </div>
     </div>
   );

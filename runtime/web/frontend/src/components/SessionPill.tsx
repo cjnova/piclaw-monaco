@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { getChatJid } from "../api/chat-jid";
-import { chatName, type ActiveChat, type Branch } from "../panels/TasksPanel";
+import { chatName } from "../panels/TasksPanel";
 
 type SessionEntry = {
   jid: string;
   name?: string;
   display_name?: string;
   archived?: boolean;
+  status?: string;
 };
 
 /** Normalize API response objects to SessionEntry shape. */
@@ -16,7 +17,18 @@ function normalizeEntry(raw: Record<string, unknown>): SessionEntry {
     name: (raw.agent_name ?? raw.name) as string | undefined,
     display_name: (raw.display_name ?? raw.session_name) as string | undefined,
     archived: Boolean(raw.archived_at ?? raw.archived),
+    status: raw.archived_at ? "archived" : (raw.status as string | undefined),
   };
+}
+
+function statusTone(entry: SessionEntry, activeChatJid: string): "current" | "active" | "inactive" | "archived" {
+  const isCurrent = entry.jid === activeChatJid;
+  const isArchived = entry.archived || entry.status === "archived";
+  const isInactive = !isArchived && entry.status === "inactive";
+  if (isCurrent) return "current";
+  if (isArchived) return "archived";
+  if (isInactive) return "inactive";
+  return "active";
 }
 
 export function SessionPill() {
@@ -54,6 +66,7 @@ export function SessionPill() {
           name: row.name ?? existing?.name,
           display_name: row.display_name ?? existing?.display_name,
           archived: row.archived,
+          status: row.status,
         });
       }
 
@@ -167,7 +180,9 @@ export function SessionPill() {
         }}
         title="Switch session"
       >
-        @{chatName(activeSession ?? { jid: activeChatJid })} ▾
+        <span className={`session-pill__dot session-pill__dot--${statusTone(activeSession ?? { jid: activeChatJid }, activeChatJid)}`} />
+        <span className="session-pill__label">@{chatName(activeSession ?? { jid: activeChatJid })}</span>
+        <i className={`codicon ${isOpen ? "codicon-chevron-up" : "codicon-chevron-down"}`} />
       </button>
 
       {isOpen && (
@@ -177,65 +192,46 @@ export function SessionPill() {
             {status === "error" && <div className="session-pill__empty">Failed to load sessions.</div>}
             {status === "idle" && sessions.length === 0 && <div className="session-pill__empty">No sessions</div>}
             {status === "idle" && sessions.map((entry) => {
-              const isCurrent = entry.jid === activeChatJid;
+              const tone = statusTone(entry, activeChatJid);
+              const isCurrent = tone === "current";
+
               return (
                 <button
                   type="button"
                   key={entry.jid}
-                  className={`session-pill__item${isCurrent ? " session-pill__item--active" : ""}${entry.archived ? " session-pill__item--archived" : ""}`}
+                  className={`session-pill__item${isCurrent ? " session-pill__item--active" : ""}${tone === "archived" ? " session-pill__item--archived" : ""}`}
                   onClick={() => {
                     setIsOpen(false);
                     goToChat(entry.jid);
                   }}
                 >
-                  <span className={`session-pill__dot${isCurrent ? " session-pill__dot--active" : ""}`} />
-                  <span className="session-pill__item-name">@{chatName(entry)}</span>
+                  <span className={`session-pill__dot session-pill__dot--${tone}`} />
+                  <span className="session-pill__item-text">
+                    <span className="session-pill__item-name">@{chatName(entry)}</span>
+                    <span className="session-pill__item-jid">{entry.jid}</span>
+                  </span>
                   {isCurrent && <span className="session-pill__item-badge session-pill__item-badge--current">current</span>}
-                  {entry.archived && <span className="session-pill__item-badge">archived</span>}
+                  {tone === "archived" && <span className="session-pill__item-badge">archived</span>}
                 </button>
               );
             })}
           </div>
-          <div className="session-pill__actions">
-            <button
-              type="button"
-              className="session-pill__action"
-              disabled={Boolean(actionBusy)}
-              onClick={handleFork}
-            >
-              New branch
+
+          <div className="session-pill__actions" role="group" aria-label="Session actions">
+            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleFork}>
+              <i className="codicon codicon-git-branch" /> New branch
             </button>
-            <button
-              type="button"
-              className="session-pill__action"
-              disabled={Boolean(actionBusy)}
-              onClick={handleNewRoot}
-            >
-              New root…
+            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleNewRoot}>
+              <i className="codicon codicon-add" /> New root
             </button>
-            <button
-              type="button"
-              className="session-pill__action"
-              disabled={Boolean(actionBusy)}
-              onClick={handleMergeParent}
-            >
-              Merge w/ parent
+            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleMergeParent}>
+              <i className="codicon codicon-git-merge" /> Merge parent
             </button>
-            <button
-              type="button"
-              className="session-pill__action"
-              disabled={Boolean(actionBusy)}
-              onClick={handleRename}
-            >
-              Rename…
+            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleRename}>
+              <i className="codicon codicon-edit" /> Rename
             </button>
-            <button
-              type="button"
-              className="session-pill__action session-pill__action--danger"
-              disabled={Boolean(actionBusy)}
-              onClick={handleDelete}
-            >
-              Delete current…
+            <button type="button" className="session-pill__action session-pill__action--danger" disabled={Boolean(actionBusy)} onClick={handleDelete}>
+              <i className="codicon codicon-trash" /> Delete current
             </button>
           </div>
         </div>
