@@ -15,7 +15,7 @@ interface StatsData {
 
 type MetricSeverity = "normal" | "warning" | "error";
 
-function formatClock(date: Date): string {
+export function formatClock(date: Date): string {
   const dayName = new Intl.DateTimeFormat("en-GB", { weekday: "long" }).format(date);
   const day = date.getDate();
   const month = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(date);
@@ -127,7 +127,6 @@ function StatsDisplay({ stats, isStale }: { stats: StatsData | null; isStale: bo
 }
 
 export function SystemStats() {
-  const clockText = useSignal<string>(formatClock(new Date()));
   const stats = useSignal<StatsData | null>(null);
   const statsError = useSignal(false);
   const lastStatsSuccess = useSignal(0);
@@ -136,27 +135,6 @@ export function SystemStats() {
     void statsPollTick.value;
     return statsError.value && lastStatsSuccess.value > 0 && Date.now() - lastStatsSuccess.value > 15000;
   });
-
-  // Clock: align to next full minute, then tick every 60s
-  useEffect(() => {
-    const tick = () => {
-      clockText.value = formatClock(new Date());
-    };
-
-    const now = new Date();
-    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-
-    let interval: ReturnType<typeof setInterval> | null = null;
-    const timeout = setTimeout(() => {
-      tick();
-      interval = setInterval(tick, 60_000);
-    }, msUntilNextMinute);
-
-    return () => {
-      clearTimeout(timeout);
-      if (interval !== null) clearInterval(interval);
-    };
-  }, [clockText]);
 
   // System stats: poll every 10 seconds
   useEffect(() => {
@@ -186,11 +164,7 @@ export function SystemStats() {
 
   return (
     <span className="sys-stats-bar">
-      <span className="sys-stats-bar__metrics">
-        <StatsDisplay stats={stats.value} isStale={isStale.value} />
-      </span>
-      <span className="sys-stats-bar__sep" aria-hidden="true">&nbsp;&nbsp;&mdash;&nbsp;&nbsp;</span>
-      <span className="sys-stats-bar__clock">{clockText.value}</span>
+      <StatsDisplay stats={stats.value} isStale={isStale.value} />
     </span>
   );
 }

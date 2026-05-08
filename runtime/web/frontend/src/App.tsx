@@ -4,7 +4,7 @@ import { useSignal } from "@preact/signals";
 import { ActivityBar } from "./components/ActivityBar";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
-import { SystemStats } from "./components/SystemStats";
+import { SystemStats, formatClock } from "./components/SystemStats";
 import { ModelContextBar } from "./components/ModelContextBar";
 import { SessionPill } from "./components/SessionPill";
 import { CommandPalette } from "./components/CommandPalette";
@@ -42,6 +42,7 @@ function AppContent() {
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
   const extensionPageHtml = useSignal<string | null>(null);
+  const clockText = useSignal<string>(formatClock(new Date()));
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
@@ -110,6 +111,16 @@ function AppContent() {
     return () => window.removeEventListener('piclaw:close-sidebar', onClose);
   }, [sidebarCollapsed]);
 
+  // Clock: align to next full minute, then tick every 60s
+  useEffect(() => {
+    const tick = () => { clockText.value = formatClock(new Date()); };
+    const now = new Date();
+    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const timeout = setTimeout(() => { tick(); interval = setInterval(tick, 60_000); }, msUntilNextMinute);
+    return () => { clearTimeout(timeout); if (interval !== null) clearInterval(interval); };
+  }, [clockText]);
+
   const connected = connectionStatus.value === "connected";
   const isExtensionPageOpen = (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value;
   const hasWidgetTab = tabs.value.some((t) => t.type === "widget");
@@ -148,6 +159,7 @@ function AppContent() {
                   activeTabId={activeTabId.value}
                   onSelectTab={(id) => { activeTabId.value = id; }}
                   onCloseTab={closeTab}
+                  clockText={clockText.value}
                 />
                 <div className="app-layout__tab-viewport">
                   {isExtensionPageOpen ? (
