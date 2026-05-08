@@ -5949,7 +5949,7 @@ pre.frontmatter-block {
 /* < 1066px: stats already collapsed to dropdown (above) */
 
 /* < 860px: hide connection text, compress model name */
-@media (max-width: 860px) {
+@media (max-width: 700px) {
   .status-bar__conn-text {
     display: none;
   }
@@ -5979,7 +5979,7 @@ pre.frontmatter-block {
 }
 
 /* < 700px: further compress, icon-only terminal */
-@media (max-width: 700px) {
+@media (max-width: 550px) {
   .model-badge__provider {
     display: none;
   }
