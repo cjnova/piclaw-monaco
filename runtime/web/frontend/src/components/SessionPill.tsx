@@ -168,6 +168,10 @@ export function SessionPill() {
     void runAction("delete", "/agent/branch-purge", { chat_jid: activeChatJid });
   };
 
+  const handleRestore = (jid: string) => {
+    void runAction("restore", "/agent/branch-restore", { chat_jid: jid });
+  };
+
   return (
     <span ref={rootRef} className="session-pill-wrap">
       <button
@@ -211,7 +215,20 @@ export function SessionPill() {
                     <span className="session-pill__item-jid">{entry.jid}</span>
                   </span>
                   {isCurrent && <span className="session-pill__item-badge session-pill__item-badge--current">current</span>}
-                  {tone === "archived" && <span className="session-pill__item-badge">archived</span>}
+                  {tone === "archived" && (
+                    <>
+                      <span className="session-pill__item-badge">archived</span>
+                      <span
+                        className="session-pill__item-restore"
+                        role="button"
+                        tabIndex={0}
+                        title="Restore session"
+                        onClick={(e) => { e.stopPropagation(); handleRestore(entry.jid); }}
+                      >
+                        <i className="codicon codicon-history" />
+                      </span>
+                    </>
+                  )}
                 </button>
               );
             })}

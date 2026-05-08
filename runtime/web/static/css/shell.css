@@ -748,6 +748,21 @@ body {
   background: var(--tint-blue-15);
 }
 
+.session-pill__item-restore {
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.session-pill__item-restore:hover {
+  color: var(--success, #a6e3a1);
+  background: var(--overlay-white-07);
+}
+
 .session-pill__actions {
   border-top: 1px solid var(--border);
   padding: 6px;
