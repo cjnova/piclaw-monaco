@@ -76,11 +76,11 @@ export function useTabs(terminalVisible: Signal<boolean>, terminalMaximized?: Si
   }, [terminalMaximized, terminalVisible, ensureTab, tabs, activeTabId, isMobile]);
 
   useEffect(() => {
-    fetch("/agent/addons/routes", { credentials: "same-origin" })
+    fetch("/api/extension-routes", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!data?.routes) return;
-        const pages = data.routes.filter((r: { prefix: string }) => r.prefix.endsWith("-page"));
+        if (!data || !Array.isArray(data)) return;
+        const pages = data.filter((r: { prefix: string }) => r.prefix.endsWith("-page"));
         const existingIds = new Set(tabs.value.map((t) => t.id));
         const extensionTabs = pages
           .map((page: { prefix: string; extensionPath: string }) => {
