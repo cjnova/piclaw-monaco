@@ -257,14 +257,14 @@ export function SessionPill() {
           </div>
 
           <div className="session-pill__toolbar" role="group" aria-label="Session actions">
-            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleFork} title="New branch">
-              <i className="codicon codicon-git-branch" />
+            <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={handleFork} title="New branch">
+              <i className="codicon codicon-repo-forked" /> Fork
             </button>
-            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleNewRoot} title="New root…">
-              <i className="codicon codicon-add" />
+            <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={handleNewRoot} title="New root…">
+              <i className="codicon codicon-add" /> New root…
             </button>
-            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleMergeParent} title="Merge to parent">
-              <i className="codicon codicon-git-merge" />
+            <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={handleMergeParent} title="Merge to parent">
+              <i className="codicon codicon-git-merge" /> Merge
             </button>
           </div>
         </div>

@@ -565,7 +565,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
         {actionError && <div className="tasks-panel__sessions-error tasks-panel__sessions-error--inline">{actionError}</div>}
         <div className="tasks-panel__sessions-footer-actions">
           <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewBranch(); }}>
-            <i className="codicon codicon-git-branch" /> New branch
+            <i className="codicon codicon-repo-forked" /> New branch
           </button>
           <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
             <i className="codicon codicon-add" /> New root…
