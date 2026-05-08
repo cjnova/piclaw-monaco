@@ -5,6 +5,7 @@ interface TabBarProps {
   activeTabId: string;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
+  clockText?: string;
 }
 
 const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
@@ -12,7 +13,7 @@ const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
 };
 
 /** Horizontal tab strip rendered above the central pane content area. */
-export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, clockText }: TabBarProps) {
   return (
     <div className="tab-bar" role="tablist" aria-label="Central pane tabs">
       {tabs.map((tab) => (
@@ -40,6 +41,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: TabBarPro
           )}
         </button>
       ))}
+      {clockText && <span className="tab-bar__clock">{clockText}</span>}
     </div>
   );
 }

@@ -470,19 +470,51 @@ body {
   color: var(--text-muted);
   font-size: 13px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sys-stats-bar__metrics,
+.sys-stats-bar__clock {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sys-stats-bar__sep {
+  color: var(--text-muted);
 }
 
 .sys-stats {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.sys-stats__label {
-  font-weight: 700;
-  margin-left: 8px;
+.sys-stats__metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.sys-stats__label:first-child {
-  margin-left: 0;
+.sys-stats__icon {
+  width: 14px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sys-stats__value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-stats__value--warning {
+  color: var(--warning);
+}
+
+.sys-stats__value--error {
+  color: var(--error);
 }
 
 /* ===== App Layout ===== */
@@ -1736,6 +1768,17 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+}
+
+.tab-bar__clock {
+  margin-left: auto;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .tab-bar::-webkit-scrollbar {
@@ -5493,7 +5536,8 @@ pre.frontmatter-block {
   }
 
   /* Hide non-essential items from top status bar */
-  .sys-stats {
+  .sys-stats-bar__metrics,
+  .sys-stats-bar__sep {
     display: none;
   }
   .status-bar__conn-text {
