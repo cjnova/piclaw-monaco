@@ -728,7 +728,7 @@ body {
 }
 
 .session-pill__dot--current { background: var(--accent); }
-.session-pill__dot--active { background: #a6e3a1; }
+.session-pill__dot--active { background: var(--success); }
 .session-pill__dot--inactive { background: var(--text-muted); }
 .session-pill__dot--archived { background: var(--overlay-white-25); }
 
@@ -759,7 +759,7 @@ body {
 }
 
 .session-pill__item-restore:hover {
-  color: var(--success, #a6e3a1);
+  color: var(--success);
   background: var(--overlay-white-07);
 }
 
@@ -790,7 +790,7 @@ body {
 }
 
 .session-pill__item-icon--danger:hover {
-  color: var(--error, #f38ba8);
+  color: var(--error);
 }
 
 .session-pill__toolbar {
@@ -826,8 +826,6 @@ body {
 .session-pill__toolbar-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-}
-  color: var(--error);
 }
 
 .session-pill__empty {
@@ -3420,62 +3418,8 @@ body {
   gap: 8px;
   padding: 24px;
 }
-.tasks-panel__empty .codicon { font-size: 24px; opacity: 0.5; }
-.tasks-panel__list { flex: 1; overflow-y: auto; padding: 4px 0; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
-.tasks-panel__item {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 12px;
-  font-size: 12px;
-  color: var(--text);
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-}
-.tasks-panel__item:hover { background: var(--bg-elevated); }
-.tasks-panel__item--active { background: var(--bg-elevated); border-left: 2px solid var(--accent); }
-.tasks-panel__item--paused { opacity: 0.6; }
-.tasks-panel__item--completed { opacity: 0.5; }
-.tasks-panel__item--archived { color: var(--text-muted); }
-.tasks-panel__item-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.tasks-panel__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.tasks-panel__status-dot--active { background: #a6e3a1; }
-.tasks-panel__status-dot--paused { background: #f9e2af; }
-.tasks-panel__status-dot--completed { background: var(--text-muted); }
-.tasks-panel__item-kind {
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-.tasks-panel__item-schedule { color: var(--text-muted); }
-.tasks-panel__item-content {
-  font-size: 12px;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-.tasks-panel__item-meta {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.tasks-panel__item-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-}
+.tasks-panel__list { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
+
 .tasks-panel__action-icon {
   background: none;
   border: none;
@@ -3487,50 +3431,8 @@ body {
   transition: color 0.15s, background 0.15s;
 }
 .tasks-panel__action-icon:hover { color: var(--text); background: var(--overlay-white-07); }
-.tasks-panel__action-icon--delete:hover { color: var(--error, #f38ba8); }
+.tasks-panel__action-icon--delete:hover { color: var(--error); }
 .tasks-panel__action-icon:disabled { opacity: 0.3; cursor: not-allowed; }
-.tasks-panel__hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-.tasks-panel__retry-btn {
-  background: var(--accent);
-  color: #1e1e2e;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  margin-top: 6px;
-}
-.tasks-panel__actions {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.tasks-panel__action-btn {
-  padding: 4px 10px;
-  font-size: 11px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 3px;
-  cursor: pointer;
-}
-.tasks-panel__action-btn:hover { background: var(--accent); color: #fff; }
-.tasks-panel__action-btn--danger {
-  border-color: var(--error);
-  color: var(--error);
-  background: var(--tint-red-10);
-}
-.tasks-panel__action-btn--danger:hover {
-  background: var(--error);
-  color: #fff;
-}
 .tasks-panel__sessions {
   display: flex;
   flex-direction: column;
@@ -3621,7 +3523,7 @@ body {
 }
 
 .tasks-panel__session-dot--current { background: var(--accent); }
-.tasks-panel__session-dot--active { background: #a6e3a1; }
+.tasks-panel__session-dot--active { background: var(--success); }
 .tasks-panel__session-dot--inactive { background: var(--text-muted); }
 .tasks-panel__session-dot--archived { background: var(--overlay-white-25); }
 
@@ -3643,7 +3545,7 @@ body {
 }
 
 .tasks-panel__item-badge--active {
-  color: #a6e3a1;
+  color: var(--success);
   background: var(--tint-green-13);
 }
 
@@ -3769,7 +3671,7 @@ body {
 
 /* ── Task cards ── */
 .tasks-panel__tasks { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
-.tasks-panel__list { display: flex; flex-direction: column; gap: 8px; }
+.tasks-panel__tasks .tasks-panel__list { display: flex; flex-direction: column; gap: 8px; }
 .tasks-panel__card {
   background: var(--overlay-white-03);
   border: 1px solid var(--border);
@@ -3791,8 +3693,14 @@ body {
   font-weight: 500;
   text-transform: uppercase;
 }
-.tasks-panel__badge--active { background: #a6e3a133; color: #a6e3a1; }
-.tasks-panel__badge--paused { background: #f9e2af33; color: #f9e2af; }
+.tasks-panel__badge--active {
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+}
+.tasks-panel__badge--paused {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  color: var(--warning);
+}
 .tasks-panel__badge--completed { background: var(--overlay-white-10); color: var(--text-muted); }
 .tasks-panel__badge--kind { background: var(--overlay-white-08); color: var(--text-muted); }
 .tasks-panel__card-row {
@@ -3827,9 +3735,9 @@ body {
   color: var(--text-muted);
   border-top: 1px solid var(--overlay-white-05);
 }
-.tasks-panel__log-entry--success .tasks-panel__log-status { color: #a6e3a1; }
-.tasks-panel__log-entry--error .tasks-panel__log-status { color: #f38ba8; }
-.tasks-panel__log-error { color: #f38ba8; font-size: 10px; }
+.tasks-panel__log-entry--success .tasks-panel__log-status { color: var(--success); }
+.tasks-panel__log-entry--error .tasks-panel__log-status { color: var(--error); }
+.tasks-panel__log-error { color: var(--error); font-size: 10px; }
 
 /* ── Card actions ── */
 .tasks-panel__card-actions {
