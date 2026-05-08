@@ -18,15 +18,6 @@ export interface Branch {
   parent_jid?: string;
 }
 
-/** Normalize API response objects (chat_jid/agent_name) to our internal shape (jid/name). */
-function normalizeChatEntry(raw: Record<string, unknown>): ActiveChat {
-  return {
-    jid: (raw.chat_jid ?? raw.jid ?? "") as string,
-    name: (raw.agent_name ?? raw.name) as string | undefined,
-    display_name: (raw.display_name ?? raw.session_name) as string | undefined,
-  };
-}
-
 function normalizeBranchEntry(raw: Record<string, unknown>): Branch {
   return {
     jid: (raw.chat_jid ?? raw.jid ?? "") as string,
@@ -305,8 +296,7 @@ function TasksTab() {
 
 
 function SessionsTab({ activeChatJid }: SessionsTabProps) {
-  const [sessions, setSessions] = useState<ActiveChat[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [allSessions, setAllSessions] = useState<Branch[]>([]);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -339,8 +329,23 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       const rawChats: Record<string, unknown>[] = Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? []);
       const rawBranches: Record<string, unknown>[] = Array.isArray(branchesData) ? branchesData : (branchesData.chats ?? branchesData.branches ?? []);
 
-      setSessions(rawChats.map(normalizeChatEntry));
-      setBranches(rawBranches.map(normalizeBranchEntry));
+      // Merge into a single deduplicated list, branches data takes priority
+      const merged = new Map<string, Branch>();
+      for (const raw of rawChats) {
+        const entry = normalizeBranchEntry(raw);
+        merged.set(entry.jid, entry);
+      }
+      for (const raw of rawBranches) {
+        const entry = normalizeBranchEntry(raw);
+        const existing = merged.get(entry.jid);
+        merged.set(entry.jid, {
+          ...entry,
+          name: entry.name ?? existing?.name,
+          display_name: entry.display_name ?? existing?.display_name,
+        });
+      }
+
+      setAllSessions(Array.from(merged.values()));
       setStatus("done");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to load sessions.");
@@ -480,42 +485,23 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   return (
     <div className="tasks-panel__sessions">
       <div className="tasks-panel__list">
-        {sessions.length === 0 && branches.length === 0 && (
+        {allSessions.length === 0 && (
           <div className="tasks-panel__empty">No sessions found.</div>
         )}
 
-        {sessions.map((session) => {
+        {allSessions.map((session) => {
           const isCurrent = session.jid === activeChatJid;
+          const isArchived = session.archived || session.status === "archived";
           return (
-            <button
-              key={session.jid}
-              type="button"
-              className={`tasks-panel__item${isCurrent ? " tasks-panel__item--active" : ""}`}
-              onClick={() => navigateToChat(session.jid)}
-            >
-              <span className="tasks-panel__item-name">@{chatName(session)}</span>
-              <span className="tasks-panel__item-sep"> — </span>
-              <span className="tasks-panel__item-jid">{session.jid}</span>
-              {isCurrent && (
-                <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--active">active</span></>
-              )}
-            </button>
-          );
-        })}
-
-        {branches.map((branch) => {
-          const isCurrent = branch.jid === activeChatJid;
-          const isArchived = branch.archived || branch.status === "archived";
-          return (
-            <div key={branch.jid} className="tasks-panel__session-row">
+            <div key={session.jid} className="tasks-panel__session-row">
               <button
                 type="button"
                 className={`tasks-panel__item${isArchived ? " tasks-panel__item--archived" : ""}${isCurrent ? " tasks-panel__item--active" : ""}`}
-                onClick={() => navigateToChat(branch.jid)}
+                onClick={() => navigateToChat(session.jid)}
               >
-                <span className="tasks-panel__item-name">@{chatName(branch)}</span>
+                <span className="tasks-panel__item-name">@{chatName(session)}</span>
                 <span className="tasks-panel__item-sep"> — </span>
-                <span className="tasks-panel__item-jid">{branch.jid}</span>
+                <span className="tasks-panel__item-jid">{session.jid}</span>
                 {isCurrent && (
                   <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--active">active</span></>
                 )}
@@ -527,8 +513,8 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
                 <button
                   type="button"
                   className="tasks-panel__restore-btn"
-                  disabled={actionBusy === `restore-${branch.jid}`}
-                  onClick={() => { void handleRestore(branch.jid); }}
+                  disabled={actionBusy === `restore-${session.jid}`}
+                  onClick={() => { void handleRestore(session.jid); }}
                 >
                   Restore
                 </button>
