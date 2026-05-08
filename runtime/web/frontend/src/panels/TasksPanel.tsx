@@ -302,6 +302,7 @@ function TasksTab() {
 
 function SessionsTab({ activeChatJid }: SessionsTabProps) {
   const [allSessions, setAllSessions] = useState<Branch[]>([]);
+  const [selectedJid, setSelectedJid] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -506,13 +507,13 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
           return (
             <div
               key={session.jid}
-              className={`tasks-panel__session-row${isCurrent ? " tasks-panel__session-row--current" : ""}${isArchived ? " tasks-panel__session-row--archived" : ""}`}
+              className={`tasks-panel__session-row${isCurrent ? " tasks-panel__session-row--current" : ""}${isArchived ? " tasks-panel__session-row--archived" : ""}${selectedJid === session.jid ? " tasks-panel__session-row--selected" : ""}`}
             >
               <button
                 type="button"
                 className="tasks-panel__session-main"
-                onClick={() => navigateToChat(session.jid)}
-                title={session.jid}
+                onClick={() => isArchived ? setSelectedJid(selectedJid === session.jid ? null : session.jid) : navigateToChat(session.jid)}
+                title={isArchived ? "Select to restore" : session.jid}
               >
                 <span className={`tasks-panel__session-dot tasks-panel__session-dot--${statusTone}`} />
                 <span className="tasks-panel__session-name">@{chatName(session)}</span>
@@ -526,20 +527,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
               </button>
 
               <div className="tasks-panel__session-actions" aria-label={`Actions for ${chatName(session)}`}>
-                {isArchived ? (
-                  <button
-                    type="button"
-                    className="tasks-panel__action-icon"
-                    disabled={actionBusy === `restore-${session.jid}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void handleRestore(session.jid);
-                    }}
-                    title="Restore session"
-                  >
-                    <i className="codicon codicon-history" />
-                  </button>
-                ) : (
+                {!isArchived && (
                   <>
                     <button
                       type="button"
@@ -587,6 +575,11 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
           >
             <i className="codicon codicon-git-merge" /> Merge to parent
           </button>
+          {selectedJid && allSessions.find(s => s.jid === selectedJid && (s.archived || s.status === "archived")) && (
+            <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRestore(selectedJid); setSelectedJid(null); }}>
+              <i className="codicon codicon-history" /> Restore selected
+            </button>
+          )}
         </div>
       </div>
     </div>
