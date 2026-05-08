@@ -1,25 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { getChatJid } from "../api/chat-jid";
-import { chatName } from "../panels/TasksPanel";
-
-type SessionEntry = {
-  jid: string;
-  name?: string;
-  display_name?: string;
-  archived?: boolean;
-  status?: string;
-};
-
-/** Normalize API response objects to SessionEntry shape. */
-function normalizeEntry(raw: Record<string, unknown>): SessionEntry {
-  return {
-    jid: (raw.chat_jid ?? raw.jid ?? "") as string,
-    name: (raw.agent_name ?? raw.name) as string | undefined,
-    display_name: (raw.display_name ?? raw.session_name) as string | undefined,
-    archived: Boolean(raw.archived_at ?? raw.archived),
-    status: raw.archived_at ? "archived" : (raw.status as string | undefined),
-  };
-}
+import {
+  chatName,
+  extractChatJidFromAction,
+  loadMergedSessions,
+  sanitizeSessionName,
+  type SessionEntry,
+} from "../utils/session";
 
 function statusTone(entry: SessionEntry, activeChatJid: string): "current" | "active" | "inactive" | "archived" {
   const isCurrent = entry.jid === activeChatJid;
@@ -42,35 +29,12 @@ export function SessionPill() {
   const loadSessions = useCallback(async () => {
     setStatus("loading");
     try {
-      const chatsRes = await fetch("/agent/active-chats", { credentials: "same-origin" });
-      if (!chatsRes.ok) throw new Error(`active-chats: HTTP ${chatsRes.status}`);
-      const chatsData = await chatsRes.json();
-
-      const branchesRes = await fetch(`/agent/branches?chat_jid=${encodeURIComponent(activeChatJid)}`, {
-        credentials: "same-origin",
-      });
-      if (!branchesRes.ok) throw new Error(`branches: HTTP ${branchesRes.status}`);
-      const branchesData = await branchesRes.json();
-
-      const chatRows = (Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? [])).map(normalizeEntry);
-      const branchRows = (Array.isArray(branchesData) ? branchesData : (branchesData.chats ?? branchesData.branches ?? [])).map(normalizeEntry);
-
-      const merged = new Map<string, SessionEntry>();
-      for (const row of chatRows) {
-        merged.set(row.jid, row);
+      const { sessions: mergedSessions, unauthorized } = await loadMergedSessions(activeChatJid);
+      if (unauthorized) {
+        setStatus("error");
+        return;
       }
-      for (const row of branchRows) {
-        const existing = merged.get(row.jid);
-        merged.set(row.jid, {
-          jid: row.jid,
-          name: row.name ?? existing?.name,
-          display_name: row.display_name ?? existing?.display_name,
-          archived: row.archived,
-          status: row.status,
-        });
-      }
-
-      setSessions(Array.from(merged.values()));
+      setSessions(mergedSessions);
       setStatus("idle");
     } catch (err) {
       console.warn("[session-pill] failed to load sessions:", err);
@@ -127,12 +91,9 @@ export function SessionPill() {
 
       const payload = await res.json().catch(() => null);
       await loadSessions();
-      const branchChatJid = payload?.branch?.chat_jid;
-      const responseChatJid = payload?.chat_jid;
-      if (typeof branchChatJid === "string" && branchChatJid) {
-        goToChat(branchChatJid);
-      } else if (typeof responseChatJid === "string" && responseChatJid) {
-        goToChat(responseChatJid);
+      const nextChatJid = extractChatJidFromAction(payload);
+      if (nextChatJid) {
+        goToChat(nextChatJid);
       }
     } catch (err) {
       console.warn(`[session-pill] ${actionKey} failed:`, err);
@@ -143,13 +104,13 @@ export function SessionPill() {
   }, [actionBusy, loadSessions]);
 
   const handleFork = () => {
-    void runAction("fork", "/agent/branch-fork", { chat_jid: activeChatJid });
+    void runAction("fork", "/agent/branch-fork", { source_chat_jid: activeChatJid });
   };
 
   const handleNewRoot = () => {
-    const name = prompt("Enter root session name:")?.trim();
+    const name = sanitizeSessionName(prompt("Enter root session name:"));
     if (!name) return;
-    void runAction("root", "/agent/root-session", { name });
+    void runAction("root", "/agent/root-session", { agent_name: name });
   };
 
   const handleMergeParent = () => {
@@ -157,9 +118,9 @@ export function SessionPill() {
   };
 
   const handleRename = () => {
-    const name = prompt("Enter new session name:")?.trim();
+    const name = sanitizeSessionName(prompt("Enter new session name:"));
     if (!name) return;
-    void runAction("rename", "/agent/branch-rename", { chat_jid: activeChatJid, name });
+    void runAction("rename", "/agent/branch-rename", { chat_jid: activeChatJid, agent_name: name });
   };
 
   const handleDelete = () => {

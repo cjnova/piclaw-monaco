@@ -1,48 +1,20 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { getChatJid } from "../api/chat-jid";
+import {
+  chatName,
+  extractChatJidFromAction,
+  loadMergedSessions,
+  sanitizeSessionName,
+  type SessionEntry,
+} from "../utils/session";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface ActiveChat {
-  jid: string;
-  name?: string;
-  display_name?: string;
-}
-
-export interface Branch {
-  jid: string;
-  name?: string;
-  display_name?: string;
-  status?: string;
-  archived?: boolean;
-  parent_jid?: string;
-}
-
-function normalizeBranchEntry(raw: Record<string, unknown>): Branch {
-  return {
-    jid: (raw.chat_jid ?? raw.jid ?? "") as string,
-    name: (raw.agent_name ?? raw.name) as string | undefined,
-    display_name: (raw.display_name ?? raw.session_name) as string | undefined,
-    status: raw.archived_at ? "archived" : (raw.status as string | undefined),
-    archived: Boolean(raw.archived_at ?? raw.archived),
-    parent_jid: (raw.parent_branch_id ?? raw.parent_jid) as string | undefined,
-  };
-}
 
 interface SessionsTabProps {
   activeChatJid: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-export function chatName(entry: { jid: string; name?: string; display_name?: string }): string {
-  if (entry.display_name) return entry.display_name;
-  const jidTail = entry.jid.split(":").pop() ?? entry.jid;
-  // When name matches the JID tail "default", show the assistant identity instead
-  if (entry.name && entry.name !== jidTail) return entry.name;
-  if (jidTail === "default") return "piclaw";
-  return entry.name ?? jidTail;
-}
 
 // ─── Tasks Tab ────────────────────────────────────────────────────────────────
 
@@ -301,7 +273,7 @@ function TasksTab() {
 
 
 function SessionsTab({ activeChatJid }: SessionsTabProps) {
-  const [allSessions, setAllSessions] = useState<Branch[]>([]);
+  const [allSessions, setAllSessions] = useState<SessionEntry[]>([]);
   const [selectedJid, setSelectedJid] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -316,45 +288,17 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     setStatus("loading");
     setErrorMsg("");
     try {
-      const [chatsRes, branchesRes] = await Promise.all([
-        fetch("/agent/active-chats", { credentials: "same-origin" }),
-        fetch(`/agent/branches?chat_jid=${encodeURIComponent(activeChatJid)}`, { credentials: "same-origin" }),
-      ]);
-
-      if (chatsRes.status === 401 || branchesRes.status === 401) {
+      const { sessions, unauthorized } = await loadMergedSessions(activeChatJid);
+      if (unauthorized) {
         setErrorMsg("Authenticate to view sessions.");
         setStatus("error");
         return;
       }
-      if (!chatsRes.ok) throw new Error(`active-chats: HTTP ${chatsRes.status}`);
-      if (!branchesRes.ok) throw new Error(`branches: HTTP ${branchesRes.status}`);
 
-      const chatsData = await chatsRes.json();
-      const branchesData = await branchesRes.json();
-
-      const rawChats: Record<string, unknown>[] = Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? []);
-      const rawBranches: Record<string, unknown>[] = Array.isArray(branchesData) ? branchesData : (branchesData.chats ?? branchesData.branches ?? []);
-
-      // Merge into a single deduplicated list, branches data takes priority
-      const merged = new Map<string, Branch>();
-      for (const raw of rawChats) {
-        const entry = normalizeBranchEntry(raw);
-        merged.set(entry.jid, entry);
-      }
-      for (const raw of rawBranches) {
-        const entry = normalizeBranchEntry(raw);
-        const existing = merged.get(entry.jid);
-        merged.set(entry.jid, {
-          ...entry,
-          name: entry.name ?? existing?.name,
-          display_name: entry.display_name ?? existing?.display_name,
-        });
-      }
-
-      setAllSessions(Array.from(merged.values()));
+      setAllSessions(sessions);
       setStatus("done");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to load sessions.");
+    } catch {
+      setErrorMsg("Failed to load sessions.");
       setStatus("error");
     }
   }, [activeChatJid]);
@@ -386,13 +330,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       }
       const payload = await res.json().catch(() => null);
       await loadData();
-      const branchChatJid = payload?.branch?.chat_jid;
-      const responseChatJid = payload?.chat_jid;
-      return typeof branchChatJid === "string" && branchChatJid
-        ? branchChatJid
-        : typeof responseChatJid === "string" && responseChatJid
-          ? responseChatJid
-          : null;
+      return extractChatJidFromAction(payload);
     } catch (err) {
       console.warn(`[tasks] ${actionKey} failed:`, err);
       setActionError(errorMessage);
@@ -403,12 +341,12 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   }, [actionBusy, loadData]);
 
   const handleRenameSession = useCallback(async (chatJid: string) => {
-    const name = prompt("Enter new session name:")?.trim();
+    const name = sanitizeSessionName(prompt("Enter new session name:"));
     if (!name) return;
     await runSessionAction(
       `rename-${chatJid}`,
       "/agent/branch-rename",
-      { chat_jid: chatJid, name },
+      { chat_jid: chatJid, agent_name: name },
       "Couldn't rename session. Please try again.",
     );
   }, [runSessionAction]);
@@ -431,19 +369,19 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     const nextChatJid = await runSessionAction(
       "fork",
       "/agent/branch-fork",
-      { chat_jid: activeChatJid },
+      { source_chat_jid: activeChatJid },
       "Couldn't create branch. Please try again.",
     );
     if (nextChatJid) navigateToChat(nextChatJid);
   }, [activeChatJid, runSessionAction]);
 
   const handleNewRoot = useCallback(async () => {
-    const name = prompt("Enter root session name:")?.trim();
+    const name = sanitizeSessionName(prompt("Enter root session name:"));
     if (!name) return;
     const nextChatJid = await runSessionAction(
       "new-root",
       "/agent/root-session",
-      { name },
+      { agent_name: name },
       "Couldn't create root session. Please try again.",
     );
     if (nextChatJid) navigateToChat(nextChatJid);
@@ -488,8 +426,6 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       </div>
     );
   }
-
-  const currentSession = allSessions.find(s => s.jid === activeChatJid);
 
   return (
     <div className="tasks-panel__sessions">
