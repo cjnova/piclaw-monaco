@@ -1097,6 +1097,8 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .model-picker {
@@ -3592,15 +3594,20 @@ body {
 }
 
 .compaction-badge {
-  background: var(--error);
-  color: #ffffff;
-  padding: 2px 10px;
+  background: var(--warning);
+  color: #1e1e2e;
+  padding: 2px 8px;
   border-radius: 3px;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   animation: compaction-pulse 1.5s infinite;
 }
 
