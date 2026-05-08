@@ -1167,6 +1167,17 @@ body {
   user-select: none;
 }
 
+.model-badge--empty {
+  background: var(--overlay-white-10);
+  border: 1px dashed var(--text-muted);
+}
+
+.model-badge__empty {
+  font-style: italic;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 .model-badge__name-wrapper {
   display: inline-flex;
   overflow: hidden;
