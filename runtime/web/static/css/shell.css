@@ -405,8 +405,9 @@ body {
 
 .modal-dialog__input {
   width: 100%;
+  box-sizing: border-box;
   margin-top: var(--modal-input-margin-top);
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 13px;
   font-family: inherit;
   background: var(--bg);
@@ -419,6 +420,7 @@ body {
 
 .modal-dialog__input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.15);
 }
 
 .modal-dialog__input::placeholder {
@@ -435,8 +437,8 @@ body {
 
 .modal-dialog__btn {
   min-width: var(--modal-btn-min-width);
-  padding: 7px 16px;
-  font-size: 12px;
+  padding: 8px 20px;
+  font-size: 13px;
   font-family: inherit;
   font-weight: 500;
   border: 1px solid var(--border);
@@ -455,20 +457,22 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: #1e1e2e;
+  font-weight: 600;
 }
 
 .modal-dialog__btn--primary:hover {
-  opacity: 0.9;
+  filter: brightness(1.1);
 }
 
 .modal-dialog__btn--destructive {
   background: var(--error);
   border-color: var(--error);
   color: #1e1e2e;
+  font-weight: 600;
 }
 
 .modal-dialog__btn--destructive:hover {
-  opacity: 0.9;
+  filter: brightness(1.1);
 }
 
 /* System stats bar */

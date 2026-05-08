@@ -130,7 +130,7 @@ export function ModalDialog({
         {mode === "prompt" && (
           <input
             ref={inputRef}
-            className="modal-dialog__input settings-panel__input"
+            className="modal-dialog__input"
             type="text"
             value={value}
             placeholder={placeholder}
@@ -148,7 +148,7 @@ export function ModalDialog({
           {mode !== "alert" && (
             <button
               type="button"
-              className="modal-dialog__btn settings-panel__provider-btn"
+              className="modal-dialog__btn"
               onClick={onCancel}
             >
               {cancelLabel ?? "Cancel"}
@@ -157,7 +157,7 @@ export function ModalDialog({
           <button
             ref={confirmRef}
             type="button"
-            className={`modal-dialog__btn settings-panel__provider-btn${destructive ? " modal-dialog__btn--destructive" : " modal-dialog__btn--primary"}`}
+            className={`modal-dialog__btn${destructive ? " modal-dialog__btn--destructive" : " modal-dialog__btn--primary"}`}
             onClick={submit}
           >
             {confirmLabel ?? (mode === "prompt" ? "Save" : mode === "confirm" ? "Confirm" : "OK")}
