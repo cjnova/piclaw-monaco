@@ -15,6 +15,27 @@ export interface Branch {
   display_name?: string;
   status?: string;
   archived?: boolean;
+  parent_jid?: string;
+}
+
+/** Normalize API response objects (chat_jid/agent_name) to our internal shape (jid/name). */
+function normalizeChatEntry(raw: Record<string, unknown>): ActiveChat {
+  return {
+    jid: (raw.chat_jid ?? raw.jid ?? "") as string,
+    name: (raw.agent_name ?? raw.name) as string | undefined,
+    display_name: (raw.display_name ?? raw.session_name) as string | undefined,
+  };
+}
+
+function normalizeBranchEntry(raw: Record<string, unknown>): Branch {
+  return {
+    jid: (raw.chat_jid ?? raw.jid ?? "") as string,
+    name: (raw.agent_name ?? raw.name) as string | undefined,
+    display_name: (raw.display_name ?? raw.session_name) as string | undefined,
+    status: raw.archived_at ? "archived" : (raw.status as string | undefined),
+    archived: Boolean(raw.archived_at ?? raw.archived),
+    parent_jid: (raw.parent_branch_id ?? raw.parent_jid) as string | undefined,
+  };
 }
 
 interface SessionsTabProps {
@@ -315,8 +336,11 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       const chatsData = await chatsRes.json();
       const branchesData = await branchesRes.json();
 
-      setSessions(Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? []));
-      setBranches(Array.isArray(branchesData) ? branchesData : (branchesData.branches ?? []));
+      const rawChats: Record<string, unknown>[] = Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? []);
+      const rawBranches: Record<string, unknown>[] = Array.isArray(branchesData) ? branchesData : (branchesData.chats ?? branchesData.branches ?? []);
+
+      setSessions(rawChats.map(normalizeChatEntry));
+      setBranches(rawBranches.map(normalizeBranchEntry));
       setStatus("done");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to load sessions.");

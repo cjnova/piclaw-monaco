@@ -9,6 +9,16 @@ type SessionEntry = {
   archived?: boolean;
 };
 
+/** Normalize API response objects to SessionEntry shape. */
+function normalizeEntry(raw: Record<string, unknown>): SessionEntry {
+  return {
+    jid: (raw.chat_jid ?? raw.jid ?? "") as string,
+    name: (raw.agent_name ?? raw.name) as string | undefined,
+    display_name: (raw.display_name ?? raw.session_name) as string | undefined,
+    archived: Boolean(raw.archived_at ?? raw.archived),
+  };
+}
+
 export function SessionPill() {
   const [isOpen, setIsOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionEntry[]>([]);
@@ -30,12 +40,12 @@ export function SessionPill() {
       if (!branchesRes.ok) throw new Error(`branches: HTTP ${branchesRes.status}`);
       const branchesData = await branchesRes.json();
 
-      const chatRows: ActiveChat[] = Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? []);
-      const branchRows: Branch[] = Array.isArray(branchesData) ? branchesData : (branchesData.branches ?? []);
+      const chatRows = (Array.isArray(chatsData) ? chatsData : (chatsData.chats ?? [])).map(normalizeEntry);
+      const branchRows = (Array.isArray(branchesData) ? branchesData : (branchesData.chats ?? branchesData.branches ?? [])).map(normalizeEntry);
 
       const merged = new Map<string, SessionEntry>();
       for (const row of chatRows) {
-        merged.set(row.jid, { jid: row.jid, name: row.name, display_name: row.display_name });
+        merged.set(row.jid, row);
       }
       for (const row of branchRows) {
         const existing = merged.get(row.jid);
@@ -43,7 +53,7 @@ export function SessionPill() {
           jid: row.jid,
           name: row.name ?? existing?.name,
           display_name: row.display_name ?? existing?.display_name,
-          archived: row.archived || row.status === "archived",
+          archived: row.archived,
         });
       }
 
