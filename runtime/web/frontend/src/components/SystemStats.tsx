@@ -16,9 +16,9 @@ interface StatsData {
 type MetricSeverity = "normal" | "warning" | "error";
 
 export function formatClock(date: Date): string {
-  const dayName = new Intl.DateTimeFormat("en-GB", { weekday: "long" }).format(date);
+  const dayName = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(date);
   const day = date.getDate();
-  const month = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(date);
+  const month = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date);
   const year = date.getFullYear();
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
