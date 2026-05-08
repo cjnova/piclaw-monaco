@@ -499,14 +499,15 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
                 className={`tasks-panel__item${isArchived ? " tasks-panel__item--archived" : ""}${isCurrent ? " tasks-panel__item--active" : ""}`}
                 onClick={() => navigateToChat(session.jid)}
               >
+                <span className={`tasks-panel__session-dot${isCurrent ? " tasks-panel__session-dot--active" : isArchived ? " tasks-panel__session-dot--archived" : ""}`} />
                 <span className="tasks-panel__item-name">@{chatName(session)}</span>
-                <span className="tasks-panel__item-sep"> — </span>
+                <span className="tasks-panel__item-sep">—</span>
                 <span className="tasks-panel__item-jid">{session.jid}</span>
                 {isCurrent && (
-                  <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--active">active</span></>
+                  <span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span>
                 )}
                 {isArchived && (
-                  <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--archived">archived</span></>
+                  <span className="tasks-panel__item-badge tasks-panel__item-badge--archived">archived</span>
                 )}
               </button>
               {isArchived && (

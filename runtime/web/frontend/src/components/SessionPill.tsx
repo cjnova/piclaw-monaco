@@ -182,13 +182,15 @@ export function SessionPill() {
                 <button
                   type="button"
                   key={entry.jid}
-                  className={`session-pill__item${isCurrent ? " session-pill__item--active" : ""}`}
+                  className={`session-pill__item${isCurrent ? " session-pill__item--active" : ""}${entry.archived ? " session-pill__item--archived" : ""}`}
                   onClick={() => {
                     setIsOpen(false);
                     goToChat(entry.jid);
                   }}
                 >
-                  <span>@{chatName(entry)}</span>
+                  <span className={`session-pill__dot${isCurrent ? " session-pill__dot--active" : ""}`} />
+                  <span className="session-pill__item-name">@{chatName(entry)}</span>
+                  {isCurrent && <span className="session-pill__item-badge session-pill__item-badge--current">current</span>}
                   {entry.archived && <span className="session-pill__item-badge">archived</span>}
                 </button>
               );
