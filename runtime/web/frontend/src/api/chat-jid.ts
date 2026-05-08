@@ -11,7 +11,8 @@ export function getChatJid(): string {
 
 /** Build the message POST URL for the current chat. */
 export function getMessageUrl(): string {
-  return `/agent/${encodeURIComponent(getChatJid())}/message`;
+  const chatJid = getChatJid();
+  return `/agent/${encodeURIComponent(chatJid)}/message?chat_jid=${encodeURIComponent(chatJid)}`;
 }
 
 /** Build a URL with ?chat_jid= (and optional extra params) for the current chat. */
