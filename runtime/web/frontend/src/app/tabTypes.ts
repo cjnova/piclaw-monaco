@@ -4,7 +4,9 @@ export interface Tab {
   label: string;
   icon?: string;
   closable: boolean;
-  type: "chat" | "widget" | "terminal";
+  type: "chat" | "widget" | "terminal" | "extension";
   /** Widget HTML content (only for widget tabs). */
   widgetHtml?: string;
+  /** Extension page URL (only for extension tabs). */
+  extensionUrl?: string;
 }

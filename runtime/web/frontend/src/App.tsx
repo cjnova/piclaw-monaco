@@ -141,9 +141,10 @@ function AppContent() {
 
   const connected = connectionStatus.value === "connected";
   const isExtensionPageOpen = (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value;
-  const hasWidgetTab = tabs.value.some((t) => t.type === "widget");
-  const isWidgetActive = hasWidgetTab && tabs.value.some((t) => t.id === activeTabId.value && t.type === "widget");
-  const isTerminalActive = activeTabId.value === "terminal";
+  const activeTab = tabs.value.find((t) => t.id === activeTabId.value) ?? tabs.value[0];
+  const isWidgetActive = activeTab?.type === "widget";
+  const isTerminalActive = activeTab?.type === "terminal";
+  const isExtensionActive = activeTab?.type === "extension";
   const hasTerminalTab = tabs.value.some((t) => t.type === "terminal");
 
   return (
@@ -189,7 +190,7 @@ function AppContent() {
                     />
                   ) : (
                     <>
-                      <div className={isWidgetActive || isTerminalActive ? "app-layout__tab-content--hidden" : "app-layout__tab-content"}>
+                      <div className={isWidgetActive || isTerminalActive || isExtensionActive ? "app-layout__tab-content--hidden" : "app-layout__tab-content"}>
                         <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
                       </div>
                       {hasTerminalTab && (
@@ -207,6 +208,15 @@ function AppContent() {
                           <WidgetPane tabMode widgetHtml={t.widgetHtml} widgetTitle={t.label} />
                         </div>
                       ))}
+                      {activeTab?.type === "extension" && activeTab.extensionUrl && (
+                        <div className="app-layout__tab-content">
+                          <iframe
+                            src={activeTab.extensionUrl}
+                            className="extension-frame__iframe"
+                            title={activeTab.label}
+                          />
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
