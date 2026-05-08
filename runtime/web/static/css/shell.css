@@ -727,8 +727,8 @@ body {
   background: var(--text-muted);
 }
 
-.session-pill__dot--current { background: var(--accent); }
-.session-pill__dot--active { background: var(--success); }
+.session-pill__dot--current { background: var(--success); }
+.session-pill__dot--active { background: var(--accent); }
 .session-pill__dot--inactive { background: var(--text-muted); }
 .session-pill__dot--archived { background: var(--overlay-white-25); }
 
@@ -744,8 +744,8 @@ body {
 }
 
 .session-pill__item-badge--current {
-  color: var(--accent);
-  background: var(--tint-blue-15);
+  color: var(--success);
+  background: var(--tint-green-13);
 }
 
 .session-pill__item-restore {
@@ -3522,8 +3522,8 @@ body {
   flex-shrink: 0;
 }
 
-.tasks-panel__session-dot--current { background: var(--accent); }
-.tasks-panel__session-dot--active { background: var(--success); }
+.tasks-panel__session-dot--current { background: var(--success); }
+.tasks-panel__session-dot--active { background: var(--accent); }
 .tasks-panel__session-dot--inactive { background: var(--text-muted); }
 .tasks-panel__session-dot--archived { background: var(--overlay-white-25); }
 
@@ -3540,13 +3540,13 @@ body {
 }
 
 .tasks-panel__item-badge--current {
-  color: var(--accent);
-  background: var(--tint-blue-15);
+  color: var(--success);
+  background: var(--tint-green-13);
 }
 
 .tasks-panel__item-badge--active {
-  color: var(--success);
-  background: var(--tint-green-13);
+  color: var(--accent);
+  background: var(--tint-blue-15);
 }
 
 .tasks-panel__item-badge--inactive {
