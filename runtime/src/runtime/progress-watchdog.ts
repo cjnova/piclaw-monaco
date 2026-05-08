@@ -44,7 +44,8 @@ const MIN_SCAN_INTERVAL_MS = 1_000;
 const MAX_SCAN_INTERVAL_MS = 5_000;
 const SNAPSHOT_PUBLISH_DEBOUNCE_MS = 250;
 
-const activeByChat = new Map<string, ProgressWatchdogEntry & { stallReported?: boolean }>();
+const activeByChat = new Map<string, ProgressWatchdogEntry & { stallReported?: boolean; abortAttempted?: boolean }>();
+const abortersByChat = new Map<string, (stall: ProgressWatchdogStall) => void | Promise<void>>();
 
 let scanTimer: ReturnType<typeof setInterval> | null = null;
 let publishTimer: ReturnType<typeof setTimeout> | null = null;
@@ -53,6 +54,11 @@ let terminateProcess: (stall: ProgressWatchdogStall) => void = (_stall) => {
 };
 let publishSnapshot: ((snapshot: ProgressWatchdogSnapshot) => void) | null = null;
 let progressWatchdogTimeoutOverrideMs: number | null = null;
+
+function shouldEscalateProgressWatchdogStall(): boolean {
+  const normalized = String(process.env.PICLAW_PROGRESS_WATCHDOG_RESTART_ON_STALL || process.env.PICLAW_PROGRESS_WATCHDOG_ESCALATE_ON_STALL || "").trim().toLowerCase();
+  return ["1", "true", "yes", "on", "restart", "exit"].includes(normalized);
+}
 
 function getProgressWatchdogScanIntervalMs(timeoutMs: number): number {
   if (timeoutMs <= 0) return 0;
@@ -200,12 +206,23 @@ export function heartbeatTrackedPhase(
 
 export function endTrackedPhase(chatJid: string): void {
   activeByChat.delete(chatJid);
+  abortersByChat.delete(chatJid);
   stopScanLoopIfIdle();
   flushProgressWatchdogState();
 }
 
+export function registerProgressWatchdogAborter(
+  chatJid: string,
+  aborter: (stall: ProgressWatchdogStall) => void | Promise<void>,
+): () => void {
+  abortersByChat.set(chatJid, aborter);
+  return () => {
+    if (abortersByChat.get(chatJid) === aborter) abortersByChat.delete(chatJid);
+  };
+}
+
 export function getTrackedPhasesSnapshot(): ProgressWatchdogEntry[] {
-  return Array.from(activeByChat.values()).map(({ stallReported: _stallReported, ...entry }) => ({ ...entry }));
+  return Array.from(activeByChat.values()).map(({ stallReported: _stallReported, abortAttempted: _abortAttempted, ...entry }) => ({ ...entry }));
 }
 
 export function scanForStalls(now = Date.now()): ProgressWatchdogStall[] {
@@ -230,8 +247,8 @@ export function scanForStalls(now = Date.now()): ProgressWatchdogStall[] {
 
     if (current.stallReported) continue;
 
-    activeByChat.set(chatJid, { ...current, stallReported: true });
-    log.error("Progress watchdog detected a stalled active phase; terminating the process.", {
+    activeByChat.set(chatJid, { ...current, stallReported: true, abortAttempted: true });
+    log.warn("Progress watchdog detected a stalled active phase; requesting best-effort run abort.", {
       operation: "progress_watchdog.stall",
       chatJid,
       phase: current.phase,
@@ -240,7 +257,47 @@ export function scanForStalls(now = Date.now()): ProgressWatchdogStall[] {
       startedAt: new Date(current.startedAt).toISOString(),
       lastProgressAt: new Date(current.lastProgressAt).toISOString(),
       metadata: current.metadata,
+      escalationEnabled: shouldEscalateProgressWatchdogStall(),
     });
+
+    const aborter = abortersByChat.get(chatJid);
+    if (aborter) {
+      Promise.resolve()
+        .then(() => aborter(stall))
+        .then(() => {
+          log.warn("Progress watchdog abort request completed.", {
+            operation: "progress_watchdog.abort_completed",
+            chatJid,
+            phase: current.phase,
+            ageMs,
+            timeoutMs,
+          });
+        })
+        .catch((error) => {
+          log.error("Progress watchdog abort request failed.", {
+            operation: "progress_watchdog.abort_failed",
+            chatJid,
+            phase: current.phase,
+            ageMs,
+            timeoutMs,
+            err: error,
+            escalationEnabled: shouldEscalateProgressWatchdogStall(),
+          });
+          if (!shouldEscalateProgressWatchdogStall()) return;
+          try {
+            terminateProcess(stall);
+          } catch (terminationError) {
+            debugSuppressedError(log, "Progress watchdog termination hook threw unexpectedly.", terminationError, {
+              operation: "progress_watchdog.termination_hook",
+              chatJid,
+              phase: current.phase,
+            });
+          }
+        });
+      continue;
+    }
+
+    if (!shouldEscalateProgressWatchdogStall()) continue;
     try {
       terminateProcess(stall);
     } catch (error) {
@@ -277,6 +334,7 @@ export function resetProgressWatchdogForTests(): void {
     clearTimeout(publishTimer);
     publishTimer = null;
   }
+  abortersByChat.clear();
   terminateProcess = () => {
     process.exit(1);
   };

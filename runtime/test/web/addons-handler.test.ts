@@ -24,9 +24,11 @@ import {
   registerAddonConfigApi,
   resetAddonConfigApiRegistryForTests,
 } from '../../src/channels/web/handlers/addon-config-api.js';
+import { getAddonApiHealthSnapshot, resetAddonApiHealthForTests } from '../../src/addons/addon-api-health.js';
 
 afterEach(() => {
   resetAddonConfigApiRegistryForTests();
+  resetAddonApiHealthForTests();
 });
 
 function createAddonTarball(baseDir: string, fileName: string, files: Record<string, string>): string {
@@ -796,6 +798,60 @@ test('handleAddonConfigApiRequest falls back to suffixed addon slash commands wh
       { chatJid: 'web:test', rawText: '/proxmox-config-get' },
       { chatJid: 'web:test', rawText: '/proxmox-config-get:1' },
     ]);
+  });
+});
+
+test('handleAddonConfigApiRequest records degraded add-on API state and clears it on recovery', async () => {
+  await withTempWorkspaceEnv('piclaw-addon-config-health-', { PICLAW_ADDON_API_FAILURE_BACKOFF_MS: '60000' }, async () => {
+    let calls = 0;
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const first = await handleAddonConfigApiRequest(
+      new Request('https://example.test/agent/addons/api/goal/session?chat_jid=web%3Atest'),
+      '/agent/addons/api/goal/session',
+      json,
+      {
+        async applySlashCommand() {
+          calls += 1;
+          return { status: 'error', message: 'backend unavailable' };
+        },
+      },
+      'web:test',
+    );
+    expect(first?.status).toBe(500);
+    expect(getAddonApiHealthSnapshot()).toEqual({
+      degraded: true,
+      entries: [expect.objectContaining({
+        addonId: 'goal',
+        action: 'session',
+        chatJid: 'web:test',
+        method: 'GET',
+        path: '/agent/addons/api/goal/session',
+        failureCount: 1,
+        degraded: true,
+        lastError: 'backend unavailable',
+      })],
+    });
+
+    const second = await handleAddonConfigApiRequest(
+      new Request('https://example.test/agent/addons/api/goal/session?chat_jid=web%3Atest'),
+      '/agent/addons/api/goal/session',
+      json,
+      {
+        async applySlashCommand() {
+          calls += 1;
+          return { status: 'success', messages: [{ customType: 'goal', text: '{"ok":true}' }] };
+        },
+      },
+      'web:test',
+    );
+    expect(second?.status).toBe(200);
+    expect(await second?.json()).toEqual({ ok: true });
+    expect(getAddonApiHealthSnapshot()).toEqual({ degraded: false, entries: [] });
+    expect(calls).toBe(2);
   });
 });
 

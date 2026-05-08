@@ -12,6 +12,11 @@ import { getAttachmentRegistry } from "../../src/agent-pool/attachments.js";
 import { AgentTurnCoordinator } from "../../src/agent-pool/turn-coordinator.js";
 import { createToolExecutionWatchdogHeartbeatController, runAgentPrompt } from "../../src/agent-pool/run-agent-orchestrator.js";
 import { getSshConfig, initDatabase, upsertSshConfig } from "../../src/db.js";
+import {
+  resetProgressWatchdogForTests,
+  scanForStalls,
+  setProgressWatchdogTimeoutForTests,
+} from "../../src/runtime/progress-watchdog.js";
 import { getToolUseMessageBudget, setToolUseMessageBudget } from "../../src/core/config.js";
 import {
   applyLiveSshConfig,
@@ -55,11 +60,179 @@ function createTestLogsDir(): string {
 }
 
 afterEach(() => {
+  resetProgressWatchdogForTests();
   setSshConnectionResolverForTests(null);
   while (tempLogsDirs.length > 0) {
     const logsDir = tempLogsDirs.pop();
     if (!logsDir) continue;
     rmSync(logsDir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentPrompt aborts and returns an interrupted result when active progress goes stale", async () => {
+  initDatabase();
+  const restoreWatchdogTimeout = setProgressWatchdogTimeoutForTests(10);
+  class StalledSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-stale" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    aborted = false;
+    private releasePrompt: (() => void) | null = null;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.isStreaming = true;
+      await new Promise<void>((resolve) => {
+        this.releasePrompt = resolve;
+      });
+      this.isStreaming = false;
+    }
+    async abort() {
+      this.aborted = true;
+      this.releasePrompt?.();
+    }
+  }
+
+  try {
+    const session = new StalledSession();
+    const logs: Array<Record<string, unknown>> = [];
+    const run = runAgentPrompt("test", "web:stale-progress", {
+      timeoutMs: 0,
+      skipPrePromptCompaction: true,
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+      onWarn: (_message, details) => logs.push(details),
+    });
+
+    await Bun.sleep(15);
+    const stalls = scanForStalls(Date.now());
+    expect(stalls).toHaveLength(1);
+
+    const result = await run;
+    expect(session.aborted).toBe(true);
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Stale-progress watchdog interrupted");
+    expect(logs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operation: "run_agent.stale_progress_abort", chatJid: "web:stale-progress" }),
+    ]));
+  } finally {
+    restoreWatchdogTimeout();
+  }
+});
+
+test("runAgentPrompt reports stale-progress abort failures", async () => {
+  initDatabase();
+  const restoreWatchdogTimeout = setProgressWatchdogTimeoutForTests(10);
+  class AbortFailingSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-stale-fail" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      await Bun.sleep(25);
+    }
+    async abort() {
+      throw new Error("abort unavailable");
+    }
+  }
+
+  try {
+    const session = new AbortFailingSession();
+    const run = runAgentPrompt("test", "web:stale-abort-fail", {
+      timeoutMs: 0,
+      skipPrePromptCompaction: true,
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+      onWarn: () => {},
+    });
+
+    await Bun.sleep(15);
+    expect(scanForStalls(Date.now())).toHaveLength(1);
+    const result = await run;
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("failed to abort");
+    expect(result.error).toContain("abort unavailable");
+  } finally {
+    restoreWatchdogTimeout();
+  }
+});
+
+test("progress watchdog does not abort active runs that keep heartbeating", async () => {
+  initDatabase();
+  const restoreWatchdogTimeout = setProgressWatchdogTimeoutForTests(20);
+  class ProgressingSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-progress" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    aborted = false;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      for (let i = 0; i < 3; i += 1) {
+        await Bun.sleep(8);
+        for (const listener of this.listeners) {
+          listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: i === 2 ? "done" : "." } });
+        }
+      }
+    }
+    async abort() {
+      this.aborted = true;
+    }
+  }
+
+  try {
+    const session = new ProgressingSession();
+    const run = runAgentPrompt("test", "web:progressing", {
+      timeoutMs: 0,
+      skipPrePromptCompaction: true,
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session) as any,
+      turnCoordinator: new AgentTurnCoordinator({ takeAttachments: () => [], touchSession: () => {}, recordMessageUsage: () => {} }),
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    await Bun.sleep(12);
+    expect(scanForStalls(Date.now())).toHaveLength(0);
+    const result = await run;
+    expect(result.status).toBe("success");
+    expect(session.aborted).toBe(false);
+  } finally {
+    restoreWatchdogTimeout();
   }
 });
 

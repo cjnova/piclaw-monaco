@@ -3,6 +3,7 @@
  */
 
 import type { WebAgentBufferEntry } from "./agent-buffers.js";
+import { getAddonApiHealthSnapshot } from "../../../addons/addon-api-health.js";
 import { appendServerTiming, measureAsync, measureSync } from "../http/server-timing.js";
 
 /** Context contract used by web agent status/context/model endpoint handlers. */
@@ -61,7 +62,7 @@ export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext):
     const status = ctx.getAgentStatus(chatJid);
     if (!status) {
       ctx.recoverStaleInflightRun(chatJid, { hasActiveStatus: false });
-      return ctx.json({ status: "idle", state: "idle", chat_jid: chatJid, data: null });
+      return ctx.json({ status: "idle", state: "idle", chat_jid: chatJid, data: null, addon_api: getAddonApiHealthSnapshot() });
     }
 
     const turnId = (status.turn_id || status.turnId) as string | undefined;
@@ -95,6 +96,7 @@ export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext):
       data: status,
       thought,
       draft,
+      addon_api: getAddonApiHealthSnapshot(),
     });
   });
   return appendServerTiming(result, {

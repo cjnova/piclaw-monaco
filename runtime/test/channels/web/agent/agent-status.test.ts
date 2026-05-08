@@ -28,7 +28,13 @@ describe("web agent status helpers", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Server-Timing")).toContain("agent_status;dur=");
-    expect(await res.json()).toEqual({ status: "idle", state: "idle", chat_jid: "web:default", data: null });
+    expect(await res.json()).toEqual({
+      status: "idle",
+      state: "idle",
+      chat_jid: "web:default",
+      data: null,
+      addon_api: { degraded: false, entries: [] },
+    });
   });
 
   test("handleAgentStatusRequest triggers stale inflight recovery when no active status exists", async () => {
@@ -44,7 +50,13 @@ describe("web agent status helpers", () => {
 
     expect(res.status).toBe(200);
     expect(calls).toEqual([{ chatJid: "web:ux", hasActiveStatus: false }]);
-    expect(await res.json()).toEqual({ status: "idle", state: "idle", chat_jid: "web:ux", data: null });
+    expect(await res.json()).toEqual({
+      status: "idle",
+      state: "idle",
+      chat_jid: "web:ux",
+      data: null,
+      addon_api: { degraded: false, entries: [] },
+    });
   });
 
   test("handleAgentStatusRequest includes thought/draft buffers when available", async () => {

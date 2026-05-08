@@ -46,6 +46,10 @@ describe("web http agent dispatch", () => {
       handleAutoresearchDismiss: async () => new Response("autoresearch-dismiss", { status: 214 }),
       handleAgentOobeComplete: async () => new Response("oobe-complete", { status: 215 }),
       handleAgentQueueState: async () => new Response("queue-state"),
+      handleAgentRuns: async () => new Response("runs"),
+      handleAgentRunAbort: async () => new Response("run-abort", { status: 218 }),
+      handleAgentRunClearStale: async () => new Response("run-clear-stale", { status: 219 }),
+      handleAgentRunDrainQueue: async () => new Response("run-drain-queue", { status: 220 }),
       handleAgentQueueRemove: async () => new Response("queue-remove", { status: 203 }),
       handleAgentQueueSteer: async () => new Response("queue-steer", { status: 204 }),
       handleAgentModels: async () => new Response("models"),
@@ -96,6 +100,18 @@ describe("web http agent dispatch", () => {
 
     const queueStateReq = new Request("https://example.com/agent/queue-state", { method: "GET" });
     expect(await (await handleAgentRoutes(channel, queueStateReq, "/agent/queue-state", new URL(queueStateReq.url)))?.text()).toBe("queue-state");
+
+    const runsReq = new Request("https://example.com/agent/runs", { method: "GET" });
+    expect(await (await handleAgentRoutes(channel, runsReq, "/agent/runs", new URL(runsReq.url)))?.text()).toBe("runs");
+
+    const runAbortReq = new Request("https://example.com/agent/runs/abort", { method: "POST" });
+    expect((await handleAgentRoutes(channel, runAbortReq, "/agent/runs/abort", new URL(runAbortReq.url)))?.status).toBe(218);
+
+    const runClearStaleReq = new Request("https://example.com/agent/runs/clear-stale", { method: "POST" });
+    expect((await handleAgentRoutes(channel, runClearStaleReq, "/agent/runs/clear-stale", new URL(runClearStaleReq.url)))?.status).toBe(219);
+
+    const runDrainQueueReq = new Request("https://example.com/agent/runs/drain-queue", { method: "POST" });
+    expect((await handleAgentRoutes(channel, runDrainQueueReq, "/agent/runs/drain-queue", new URL(runDrainQueueReq.url)))?.status).toBe(220);
 
     const queueRemoveReq = new Request("https://example.com/agent/queue-remove", { method: "POST" });
     expect((await handleAgentRoutes(channel, queueRemoveReq, "/agent/queue-remove", new URL(queueRemoveReq.url)))?.status).toBe(203);

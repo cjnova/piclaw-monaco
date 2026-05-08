@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { initDatabase } from "../../../../src/db.js";
+import "../../../helpers.js";
+import { beginChatRun, getInflightRuns, initDatabase } from "../../../../src/db.js";
 import { WebAgentControlPlaneService } from "../../../../src/channels/web/agent/agent-control-plane-service.js";
 import type { QueuedFollowupLifecycleService } from "../../../../src/channels/web/runtime/queued-followup-lifecycle-service.js";
 
@@ -157,6 +158,99 @@ describe("WebAgentControlPlaneService", () => {
         data: { chat_jid: "web:branch", row_id: 7, thread_id: 11 },
       },
     ]);
+  });
+
+  test("lists active runs and supports targeted abort, stale marker clear, and queue drain", async () => {
+    initDatabase();
+    const events: Array<{ type: string; data: unknown }> = [];
+    const slashCalls: Array<{ chatJid: string; rawText: string }> = [];
+    const removedRows: number[] = [];
+    beginChatRun("web:hung", "2024-01-01T00:00:02.000Z", {
+      prevTs: "2024-01-01T00:00:01.000Z",
+      messageId: "msg-hung",
+      startedAt: "2024-01-01T00:00:03.000Z",
+    });
+    const queueLifecycle: QueueLifecycleStub = {
+      getQueuedFollowupCount: () => 2,
+      listQueuedStateItems: () => [
+        { rowId: 41, content: "first" },
+        { row_id: 42, content: "second" },
+      ],
+      prependQueuedFollowupItem: () => {},
+      removeQueuedFollowupForAction: async (_chatJid, rowId) => {
+        removedRows.push(rowId);
+        return {
+          removed: {
+            rowId,
+            queuedContent: `queued-${rowId}`,
+            queuedAt: "2024-01-01T00:00:00.000Z",
+            materializeRetries: 0,
+          },
+          source: "deferred",
+        };
+      },
+    };
+    const service = createService({
+      broadcastEvent: (type, data) => events.push({ type, data }),
+      queuedFollowupLifecycle: queueLifecycle,
+      getAgentStatus: (chatJid) => chatJid === "web:hung" ? { type: "thinking", turn_id: "turn-hung" } : null,
+      agentPool: {
+        setSessionBinder: () => {},
+        listActiveChats: () => [{ chat_jid: "web:hung", agent_name: "hung", is_active: true }],
+        applySlashCommand: async (chatJid: string, rawText: string) => {
+          slashCalls.push({ chatJid, rawText });
+          return { status: "success", message: "aborted" };
+        },
+      },
+    });
+
+    const listResponse = await service.handleAgentRuns(new Request("https://example.com/agent/runs?chat_jid=web%3Ahung"));
+    expect(listResponse.status).toBe(200);
+    expect(await listResponse.json()).toEqual(expect.objectContaining({
+      runs: [expect.objectContaining({
+        chat_jid: "web:hung",
+        is_active: true,
+        queue_count: 2,
+        inflight: expect.objectContaining({ messageId: "msg-hung" }),
+        status: expect.objectContaining({ turn_id: "turn-hung" }),
+      })],
+    }));
+
+    const abortResponse = await service.handleAgentRunAbort(new Request("https://example.com/agent/runs/abort", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_jid: "web:hung", turn_id: "turn-hung" }),
+    }));
+    expect(abortResponse.status).toBe(200);
+    expect(await abortResponse.json()).toEqual(expect.objectContaining({ status: "ok", chat_jid: "web:hung", turn_id: "turn-hung" }));
+    expect(slashCalls).toEqual([{ chatJid: "web:hung", rawText: "/abort" }]);
+
+    const drainResponse = await service.handleAgentRunDrainQueue(new Request("https://example.com/agent/runs/drain-queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_jid: "web:hung" }),
+    }));
+    expect(drainResponse.status).toBe(200);
+    expect(await drainResponse.json()).toEqual({ status: "ok", chat_jid: "web:hung", removed_count: 2 });
+    expect(removedRows).toEqual([41, 42]);
+
+    const clearResponse = await service.handleAgentRunClearStale(new Request("https://example.com/agent/runs/clear-stale", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_jid: "web:hung" }),
+    }));
+    expect(clearResponse.status).toBe(200);
+    expect(await clearResponse.json()).toEqual({
+      status: "ok",
+      chat_jid: "web:hung",
+      cleared: true,
+      had_inflight: true,
+      had_preflight: false,
+    });
+    expect(getInflightRuns().some((run) => run.chatJid === "web:hung")).toBe(false);
+    expect(events).toEqual(expect.arrayContaining([
+      { type: "agent_followup_drained", data: { chat_jid: "web:hung", removed_count: 2 } },
+    ]));
   });
 
   test("preserves branch lifecycle wrapper status codes and payload shapes", async () => {

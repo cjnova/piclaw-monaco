@@ -60,6 +60,7 @@ import {
   heartbeatTrackedPhase,
   endTrackedPhase,
   getProgressWatchdogTimeoutMs,
+  registerProgressWatchdogAborter,
 } from "../runtime/progress-watchdog.js";
 
 const log = createLogger("agent-pool.run-orchestrator");
@@ -794,6 +795,27 @@ async function runPromptAttempt(
     if (!completedRef.value) completedRef.value = true;
     if (timeoutId) clearTimeout(timeoutId);
   };
+  let staleProgressInterrupted = false;
+  let staleProgressAbortFailed: string | null = null;
+  const unregisterProgressAborter = registerProgressWatchdogAborter(chatJid, async (stall) => {
+    staleProgressInterrupted = true;
+    options.onWarn?.("Stale-progress watchdog aborting stalled agent run", {
+      operation: "run_agent.stale_progress_abort",
+      chatJid,
+      phase: stall.phase,
+      ageMs: stall.ageMs,
+      timeoutMs: stall.timeoutMs,
+      startedAt: new Date(stall.startedAt).toISOString(),
+      lastProgressAt: new Date(stall.lastProgressAt).toISOString(),
+      ...getRunObservabilityDetails(runOptions),
+    });
+    try {
+      await session.abort();
+    } catch (error) {
+      staleProgressAbortFailed = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  });
 
   let promptThrownError: string | null = null;
   try {
@@ -824,6 +846,7 @@ async function runPromptAttempt(
     promptThrownError = error instanceof Error ? error.message : String(error);
   } finally {
     finishPromptTimeout();
+    unregisterProgressAborter();
     toolExecutionWatchdogHeartbeat.stop();
     unsub();
   }
@@ -842,7 +865,11 @@ async function runPromptAttempt(
   const latentStateError = !finalText ? getSessionStateErrorMessage(session) : null;
 
   let output: AgentOutput;
-  if (timedOut) {
+  if (staleProgressAbortFailed) {
+    output = { status: "error", result: null, error: `Stale-progress watchdog detected no progress and failed to abort the run: ${staleProgressAbortFailed}` };
+  } else if (staleProgressInterrupted) {
+    output = { status: "error", result: null, error: `Stale-progress watchdog interrupted the run after no progress for ${formatTimeoutDuration(getProgressWatchdogTimeoutMs())}.` };
+  } else if (timedOut) {
     output = { status: "error", result: null, error: `Timed out after ${formatTimeoutDuration(timeoutMs)}` };
   } else if (toolUseBudgetExceeded && !finalText && finalAttachments.length === 0) {
     sawCompactionIntent = true;

@@ -164,6 +164,10 @@ export interface WebChannelLike
   handleAutoresearchDismiss(req: Request): Promise<Response>;
   handleAgentOobeComplete(req: Request): Promise<Response>;
   handleAgentQueueState(req: Request): Promise<Response>;
+  handleAgentRuns(req: Request): Promise<Response>;
+  handleAgentRunAbort(req: Request): Promise<Response>;
+  handleAgentRunClearStale(req: Request): Promise<Response>;
+  handleAgentRunDrainQueue(req: Request): Promise<Response>;
   handleAgentQueueRemove(req: Request): Promise<Response>;
   handleAgentQueueSteer(req: Request): Promise<Response>;
   handleAgentQueueReorder(req: Request): Promise<Response>;

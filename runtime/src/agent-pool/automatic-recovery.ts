@@ -25,6 +25,7 @@ export type RecoveryClassifier =
   | "budget_exhausted"
   | "auth_config"
   | "recovery_suppressed"
+  | "stale_progress_watchdog"
   | "non_recoverable"
   | "tool_activity"
   | "completed_turn_output"
@@ -181,6 +182,15 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
       classifier: "disabled",
       strategy: null,
       reason: "Automatic turn recovery is disabled.",
+    };
+  }
+
+  if (/stale-progress watchdog/i.test(errorText)) {
+    return {
+      recover: false,
+      classifier: "stale_progress_watchdog",
+      strategy: null,
+      reason: "Stale-progress watchdog already interrupted the active run; do not retry automatically.",
     };
   }
 
