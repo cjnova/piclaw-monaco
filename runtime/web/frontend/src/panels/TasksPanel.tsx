@@ -473,7 +473,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
               <span className="tasks-panel__item-sep"> — </span>
               <span className="tasks-panel__item-jid">{session.jid}</span>
               {isCurrent && (
-                <span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span>
+                <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--active">active</span></>
               )}
             </button>
           );
@@ -486,15 +486,18 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
             <div key={branch.jid} className="tasks-panel__session-row">
               <button
                 type="button"
-                className={`tasks-panel__item tasks-panel__item--archived${isCurrent ? " tasks-panel__item--active" : ""}`}
+                className={`tasks-panel__item${isArchived ? " tasks-panel__item--archived" : ""}${isCurrent ? " tasks-panel__item--active" : ""}`}
                 onClick={() => navigateToChat(branch.jid)}
               >
                 <span className="tasks-panel__item-name">@{chatName(branch)}</span>
                 <span className="tasks-panel__item-sep"> — </span>
                 <span className="tasks-panel__item-jid">{branch.jid}</span>
-                <span className={`tasks-panel__item-badge tasks-panel__item-badge--${isArchived ? "archived" : "branch"}`}>
-                  {isArchived ? "archived" : "branch"}
-                </span>
+                {isCurrent && (
+                  <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--current">current</span><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--active">active</span></>
+                )}
+                {isArchived && (
+                  <><span className="tasks-panel__item-dot"> • </span><span className="tasks-panel__item-badge tasks-panel__item-badge--archived">archived</span></>
+                )}
               </button>
               {isArchived && (
                 <button

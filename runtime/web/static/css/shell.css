@@ -3421,6 +3421,17 @@ body {
 }
 .tasks-panel__session-row .tasks-panel__item {
   flex: 1;
+  flex-direction: row;
+  align-items: center;
+}
+.tasks-panel__sessions > .tasks-panel__list > .tasks-panel__item {
+  flex-direction: row;
+  align-items: center;
+}
+.tasks-panel__item--active .tasks-panel__item-name,
+.tasks-panel__item--active .tasks-panel__item-sep,
+.tasks-panel__item--active .tasks-panel__item-jid {
+  color: var(--accent);
 }
 .tasks-panel__restore-btn {
   border: 1px solid var(--border);
@@ -3435,6 +3446,21 @@ body {
   background: var(--tint-green-08);
   color: var(--success);
   border-color: var(--success);
+}
+.tasks-panel__item-dot {
+  color: var(--text-muted);
+}
+.tasks-panel__item-badge {
+  font-size: 11px;
+}
+.tasks-panel__item-badge--current {
+  color: var(--accent);
+}
+.tasks-panel__item-badge--active {
+  color: #a6e3a1;
+}
+.tasks-panel__item-badge--archived {
+  color: var(--text-muted);
 }
 
 /* ── Tasks filter tabs ── */
