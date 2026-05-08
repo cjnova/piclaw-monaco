@@ -2,7 +2,6 @@
  * runtime/shutdown.ts – Graceful shutdown orchestration helpers.
  */
 
-import { closeDatabase } from "../db.js";
 import { runPreShutdownHooksOnce } from "./shutdown-registry.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -66,13 +65,6 @@ export function createShutdownHandler(deps: ShutdownDeps): (signal: string) => P
     await withTimeout(deps.whatsapp.disconnect(), 8000, "whatsapp disconnect");
     await withTimeout(deps.web.stop(), 4000, "web stop");
     await withTimeout(deps.pushover?.stop() ?? Promise.resolve(), 4000, "pushover stop");
-
-    try {
-      closeDatabase();
-      log.info("Database closed and WAL checkpointed", { operation: "shutdown.close_database" });
-    } catch (err) {
-      log.warn("Failed to close database during shutdown", { operation: "shutdown.close_database", err });
-    }
 
     clearTimeout(forceExit);
     process.exit(0);
