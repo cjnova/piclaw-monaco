@@ -5690,6 +5690,11 @@ pre.frontmatter-block {
     flex-direction: column;
   }
 
+  /* Hide desktop status bar — replaced by mobile toolbar */
+  .app-layout__status-bar {
+    display: none;
+  }
+
   /* Hide non-essential items from top status bar */
   .sys-stats-bar__metrics,
   .sys-stats-bar__sep {
