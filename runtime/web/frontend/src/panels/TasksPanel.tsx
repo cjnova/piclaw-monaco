@@ -290,7 +290,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     setStatus("loading");
     setErrorMsg("");
     try {
-      const { sessions, unauthorized } = await loadMergedSessions(activeChatJid);
+      const { sessions, unauthorized } = await loadMergedSessions(activeChatJid, { includeArchived: true });
       if (unauthorized) {
         setErrorMsg("Authenticate to view sessions.");
         setStatus("error");
