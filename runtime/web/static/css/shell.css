@@ -51,17 +51,6 @@
   --overlay-black-50: rgba(0, 0, 0, 0.5);
   --overlay-black-85: rgba(0, 0, 0, 0.85);
   --modal-z-index: 10020;
-  --modal-padding: 24px;
-  --modal-width: 420px;
-  --modal-radius: 12px;
-  --modal-gap: 12px;
-  --modal-title-size: 15px;
-  --modal-description-size: 13px;
-  --modal-input-margin-top: 4px;
-  --modal-actions-gap: 10px;
-  --modal-actions-margin-top: 8px;
-  --modal-btn-min-width: 88px;
-  --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   /* Progressive font sizing */
   --font-size-sm: clamp(11px, 1.1vw, 13px);
   --font-size-md: clamp(13px, 1.3vw, 15px);
@@ -369,36 +358,35 @@ body {
   position: fixed;
   inset: 0;
   z-index: var(--modal-z-index);
-  background: var(--overlay-black-40);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--modal-padding);
+  padding: 16px;
 }
 
 .modal-dialog {
-  width: min(var(--modal-width), calc(100vw - (var(--modal-padding) * 2)));
-  border-radius: var(--modal-radius);
-  border: 1px solid var(--border);
+  width: min(440px, 92vw);
   background: var(--bg-sidebar);
-  box-shadow: var(--modal-shadow);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--modal-gap);
-  padding: var(--modal-padding);
-  transition: transform 140ms ease, opacity 140ms ease;
+  gap: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
 }
 
 .modal-dialog__title {
   margin: 0;
-  font-size: var(--modal-title-size);
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
 }
 
 .modal-dialog__description {
   margin: 0;
-  font-size: var(--modal-description-size);
+  font-size: 13px;
   line-height: 1.45;
   color: var(--text-muted);
 }
@@ -406,73 +394,64 @@ body {
 .modal-dialog__input {
   width: 100%;
   box-sizing: border-box;
-  margin-top: var(--modal-input-margin-top);
-  padding: 10px 14px;
-  font-size: 13px;
-  font-family: inherit;
-  background: var(--bg);
-  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
   outline: none;
-  transition: border-color 0.15s;
 }
 
 .modal-dialog__input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.15);
+  outline: 2px solid rgba(137, 180, 250, 0.35);
+  outline-offset: 1px;
 }
 
 .modal-dialog__input::placeholder {
   color: var(--text-muted);
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .modal-dialog__actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--modal-actions-gap);
-  margin-top: var(--modal-actions-margin-top);
+  gap: 8px;
 }
 
 .modal-dialog__btn {
-  min-width: var(--modal-btn-min-width);
-  padding: 8px 20px;
-  font-size: 13px;
-  font-family: inherit;
-  font-weight: 500;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-elevated);
+  background: var(--bg);
   color: var(--text);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  min-width: 80px;
 }
 
 .modal-dialog__btn:hover {
-  background: var(--overlay-white-10);
+  background: var(--bg-elevated);
 }
 
 .modal-dialog__btn--primary {
-  background: var(--accent);
   border-color: var(--accent);
-  color: #1e1e2e;
-  font-weight: 600;
+  color: var(--accent);
 }
 
 .modal-dialog__btn--primary:hover {
-  filter: brightness(1.1);
+  background: var(--tint-blue-08);
 }
 
 .modal-dialog__btn--destructive {
-  background: var(--error);
   border-color: var(--error);
-  color: #1e1e2e;
-  font-weight: 600;
+  color: var(--error);
 }
 
 .modal-dialog__btn--destructive:hover {
-  filter: brightness(1.1);
+  background: var(--tint-red-10);
 }
 
 /* System stats bar */
