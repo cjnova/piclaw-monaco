@@ -41,3 +41,8 @@ runtime/artifacts/web-control-plane-fuzz/
 # TypeScript validation build output (not packaged)
 runtime/generated/dist/
 runtime/generated/github-collate/
+
+# Runtime DB — never track (sessions, messages, state)
+workspace/.piclaw/store/messages.db
+workspace/.piclaw/store/messages.db-shm
+workspace/.piclaw/store/messages.db-wal
