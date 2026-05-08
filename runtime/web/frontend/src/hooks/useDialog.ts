@@ -1,4 +1,4 @@
-import { Fragment, h, type JSX } from "preact";
+import { h, type JSX } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { ModalDialog } from "../components/ModalDialog";
 
@@ -21,19 +21,23 @@ interface AlertOptions {
   description?: string;
 }
 
-type PromptDialogRequest = {
+interface BaseDialogRequest {
+  settled: boolean;
+}
+
+type PromptDialogRequest = BaseDialogRequest & {
   kind: "prompt";
   opts: PromptOptions;
   resolve: (value: string | null) => void;
 };
 
-type ConfirmDialogRequest = {
+type ConfirmDialogRequest = BaseDialogRequest & {
   kind: "confirm";
   opts: ConfirmOptions;
   resolve: (value: boolean) => void;
 };
 
-type AlertDialogRequest = {
+type AlertDialogRequest = BaseDialogRequest & {
   kind: "alert";
   opts: AlertOptions;
   resolve: () => void;
@@ -63,6 +67,13 @@ function resolveActiveDialog() {
   notifySubscribers();
 }
 
+function settleDialog(dialog: DialogRequest, settle: () => void) {
+  if (dialog.settled) return;
+  dialog.settled = true;
+  settle();
+  resolveActiveDialog();
+}
+
 function getActiveDialog() {
   return activeDialog;
 }
@@ -74,21 +85,21 @@ function subscribeDialog(listener: () => void) {
   };
 }
 
-async function showPrompt(opts: PromptOptions): Promise<string | null> {
+function showPrompt(opts: PromptOptions): Promise<string | null> {
   return new Promise((resolve) => {
-    enqueueDialog({ kind: "prompt", opts, resolve });
+    enqueueDialog({ kind: "prompt", opts, resolve, settled: false });
   });
 }
 
-async function showConfirm(opts: ConfirmOptions): Promise<boolean> {
+function showConfirm(opts: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
-    enqueueDialog({ kind: "confirm", opts, resolve });
+    enqueueDialog({ kind: "confirm", opts, resolve, settled: false });
   });
 }
 
-async function showAlert(opts: AlertOptions): Promise<void> {
+function showAlert(opts: AlertOptions): Promise<void> {
   return new Promise((resolve) => {
-    enqueueDialog({ kind: "alert", opts, resolve });
+    enqueueDialog({ kind: "alert", opts, resolve, settled: false });
   });
 }
 
@@ -99,7 +110,7 @@ function DialogHost(): JSX.Element {
     return subscribeDialog(() => setDialog(getActiveDialog()));
   }, []);
 
-  if (!dialog) return h(Fragment, null);
+  if (!dialog) return null;
 
   if (dialog.kind === "prompt") {
     return h(ModalDialog, {
@@ -110,12 +121,14 @@ function DialogHost(): JSX.Element {
       defaultValue: dialog.opts.defaultValue,
       confirmLabel: "Save",
       onConfirm: (value) => {
-        dialog.resolve(value?.trim() ? value : null);
-        resolveActiveDialog();
+        settleDialog(dialog, () => {
+          dialog.resolve(value?.trim() ? value : null);
+        });
       },
       onCancel: () => {
-        dialog.resolve(null);
-        resolveActiveDialog();
+        settleDialog(dialog, () => {
+          dialog.resolve(null);
+        });
       },
     });
   }
@@ -128,12 +141,14 @@ function DialogHost(): JSX.Element {
       confirmLabel: dialog.opts.confirmLabel ?? "Confirm",
       destructive: dialog.opts.destructive,
       onConfirm: () => {
-        dialog.resolve(true);
-        resolveActiveDialog();
+        settleDialog(dialog, () => {
+          dialog.resolve(true);
+        });
       },
       onCancel: () => {
-        dialog.resolve(false);
-        resolveActiveDialog();
+        settleDialog(dialog, () => {
+          dialog.resolve(false);
+        });
       },
     });
   }
@@ -144,12 +159,14 @@ function DialogHost(): JSX.Element {
     description: dialog.opts.description,
     confirmLabel: "OK",
     onConfirm: () => {
-      dialog.resolve();
-      resolveActiveDialog();
+      settleDialog(dialog, () => {
+        dialog.resolve();
+      });
     },
     onCancel: () => {
-      dialog.resolve();
-      resolveActiveDialog();
+      settleDialog(dialog, () => {
+        dialog.resolve();
+      });
     },
   });
 }

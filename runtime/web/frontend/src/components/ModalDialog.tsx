@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 
+const FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "[href]",
+  'input:not([disabled]):not([type="hidden"])',
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
 export type ModalDialogMode = "prompt" | "confirm" | "alert";
 
 interface ModalDialogProps {
@@ -30,6 +39,9 @@ export function ModalDialog({
   const [value, setValue] = useState(defaultValue ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleIdRef = useRef(`modal-dialog-title-${Math.random().toString(36).slice(2, 9)}`);
+  const descriptionIdRef = useRef(`modal-dialog-description-${Math.random().toString(36).slice(2, 9)}`);
 
   useEffect(() => {
     setValue(defaultValue ?? "");
@@ -49,15 +61,39 @@ export function ModalDialog({
   }, [mode]);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
         onCancel();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (!focusableElements?.length) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
       }
     };
 
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [onCancel]);
 
   const canBackdropClose = !(mode === "confirm" && destructive);
@@ -80,14 +116,16 @@ export function ModalDialog({
       }}
     >
       <div
+        ref={dialogRef}
         className="modal-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleIdRef.current}
+        aria-describedby={description ? descriptionIdRef.current : undefined}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 className="modal-dialog__title">{title}</h2>
-        {description && <p className="modal-dialog__description">{description}</p>}
+        <h2 id={titleIdRef.current} className="modal-dialog__title">{title}</h2>
+        {description && <p id={descriptionIdRef.current} className="modal-dialog__description">{description}</p>}
 
         {mode === "prompt" && (
           <input
