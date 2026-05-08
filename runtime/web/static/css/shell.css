@@ -662,6 +662,7 @@ body {
   font-size: 13px;
   flex-shrink: 0;
   gap: 14px;
+  position: relative;
 }
 
 .app-layout__status-bar--flash {
@@ -713,6 +714,10 @@ body {
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 40%;
 }
 
 .status-bar__flash--error {
@@ -1091,6 +1096,7 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
+  min-width: 0;
 }
 
 .model-picker {
@@ -3586,15 +3592,20 @@ body {
 }
 
 .compaction-badge {
-  background: var(--error);
-  color: #ffffff;
-  padding: 2px 10px;
+  background: var(--warning);
+  color: #1e1e2e;
+  padding: 2px 8px;
   border-radius: 3px;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   animation: compaction-pulse 1.5s infinite;
 }
 
