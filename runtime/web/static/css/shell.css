@@ -358,7 +358,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: var(--modal-z-index);
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -370,11 +370,11 @@ body {
   background: var(--bg-sidebar);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  gap: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
   outline: none;
 }
 
@@ -397,7 +397,7 @@ body {
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 9px 12px;
   background: var(--bg);
   color: var(--text);
   font: inherit;
@@ -406,13 +406,12 @@ body {
 }
 
 .modal-dialog__input:focus {
-  outline: 2px solid rgba(137, 180, 250, 0.35);
-  outline-offset: 1px;
+  border-color: var(--accent);
 }
 
 .modal-dialog__input::placeholder {
   color: var(--text-muted);
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .modal-dialog__actions {
