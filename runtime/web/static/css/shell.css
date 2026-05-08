@@ -5751,7 +5751,10 @@ pre.frontmatter-block {
     display: flex;
     font-size: var(--font-size-sm);
   }
-  .mobile-toolbar__model-slot .context-ring,
+  .mobile-toolbar__model-slot .context-ring {
+    display: inline-flex;
+  }
+  .mobile-toolbar__model-slot .usage-badge,
   .mobile-toolbar__model-slot .compaction-badge {
     display: none;
   }
