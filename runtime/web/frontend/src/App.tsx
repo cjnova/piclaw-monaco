@@ -1,6 +1,7 @@
 import { isSafeExtensionUrl } from "./utils/isSafeExtensionUrl";
 import { useCallback, useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
+import { getChatJid } from "./api/chat-jid";
 import { ActivityBar } from "./components/ActivityBar";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
@@ -120,6 +121,23 @@ function AppContent() {
     const timeout = setTimeout(() => { tick(); interval = setInterval(tick, 60_000); }, msUntilNextMinute);
     return () => { clearTimeout(timeout); if (interval !== null) clearInterval(interval); };
   }, [clockText]);
+
+  // Redirect away from archived sessions on load
+  useEffect(() => {
+    const chatJid = getChatJid();
+    if (chatJid === "web:default") return;
+    fetch(`/agent/branches?include_archived=1`, { credentials: "same-origin" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return;
+        const chats = Array.isArray(data) ? data : (data.chats ?? []);
+        const current = chats.find((c: Record<string, unknown>) => (c.chat_jid ?? c.jid) === chatJid);
+        if (current?.archived_at) {
+          window.location.href = "/?chat_jid=web:default";
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const connected = connectionStatus.value === "connected";
   const isExtensionPageOpen = (extensionPageUrl.value && isSafeExtensionUrl(extensionPageUrl.value)) || extensionPageHtml.value;

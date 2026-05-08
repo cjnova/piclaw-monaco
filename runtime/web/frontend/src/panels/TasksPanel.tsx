@@ -290,7 +290,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     setStatus("loading");
     setErrorMsg("");
     try {
-      const { sessions, unauthorized } = await loadMergedSessions(activeChatJid);
+      const { sessions, unauthorized } = await loadMergedSessions(activeChatJid, { includeArchived: true });
       if (unauthorized) {
         setErrorMsg("Authenticate to view sessions.");
         setStatus("error");
@@ -361,11 +361,28 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     );
   }, [allSessions, runSessionAction, showPrompt]);
 
+  const handleArchiveSession = useCallback(async (chatJid: string) => {
+    const confirmed = await showConfirm({
+      title: "Archive this session?",
+      description: "The session will be archived and can be restored later.",
+      confirmLabel: "Archive",
+    });
+    if (!confirmed) return;
+    await runSessionAction(
+      `archive-${chatJid}`,
+      "/agent/branch-prune",
+      { chat_jid: chatJid },
+      "Couldn't archive session. Please try again.",
+    );
+    // Navigate to default if we archived the current session
+    if (chatJid === activeChatJid) navigateToChat("web:default");
+  }, [activeChatJid, runSessionAction, showConfirm]);
+
   const handleDeleteSession = useCallback(async (chatJid: string) => {
     const confirmed = await showConfirm({
       title: "Delete this session permanently?",
-      description: "This cannot be undone.",
-      confirmLabel: "Delete",
+      description: "This cannot be undone. The session must be archived first.",
+      confirmLabel: "Delete permanently",
       destructive: true,
     });
     if (!confirmed) return;
@@ -482,7 +499,34 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
               </button>
 
               <div className="tasks-panel__session-actions" aria-label={`Actions for ${chatName(session)}`}>
-                {!isArchived && (
+                {isArchived ? (
+                  <>
+                    <button
+                      type="button"
+                      className="tasks-panel__action-icon"
+                      disabled={Boolean(actionBusy)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleRestore(session.jid);
+                      }}
+                      title="Restore session"
+                    >
+                      <i className="codicon codicon-history" />
+                    </button>
+                    <button
+                      type="button"
+                      className="tasks-panel__action-icon tasks-panel__action-icon--delete"
+                      disabled={Boolean(actionBusy)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDeleteSession(session.jid);
+                      }}
+                      title="Delete permanently"
+                    >
+                      <i className="codicon codicon-trash" />
+                    </button>
+                  </>
+                ) : (
                   <>
                     <button
                       type="button"
@@ -498,15 +542,15 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
                     </button>
                     <button
                       type="button"
-                      className="tasks-panel__action-icon tasks-panel__action-icon--delete"
+                      className="tasks-panel__action-icon"
                       disabled={Boolean(actionBusy)}
                       onClick={(event) => {
                         event.stopPropagation();
-                        void handleDeleteSession(session.jid);
+                        void handleArchiveSession(session.jid);
                       }}
-                      title="Delete session"
+                      title="Archive session"
                     >
-                      <i className="codicon codicon-trash" />
+                      <i className="codicon codicon-archive" />
                     </button>
                   </>
                 )}

@@ -74,10 +74,11 @@ export function extractChatJidFromAction(payload: unknown): string | null {
   return null;
 }
 
-export async function loadMergedSessions(activeChatJid: string): Promise<{ sessions: SessionEntry[]; unauthorized: boolean }> {
+export async function loadMergedSessions(activeChatJid: string, options?: { includeArchived?: boolean }): Promise<{ sessions: SessionEntry[]; unauthorized: boolean }> {
+  const archiveParam = options?.includeArchived ? "&include_archived=1" : "";
   const [chatsRes, branchesRes] = await Promise.all([
     fetch("/agent/active-chats", { credentials: "same-origin" }),
-    fetch(`/agent/branches?chat_jid=${encodeURIComponent(activeChatJid)}`, { credentials: "same-origin" }),
+    fetch(`/agent/branches?_=1${archiveParam}`, { credentials: "same-origin" }),
   ]);
 
   if (chatsRes.status === 401 || branchesRes.status === 401) {
