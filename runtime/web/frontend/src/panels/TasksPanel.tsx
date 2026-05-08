@@ -526,7 +526,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
               </button>
 
               <div className="tasks-panel__session-actions" aria-label={`Actions for ${chatName(session)}`}>
-                {isArchived && (
+                {isArchived ? (
                   <button
                     type="button"
                     className="tasks-panel__action-icon"
@@ -539,6 +539,33 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
                   >
                     <i className="codicon codicon-history" />
                   </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="tasks-panel__action-icon"
+                      disabled={Boolean(actionBusy)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleRenameSession(session.jid);
+                      }}
+                      title="Rename session"
+                    >
+                      <i className="codicon codicon-edit" />
+                    </button>
+                    <button
+                      type="button"
+                      className="tasks-panel__action-icon tasks-panel__action-icon--delete"
+                      disabled={Boolean(actionBusy)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDeleteSession(session.jid);
+                      }}
+                      title="Delete session"
+                    >
+                      <i className="codicon codicon-trash" />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
