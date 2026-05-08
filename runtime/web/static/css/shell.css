@@ -662,7 +662,6 @@ body {
   font-size: 13px;
   flex-shrink: 0;
   gap: 14px;
-  overflow: hidden;
   position: relative;
 }
 
@@ -1098,7 +1097,6 @@ body {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  overflow: hidden;
 }
 
 .model-picker {
