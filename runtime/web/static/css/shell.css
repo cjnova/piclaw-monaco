@@ -447,7 +447,9 @@ body {
 }
 
 .modal-dialog__btn--primary:hover {
+  background: var(--accent);
   filter: brightness(1.15);
+  color: #111;
 }
 
 .modal-dialog__btn--destructive {
@@ -458,7 +460,9 @@ body {
 }
 
 .modal-dialog__btn--destructive:hover {
+  background: var(--error);
   filter: brightness(1.15);
+  color: #fff;
 }
 
 /* System stats bar */

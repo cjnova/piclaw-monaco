@@ -114,6 +114,7 @@ export function SessionPill() {
   };
 
   const handleNewRoot = async () => {
+    setIsOpen(false);
     const input = await showPrompt({
       title: "Enter root session name:",
       placeholder: "session-name",
@@ -128,6 +129,7 @@ export function SessionPill() {
   };
 
   const handleRename = async () => {
+    setIsOpen(false);
     const input = await showPrompt({
       title: "Enter new session name:",
       placeholder: "session-name",
@@ -139,6 +141,7 @@ export function SessionPill() {
   };
 
   const handleDelete = async () => {
+    setIsOpen(false);
     const confirmed = await showConfirm({
       title: "Delete current session permanently?",
       description: "This cannot be undone.",
