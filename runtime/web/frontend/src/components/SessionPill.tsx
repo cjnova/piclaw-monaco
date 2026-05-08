@@ -215,6 +215,28 @@ export function SessionPill() {
                     <span className="session-pill__item-jid">{entry.jid}</span>
                   </span>
                   {isCurrent && <span className="session-pill__item-badge session-pill__item-badge--current">current</span>}
+                  {!entry.archived && (
+                    <span className="session-pill__item-icons">
+                      <span
+                        className="session-pill__item-icon"
+                        role="button"
+                        tabIndex={0}
+                        title="Rename…"
+                        onClick={(e) => { e.stopPropagation(); handleRename(); }}
+                      >
+                        <i className="codicon codicon-edit" />
+                      </span>
+                      <span
+                        className="session-pill__item-icon session-pill__item-icon--danger"
+                        role="button"
+                        tabIndex={0}
+                        title="Delete…"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                      >
+                        <i className="codicon codicon-trash" />
+                      </span>
+                    </span>
+                  )}
                   {tone === "archived" && (
                     <>
                       <span className="session-pill__item-badge">archived</span>
@@ -243,12 +265,6 @@ export function SessionPill() {
             </button>
             <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleMergeParent} title="Merge to parent">
               <i className="codicon codicon-git-merge" />
-            </button>
-            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleRename} title="Rename…">
-              <i className="codicon codicon-edit" />
-            </button>
-            <button type="button" className="session-pill__icon-btn session-pill__icon-btn--danger" disabled={Boolean(actionBusy)} onClick={handleDelete} title="Delete current…">
-              <i className="codicon codicon-trash" />
             </button>
           </div>
         </div>

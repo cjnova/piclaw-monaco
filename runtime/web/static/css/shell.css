@@ -763,6 +763,36 @@ body {
   background: var(--overlay-white-07);
 }
 
+.session-pill__item-icons {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.session-pill__item:hover .session-pill__item-icons {
+  opacity: 1;
+}
+
+.session-pill__item-icon {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.session-pill__item-icon:hover {
+  color: var(--text);
+  background: var(--overlay-white-07);
+}
+
+.session-pill__item-icon--danger:hover {
+  color: var(--error, #f38ba8);
+}
+
 .session-pill__toolbar {
   border-top: 1px solid var(--border);
   padding: 6px 8px;
