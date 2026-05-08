@@ -142,16 +142,27 @@ export function SessionPill() {
     void runAction("rename", "/agent/branch-rename", { chat_jid: activeChatJid, agent_name: name });
   };
 
-  const handleDelete = async () => {
+  const handleArchive = async () => {
     setIsOpen(false);
     const confirmed = await showConfirm({
-      title: "Delete current session permanently?",
+      title: "Archive current session?",
+      description: "The session will be archived and can be restored later.",
+      confirmLabel: "Archive",
+    });
+    if (!confirmed) return;
+    void runAction("archive", "/agent/branch-prune", { chat_jid: activeChatJid });
+  };
+
+  const handleDelete = async (jid: string) => {
+    setIsOpen(false);
+    const confirmed = await showConfirm({
+      title: "Delete this session permanently?",
       description: "This cannot be undone.",
-      confirmLabel: "Delete",
+      confirmLabel: "Delete permanently",
       destructive: true,
     });
     if (!confirmed) return;
-    void runAction("delete", "/agent/branch-purge", { chat_jid: activeChatJid });
+    void runAction("delete", "/agent/branch-purge", { chat_jid: jid });
   };
 
   const handleRestore = (jid: string) => {
@@ -213,27 +224,38 @@ export function SessionPill() {
                         <i className="codicon codicon-edit" />
                       </span>
                       <span
-                        className="session-pill__item-icon session-pill__item-icon--danger"
+                        className="session-pill__item-icon"
                         role="button"
                         tabIndex={0}
-                        title="Delete…"
-                        onClick={(e) => { e.stopPropagation(); void handleDelete(); }}
+                        title="Archive"
+                        onClick={(e) => { e.stopPropagation(); void handleArchive(); }}
                       >
-                        <i className="codicon codicon-trash" />
+                        <i className="codicon codicon-archive" />
                       </span>
                     </span>
                   )}
                   {tone === "archived" && (
                     <>
                       <span className="session-pill__item-badge">archived</span>
-                      <span
-                        className="session-pill__item-restore"
-                        role="button"
-                        tabIndex={0}
-                        title="Restore session"
-                        onClick={(e) => { e.stopPropagation(); handleRestore(entry.jid); }}
-                      >
-                        <i className="codicon codicon-history" />
+                      <span className="session-pill__item-icons">
+                        <span
+                          className="session-pill__item-icon"
+                          role="button"
+                          tabIndex={0}
+                          title="Restore"
+                          onClick={(e) => { e.stopPropagation(); handleRestore(entry.jid); }}
+                        >
+                          <i className="codicon codicon-history" />
+                        </span>
+                        <span
+                          className="session-pill__item-icon session-pill__item-icon--danger"
+                          role="button"
+                          tabIndex={0}
+                          title="Delete permanently"
+                          onClick={(e) => { e.stopPropagation(); void handleDelete(entry.jid); }}
+                        >
+                          <i className="codicon codicon-trash" />
+                        </span>
                       </span>
                     </>
                   )}
