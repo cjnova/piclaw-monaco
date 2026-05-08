@@ -5690,6 +5690,11 @@ pre.frontmatter-block {
     flex-direction: column;
   }
 
+  /* Hide desktop status bar — replaced by mobile toolbar */
+  .app-layout__status-bar {
+    display: none;
+  }
+
   /* Hide non-essential items from top status bar */
   .sys-stats-bar__metrics,
   .sys-stats-bar__sep {
@@ -5751,7 +5756,9 @@ pre.frontmatter-block {
     display: flex;
     font-size: var(--font-size-sm);
   }
-  .mobile-toolbar__model-slot .context-ring,
+  .mobile-toolbar__model-slot .context-ring {
+    display: inline-flex;
+  }
   .mobile-toolbar__model-slot .usage-badge,
   .mobile-toolbar__model-slot .compaction-badge {
     display: none;
@@ -5873,5 +5880,91 @@ pre.frontmatter-block {
 @media (min-width: 640px) {
   .mobile-toolbar {
     display: none;
+  }
+}
+
+/* ── Responsive stats: inline vs dropdown ── */
+.sys-stats-bar__compact { display: none; }
+.sys-stats-bar__inline { display: inline-flex; }
+
+@media (max-width: 1066px) {
+  .sys-stats-bar__inline { display: none; }
+  .sys-stats-bar {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-status);
+    border-top: 1px solid var(--border);
+    padding: 2px 14px;
+    display: flex;
+    justify-content: center;
+  }
+  .sys-stats-bar__compact {
+    display: inline-flex;
+  }
+  .sys-stats--bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+  }
+}
+
+/* < 1066px: stats already collapsed to dropdown (above) */
+
+/* < 860px: hide connection text, compress model name */
+@media (max-width: 700px) {
+  .status-bar__conn-text {
+    display: none;
+  }
+  .model-badge__name-wrapper {
+    max-width: 140px;
+  }
+  .model-badge {
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+  .thinking-badge {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+  .session-pill {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .status-bar__terminal-btn {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .app-layout__status-bar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+}
+
+/* < 700px: further compress, icon-only terminal */
+@media (max-width: 550px) {
+  .model-badge__provider {
+    display: none;
+  }
+  .model-badge__name-wrapper {
+    max-width: 100px;
+  }
+  .status-bar__terminal-btn {
+    font-size: 0;
+  }
+  .status-bar__terminal-btn::before {
+    content: "⬛";
+    font-size: 12px;
+  }
+  .session-pill {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .app-layout__status-bar {
+    gap: 6px;
+    padding: 0 6px;
   }
 }

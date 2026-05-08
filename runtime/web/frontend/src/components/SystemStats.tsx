@@ -31,9 +31,7 @@ function formatMegabytes(bytes: number): string {
 
 function formatBufferCache(bytes: number): string {
   const mb = bytes / (1024 * 1024);
-  if (mb < 1024) {
-    return `${Math.round(mb)}M`;
-  }
+  if (mb < 1024) return `${Math.round(mb)}M`;
   return `${(mb / 1024).toFixed(1)}G`;
 }
 
@@ -55,73 +53,57 @@ function valueClassName(severity: MetricSeverity): string {
   return "sys-stats__value";
 }
 
-function Metric({
-  icon,
-  title,
-  value,
-  severity = "normal",
-}: {
-  icon: string;
-  title: string;
-  value: string;
-  severity?: MetricSeverity;
+function Metric({ icon, title, value, severity = "normal", label }: {
+  icon: string; title: string; value: string; severity?: MetricSeverity; label?: string;
 }) {
   return (
     <span className="sys-stats__metric" title={title}>
       <span className={`sys-stats__icon codicon ${icon}`} aria-hidden="true" />
+      {label && <span className="sys-stats__label">{label}</span>}
       <span className={valueClassName(severity)}>{value}</span>
     </span>
   );
 }
 
-function StatsDisplay({ stats, isStale }: { stats: StatsData | null; isStale: boolean }) {
+function buildMetrics(stats: StatsData | null, withLabels = false) {
   if (!stats) {
-    return (
-      <span className="sys-stats">
-        {isStale && <span className="sys-stats__stale" title="System stats unavailable">⚠</span>}
-        <Metric icon="codicon-pulse" title="CPU" value="--" />
-        <Metric icon="codicon-circuit-board" title="RAM" value="--" />
-        <Metric icon="codicon-package" title="Process RSS" value="--" />
-        <Metric icon="codicon-arrow-swap" title="Swap" value="--" />
-        <Metric icon="codicon-database" title="Buffer/cache" value="--" />
-      </span>
-    );
+    return [
+      <Metric key="cpu" icon="codicon-pulse" title="CPU" value="--" label={withLabels ? "CPU" : undefined} />,
+      <Metric key="ram" icon="codicon-circuit-board" title="RAM" value="--" label={withLabels ? "RAM" : undefined} />,
+    ];
   }
 
   const rss = formatMegabytes(stats.process_memory?.rss_bytes ?? 0);
   const swapValue = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
+  const metrics = [
+    <Metric key="cpu" icon="codicon-pulse" title="CPU usage" value={`${stats.cpu_percent}%`} severity={percentSeverity(stats.cpu_percent)} label={withLabels ? "CPU" : undefined} />,
+    <Metric key="ram" icon="codicon-circuit-board" title="RAM usage" value={`${stats.ram_percent}%`} severity={percentSeverity(stats.ram_percent)} label={withLabels ? "RAM" : undefined} />,
+    <Metric key="rss" icon="codicon-package" title="Process RSS" value={rss} label={withLabels ? "RSS" : undefined} />,
+    <Metric key="swp" icon="codicon-arrow-swap" title="Swap usage" value={swapValue} severity={swapSeverity(stats.swap_percent)} label={withLabels ? "SWP" : undefined} />,
+    <Metric key="buf" icon="codicon-database" title="Buffer/cache" value={formatBufferCache(stats.buffer_cache_bytes)} label={withLabels ? "BUF" : undefined} />,
+  ];
+  if (stats.gpu_provider) {
+    metrics.push(
+      <Metric key="gpu" icon="codicon-server-process" title={`GPU VRAM (${stats.gpu_provider})`} value={stats.vram_percent != null ? `${stats.vram_percent}%` : "--"} severity={percentSeverity(stats.vram_percent)} label={withLabels ? "GPU" : undefined} />
+    );
+  }
+  return metrics;
+}
 
+function StatsDisplay({ stats, isStale }: { stats: StatsData | null; isStale: boolean }) {
   return (
     <span className="sys-stats">
       {isStale && <span className="sys-stats__stale" title="System stats unavailable">⚠</span>}
-      <Metric
-        icon="codicon-pulse"
-        title="CPU usage"
-        value={`${stats.cpu_percent}%`}
-        severity={percentSeverity(stats.cpu_percent)}
-      />
-      <Metric
-        icon="codicon-circuit-board"
-        title="RAM usage"
-        value={`${stats.ram_percent}%`}
-        severity={percentSeverity(stats.ram_percent)}
-      />
-      <Metric icon="codicon-package" title="Process RSS" value={rss} />
-      <Metric
-        icon="codicon-arrow-swap"
-        title="Swap usage"
-        value={swapValue}
-        severity={swapSeverity(stats.swap_percent)}
-      />
-      <Metric icon="codicon-database" title="Buffer/cache" value={formatBufferCache(stats.buffer_cache_bytes)} />
-      {stats.gpu_provider && (
-        <Metric
-          icon="codicon-server-process"
-          title={`GPU VRAM (${stats.gpu_provider})`}
-          value={stats.vram_percent != null ? `${stats.vram_percent}%` : "--"}
-          severity={percentSeverity(stats.vram_percent)}
-        />
-      )}
+      {buildMetrics(stats)}
+    </span>
+  );
+}
+
+function StatsBar({ stats, isStale }: { stats: StatsData | null; isStale: boolean }) {
+  return (
+    <span className="sys-stats sys-stats--bar">
+      {isStale && <span className="sys-stats__stale" title="System stats unavailable">⚠</span>}
+      {buildMetrics(stats, true)}
     </span>
   );
 }
@@ -136,7 +118,6 @@ export function SystemStats() {
     return statsError.value && lastStatsSuccess.value > 0 && Date.now() - lastStatsSuccess.value > 15000;
   });
 
-  // System stats: poll every 10 seconds
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -156,7 +137,6 @@ export function SystemStats() {
         statsPollTick.value += 1;
       }
     };
-
     fetchStats();
     const interval = setInterval(fetchStats, 10_000);
     return () => clearInterval(interval);
@@ -164,7 +144,14 @@ export function SystemStats() {
 
   return (
     <span className="sys-stats-bar">
-      <StatsDisplay stats={stats.value} isStale={isStale.value} />
+      {/* Inline metrics for wide screens */}
+      <span className="sys-stats-bar__inline">
+        <StatsDisplay stats={stats.value} isStale={isStale.value} />
+      </span>
+      {/* Stats bar for narrow screens */}
+      <span className="sys-stats-bar__compact">
+        <StatsBar stats={stats.value} isStale={isStale.value} />
+      </span>
     </span>
   );
 }
