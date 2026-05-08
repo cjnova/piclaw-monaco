@@ -44,6 +44,7 @@ describe("router", () => {
     ];
     const result = formatMessages(msgs, "web");
     expect(result).toContain("Channel: web");
+    expect(result).toContain("Chat: web:default");
     expect(result).toContain("Alice @ 2025-01-01T00:00:00Z:");
     expect(result).toContain("  hello");
     expect(result).not.toContain("<messages");
@@ -53,8 +54,9 @@ describe("router", () => {
     const msgs = [
       { id: "1", chat_jid: "x", sender: "u", sender_name: "U", content: "hi", timestamp: "t", is_from_me: false, is_bot_message: false },
     ];
-    const result = formatMessages(msgs, "whatsapp");
+    const result = formatMessages(msgs, "whatsapp", "1203630@g.us");
     expect(result).toContain("Channel: whatsapp");
+    expect(result).toContain("Chat: 1203630@g.us");
     expect(result).not.toContain("Formatting:");
   });
 
@@ -66,6 +68,7 @@ describe("router", () => {
     expect(result).toContain("U @ t:");
     expect(result).toContain("  hi");
     expect(result).not.toContain("Channel:");
+    expect(result).toContain("Chat: x");
     expect(result).not.toContain("Formatting:");
   });
 

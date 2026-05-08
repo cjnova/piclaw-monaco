@@ -1,42 +1,42 @@
+import { mkdtempSync, rmSync, mkdirSync, existsSync, lstatSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { expect, test } from "bun:test";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 import { ensureExtensionNodeModulesLink } from "../../src/agent-pool/session-node-modules-link.js";
 
-test("ensureExtensionNodeModulesLink creates the bundled extension node_modules symlink", () => {
-  const root = mkdtempSync(join(tmpdir(), "piclaw-session-link-"));
-  const extensionsDir = join(root, "extensions");
-  const nodeModulesDir = join(root, "node_modules");
-  mkdirSync(extensionsDir, { recursive: true });
-  mkdirSync(nodeModulesDir, { recursive: true });
-
+test("ensureExtensionNodeModulesLink creates the node_modules symlink when missing", () => {
+  const temp = mkdtempSync(join(tmpdir(), "piclaw-ext-modules-link-"));
   try {
-    ensureExtensionNodeModulesLink(extensionsDir, nodeModulesDir);
+    const extensionsDir = join(temp, "extensions");
+    const runtimeNodeModules = join(temp, "runtime-node_modules");
+    mkdirSync(extensionsDir, { recursive: true });
+    mkdirSync(join(runtimeNodeModules, "typebox"), { recursive: true });
 
-    const linkPath = join(extensionsDir, "node_modules");
-    expect(existsSync(linkPath)).toBe(true);
-    expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    ensureExtensionNodeModulesLink(extensionsDir, runtimeNodeModules);
+
+    const link = join(extensionsDir, "node_modules");
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(temp, { recursive: true, force: true });
   }
 });
 
-test("ensureExtensionNodeModulesLink leaves an existing node_modules link untouched", () => {
-  const root = mkdtempSync(join(tmpdir(), "piclaw-session-link-existing-"));
-  const extensionsDir = join(root, "extensions");
-  const nodeModulesDir = join(root, "node_modules");
-  mkdirSync(extensionsDir, { recursive: true });
-  mkdirSync(nodeModulesDir, { recursive: true });
-
-  const linkPath = join(extensionsDir, "node_modules");
-  symlinkSync(nodeModulesDir, linkPath);
-
+test("ensureExtensionNodeModulesLink adds @sinclair/typebox inside an existing extension node_modules", () => {
+  const temp = mkdtempSync(join(tmpdir(), "piclaw-ext-modules-alias-"));
   try {
-    expect(() => ensureExtensionNodeModulesLink(extensionsDir, nodeModulesDir)).not.toThrow();
-    expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    const extensionsDir = join(temp, "extensions");
+    const runtimeNodeModules = join(temp, "runtime-node_modules");
+    const extensionNodeModules = join(extensionsDir, "node_modules");
+    mkdirSync(extensionNodeModules, { recursive: true });
+    mkdirSync(join(runtimeNodeModules, "typebox"), { recursive: true });
+
+    ensureExtensionNodeModulesLink(extensionsDir, runtimeNodeModules);
+
+    const alias = join(extensionNodeModules, "@sinclair", "typebox");
+    expect(existsSync(alias)).toBe(true);
+    expect(lstatSync(alias).isSymbolicLink()).toBe(true);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(temp, { recursive: true, force: true });
   }
 });

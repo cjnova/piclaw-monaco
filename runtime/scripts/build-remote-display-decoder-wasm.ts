@@ -8,21 +8,31 @@ const PROJECT_DIR = process.cwd();
 const SOURCE_FILE = resolve(PROJECT_DIR, "assemblyscript/remote-display-decoder.ts");
 const OUTPUT_FILE = resolve(PROJECT_DIR, "web/static/js/vendor/remote-display-decoder.wasm");
 const METADATA_FILE = resolve(PROJECT_DIR, "web/static/js/vendor/remote-display-decoder.meta.json");
-const ASC_BIN = resolve(PROJECT_DIR, "../node_modules/.bin/asc");
+const ASC_BIN_CANDIDATES = [
+  resolve(PROJECT_DIR, "../node_modules/.bin/asc"),
+  resolve(PROJECT_DIR, "../node_modules/.bin/asc.cmd"),
+  resolve(PROJECT_DIR, "../node_modules/.bin/asc.ps1"),
+];
+const ASC_JS = resolve(PROJECT_DIR, "../node_modules/assemblyscript/bin/asc.js");
 const LOG_PREFIX = "[vendor:remote-display-decoder]";
 
 function sha256ForFile(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+function resolveAscCommand(): string[] {
+  const found = ASC_BIN_CANDIDATES.find((candidate) => existsSync(candidate));
+  if (found) return [found];
+  if (existsSync(ASC_JS)) return ["bun", ASC_JS];
+  throw new Error(`${LOG_PREFIX} Missing asc compiler at ${[...ASC_BIN_CANDIDATES, ASC_JS].join(" or ")}. Run bun install first.`);
+}
+
 function main(): void {
-  if (!existsSync(ASC_BIN)) {
-    throw new Error(`${LOG_PREFIX} Missing asc compiler at ${ASC_BIN}. Run bun install first.`);
-  }
+  const ascCommand = resolveAscCommand();
   mkdirSync(dirname(OUTPUT_FILE), { recursive: true });
 
   const proc = Bun.spawnSync([
-    ASC_BIN,
+    ...ascCommand,
     SOURCE_FILE,
     "--target", "release",
     "--runtime", "incremental",

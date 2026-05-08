@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 import { execFileSync } from "node:child_process";
 import { PassThrough, Writable } from "node:stream";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import sshCoreExtension, {
   applyLiveSshConfig,
@@ -152,13 +152,23 @@ describe("ssh-core helpers", () => {
 describe("ssh-core persistent shell", () => {
   test("hard-stops a wedged command after timeout", async () => {
     const child = new FakeSshChild();
-    setPersistentSshSpawnForTests(() => child as unknown as any);
+    let capturedArgs: string[] = [];
+    setPersistentSshSpawnForTests((args) => {
+      capturedArgs = args;
+      return child as unknown as any;
+    });
     setPersistentSshInterruptGraceMsForTests(10);
 
     const shell = new PersistentRemoteShell(fakeConnection as any);
     const result = shell.exec("sleep 99", "/workspace", { onData() {}, timeout: 0.01 });
 
     await expect(result).rejects.toThrow("timeout:0.01");
+    expect(capturedArgs).toEqual(expect.arrayContaining([
+      "-o", "ConnectTimeout=10",
+      "-o", "ConnectionAttempts=1",
+      "-o", "ServerAliveInterval=15",
+      "-o", "ServerAliveCountMax=2",
+    ]));
     expect(child.stdinWrites.some((value) => value.includes("\x03"))).toBe(true);
     expect(child.killCalls).toBeGreaterThanOrEqual(1);
   });

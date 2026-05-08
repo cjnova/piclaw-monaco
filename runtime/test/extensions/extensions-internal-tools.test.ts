@@ -7,17 +7,15 @@ import "../helpers.js";
 import { createFakeExtensionApi } from "./fake-extension-api.js";
 
 describe("internal-tools extension", () => {
-  test("registers list_tools plus a deprecated list_internal_tools alias", async () => {
+  test("registers list_tools as the only built-in tool discovery surface", async () => {
     const { internalTools } = await import("../../src/extensions/internal-tools.js");
     const fake = createFakeExtensionApi({ allTools: [] });
     internalTools(fake.api);
 
     const tool = fake.tools.get("list_tools");
-    const alias = fake.tools.get("list_internal_tools");
     expect(tool).toBeDefined();
     expect(tool.name).toBe("list_tools");
-    expect(alias).toBeDefined();
-    expect(alias.name).toBe("list_internal_tools");
+    expect(fake.tools.has(["list", "internal", "tools"].join("_"))).toBe(false);
   });
 
   test("lists tools with brief descriptions, query filter, and a visible discovery hint", async () => {
@@ -409,41 +407,6 @@ describe("internal-tools extension", () => {
     expect(readAttachmentTool.kind).toBe("read-only");
     expect(readAttachmentTool.weight).toBe("lightweight");
     expect(readAttachmentTool.activation).toBe("default");
-  });
-
-  test("list_tools hides the deprecated alias from normal discovery output", async () => {
-    const { internalTools } = await import("../../src/extensions/internal-tools.js");
-    const fake = createFakeExtensionApi({
-      allTools: [
-        { name: "bash", description: "Run a shell command." },
-        { name: "list_tools", description: "List tools." },
-        { name: "list_internal_tools", description: "Deprecated list tools alias." },
-      ],
-      activeTools: ["list_tools"],
-    });
-    internalTools(fake.api);
-
-    const tool = fake.tools.get("list_tools");
-    const result = await tool.execute("t-hidden-alias", {});
-    expect(result.details.tools.some((entry: any) => entry.name === "list_internal_tools")).toBe(false);
-  });
-
-  test("deprecated alias returns a deprecation notice while preserving results", async () => {
-    const { internalTools } = await import("../../src/extensions/internal-tools.js");
-    const fake = createFakeExtensionApi({
-      allTools: [
-        { name: "bash", description: "Run a shell command." },
-        { name: "list_tools", description: "List tools." },
-      ],
-      activeTools: ["list_tools"],
-    });
-    internalTools(fake.api);
-
-    const alias = fake.tools.get("list_internal_tools");
-    const result = await alias.execute("t-deprecated", { query: "shell" });
-    expect(result.content[0].text).toContain("Deprecated alias: use list_tools instead.");
-    expect(result.details.deprecated_alias_of).toBe("list_tools");
-    expect(result.details.tools[0].name).toBe("bash");
   });
 
   test("unknown tools get sensible default capabilities", async () => {

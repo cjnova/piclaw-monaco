@@ -93,10 +93,9 @@ test("static helpers serve files and not-found", async () => {
   const indexHtml = await okRes.text();
   expect(indexHtml).not.toContain("__APP_ASSET_VERSION__");
   expect(indexHtml).not.toContain("__PICLAW_NOTIFICATION_SOURCE_LABELS_FLAG__");
-  // FORK-MODIFIED: cjnova/piclaw-monaco — our build doesn't use cache busters
-  expect(indexHtml).toContain("/static/dist/app.bundle.js");
-  // expect(indexHtml).toMatch(/\/manifest\.json\?v=[a-z0-9]+/i);
-  // expect(indexHtml).toContain('window.__PICLAW_NOTIFICATION_SOURCE_LABELS_ENABLED__ = "0" === "1";');
+  expect(indexHtml).toMatch(/\/static\/dist\/app\.bundle\.js\?v=[a-z0-9]+/i);
+  expect(indexHtml).toMatch(/\/manifest\.json\?v=[a-z0-9]+/i);
+  expect(indexHtml).toContain('window.__PICLAW_NOTIFICATION_SOURCE_LABELS_ENABLED__ = "0" === "1";');
 
   const loginRes = await serveStatic("login.html", () => new Response("nope", { status: 404 }));
   expect(loginRes.status).toBe(200);

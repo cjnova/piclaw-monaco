@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 import { getChatJid } from "../core/chat-context.js";
@@ -88,7 +88,7 @@ const SSH_TOOL_HINT = [
   "## SSH",
   "Use ssh to inspect or change the SSH profile for the current session.",
   "When a live session exists, SSH-backed core tools switch immediately for the current turn.",
-  "Live SSH tool redirection clears at the end of each agent turn; stored SSH profiles remain available.",
+  "Live SSH tool redirection and stored SSH profiles are cleared at the end of each agent turn.",
 ].join("\n");
 
 function normalizeChatJid(value: string | undefined): string {

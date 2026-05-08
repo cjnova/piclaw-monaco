@@ -2,7 +2,7 @@
  * agent-pool/run-agent-orchestrator.ts – Main runAgent prompt lifecycle orchestration.
  */
 
-import { type AgentSession, type AgentSessionEvent, type AgentSessionRuntime } from "@mariozechner/pi-coding-agent";
+import { type AgentSession, type AgentSessionEvent, type AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 
 import type { AttachmentInfo } from "./attachments.js";
 import {
@@ -11,6 +11,7 @@ import {
   updateSessionStreaming,
   updateSessionModel,
 } from "../extensions/session-status.js";
+import { deleteSshConfig } from "../db.js";
 import { clearLiveSshConfig } from "../extensions/ssh-core.js";
 
 import {
@@ -59,6 +60,7 @@ import {
   heartbeatTrackedPhase,
   endTrackedPhase,
   getProgressWatchdogTimeoutMs,
+  registerProgressWatchdogAborter,
 } from "../runtime/progress-watchdog.js";
 
 const log = createLogger("agent-pool.run-orchestrator");
@@ -86,6 +88,82 @@ const MIN_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS = 1_000;
 const MAX_TOOL_EXECUTION_WATCHDOG_HEARTBEAT_MS = 15_000;
 const MID_TURN_CONTEXT_CHECK_MIN_INTERVAL_MS = 1_000;
 const CONTEXT_USAGE_UPDATE_MIN_INTERVAL_MS = 250;
+const DEFAULT_RECOVERY_LOOP_GUARD_MAX_FAILURES = 3;
+const DEFAULT_RECOVERY_LOOP_GUARD_WINDOW_MS = 10 * 60 * 1000;
+
+type RecoveryFailureSignatureRecord = {
+  atMs: number;
+  signature: string;
+};
+
+const recentRecoveryFailuresByChat = new Map<string, RecoveryFailureSignatureRecord[]>();
+
+function normalizeRecoverySignatureText(value: string | null | undefined): string {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b\d{2,}\b/g, "#")
+    .replace(/[0-9a-f]{8,}/gi, "#")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseRecoveryLoopGuardEnabled(): boolean {
+  const normalized = String(process.env.PICLAW_RECOVERY_LOOP_GUARD_ENABLED || "").trim().toLowerCase();
+  if (!normalized) return true;
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return true;
+}
+
+function parseRecoveryLoopGuardMaxFailures(): number {
+  const raw = Number.parseInt(String(process.env.PICLAW_RECOVERY_LOOP_GUARD_MAX_FAILURES || "").trim(), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RECOVERY_LOOP_GUARD_MAX_FAILURES;
+}
+
+function parseRecoveryLoopGuardWindowMs(): number {
+  const raw = Number.parseInt(String(process.env.PICLAW_RECOVERY_LOOP_GUARD_WINDOW_MS || "").trim(), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RECOVERY_LOOP_GUARD_WINDOW_MS;
+}
+
+function shouldSuppressRecoveryLoop(options: {
+  chatJid: string;
+  modelLabel: string | null;
+  classifier: string;
+  strategy: string | null;
+  errorText: string;
+}): { suppress: boolean; attemptsInWindow: number; maxFailures: number; windowMs: number } {
+  const maxFailures = parseRecoveryLoopGuardMaxFailures();
+  const windowMs = parseRecoveryLoopGuardWindowMs();
+  if (!parseRecoveryLoopGuardEnabled()) {
+    return {
+      suppress: false,
+      attemptsInWindow: 0,
+      maxFailures,
+      windowMs,
+    };
+  }
+
+  const now = Date.now();
+  const signature = [
+    normalizeRecoverySignatureText(options.modelLabel),
+    normalizeRecoverySignatureText(options.classifier),
+    normalizeRecoverySignatureText(options.strategy),
+    normalizeRecoverySignatureText(options.errorText),
+  ].join("|");
+
+  const current = recentRecoveryFailuresByChat.get(options.chatJid) ?? [];
+  const filtered = current.filter((entry) => (now - entry.atMs) <= windowMs);
+  filtered.push({ atMs: now, signature });
+  recentRecoveryFailuresByChat.set(options.chatJid, filtered.slice(-200));
+
+  const attemptsInWindow = filtered.filter((entry) => entry.signature === signature).length;
+  return {
+    suppress: attemptsInWindow >= maxFailures,
+    attemptsInWindow,
+    maxFailures,
+    windowMs,
+  };
+}
 
 type ToolExecutionWatchdogEvent = {
   type: "tool_execution_start" | "tool_execution_update" | "tool_execution_end";
@@ -717,6 +795,27 @@ async function runPromptAttempt(
     if (!completedRef.value) completedRef.value = true;
     if (timeoutId) clearTimeout(timeoutId);
   };
+  let staleProgressInterrupted = false;
+  let staleProgressAbortFailed: string | null = null;
+  const unregisterProgressAborter = registerProgressWatchdogAborter(chatJid, async (stall) => {
+    staleProgressInterrupted = true;
+    options.onWarn?.("Stale-progress watchdog aborting stalled agent run", {
+      operation: "run_agent.stale_progress_abort",
+      chatJid,
+      phase: stall.phase,
+      ageMs: stall.ageMs,
+      timeoutMs: stall.timeoutMs,
+      startedAt: new Date(stall.startedAt).toISOString(),
+      lastProgressAt: new Date(stall.lastProgressAt).toISOString(),
+      ...getRunObservabilityDetails(runOptions),
+    });
+    try {
+      await session.abort();
+    } catch (error) {
+      staleProgressAbortFailed = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  });
 
   let promptThrownError: string | null = null;
   try {
@@ -747,6 +846,7 @@ async function runPromptAttempt(
     promptThrownError = error instanceof Error ? error.message : String(error);
   } finally {
     finishPromptTimeout();
+    unregisterProgressAborter();
     toolExecutionWatchdogHeartbeat.stop();
     unsub();
   }
@@ -765,7 +865,11 @@ async function runPromptAttempt(
   const latentStateError = !finalText ? getSessionStateErrorMessage(session) : null;
 
   let output: AgentOutput;
-  if (timedOut) {
+  if (staleProgressAbortFailed) {
+    output = { status: "error", result: null, error: `Stale-progress watchdog detected no progress and failed to abort the run: ${staleProgressAbortFailed}` };
+  } else if (staleProgressInterrupted) {
+    output = { status: "error", result: null, error: `Stale-progress watchdog interrupted the run after no progress for ${formatTimeoutDuration(getProgressWatchdogTimeoutMs())}.` };
+  } else if (timedOut) {
     output = { status: "error", result: null, error: `Timed out after ${formatTimeoutDuration(timeoutMs)}` };
   } else if (toolUseBudgetExceeded && !finalText && finalAttachments.length === 0) {
     sawCompactionIntent = true;
@@ -829,10 +933,12 @@ async function runPromptAttempt(
         // side effect (for example posting an Adaptive Card/dashboard widget or
         // requesting process exit). If such a tool completed successfully, a
         // missing closing assistant text is informational, not a failed turn.
+        // This must remain true even if the assistant streamed a short lead-in
+        // before the tool call; otherwise the UI side effect can be hidden by
+        // recovery/error handling.
         // Read-only tool-only stops remain recoverable so we can retry and ask
         // the provider for the final prose reply.
         const isTerminalSideEffectCompletion = hadToolActivity
-          && !hadPartialOutput
           && !isBlankTurnSessionDelta(blankTurnDelta)
           && sawTerminalSideEffectToolActivity;
         const isRecoverableToolOnlyStop = hadToolActivity
@@ -1071,6 +1177,7 @@ export async function runAgentPrompt(
               recoveryDiagnostics,
             );
           }
+          recentRecoveryFailuresByChat.delete(chatJid);
           return attempt.output;
         }
 
@@ -1084,6 +1191,7 @@ export async function runAgentPrompt(
             durationMs: duration,
             ...getRunObservabilityDetails(runOptions),
           });
+          recentRecoveryFailuresByChat.delete(chatJid);
           return attempt.output;
         }
 
@@ -1095,53 +1203,67 @@ export async function runAgentPrompt(
           elapsedMs: getRecoveryBudgetElapsedMs(),
           snapshot: attempt.snapshot,
         });
-        lastClassifier = decision.classifier;
+
+        let effectiveDecision = decision;
+        if (decision.recover && decision.strategy) {
+          const guard = shouldSuppressRecoveryLoop({
+            chatJid,
+            modelLabel,
+            classifier: decision.classifier,
+            strategy: decision.strategy,
+            errorText,
+          });
+          if (guard.suppress) {
+            effectiveDecision = {
+              recover: false,
+              classifier: "recovery_suppressed",
+              strategy: null,
+              reason: `Automatic recovery suppressed after ${guard.attemptsInWindow} repeated failures within ${Math.max(1, Math.round(guard.windowMs / 60000))} minute(s).`,
+            };
+          }
+        }
+
+        lastClassifier = effectiveDecision.classifier;
 
         options.onWarn?.("Agent attempt failed", {
           operation: "run_agent.attempt_failed",
           chatJid,
           errorText,
-          classifier: decision.classifier,
+          classifier: effectiveDecision.classifier,
           recoveryAttemptsUsed,
-          recoveryStrategy: decision.strategy,
-          reason: decision.reason,
+          recoveryStrategy: effectiveDecision.strategy,
+          reason: effectiveDecision.reason,
           ...getRunObservabilityDetails(runOptions),
         });
 
         recoveryDiagnostics.push(buildRecoveryDiagnosticEntry(
           "attempt_failure",
           recoveryAttemptsUsed + 1,
-          decision.classifier,
-          decision.strategy,
-          decision.reason,
+          effectiveDecision.classifier,
+          effectiveDecision.strategy,
+          effectiveDecision.reason,
           errorText,
           Date.now() - startTime,
           attempt.snapshot,
         ));
 
-        if (!decision.recover || !decision.strategy) {
+        if (!effectiveDecision.recover || !effectiveDecision.strategy) {
           const duration = Date.now() - startTime;
-          const recoveryMeta = recoveryAttemptsUsed > 0
+          const recoveryMeta = (recoveryAttemptsUsed > 0 || Boolean(lastClassifier))
             ? buildRecoveryMetadata(recoveryAttemptsUsed, duration, false, true, lastClassifier, strategyHistory, recoveryDiagnostics)
             : null;
           writeAgentLog(options.logsDir, chatJid, duration, false, null, errorText, recoveryMeta);
-          if (recoveryAttemptsUsed > 0) {
+          if (recoveryAttemptsUsed > 0 || effectiveDecision.classifier === "recovery_suppressed") {
             emitAgentSessionEvent(runOptions.onEvent, {
               type: "recovery_end",
               outcome: "exhausted",
               attemptsUsed: recoveryAttemptsUsed,
-              classifier: decision.classifier,
+              classifier: effectiveDecision.classifier,
               errorMessage: errorText,
             });
-            attempt.output.recovery = buildRecoveryMetadata(
-              recoveryAttemptsUsed,
-              duration,
-              false,
-              true,
-              lastClassifier,
-              strategyHistory,
-              recoveryDiagnostics,
-            );
+          }
+          if (recoveryMeta) {
+            attempt.output.recovery = recoveryMeta;
           }
           return attempt.output;
         }
@@ -1151,8 +1273,8 @@ export async function runAgentPrompt(
         }
 
         recoveryAttemptsUsed += 1;
-        strategyHistory.push(decision.strategy);
-        const retryDelayMs = decision.strategy === "retry"
+        strategyHistory.push(effectiveDecision.strategy);
+        const retryDelayMs = effectiveDecision.strategy === "retry"
           ? getAutomaticRecoveryDelayMs(recoveryConfig, recoveryAttemptsUsed)
           : 0;
         heartbeatTrackedPhase(chatJid, "recovery", {
@@ -1161,15 +1283,15 @@ export async function runAgentPrompt(
         });
         emitAgentSessionEvent(runOptions.onEvent, {
           type: "recovery_start",
-          classifier: decision.classifier,
-          strategy: decision.strategy,
+          classifier: effectiveDecision.classifier,
+          strategy: effectiveDecision.strategy,
           attempt: recoveryAttemptsUsed,
           maxAttempts: recoveryConfig.maxAttempts,
           totalBudgetMs: recoveryConfig.totalBudgetMs,
           delayMs: retryDelayMs,
-          reason: decision.classifier === "unknown" && errorText
-            ? `${decision.reason} Error: ${errorText}`
-            : decision.reason,
+          reason: effectiveDecision.classifier === "unknown" && errorText
+            ? `${effectiveDecision.reason} Error: ${errorText}`
+            : effectiveDecision.reason,
           errorMessage: errorText,
         });
 
@@ -1181,7 +1303,7 @@ export async function runAgentPrompt(
           await sleep(retryDelayMs);
         }
 
-        if (decision.strategy === "compact_then_retry") {
+        if (effectiveDecision.strategy === "compact_then_retry") {
           const compactionResult = await runRecoveryCompaction(session, chatJid, runOptions, options);
           heartbeatTrackedPhase(chatJid, "preprompt_compaction", {
             eventType: "recovery_compaction",
@@ -1298,13 +1420,14 @@ export async function runAgentPrompt(
     }
     try {
       await clearLiveSshConfig(chatJid);
+      deleteSshConfig(chatJid);
     } catch (error) {
-      options.onWarn?.("Failed to clear turn-scoped SSH tool redirection", {
+      options.onWarn?.("Failed to clear turn-scoped SSH profile", {
         operation: "run_agent.ssh_clear_turn_scope",
         chatJid,
         error,
       });
-      debugSuppressedError(log, "Failed to clear turn-scoped SSH tool redirection.", error, { chatJid });
+      debugSuppressedError(log, "Failed to clear turn-scoped SSH profile.", error, { chatJid });
     }
     options.clearActiveForkBaseLeaf(chatJid);
   }

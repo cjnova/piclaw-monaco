@@ -15,6 +15,7 @@ import {
   type StoreWebMessageParams,
 } from "./message-store.js";
 import type { WebChannelLike } from "../core/web-channel-contracts.js";
+import { recordTimelineInteraction } from "../../../session-recordings/session-recordings.js";
 
 export interface WebChannelStoreMessageOptions {
   contentBlocks?: unknown[];
@@ -75,7 +76,7 @@ export class WebMessageProcessingStorageService {
     mediaIds: number[],
     options: WebChannelStoreMessageOptions = {},
   ): InteractionRow | null {
-    return this.options.storeWebMessage(
+    const interaction = this.options.storeWebMessage(
       this.channel,
       {
         chatJid,
@@ -95,5 +96,7 @@ export class WebMessageProcessingStorageService {
         isSteeringMessage: options.isSteeringMessage,
       },
     );
+    recordTimelineInteraction(interaction);
+    return interaction;
   }
 }

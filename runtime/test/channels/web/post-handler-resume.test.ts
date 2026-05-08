@@ -45,15 +45,19 @@ describe("web post handler", () => {
     expect(resumed).toEqual([{ chatJid: "web:default", threadRootId: 41 }]);
   });
 
-  test("POST /post reply wakes resumeChat for the explicit reply thread root", async () => {
+  test("POST /post reply stores and wakes resumeChat for the explicit reply thread root", async () => {
     const resumed: Array<{ chatJid: string; threadRootId: number | null | undefined }> = [];
+    const storeCalls: Array<{ threadId?: number }> = [];
 
     const channel = {
       json: (payload: unknown, status = 200) => new Response(JSON.stringify(payload), {
         status,
         headers: { "Content-Type": "application/json" },
       }),
-      storeMessage: () => makeInteraction(52, null),
+      storeMessage: (_chatJid: string, _content: string, _isBot: boolean, _mediaIds: number[], options?: { threadId?: number }) => {
+        storeCalls.push({ threadId: options?.threadId });
+        return makeInteraction(52, options?.threadId ?? null);
+      },
       broadcastEvent: () => {},
       resumeChat: (chatJid: string, threadRootId?: number | null) => {
         resumed.push({ chatJid, threadRootId });
@@ -68,6 +72,7 @@ describe("web post handler", () => {
 
     const res = await handlePost(channel, req, true, "web:default");
     expect(res.status).toBe(201);
+    expect(storeCalls).toEqual([{ threadId: 41 }]);
     expect(resumed).toEqual([{ chatJid: "web:default", threadRootId: 41 }]);
   });
 });

@@ -83,7 +83,7 @@ For internal-tool discovery, prefer this order:
 
 That keeps discovery separate from activation and avoids bulky “dump every tool schema first” behavior.
 
-`list_tools(intent=...)` scores explicit tool metadata first (`name`, `description`, `promptSnippet`, toolsets, and capability profiles). `list_internal_tools` remains as a deprecated compatibility alias during migration. When a tool also exposes structured discovery docs/JDocs (for example aliases, domains, verbs, nouns, keywords, guidance, or examples), those are treated as supplemental low-weight hints rather than overrides.
+`list_tools(intent=...)` scores explicit tool metadata first (`name`, `description`, `promptSnippet`, toolsets, and capability profiles). When a tool also exposes structured discovery docs/JDocs (for example aliases, domains, verbs, nouns, keywords, guidance, or examples), those are treated as supplemental low-weight hints rather than overrides.
 
 ### ToolJDoc: supplemental discovery metadata
 
@@ -251,7 +251,7 @@ You can extend that baseline with `.piclaw/config.json`:
 - `schedule_task` — schedule agent prompts or shell commands (cron, interval, or one-shot)
 - `scheduled_tasks` — inspect scheduled-task records via a shared query surface (`list` / `get`, optional latest-run summaries)
 - `introspect_sql` — run read-only SQL queries against the messages database
-- `list_tools` — list available tools with compact summaries, active-state markers, toolset membership, capability metadata, and intent-based recommendations via `intent` (`list_internal_tools` remains as a deprecated compatibility alias during migration)
+- `list_tools` — list available tools with compact summaries, active-state markers, toolset membership, capability metadata, and intent-based recommendations via `intent`
 - `list_scripts` — discover packaged skill scripts plus workspace skill/note scripts with compact summaries, role markers (`entrypoint` vs `module`), Bun invocation hints, and the same kind of query/intent shortlisting used for tool discovery
 - `activate_tools` — activate one or more available tools for the current session
 - `reset_active_tools` — restore the configured default active-tool set for the current session
@@ -266,7 +266,7 @@ You can extend that baseline with `.piclaw/config.json`:
 - `powershell` — Windows-only replacement for the default shell tool; active instead of `bash` on Windows hosts
 - `bun_run` — run a workspace Bun script directly; kept in the default active baseline on Windows so there is still a first-party script runner alongside PowerShell
 - `exit_process` — gracefully terminate piclaw so Supervisor restarts it; kept always active because lifecycle control should not depend on same-turn lazy activation
-- `ssh` — get, set, or clear the session-scoped SSH profile used by remote-backed core tools (`read`, `write`, `edit`, `bash`)
+- `ssh` — get, set, or clear the session-scoped SSH profile used by remote-backed core tools (`read`, `write`, `edit`, `bash`); live redirection is turn-scoped and is cleared automatically at the end of each agent turn
 - `mcp` — token-efficient proxy for external MCP servers via the bundled `pi-mcp-adapter`; supports search, describe, connect, tool calls, and MCP UI message retrieval using shared `.mcp.json` plus optional Pi-owned override config
 
 > **Note:** `proxmox` and `portainer` tools have been moved to the [piclaw-addons](https://github.com/rcarmo/piclaw-addons) repository. When the addons package is installed, these tools are registered automatically. They use the same session-scoped profile + `discover` → `capabilities` → `workflow` pattern as `ssh`.

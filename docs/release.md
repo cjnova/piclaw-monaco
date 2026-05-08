@@ -7,6 +7,23 @@ Pushing a version tag triggers `.github/workflows/publish.yml` and publishes mul
 - `ghcr.io/rcarmo/piclaw:<tag>`
 - `ghcr.io/rcarmo/piclaw:latest`
 
+The same workflow also builds portable YOLO upgrade artifacts and attaches them to the GitHub release:
+
+- `piclaw-<version>-linux-x64.run`
+- `piclaw-<version>-linux-x64-baseline.run` — non-AVX x64 Linux Bun runtime for older CPUs
+- `piclaw-<version>-linux-arm64.run`
+- `piclaw-<version>-macos-arm64.tar.gz`
+- `piclaw-<version>-windows-x64.zip`
+
+These portable artifacts bundle Bun, Piclaw, built web assets, `skel/`, vendored runtime assets, and production `node_modules` for the target OS/architecture. The `linux-x64-baseline` artifact uses Bun’s non-AVX baseline build.
+
+The workflow also publishes the experimental Electrobun desktop shell for each release runner with a `piclaw-desktop` prefix:
+
+- `piclaw-desktop-<version>-linux-x64.tar.gz`
+- `piclaw-desktop-<version>-linux-arm64.tar.gz`
+- `piclaw-desktop-<version>-macos-arm64.tar.gz`
+- `piclaw-desktop-<version>-windows-x64.zip`
+
 ## Cutting a release
 
 The authoritative workflow is documented in the [cut-release skill](/workspace/.pi/skills/cut-release/SKILL.md), which covers:
@@ -42,6 +59,42 @@ git push origin main vX.Y.Z
 
 Then monitor CI and publish the GitHub release via the API (see skill for details).
 
+Build a local portable artifact for the current architecture when you need a manual YOLO bundle smoke test:
+
+```bash
+make portable       # current OS/arch portable runtime artifact
+make portable-linux # Linux-only .run alias
+make portable-linux-baseline # Linux x64 .run with non-AVX Bun baseline runtime
+make portable-mac   # macOS-only .tar.gz alias
+make portable-windows # Windows-only .zip alias
+make portable-experimental-shell # current OS/arch Electrobun shell artifact with piclaw-desktop prefix
+```
+
+Linux smoke-test example:
+
+```bash
+make portable-linux
+./artifacts/release/piclaw-$(jq -r .version package.json)-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').run --extract /tmp/piclaw-run-test
+/tmp/piclaw-run-test/piclaw-$(jq -r .version package.json)-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')/bin/piclaw --version
+```
+
+Install/upgrade from a release asset on a YOLO Linux host:
+
+```bash
+chmod +x piclaw-<version>-linux-x64.run
+sudo ./piclaw-<version>-linux-x64.run --install /opt/piclaw
+# writes /usr/local/bin/piclaw unless PICLAW_SKIP_BIN_LINK=1 or PICLAW_BIN_DIR is set
+```
+
+Package UX reports as one concatenated PDF plus a data-only ZIP before attaching release assets:
+
+```bash
+bun run release:package-ux-reports -- --input /tmp/piclaw-vX.Y.Z-ux-reports --version X.Y.Z
+# Upload both:
+# /workspace/tmp/piclaw-vX.Y.Z-ux-report.pdf
+# /workspace/tmp/piclaw-vX.Y.Z-ux-report-data.zip
+```
+
 For manual release-image verification outside GitHub Actions, the repo-owned smoke contract is:
 
 ```bash
@@ -56,6 +109,7 @@ Boundary note:
 - publish smoke is intentionally repo-owned (`make publish-smoke`)
 - release/tag/workflow/package pruning remains GitHub-native in `.github/workflows/publish.yml`
   because it depends directly on Actions context and GitHub APIs
+- Actions workflow runs and Actions artifacts are pruned after release publishing using the oldest timestamp among the latest 5 GitHub releases as the retention cutoff
 
 ## Release naming
 

@@ -69,6 +69,70 @@ test.describe('US-03: Session Switching', () => {
   });
 });
 
+test.describe('US-03: Mobile Compose Session Switcher', () => {
+  test('session pill stays pinned above the input at the compose top-right', async ({ authedPage: page }, testInfo) => {
+    test.skip(!['ipad', 'iphone', 'android-chrome'].includes(testInfo.project.name), 'mobile-only compose layout coverage');
+
+    const composeBox = page.locator(sel.composeBox).first();
+    const wrapper = page.locator('.compose-input-wrapper').first();
+    const textarea = page.locator(sel.composeInput).first();
+    const switcher = page.locator('[data-testid="session-switcher"]').first();
+
+    await expect(composeBox).toBeVisible();
+    await expect(wrapper).toBeVisible();
+    await expect(textarea).toBeVisible();
+    await expect(switcher).toBeVisible();
+
+    const layout = await page.evaluate(() => {
+      const wrapperEl = document.querySelector('.compose-input-wrapper') as HTMLElement | null;
+      const textareaEl = document.querySelector('.compose-input-wrapper textarea') as HTMLTextAreaElement | null;
+      const triggerEl = document.querySelector('[data-testid="session-switcher"]') as HTMLElement | null;
+      const triggerGroupEl = triggerEl?.closest('.compose-session-trigger-top') as HTMLElement | null;
+      if (!wrapperEl || !textareaEl || !triggerEl || !triggerGroupEl) return null;
+
+      const rect = (el: Element) => {
+        const box = el.getBoundingClientRect();
+        return { top: box.top, right: box.right, bottom: box.bottom, left: box.left, width: box.width, height: box.height };
+      };
+      const triggerBox = rect(triggerEl);
+      const textareaBox = rect(textareaEl);
+      const centerX = triggerBox.left + triggerBox.width / 2;
+      const centerY = triggerBox.top + triggerBox.height / 2;
+      const topElement = document.elementFromPoint(centerX, centerY);
+      const textareaStyle = window.getComputedStyle(textareaEl);
+      const triggerGroupStyle = window.getComputedStyle(triggerGroupEl);
+
+      return {
+        wrapper: rect(wrapperEl),
+        textarea: textareaBox,
+        trigger: triggerBox,
+        triggerPosition: triggerGroupStyle.position,
+        triggerZIndex: Number.parseInt(triggerGroupStyle.zIndex || '0', 10),
+        textareaPaddingRight: Number.parseFloat(textareaStyle.paddingRight || '0'),
+        triggerOwnsTopPoint: !!topElement && triggerEl.contains(topElement),
+      };
+    });
+
+    expect(layout).not.toBeNull();
+    if (!layout) return;
+
+    // Pinned to the compose input's top-right corner on mobile, not pushed into
+    // normal flow above the editor.
+    expect(layout.triggerPosition).toBe('absolute');
+    expect(layout.triggerZIndex).toBeGreaterThan(0);
+    expect(layout.trigger.right).toBeLessThanOrEqual(layout.wrapper.right - 2);
+    expect(layout.trigger.right).toBeGreaterThanOrEqual(layout.wrapper.right - 24);
+    expect(layout.trigger.top).toBeGreaterThanOrEqual(layout.wrapper.top);
+    expect(layout.trigger.top).toBeLessThanOrEqual(layout.wrapper.top + 16);
+
+    // The textarea reserves enough right-side space that typed text does not run
+    // underneath the pill, and the pill remains on top for tapping.
+    const reservedRight = layout.textarea.right - layout.trigger.left;
+    expect(layout.textareaPaddingRight).toBeGreaterThanOrEqual(reservedRight + 4);
+    expect(layout.triggerOwnsTopPoint).toBe(true);
+  });
+});
+
 test.describe('US-03: iPad Session Switching', () => {
   test('finger swipe on timeline edge switches sessions', async ({ authedPage: page }, testInfo) => {
     test.skip(testInfo.project.name !== 'ipad', 'iPad-only touch gesture coverage');

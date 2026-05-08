@@ -294,7 +294,7 @@ A chat can optionally switch its core file/shell tools to a remote host over SSH
 - Persistence: SQLite `ssh_configs`
 - Affected tools: `read`, `write`, `edit`, `bash`
 
-The important runtime property is that SSH mode is **live mutable**. If a warm session already exists, `ssh set` and `ssh clear` can flip the backend immediately for the next tool/model step without rebuilding the whole session.
+The important runtime property is that SSH mode is **live mutable** and **turn scoped**. If a warm session already exists, `ssh set` and `ssh clear` can flip the backend immediately for the next tool/model step without rebuilding the whole session. Piclaw clears live SSH redirection at the end of each agent turn; the stored chat profile remains available for later inspection or re-application.
 
 ```mermaid
 sequenceDiagram
@@ -310,6 +310,8 @@ sequenceDiagram
   Pool->>DB: upsert ssh_configs
   Pool->>Core: applyLiveSshConfig(chatJid)
   Core-->>Host: next read/write/edit/bash uses SSH
+  Pool->>Core: turn-finally clearLiveSshConfig(chatJid)
+  Core-->>Host: next turn starts with local core tools
 
   Agent->>ssh: action=clear
   ssh->>Pool: clearSshConfig(chatJid)

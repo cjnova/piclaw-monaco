@@ -3,6 +3,7 @@
  */
 
 import type { WebAgentBufferEntry } from "./agent-buffers.js";
+import { getAddonApiHealthSnapshot } from "../../../addons/addon-api-health.js";
 import { appendServerTiming, measureAsync, measureSync } from "../http/server-timing.js";
 
 /** Context contract used by web agent status/context/model endpoint handlers. */
@@ -24,6 +25,36 @@ function resolveChatJid(req: Request, defaultChatJid: string): string {
   return (url.searchParams.get("chat_jid") || defaultChatJid).trim() || defaultChatJid;
 }
 
+function readTrimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isAuthFailureText(value: string): boolean {
+  return /no api key(?: found| for provider)?|token refresh failed\s*:\s*401|authentication failed|credentials may have expired|re-authenticate|unauthorized|\b401\b|\b403\b|invalid.*api.*key|api.*key.*invalid|token.*expired|oauth.*expired|refresh.*token|provider login required|auth.*expired|missing provider credential|missing provider config/i.test(value);
+}
+
+function deriveAgentState(status: Record<string, unknown>): string {
+  const explicit = readTrimmedString(status.state);
+  if (explicit) return explicit;
+
+  const classifier = readTrimmedString(
+    status.classifier
+      ?? status.recovery_classifier
+      ?? status.recoveryClassifier
+      ?? status.failure_classifier,
+  );
+
+  if (classifier === "recovery_suppressed") return "recovery_suppressed";
+  if (classifier === "auth_config" || classifier === "provider_auth") return "blocked_auth";
+
+  const title = readTrimmedString(status.title);
+  const detail = readTrimmedString(status.detail);
+  const errorText = `${title} ${detail}`.trim();
+  if (errorText && isAuthFailureText(errorText)) return "blocked_auth";
+
+  return "active";
+}
+
 /** Return active/idle agent status plus streamed thought/draft buffers when available. */
 export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext): Response {
   const { result, durationMs } = measureSync(() => {
@@ -31,7 +62,7 @@ export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext):
     const status = ctx.getAgentStatus(chatJid);
     if (!status) {
       ctx.recoverStaleInflightRun(chatJid, { hasActiveStatus: false });
-      return ctx.json({ status: "idle", data: null });
+      return ctx.json({ status: "idle", state: "idle", chat_jid: chatJid, data: null, addon_api: getAddonApiHealthSnapshot() });
     }
 
     const turnId = (status.turn_id || status.turnId) as string | undefined;
@@ -44,7 +75,29 @@ export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext):
       if (db) draft = { text: db.text, totalLines: db.totalLines };
     }
 
-    return ctx.json({ status: "active", data: status, thought, draft });
+    const state = deriveAgentState(status);
+    const classifier = readTrimmedString(
+      status.classifier
+      ?? status.recovery_classifier
+      ?? status.recoveryClassifier
+      ?? status.failure_classifier,
+    ) || null;
+
+    return ctx.json({
+      status: "active",
+      state,
+      chat_jid: chatJid,
+      provider: readTrimmedString(status.provider) || null,
+      model: readTrimmedString(status.model) || null,
+      classifier,
+      last_error: readTrimmedString(status.detail) || readTrimmedString(status.title) || null,
+      recovery_strategy: readTrimmedString(status.recovery_strategy ?? status.recoveryStrategy ?? status.strategy) || null,
+      recovery_suppressed_reason: readTrimmedString(status.recovery_suppressed_reason ?? status.recoverySuppressedReason) || null,
+      data: status,
+      thought,
+      draft,
+      addon_api: getAddonApiHealthSnapshot(),
+    });
   });
   return appendServerTiming(result, {
     name: "agent_status",

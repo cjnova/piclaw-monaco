@@ -36,6 +36,12 @@ make local-install   # pack and install piclaw globally (no restart)
 make restart         # restart piclaw via the detected service manager
 ```
 
+## CI workflow map
+
+For the current end-to-end GitHub Actions flow (triggers, job dependencies, and step-level map), see:
+
+- [CI workflows and dependencies](./ci-flows.md)
+
 ## Testing
 
 The implementation lives under `runtime/`, so direct Bun test runs should target that subtree. Sequential mode is recommended for SQLite safety:

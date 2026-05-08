@@ -87,7 +87,7 @@ describe("web control-plane payload guards", () => {
     expect((await respondResponse.json()).error).toBe("JSON body must be an object");
   });
 
-  test("queue remove returns typed 400s for invalid JSON and missing row ids", async () => {
+  test("queue remove returns typed 400s for invalid JSON and invalid row ids", async () => {
     const channel = createControlPlaneChannel();
 
     const invalidJson = new Request("https://example.com/agent/queue-remove", {
@@ -107,9 +107,18 @@ describe("web control-plane payload guards", () => {
     const missingRowIdResponse = await WebChannel.prototype.handleAgentQueueRemove.call(channel, missingRowId);
     expect(missingRowIdResponse.status).toBe(400);
     expect((await missingRowIdResponse.json()).error).toBe("Missing or invalid row_id");
+
+    const decimalRowId = new Request("https://example.com/agent/queue-remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ row_id: 1.5 }),
+    });
+    const decimalRowIdResponse = await WebChannel.prototype.handleAgentQueueRemove.call(channel, decimalRowId);
+    expect(decimalRowIdResponse.status).toBe(400);
+    expect((await decimalRowIdResponse.json()).error).toBe("Missing or invalid row_id");
   });
 
-  test("queue steer rejects non-object JSON payloads", async () => {
+  test("queue steer rejects non-object JSON payloads and invalid row ids", async () => {
     const channel = createControlPlaneChannel();
     const req = new Request("https://example.com/agent/queue-steer", {
       method: "POST",
@@ -120,6 +129,15 @@ describe("web control-plane payload guards", () => {
     const response = await WebChannel.prototype.handleAgentQueueSteer.call(channel, req);
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe("JSON body must be an object");
+
+    const decimalRowId = new Request("https://example.com/agent/queue-steer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ row_id: 2.25 }),
+    });
+    const decimalRowIdResponse = await WebChannel.prototype.handleAgentQueueSteer.call(channel, decimalRowId);
+    expect(decimalRowIdResponse.status).toBe(400);
+    expect((await decimalRowIdResponse.json()).error).toBe("Missing or invalid row_id");
   });
 
   test("branch payload handlers reject malformed JSON bodies consistently", async () => {

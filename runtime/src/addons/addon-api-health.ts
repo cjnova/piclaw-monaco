@@ -1,0 +1,141 @@
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("addons.api-health");
+
+export interface AddonApiHealthEntry {
+  addonId: string;
+  action: string;
+  chatJid: string | null;
+  method: string;
+  path: string;
+  degraded: boolean;
+  failureCount: number;
+  firstFailedAt: string | null;
+  lastFailedAt: string | null;
+  lastRecoveredAt: string | null;
+  lastStatus: number | null;
+  lastError: string | null;
+  suppressedUntil: string | null;
+  suppressedCount: number;
+}
+
+const DEFAULT_BACKOFF_MS = 60_000;
+const MAX_ENTRIES = 200;
+const entries = new Map<string, AddonApiHealthEntry>();
+
+function nowIso(nowMs = Date.now()): string {
+  return new Date(nowMs).toISOString();
+}
+
+function backoffMs(): number {
+  const parsed = Number(process.env.PICLAW_ADDON_API_FAILURE_BACKOFF_MS || "");
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : DEFAULT_BACKOFF_MS;
+}
+
+function keyFor(input: { addonId: string; action: string; chatJid?: string | null; method?: string; path?: string }): string {
+  return [
+    String(input.addonId || "").trim(),
+    String(input.action || "").trim(),
+    String(input.chatJid || "").trim(),
+    String(input.method || "").trim().toUpperCase(),
+    String(input.path || "").trim(),
+  ].join("::");
+}
+
+function pruneIfNeeded(): void {
+  if (entries.size <= MAX_ENTRIES) return;
+  const victims = [...entries.entries()]
+    .sort((a, b) => String(a[1].lastFailedAt || a[1].lastRecoveredAt || "").localeCompare(String(b[1].lastFailedAt || b[1].lastRecoveredAt || "")))
+    .slice(0, entries.size - MAX_ENTRIES);
+  for (const [key] of victims) entries.delete(key);
+}
+
+export function recordAddonApiFailure(input: {
+  addonId: string;
+  action: string;
+  chatJid?: string | null;
+  method?: string;
+  path?: string;
+  status?: number | null;
+  error?: unknown;
+}): AddonApiHealthEntry & { shouldLog: boolean } {
+  const nowMs = Date.now();
+  const key = keyFor(input);
+  const previous = entries.get(key);
+  const suppressedUntilMs = previous?.suppressedUntil ? Date.parse(previous.suppressedUntil) : 0;
+  const shouldLog = !previous || !Number.isFinite(suppressedUntilMs) || nowMs >= suppressedUntilMs;
+  const next: AddonApiHealthEntry = {
+    addonId: String(input.addonId || "").trim(),
+    action: String(input.action || "").trim(),
+    chatJid: input.chatJid ? String(input.chatJid).trim() : null,
+    method: String(input.method || "").trim().toUpperCase() || "GET",
+    path: String(input.path || "").trim(),
+    degraded: true,
+    failureCount: (previous?.failureCount ?? 0) + 1,
+    firstFailedAt: previous?.firstFailedAt ?? nowIso(nowMs),
+    lastFailedAt: nowIso(nowMs),
+    lastRecoveredAt: previous?.lastRecoveredAt ?? null,
+    lastStatus: Number.isFinite(input.status) ? Number(input.status) : null,
+    lastError: String((input.error as Error)?.message || input.error || "Addon API request failed"),
+    suppressedUntil: nowIso(nowMs + backoffMs()),
+    suppressedCount: previous ? previous.suppressedCount + (shouldLog ? 0 : 1) : 0,
+  };
+  entries.set(key, next);
+  pruneIfNeeded();
+  if (shouldLog) {
+    log.warn("Add-on API request failed; repeated identical failures will be suppressed temporarily", {
+      operation: "addon_api.failure",
+      addonId: next.addonId,
+      action: next.action,
+      chatJid: next.chatJid,
+      method: next.method,
+      path: next.path,
+      status: next.lastStatus,
+      error: next.lastError,
+      failureCount: next.failureCount,
+      suppressedUntil: next.suppressedUntil,
+    });
+  }
+  return { ...next, shouldLog };
+}
+
+export function recordAddonApiSuccess(input: {
+  addonId: string;
+  action: string;
+  chatJid?: string | null;
+  method?: string;
+  path?: string;
+}): AddonApiHealthEntry | null {
+  const key = keyFor(input);
+  const previous = entries.get(key);
+  if (!previous) return null;
+  const next: AddonApiHealthEntry = {
+    ...previous,
+    degraded: false,
+    lastRecoveredAt: nowIso(),
+    lastStatus: 200,
+    lastError: null,
+    suppressedUntil: null,
+    suppressedCount: 0,
+  };
+  entries.set(key, next);
+  log.info("Add-on API request recovered", {
+    operation: "addon_api.recovered",
+    addonId: next.addonId,
+    action: next.action,
+    chatJid: next.chatJid,
+    method: next.method,
+    path: next.path,
+    failureCount: next.failureCount,
+  });
+  return next;
+}
+
+export function getAddonApiHealthSnapshot(): { degraded: boolean; entries: AddonApiHealthEntry[] } {
+  const snapshot = [...entries.values()].filter((entry) => entry.degraded);
+  return { degraded: snapshot.length > 0, entries: snapshot };
+}
+
+export function resetAddonApiHealthForTests(): void {
+  entries.clear();
+}

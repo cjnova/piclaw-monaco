@@ -7,6 +7,10 @@
 #   build-piclaw   – Full build: build-web (vendor + bundles) + build-ts.
 #   build-desktop  – Build the optional Electrobun desktop shell.
 #   pack           – Pack piclaw into a .tgz (depends on build-piclaw).
+#   portable-linux – Build a Linux self-extracting .run artifact (depends on build-piclaw).
+#   portable-linux-baseline – Build a Linux x64 .run artifact with non-AVX Bun.
+#   portable-mac/windows – Build platform-native portable artifacts on matching runners.
+#   portable-experimental-shell – Build the Electrobun shell artifact with an -experimental suffix.
 #   local-install  – Pack and install globally (no restart).
 #   lint/test      – Run ESLint and bun test suite.
 #   ci-fast        – Run the canonical fast CI guardrails + web build.
@@ -37,10 +41,10 @@ BUN_BIN_REAL ?= $(shell readlink -f $(shell command -v bun 2>/dev/null) 2>/dev/n
 BUN_ROOT ?= $(or $(BUN_INSTALL),$(patsubst %/bin/bun,%,$(BUN_BIN_REAL)),/usr/local/lib/bun)
 GLOBAL_PKG := $(BUN_ROOT)/install/global/package.json
 GLOBAL_LOCK := $(BUN_ROOT)/install/global/bun.lock
-PI_AGENT_VERSION ?= $(shell jq -r '.dependencies["@mariozechner/pi-coding-agent"] // "0.58.3"' package.json)
+PI_AGENT_VERSION ?= $(shell jq -r '.dependencies["@earendil-works/pi-coding-agent"] // "0.74.0"' package.json)
 WEB_BUILD_TEST_TIMEOUT_MS ?= 20000
 
-.PHONY: help up down enter build build-piclaw build-web build-ts build-desktop vendor update-mermaid-vendor pack \
+.PHONY: help up down enter build build-piclaw build-web build-ts build-desktop vendor update-mermaid-vendor pack portable portable-linux portable-linux-baseline portable-mac portable-windows portable-experimental-shell \
         local-install restart lint test test-coverage ci-fast ci-integration install-git-hooks pre-push-ci publish-smoke \
         dual-tag tag-ghcr sync-version bump-minor bump-patch push
 
@@ -136,6 +140,29 @@ pack: build-piclaw ## Pack piclaw into a .tgz (outside the repo)
 		bun pm pack --destination $(PACK_DIR); \
 	ls -lh $(PACK_DIR)/piclaw-*.tgz || true
 
+portable: build-piclaw ## Build the platform-native portable artifact for the current runner
+	bun run release:build-portable
+
+portable-linux: build-piclaw ## Build a Linux self-extracting .run artifact for the current architecture
+	@test "$$(uname -s)" = "Linux" || { echo "portable-linux must run on Linux" >&2; exit 1; }
+	bun run release:build-linux-run
+
+portable-linux-baseline: build-piclaw ## Build a Linux x64 .run artifact with non-AVX Bun baseline runtime
+	@test "$$(uname -s)" = "Linux" || { echo "portable-linux-baseline must run on Linux" >&2; exit 1; }
+	@test "$$(uname -m)" = "x86_64" || { echo "portable-linux-baseline must run on x86_64" >&2; exit 1; }
+	bun run release:build-portable --bun-target linux-x64-baseline
+
+portable-mac: build-piclaw ## Build a macOS portable .tar.gz artifact on a macOS runner
+	@test "$$(uname -s)" = "Darwin" || { echo "portable-mac must run on macOS" >&2; exit 1; }
+	bun run release:build-portable
+
+portable-windows: build-piclaw ## Build a Windows portable .zip artifact on a Windows runner
+	@node -e "process.exit(process.platform === 'win32' ? 0 : 1)" || { echo "portable-windows must run on Windows" >&2; exit 1; }
+	bun run release:build-portable
+
+portable-experimental-shell: ## Build the Electrobun shell artifact for the current runner with an -experimental suffix
+	bun run release:build-experimental-shell
+
 restart: ## No-op safety guard: use exit_process from the agent instead of restarting inline
 	@printf '%s\n' "[restart] No-op by design." \
 		"[restart] Do not restart piclaw inline from an active agent turn." \
@@ -151,7 +178,7 @@ local-install: pack ## Pack and install piclaw globally (no restart)
 	TGZ="$$(find $(PACK_DIR) -maxdepth 1 -type f -name 'piclaw-*.tgz' | sort | tail -1)"; \
 	if [ -z "$$TGZ" ]; then printf '%s\n' "[local-install] No package tarball found in $(PACK_DIR)"; exit 1; fi; \
 	printf '%s\n' "[local-install] Installing v$${VERSION} globally..."; \
-	printf '{"dependencies":{"@mariozechner/pi-coding-agent":"$(PI_AGENT_VERSION)","@mariozechner/pi-agent-core":"$(PI_AGENT_VERSION)","@mariozechner/pi-ai":"$(PI_AGENT_VERSION)","@mariozechner/pi-tui":"$(PI_AGENT_VERSION)","piclaw":"%s"}}\n' \
+	printf '{"dependencies":{"@earendil-works/pi-coding-agent":"$(PI_AGENT_VERSION)","@earendil-works/pi-agent-core":"$(PI_AGENT_VERSION)","@earendil-works/pi-ai":"$(PI_AGENT_VERSION)","@earendil-works/pi-tui":"$(PI_AGENT_VERSION)","piclaw":"%s"}}\n' \
 		"$$TGZ" | sudo tee $(GLOBAL_PKG) >/dev/null; \
 	sudo rm -f $(GLOBAL_LOCK); \
 	sudo mkdir -p $(PICLAW_TMPDIR) $(BUN_CACHE_DIR); \

@@ -128,16 +128,6 @@ const TOOL_CAPABILITIES: Record<string, ToolCapability> = {
       nouns: ["tools", "tool", "capabilities", "catalog"],
     }),
   },
-  list_internal_tools: {
-    kind: "read-only",
-    weight: "lightweight",
-    summary: "Deprecated alias for list_tools.",
-    recommend: rec({
-      domains: ["tools", "discovery"],
-      verbs: ["list", "discover", "find", "inspect"],
-      nouns: ["tools", "tool", "capabilities", "catalog"],
-    }),
-  },
   list_scripts: {
     kind: "read-only",
     weight: "standard",

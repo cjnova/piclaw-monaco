@@ -68,6 +68,7 @@ export function storePost(
   const interaction = channel.storeMessage(chatJid, data.content || "", false, mediaIds, {
     contentBlocks,
     linkPreviews,
+    threadId: options.isReply && data.thread_id ? Number(data.thread_id) : undefined,
   });
   if (!interaction) return { status: 500, body: { error: "Failed to store message" } };
 

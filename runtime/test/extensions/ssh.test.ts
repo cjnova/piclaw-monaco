@@ -15,10 +15,21 @@ test("ssh registers a normalized tool name", () => {
   expect(fake.tools.has("ssh")).toBe(true);
 });
 
+test("ssh before_agent_start tells the model that SSH tool redirection is turn-scoped", async () => {
+  const fake = createFakeExtensionApi();
+
+  sshTool(fake.api);
+  const handler = fake.handlers.find((entry) => entry.event === "before_agent_start")?.handler;
+  const result = await handler?.({ systemPrompt: "base prompt" });
+
+  expect(result?.systemPrompt).toContain("Live SSH tool redirection and stored SSH profiles are cleared at the end of each agent turn.");
+});
+
 test("ssh set stores config through registered handlers", async () => {
   let seen: any = null;
   setSshToolHandlers({
     get: () => null,
+    isActive: () => false,
     async set(chatJid, config) {
       seen = { chatJid, config };
       return {
@@ -60,12 +71,14 @@ test("ssh set stores config through registered handlers", async () => {
     },
   });
   expect(result.details.apply_timing).toBe("next_turn");
+  expect(result.details.turn_scoped_redirection).toBe(true);
   expect(result.content[0].text).toContain("Stored SSH config");
 });
 
 test("ssh get reports missing config for the current session", async () => {
   setSshToolHandlers({
     get: () => null,
+    isActive: () => false,
     async set() {
       throw new Error("unexpected");
     },
@@ -81,5 +94,7 @@ test("ssh get reports missing config for the current session", async () => {
   const result = await tool.execute("tool-2", { action: "get" });
 
   expect(result.details.configured).toBe(false);
+  expect(result.details.live_redirection_active).toBe(false);
   expect(result.content[0].text).toContain("No SSH config stored");
+  expect(result.content[0].text).toContain("Live SSH tool redirection is inactive");
 });

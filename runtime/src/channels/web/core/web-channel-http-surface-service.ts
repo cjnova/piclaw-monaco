@@ -42,6 +42,10 @@ type WebChannelHttpSurfaceControlPlane = Pick<
   | "handleAutoresearchDismiss"
   | "handleAgentOobeComplete"
   | "handleAgentQueueState"
+  | "handleAgentRuns"
+  | "handleAgentRunAbort"
+  | "handleAgentRunClearStale"
+  | "handleAgentRunDrainQueue"
   | "handleAgentQueueRemove"
   | "handleAgentQueueSteer"
   | "handleAgentQueueReorder"
@@ -211,6 +215,22 @@ export class WebChannelHttpSurfaceService {
 
   async handleAgentQueueState(req: Request): Promise<Response> {
     return await this.channel.controlPlaneService.handleAgentQueueState(req);
+  }
+
+  async handleAgentRuns(req: Request): Promise<Response> {
+    return await this.channel.controlPlaneService.handleAgentRuns(req);
+  }
+
+  async handleAgentRunAbort(req: Request): Promise<Response> {
+    return await this.channel.controlPlaneService.handleAgentRunAbort(req);
+  }
+
+  async handleAgentRunClearStale(req: Request): Promise<Response> {
+    return await this.channel.controlPlaneService.handleAgentRunClearStale(req);
+  }
+
+  async handleAgentRunDrainQueue(req: Request): Promise<Response> {
+    return await this.channel.controlPlaneService.handleAgentRunDrainQueue(req);
   }
 
   async handleAgentQueueRemove(req: Request): Promise<Response> {

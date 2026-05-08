@@ -4,7 +4,13 @@ import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 
 import { WebChannel } from "../../../src/channels/web.ts";
+import { WebAgentControlPlaneService } from "../../../src/channels/web/agent/agent-control-plane-service.js";
 import { handleAgentMessage } from "../../../src/channels/web/handlers/agent.ts";
+import {
+  handleAgentRespondRequest,
+  handleThoughtVisibilityRequest,
+  type UiEndpointsContext,
+} from "../../../src/channels/web/endpoints/ui-endpoints.js";
 import { runExtensionHookDeterminismAudit } from "../../extensions/extension-hook-determinism-audit.ts";
 
 export const DEFAULT_FUZZ_SEED = 424242;
@@ -79,8 +85,8 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
-function createUiEndpointChannel() {
-  const uiContext = {
+function createUiEndpointContext(): UiEndpointsContext {
+  return {
     json: jsonResponse,
     getWorkspaceVisible: () => false,
     setWorkspaceVisible: () => {},
@@ -89,12 +95,29 @@ function createUiEndpointChannel() {
     setPanelExpanded: () => {},
     handleUiResponse: () => ({ status: "ok" as const }),
   };
+}
 
-  return {
-    endpointContexts: {
-      ui: () => uiContext,
+function createControlPlaneService(): WebAgentControlPlaneService {
+  return new WebAgentControlPlaneService({
+    defaultChatJid: "web:default",
+    defaultAgentId: "default",
+    json: jsonResponse,
+    broadcastEvent: () => {},
+    queue: {
+      enqueue: (task: () => unknown) => task(),
     },
-  } as any;
+    agentPool: {} as any,
+    queuedFollowupLifecycle: {
+      getQueuedFollowupCount: () => 0,
+      listQueuedStateItems: () => [],
+      prependQueuedFollowupItem: () => {},
+      removeQueuedFollowupForAction: () => false,
+      reorderQueuedFollowupItems: () => [],
+    },
+    queuePendingSteering: () => {},
+    storeMessage: () => null,
+    processChat: async () => {},
+  });
 }
 
 function mulberry32(seed: number): () => number {
@@ -285,9 +308,9 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleThoughtVisibility.call(
-        createUiEndpointChannel(),
+      execute: async () => handleThoughtVisibilityRequest(
         createRequest("/agent/thought/visibility", spec.bodyText),
+        createUiEndpointContext(),
       ),
     };
   }
@@ -299,9 +322,9 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentRespond.call(
-        createUiEndpointChannel(),
+      execute: async () => handleAgentRespondRequest(
         createRequest("/agent/respond", spec.bodyText),
+        createUiEndpointContext(),
       ),
     };
   }
@@ -313,8 +336,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentQueueRemove.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAgentQueueRemove(
         createRequest("/agent/queue-remove", spec.bodyText),
       ),
     };
@@ -327,8 +349,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentQueueSteer.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAgentQueueSteer(
         createRequest("/agent/queue-steer", spec.bodyText),
       ),
     };
@@ -341,8 +362,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentBranchFork.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAgentBranchFork(
         createRequest("/agent/branch-fork", spec.bodyText),
       ),
     };
@@ -355,8 +375,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentBranchRename.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAgentBranchRename(
         createRequest("/agent/branch-rename", spec.bodyText),
       ),
     };
@@ -369,8 +388,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentBranchPrune.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAgentBranchPrune(
         createRequest("/agent/branch-prune", spec.bodyText),
       ),
     };
@@ -383,8 +401,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAgentBranchRestore.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAgentBranchRestore(
         createRequest("/agent/branch-restore", spec.bodyText),
       ),
     };
@@ -439,8 +456,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAutoresearchStop.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAutoresearchStop(
         createRequest("/agent/autoresearch/stop", spec.bodyText),
       ),
     };
@@ -453,8 +469,7 @@ function buildAuditCase(caseId: number, seed: number): AuditCase {
       payloadClass: spec.payloadClass,
       requestBody: spec.bodyText,
       expectedError: spec.expectedError,
-      execute: async () => WebChannel.prototype.handleAutoresearchDismiss.call(
-        { json: jsonResponse },
+      execute: async () => createControlPlaneService().handleAutoresearchDismiss(
         createRequest("/agent/autoresearch/dismiss", spec.bodyText),
       ),
     };

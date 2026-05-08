@@ -182,10 +182,7 @@ test.describe('US-16: Cascading Thread Deletion', () => {
 
   test('confirming cascade removes parent and all replies', async ({ authedPage: page }) => {
     const parentId = await sendMessage(page, 'Cascade delete test - please reply');
-    await sendReply(page, parentId, 'Cascade delete reply 1');
-
-    const postsBefore = await getVisiblePostIds(page);
-    const countBefore = postsBefore.length;
+    const replyId = await sendReply(page, parentId, 'Cascade delete reply 1');
 
     const parentPost = page.locator(`#post-${parentId}`);
 
@@ -202,16 +199,14 @@ test.describe('US-16: Cascading Thread Deletion', () => {
       await page.waitForTimeout(1000);
 
       const postsAfter = await getVisiblePostIds(page);
-      // Should have fewer posts (at least the parent, possibly replies too)
-      expect(postsAfter.length).toBeLessThan(countBefore);
+      expect(postsAfter).not.toContain(String(parentId));
+      expect(postsAfter).not.toContain(String(replyId));
     }
   });
 
   test('cancelling cascade preserves all messages', async ({ authedPage: page }) => {
     const parentId = await sendMessage(page, 'Cancel cascade test');
-    await sendReply(page, parentId, 'Cancel cascade reply 1');
-
-    const postsBefore = await getVisiblePostIds(page);
+    const replyId = await sendReply(page, parentId, 'Cancel cascade reply 1');
 
     const parentPost = page.locator(`#post-${parentId}`);
 
@@ -228,8 +223,8 @@ test.describe('US-16: Cascading Thread Deletion', () => {
       await page.waitForTimeout(500);
 
       const postsAfter = await getVisiblePostIds(page);
-      // All posts should still be there
-      expect(postsAfter.length).toBe(postsBefore.length);
+      expect(postsAfter).toContain(String(parentId));
+      expect(postsAfter).toContain(String(replyId));
     }
   });
 

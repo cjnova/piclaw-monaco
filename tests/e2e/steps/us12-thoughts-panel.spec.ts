@@ -3,8 +3,8 @@ import { test, expect } from '../support/world';
 // US-12: Thoughts panel expand/collapse and scroll behaviour
 //
 // The thoughts panel uses CSS to control scrollability:
-// - Collapsed: overflow-y: hidden, max-height clamped to N lines
-// - Expanded (thought panel): overflow-y: auto, max-height: min(52vh, 34rem)
+// - Collapsed: overflow-y: auto with max-height clamped to N lines
+// - Expanded (thought panel): overflow-y: auto with the expanded line cap
 // - data-expanded="true"/"false" on .agent-thinking element
 //
 // These tests use a deterministic DOM fixture instead of sending a real agent
@@ -26,10 +26,13 @@ async function mountThoughtPanelFixture(page: import('@playwright/test').Page, l
     panel.setAttribute('data-expanded', 'false');
     panel.setAttribute('data-collapsible', 'true');
     panel.setAttribute('data-panel-key', 'thought');
+    const triangle = (direction: 'right' | 'up') => direction === 'up'
+      ? '<svg class="ui-disclosure-triangle ui-disclosure-triangle-up" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><polygon points="2 7 8 7 5 2"></polygon></svg>'
+      : '<svg class="ui-disclosure-triangle ui-disclosure-triangle-right" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><polygon points="3 2 8 5 3 8"></polygon></svg>';
     panel.innerHTML = `
       <div class="agent-thinking-title">Thoughts</div>
       <div class="agent-thinking-body agent-thinking-body-collapsible" style="--agent-thinking-collapsed-lines: 8;"></div>
-      <button class="agent-thinking-truncation" type="button">▸ ${Math.max(0, lines - 8)} more lines</button>
+      <button class="agent-thinking-truncation" type="button"><span class="agent-thinking-truncation-arrow">${triangle('right')}</span><span>${Math.max(0, lines - 8)} more lines</span></button>
     `;
     const body = panel.querySelector('.agent-thinking-body') as HTMLElement;
     body.innerHTML = text
@@ -41,7 +44,9 @@ async function mountThoughtPanelFixture(page: import('@playwright/test').Page, l
       const expanded = panel.getAttribute('data-expanded') === 'true';
       panel.setAttribute('data-expanded', expanded ? 'false' : 'true');
       if (!expanded) body.scrollTop = 0;
-      button.textContent = expanded ? `▸ ${Math.max(0, lines - 8)} more lines` : '▴ show less';
+      button.innerHTML = expanded
+        ? `<span class="agent-thinking-truncation-arrow">${triangle('right')}</span><span>${Math.max(0, lines - 8)} more lines</span>`
+        : `<span class="agent-thinking-truncation-arrow">${triangle('up')}</span><span>show less</span>`;
     });
     const host = document.querySelector('.timeline, .container, body') || document.body;
     host.prepend(panel);
@@ -72,7 +77,7 @@ async function getThoughtsPanelState(page: import('@playwright/test').Page) {
 }
 
 test.describe('US-12: Thoughts Panel Scroll Behaviour', () => {
-  test('collapsed panel is not scrollable and shows "more lines"', async ({ authedPage: page }) => {
+  test('collapsed panel keeps bounded scrolling and shows "more lines"', async ({ authedPage: page }) => {
     await mountThoughtPanelFixture(page);
     const state = await getThoughtsPanelState(page);
     expect(state).toBeTruthy();
@@ -80,7 +85,7 @@ test.describe('US-12: Thoughts Panel Scroll Behaviour', () => {
 
     // Collapsed state checks
     expect(state!.expanded).toBe('false');
-    expect(state!.overflowY).toBe('hidden');
+    expect(state!.overflowY).toBe('auto');
     expect(state!.moreButtonText).toContain('more lines');
   });
 
@@ -109,7 +114,7 @@ test.describe('US-12: Thoughts Panel Scroll Behaviour', () => {
     }
   });
 
-  test('clicking "show less" collapses and disables scrolling', async ({ authedPage: page }) => {
+  test('clicking "show less" collapses back to bounded scrolling', async ({ authedPage: page }) => {
     await mountThoughtPanelFixture(page, 80);
     const panel = page.locator('.agent-thinking[data-panel-key="thought"]');
     const moreBtn = panel.locator('.agent-thinking-truncation');
@@ -128,7 +133,7 @@ test.describe('US-12: Thoughts Panel Scroll Behaviour', () => {
     // Verify collapsed
     state = await getThoughtsPanelState(page);
     expect(state!.expanded).toBe('false');
-    expect(state!.overflowY).toBe('hidden');
+    expect(state!.overflowY).toBe('auto');
   });
 
   test('expand/collapse round-trip preserves content', async ({ authedPage: page }) => {

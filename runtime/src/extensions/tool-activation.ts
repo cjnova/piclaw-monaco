@@ -2,7 +2,7 @@
  * tool-activation – keeps the default active tool set small and lets the agent
  * enable specific tools on demand.
  */
-import type { ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { getToolActivationConfig } from "../core/config.js";
 import { getToolCapability } from "./tool-capabilities.js";
@@ -22,7 +22,7 @@ export const TOOLSETS: ToolsetDefinition[] = [
   {
     name: "discovery",
     description: "Tool discovery and lazy activation controls.",
-    toolNames: ["list_tools", "list_internal_tools", "list_scripts", "activate_tools", "reset_active_tools"],
+    toolNames: ["list_tools", "list_scripts", "activate_tools", "reset_active_tools"],
   },
   {
     name: "attachments",
