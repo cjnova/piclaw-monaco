@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 
 interface StatsData {
@@ -99,45 +99,11 @@ function StatsDisplay({ stats, isStale }: { stats: StatsData | null; isStale: bo
   );
 }
 
-function StatsDropdown({ stats, isStale }: { stats: StatsData | null; isStale: boolean }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onClick); document.removeEventListener("keydown", onKey); };
-  }, [open]);
-
-  // Show worst severity as the toggle indicator
-  const worstSeverity = stats
-    ? ([percentSeverity(stats.cpu_percent), percentSeverity(stats.ram_percent), swapSeverity(stats.swap_percent), percentSeverity(stats.vram_percent)]
-        .includes("error") ? "error" : [percentSeverity(stats.cpu_percent), percentSeverity(stats.ram_percent)].includes("warning") ? "warning" : "normal")
-    : "normal";
-
+function StatsBar({ stats, isStale }: { stats: StatsData | null; isStale: boolean }) {
   return (
-    <span className="sys-stats-dropdown" ref={ref}>
-      <button
-        type="button"
-        className={`sys-stats-dropdown__toggle sys-stats-dropdown__toggle--${worstSeverity}`}
-        onClick={() => setOpen(!open)}
-        title="System metrics"
-      >
-        {isStale && <span className="sys-stats__stale">⚠</span>}
-        <span className="codicon codicon-pulse" aria-hidden="true" />
-        {stats ? `${stats.cpu_percent}%` : "--"}
-        <span className="sys-stats-dropdown__caret" aria-hidden="true">▾</span>
-      </button>
-      {open && (
-        <div className="sys-stats-dropdown__menu">
-          {buildMetrics(stats, true).map((m, i) => (
-            <div key={i} className="sys-stats-dropdown__row">{m}</div>
-          ))}
-        </div>
-      )}
+    <span className="sys-stats sys-stats--bar">
+      {isStale && <span className="sys-stats__stale" title="System stats unavailable">⚠</span>}
+      {buildMetrics(stats, true)}
     </span>
   );
 }
@@ -182,9 +148,9 @@ export function SystemStats() {
       <span className="sys-stats-bar__inline">
         <StatsDisplay stats={stats.value} isStale={isStale.value} />
       </span>
-      {/* Dropdown for narrow screens */}
+      {/* Stats bar for narrow screens */}
       <span className="sys-stats-bar__compact">
-        <StatsDropdown stats={stats.value} isStale={isStale.value} />
+        <StatsBar stats={stats.value} isStale={isStale.value} />
       </span>
     </span>
   );
