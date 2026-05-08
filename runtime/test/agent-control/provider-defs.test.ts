@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 import { PROVIDER_DEFS, getProviderDefs, getProviderDisplayName } from "../../src/agent-control/provider-defs.js";
 
@@ -20,9 +20,27 @@ describe("provider defs", () => {
     expect(ids).toContain("cloudflare-workers-ai");
     expect(ids).toContain("moonshotai");
     expect(ids).toContain("moonshotai-cn");
+    expect(ids).toContain("xiaomi");
+    expect(ids).toContain("xiaomi-token-plan-cn");
+    expect(ids).toContain("xiaomi-token-plan-ams");
+    expect(ids).toContain("xiaomi-token-plan-sgp");
     expect(ids).not.toContain("google-gemini-cli");
     expect(ids).not.toContain("google-antigravity");
     expect(ids).not.toContain("antigravity");
+  });
+
+  test("documents Xiaomi MiMo API billing and regional token-plan provider split", () => {
+    const defs = getProviderDefs();
+    expect(defs.find((entry) => entry.id === "xiaomi")).toMatchObject({
+      name: "Xiaomi MiMo (API billing)",
+      hasApiKey: true,
+      apiKeyHint: "XIAOMI_API_KEY",
+    });
+    expect(defs.find((entry) => entry.id === "xiaomi-token-plan-ams")).toMatchObject({
+      name: "Xiaomi MiMo Token Plan (AMS)",
+      hasApiKey: true,
+      apiKeyHint: "XIAOMI_TOKEN_PLAN_AMS_API_KEY",
+    });
   });
 
   test("can enrich provider names from ModelRegistry when available", () => {

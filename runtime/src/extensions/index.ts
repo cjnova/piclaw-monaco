@@ -9,7 +9,7 @@
  *   - fileAttachments: attach_file tool for delivering workspace files.
  *   - messages: unified messages tool for searching, retrieving, adding, and deleting chat messages.
  *   - modelControl: get_model_state, list_models, switch_model, switch_thinking.
- *   - internalTools: list_tools for tool discovery (with a deprecated list_internal_tools compatibility alias).
+ *   - internalTools: list_tools for tool discovery.
  *   - runtimeScripts: list_scripts for packaged/workspace script discovery.
  *   - toolActivation: activate_tools/reset_active_tools for lazy tool activation.
  *   - sqlIntrospect: introspect_sql for read-only DB introspection.
@@ -29,7 +29,7 @@
  * Consumers:
  *   - agent-pool/session.ts passes builtinExtensionFactories to the resource loader.
  */
-import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { AttachmentRegistry } from "../agent-pool/attachments.js";
 import { createFileAttachmentsExtension } from "./file-attachments.js";
 import { messagesCrud } from "./messages-crud.js";

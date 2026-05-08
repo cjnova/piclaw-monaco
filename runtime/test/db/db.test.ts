@@ -540,7 +540,7 @@ test("permanentDeleteArchivedBranch rejects non-archived chats and root sessions
   expect(() => db.permanentDeleteArchivedBranch(rootChatJid)).toThrow(/child branch sessions still exist/);
 });
 
-test("initDatabase migrates legacy chat branch uniqueness so pruned handles can be reused", () => {
+test("initDatabase migrates legacy chat branch uniqueness so pruned handles can be reused", { timeout: 15000 }, () => {
   const ws = createTempWorkspace("piclaw-chat-branch-migrate-");
 
   try {

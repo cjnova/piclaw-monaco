@@ -35,6 +35,7 @@ import { handleMediaRoutes } from "./http/dispatch-media.js";
 import { handleShellRoutes } from "./http/dispatch-shell.js";
 import { handleWorkspaceRoutes } from "./http/dispatch-workspace.js";
 import { handleWidgetStateRoutes } from "./state-api.js";
+import { handleSessionRecordingRoutes } from "./handlers/session-recordings.js";
 import "./http/editor-vendor-route.js";
 import "./http/csv-viewer-route.js";
 import "./http/image-viewer-route.js";
@@ -146,6 +147,11 @@ export class RequestRouterService {
 
     // Track the last seen origin only after the request clears guard/auth checks.
     rememberWebOrigin("web:default", req);
+
+    const recordingResponse = await handleSessionRecordingRoutes(req, pathname, (body, status) => this.channel.json(body, status));
+    if (recordingResponse) {
+      return recordingResponse;
+    }
 
     const shellResponse = await handleShellRoutes(
       this.channel,

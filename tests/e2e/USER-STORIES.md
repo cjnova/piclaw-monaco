@@ -275,6 +275,19 @@
 - Closing settings removes backdrop and restores workspace interactivity
 - No stacking context leakage from workspace tooltips (z-index: 9999)
 
+### US-23: Mobile PWA Viewport and Themed Safe Areas
+> As an iPhone/iPad home-screen webapp user, I want the compose area to remain flush with the bottom edge and the active theme to cover every safe-area/background surface, so that the app feels native and never shows a blank strip below compose.
+
+**Acceptance criteria:**
+- In standalone mobile mode, `--app-height` uses the layout viewport when `visualViewport.height` is only slightly shorter due to iOS chrome/safe-area reporting
+- Small closed-keyboard viewport gaps (for example ~59px) do not shorten the app shell or create whitespace below compose
+- Large viewport shrink values are still respected for the virtual keyboard
+- The compose box bottom edge is within a few pixels of the visible app surface bottom
+- The point below compose is either outside the viewport or belongs to compose/app chrome, never a blank body strip
+- Persisted themes apply before/at app boot in standalone mode
+- Theme changes update CSS variables, root/body inline backgrounds, and PWA `theme-color` meta tags
+- Non-default themes and default+tint both cover root/body safe-area backgrounds
+
 ---
 
 ## Priority Matrix
@@ -303,6 +316,7 @@
 | US-20 Lightbox dismissal | ★★★ | ★★★ | ★★ | Every image view | Medium |
 | US-21 Swipe independence | ★★★ | ★★★ | ★ | Every session switch (touch) | High |
 | US-22 Settings layering | ★★★ | ★★ | ★★★ | Every settings open | Medium |
+| US-23 Mobile PWA viewport/theme | ★★★ | ★★★ | ☆ | Every mobile webapp session | Very high |
 
 ## Test implementation priority
 
@@ -328,3 +342,4 @@
 20. **US-20** — Lightbox dismissal (any key/click/tap)
 21. **US-21** — Session swipe independence from visible elements
 22. **US-22** — Settings dialog layering above workspace
+23. **US-23** — Mobile PWA viewport and themed safe-area coverage

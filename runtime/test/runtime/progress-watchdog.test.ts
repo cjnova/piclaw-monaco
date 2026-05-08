@@ -76,11 +76,11 @@ test("progress watchdog publishes heartbeat snapshots when phases change", () =>
   ]);
 });
 
-test("progress watchdog reports and terminates stalled phases", () => {
+test("progress watchdog reports stalled phases without process escalation by default", () => {
   restoreTimeoutOverride = setProgressWatchdogTimeoutForTests(25);
-  const stalls: any[] = [];
+  const terminations: any[] = [];
   restoreTerminationHook = setProgressWatchdogTerminationHook((stall) => {
-    stalls.push(stall);
+    terminations.push(stall);
   });
 
   beginTrackedPhase("web:test", "preprompt_compaction", { source: "test" });
@@ -94,5 +94,28 @@ test("progress watchdog reports and terminates stalled phases", () => {
     phase: "preprompt_compaction",
     timeoutMs: 25,
   });
-  expect(stalls).toEqual([expect.objectContaining({ chatJid: "web:test", phase: "preprompt_compaction" })]);
+  expect(terminations).toEqual([]);
+});
+
+test("progress watchdog can escalate stalled phases when explicitly enabled", () => {
+  const previous = process.env.PICLAW_PROGRESS_WATCHDOG_RESTART_ON_STALL;
+  process.env.PICLAW_PROGRESS_WATCHDOG_RESTART_ON_STALL = "1";
+  try {
+    restoreTimeoutOverride = setProgressWatchdogTimeoutForTests(25);
+    const terminations: any[] = [];
+    restoreTerminationHook = setProgressWatchdogTerminationHook((stall) => {
+      terminations.push(stall);
+    });
+
+    beginTrackedPhase("web:test", "preprompt_compaction", { source: "test" });
+    const tracked = getTrackedPhasesSnapshot()[0];
+    expect(tracked).toBeTruthy();
+
+    const results = scanForStalls((tracked?.lastProgressAt ?? 0) + 30);
+    expect(results).toHaveLength(1);
+    expect(terminations).toEqual([expect.objectContaining({ chatJid: "web:test", phase: "preprompt_compaction" })]);
+  } finally {
+    if (previous === undefined) delete process.env.PICLAW_PROGRESS_WATCHDOG_RESTART_ON_STALL;
+    else process.env.PICLAW_PROGRESS_WATCHDOG_RESTART_ON_STALL = previous;
+  }
 });

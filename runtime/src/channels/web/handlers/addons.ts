@@ -21,6 +21,7 @@ import { WORKSPACE_DIR } from "../../../core/config.js";
 import { requestGracefulShutdown } from "../../../runtime/shutdown-registry.js";
 import { createLogger } from "../../../utils/logger.js";
 import { handleRegisteredAddonConfigApiRequest } from "./addon-config-api.js";
+import { recordAddonApiFailure, recordAddonApiSuccess } from "../../../addons/addon-api-health.js";
 
 const DEFAULT_CATALOG_URL = "https://raw.githubusercontent.com/rcarmo/piclaw-addons/main/catalog.json";
 const DEFAULT_CATALOG_URLS = [DEFAULT_CATALOG_URL] as const;
@@ -164,14 +165,14 @@ function findBundledNodeModulesDir(startDir = __dirname): string | null {
   let dir = startDir;
   for (let i = 0; i < 10; i++) {
     const candidate = join(dir, "node_modules");
-    if (existsSync(join(candidate, "@mariozechner", "pi-ai"))) return candidate;
+    if (existsSync(join(candidate, "@earendil-works", "pi-ai"))) return candidate;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
 
   const globalCandidate = "/usr/local/lib/bun/install/global/node_modules";
-  return existsSync(join(globalCandidate, "@mariozechner", "pi-ai")) ? globalCandidate : null;
+  return existsSync(join(globalCandidate, "@earendil-works", "pi-ai")) ? globalCandidate : null;
 }
 
 function linkBundledNodeModulesIntoAddon(addonDir: string): void {
@@ -785,8 +786,37 @@ export async function handleAddonConfigApiRequest(
     return json({ error: 'Method not allowed' }, 405);
   }
 
+  const method = req.method.toUpperCase();
   const directResponse = await handleRegisteredAddonConfigApiRequest(req, parsed.addonId, parsed.action, json);
-  if (directResponse) return directResponse;
+  if (directResponse) {
+    if (directResponse.status >= 400) {
+      recordAddonApiFailure({
+        addonId: parsed.addonId,
+        action: parsed.action,
+        chatJid,
+        method,
+        path: pathname,
+        status: directResponse.status,
+        error: `HTTP ${directResponse.status}`,
+      });
+    } else {
+      recordAddonApiSuccess({ addonId: parsed.addonId, action: parsed.action, chatJid, method, path: pathname });
+    }
+    return directResponse;
+  }
+
+  const fail = (body: unknown, status: number, error: unknown): Response => {
+    recordAddonApiFailure({
+      addonId: parsed.addonId,
+      action: parsed.action,
+      chatJid,
+      method,
+      path: pathname,
+      status,
+      error,
+    });
+    return json(body, status);
+  };
 
   const commandBaseName = `${parsed.addonId}-${parsed.action}-${req.method === 'GET' ? 'get' : 'set'}`;
   const payload = req.method === 'POST'
@@ -796,13 +826,15 @@ export async function handleAddonConfigApiRequest(
   const result = await applyAddonConfigSlashCommand(agentPool, chatJid, commandBaseName, payload);
   if (result.status !== 'success') {
     const message = String(result.message || 'Add-on command failed');
-    return json({ error: message }, isUnknownAddonCommandMessage(message) ? 404 : 500);
+    return fail({ error: message }, isUnknownAddonCommandMessage(message) ? 404 : 500, message);
   }
 
   try {
-    return json(parseAddonCommandJsonPayload(parsed.addonId, result));
+    const payloadJson = parseAddonCommandJsonPayload(parsed.addonId, result);
+    recordAddonApiSuccess({ addonId: parsed.addonId, action: parsed.action, chatJid, method, path: pathname });
+    return json(payloadJson);
   } catch (error) {
-    return json({ error: String((error as Error)?.message || error) }, 502);
+    return fail({ error: String((error as Error)?.message || error) }, 502, error);
   }
 }
 

@@ -7,10 +7,19 @@
 
 import { describe, test, expect } from "bun:test";
 import { AgentQueue } from "../../../src/queue.js";
+import { waitFor } from "../../helpers.js";
 import { createWebChannelTestFixture } from "./helpers/web-channel-fixture.js";
 
 function makeEvent(type: string, payload: Record<string, unknown> = {}) {
   return { type, ...payload } as any;
+}
+
+function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe("web agent streaming", () => {
@@ -54,6 +63,12 @@ describe("web agent streaming", () => {
           toolCallId: "tool-1",
           toolName: "bash",
           args: { command: "echo hi" },
+          partialResult: {
+            content: [{
+              type: "text",
+              text: Array.from({ length: 105 }, (_, index) => `line ${index + 1}`).join("\n"),
+            }],
+          },
         }));
         options.onEvent?.(makeEvent("tool_execution_end", {
           toolCallId: "tool-1",
@@ -111,6 +126,13 @@ describe("web agent streaming", () => {
       expect(toolStatus).toBeDefined();
       expect(toolStatus?.data?.tool_name).toBe("bash");
       expect(toolStatus?.data?.tool_args).toEqual({ command: "echo hi" });
+      expect(toolStatus?.data?.title).toBe("bash: echo hi");
+      expect(typeof toolStatus?.data?.started_at).toBe("string");
+      expect(typeof toolStatus?.data?.last_event_at).toBe("string");
+      expect(toolStatus?.data?.output_preview).toBe(Array.from({ length: 100 }, (_, index) => `line ${index + 6}`).join("\n"));
+      expect(toolStatus?.data?.output_total_lines).toBe(105);
+      expect(toolStatus?.data?.output_preview_lines).toBe(100);
+      expect(toolStatus?.data?.output_truncated).toBe(true);
 
       const responses = events.filter((event) => event.type === "agent_response");
       expect(responses.length).toBeGreaterThanOrEqual(2);
@@ -222,6 +244,67 @@ describe("web agent streaming", () => {
       expect(finalEvent?.data?.status).toBe("final");
       expect(finalEvent?.data?.artifact?.html).toBe("<div>hello</div>");
     } finally {
+      fixture.cleanup();
+    }
+  });
+
+  test("pre-prompt compaction defers in background and resumes the chat lane", async () => {
+    const previousForeground = process.env.PICLAW_PREPROMPT_COMPACTION_FOREGROUND_MS;
+    process.env.PICLAW_PREPROMPT_COMPACTION_FOREGROUND_MS = "1";
+    const releaseCompaction = deferred<void>();
+    let compactCalls = 0;
+    let runCalls = 0;
+    const session = {
+      isStreaming: false,
+      isCompacting: false,
+      isRetrying: false,
+      model: { provider: "test", id: "large", contextWindow: 100 },
+      settingsManager: { getCompactionSettings: () => ({ enabled: true, reserveTokens: 25 }) },
+      getContextUsage: () => ({ tokens: compactCalls === 0 ? 90 : 10, contextWindow: 100, percent: compactCalls === 0 ? 90 : 10 }),
+      sessionManager: {
+        buildSessionContext: () => ({ messages: [{ role: "user", content: [{ type: "text", text: "x".repeat(compactCalls === 0 ? 360 : 4) }] }] }),
+      },
+      compact: async () => {
+        compactCalls += 1;
+        await releaseCompaction.promise;
+        return { summary: "compacted", tokensBefore: 90, firstKeptEntryId: "entry-1" };
+      },
+    } as any;
+    const agentPool = {
+      setSessionBinder: () => {},
+      getSessionForIntrospection: async () => session,
+      runAgent: async () => {
+        runCalls += 1;
+        return { status: "success", result: "after compaction", attachments: [] };
+      },
+      getContextUsageForChat: async () => null,
+    } as any;
+
+    const fixture = await createWebChannelTestFixture({
+      workspace: "temp",
+      queue: new AgentQueue(),
+      agentPool,
+    });
+
+    try {
+      const { channel, db } = fixture;
+      const interaction = channel.storeMessage("web:default", "hello", false, []);
+      expect(interaction).not.toBeNull();
+
+      await channel.processChat("web:default", "default");
+
+      expect(compactCalls).toBe(1);
+      expect(runCalls).toBe(0);
+      expect(db.getChatCursor("web:default")).not.toBe(interaction!.timestamp);
+
+      releaseCompaction.resolve(undefined);
+      await waitFor(() => runCalls === 1, 500, 10);
+
+      expect(db.getChatCursor("web:default")).toBe(interaction!.timestamp);
+    } finally {
+      if (previousForeground === undefined) delete process.env.PICLAW_PREPROMPT_COMPACTION_FOREGROUND_MS;
+      else process.env.PICLAW_PREPROMPT_COMPACTION_FOREGROUND_MS = previousForeground;
+      releaseCompaction.resolve(undefined);
       fixture.cleanup();
     }
   });

@@ -533,6 +533,26 @@ export function installWebChannelPrototype(
       writable: true,
       value: withHttpSurface(async (service, req: Request) => await service.handleAgentQueueState(req)),
     },
+    handleAgentRuns: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request) => await service.handleAgentRuns(req)),
+    },
+    handleAgentRunAbort: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request) => await service.handleAgentRunAbort(req)),
+    },
+    handleAgentRunClearStale: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request) => await service.handleAgentRunClearStale(req)),
+    },
+    handleAgentRunDrainQueue: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request) => await service.handleAgentRunDrainQueue(req)),
+    },
     handleAgentQueueRemove: {
       configurable: true,
       writable: true,

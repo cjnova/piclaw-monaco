@@ -152,7 +152,7 @@ These are compiled into the package and registered via `extensionFactories` on t
 | `fileAttachments` | `attach_file` |
 | `messagesCrud` | `messages` |
 | `modelControl` | `get_model_state`, `list_models`, `switch_model`, `switch_thinking` |
-| `internalTools` | `list_tools` (`list_internal_tools` deprecated alias) with capability metadata + intent-based shortlisting |
+| `internalTools` | `list_tools` with capability metadata + intent-based shortlisting |
 | `runtimeScripts` | `list_scripts` for packaged/workspace script discovery and script-JDoc-powered recommendations |
 | `toolActivation` | `activate_tools`, `reset_active_tools` |
 | `sqlIntrospect` | `introspect_sql` (read-only SQLite queries) |

@@ -23,6 +23,9 @@ export type RecoveryStrategy = "retry" | "compact_then_retry";
 export type RecoveryClassifier =
   | "disabled"
   | "budget_exhausted"
+  | "auth_config"
+  | "recovery_suppressed"
+  | "stale_progress_watchdog"
   | "non_recoverable"
   | "tool_activity"
   | "completed_turn_output"
@@ -129,9 +132,14 @@ export function isTransientFailure(errorText: string | null | undefined): boolea
   return /timed out|timeout|before finalization|connection error|fetch failed|socket hang up|econnreset|econnrefused|etimedout|enotfound|502|503|504|temporary|temporarily unavailable|try again|rate limit|too many requests|\b429\b|overloaded|server error/i.test(errorText);
 }
 
+export function isProviderAuthConfigFailure(errorText: string | null | undefined): boolean {
+  if (!errorText) return false;
+  return /no api key for provider|no api key found|token refresh failed\s*:\s*401|authentication failed|credentials may have expired|re-authenticate|unauthorized|\b401\b|\b403\b|invalid.*api.*key|api.*key.*invalid|token.*expired|oauth.*expired|refresh.*token|provider login required|auth.*expired|missing provider credential|missing provider config/i.test(errorText);
+}
+
 export function isNonRecoverableFailure(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
-  return /request was aborted|\baborted\b|authentication failed|credentials may have expired|re-authenticate|unauthorized|\b401\b|\b403\b|invalid.*api.*key|api.*key.*invalid|token.*expired|oauth.*expired|refresh.*token|no model selected|select a model|use \/model|use \/login|model not found|deployment.*not found|policy|safety|blocked by policy|invalid_request_error|malformed|schema|unsupported model|capability mismatch|permission denied|missing required file|file not found/i.test(errorText);
+  return /request was aborted|\baborted\b|no model selected|select a model|use \/model|use \/login|model not found|deployment.*not found|policy|safety|blocked by policy|invalid_request_error|malformed|schema|unsupported model|capability mismatch|permission denied|missing required file|file not found/i.test(errorText);
 }
 
 export interface RecoveryDecisionInput {
@@ -177,6 +185,15 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
     };
   }
 
+  if (/stale-progress watchdog/i.test(errorText)) {
+    return {
+      recover: false,
+      classifier: "stale_progress_watchdog",
+      strategy: null,
+      reason: "Stale-progress watchdog already interrupted the active run; do not retry automatically.",
+    };
+  }
+
   if (input.recoveryAttemptsUsed >= input.config.maxAttempts || input.elapsedMs >= input.config.totalBudgetMs) {
     return {
       recover: false,
@@ -194,6 +211,15 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
       reason: isContextPressureFailure(errorText) || input.snapshot.sawCompactionIntent
         ? "Compaction itself exceeded the context window; refusing to compact-and-retry again. Start a shorter branch or compact with a larger model."
         : "Compaction failed; refusing automatic retry to avoid re-entering the same failed compaction path.",
+    };
+  }
+
+  if (isProviderAuthConfigFailure(errorText)) {
+    return {
+      recover: false,
+      classifier: "auth_config",
+      strategy: null,
+      reason: "Provider authentication/configuration failure; automatic recovery suppressed until credentials or login are fixed.",
     };
   }
 

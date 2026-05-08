@@ -47,7 +47,6 @@ const EXPECTED_BUILTIN_TOOL_NAMES = [
   "switch_thinking",
   // internal-tools (discovery)
   "list_tools",
-  "list_internal_tools",
   // runtime-scripts
   "list_scripts",
   // tool-activation

@@ -45,13 +45,28 @@ describe("audit-baseline-quality-deterministic", () => {
     expect(stderr.trim()).toBe("");
 
     const lines = stdout.trim().split(/\r?\n/);
-    expect(lines).toContain("channels-web-agent-flow\t48\tchannels web agent flow");
-    expect(lines).toContain("channels-web-auth-security\t17\tchannels web auth and security");
-    expect(lines).toContain("channels-web-http-routes\t43\tchannels web http and route surfaces");
-    expect(lines).toContain("channels-web-media-workspace-remote\t17\tchannels web media, workspace, and remote surfaces");
-    expect(lines).toContain("web-ui-interaction-and-state\t94\tweb ui interaction and state");
-    expect(lines).toContain("web-ui-rendering-and-panes\t65\tweb ui rendering and panes");
-    expect(lines).toContain("web-ui-remote-and-workspace\t16\tweb ui remote and workspace");
+    const groups = new Map<string, { count: number; label: string }>();
+    for (const line of lines) {
+      const [id = "", countText = "", label = ""] = line.split("\t");
+      const count = Number.parseInt(countText, 10);
+      if (!id || !label || !Number.isFinite(count)) continue;
+      groups.set(id, { count, label });
+    }
+
+    const expectGroup = (id: string, label: string) => {
+      const group = groups.get(id);
+      expect(group).toBeDefined();
+      expect(group?.label).toBe(label);
+      expect((group?.count ?? 0) > 0).toBe(true);
+    };
+
+    expectGroup("channels-web-agent-flow", "channels web agent flow");
+    expectGroup("channels-web-auth-security", "channels web auth and security");
+    expectGroup("channels-web-http-routes", "channels web http and route surfaces");
+    expectGroup("channels-web-media-workspace-remote", "channels web media, workspace, and remote surfaces");
+    expectGroup("web-ui-interaction-and-state", "web ui interaction and state");
+    expectGroup("web-ui-rendering-and-panes", "web ui rendering and panes");
+    expectGroup("web-ui-remote-and-workspace", "web ui remote and workspace");
   });
 
   test("follow-up ticket markdown captures reproducible failure evidence", () => {

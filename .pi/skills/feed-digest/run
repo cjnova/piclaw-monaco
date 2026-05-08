@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
-bun "$SKILL_DIR/feeds-digest.ts" "$@"

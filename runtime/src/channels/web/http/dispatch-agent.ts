@@ -118,6 +118,26 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
     handle: (channel, req) => channel.handleAgentQueueState(req),
   },
   {
+    method: "GET",
+    path: "/agent/runs",
+    handle: (channel, req) => channel.handleAgentRuns(req),
+  },
+  {
+    method: "POST",
+    path: "/agent/runs/abort",
+    handle: (channel, req) => channel.handleAgentRunAbort(req),
+  },
+  {
+    method: "POST",
+    path: "/agent/runs/clear-stale",
+    handle: (channel, req) => channel.handleAgentRunClearStale(req),
+  },
+  {
+    method: "POST",
+    path: "/agent/runs/drain-queue",
+    handle: (channel, req) => channel.handleAgentRunDrainQueue(req),
+  },
+  {
     method: "POST",
     path: "/agent/queue-remove",
     handle: (channel, req) => channel.handleAgentQueueRemove(req),

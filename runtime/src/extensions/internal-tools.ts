@@ -6,7 +6,7 @@ import type {
   AgentToolResult,
   ExtensionAPI,
   ExtensionFactory,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { getToolsetsForTool, getEffectiveDefaultActiveToolNames } from "./tool-activation.js";
 import { getToolCapability, type ToolActivation, type ToolCapability } from "./tool-capabilities.js";
 import type { ToolJDoc } from "./discovery-jdoc.js";
@@ -42,7 +42,6 @@ function normalizeText(value: string | undefined): string {
 }
 
 const SHORT_TOKEN_ALLOWLIST = new Set(["ai", "db", "fs", "id", "ip", "mcp", "sql", "ssh", "ui", "vm", "vnc"]);
-const HIDDEN_DISCOVERY_ALIAS_NAMES = new Set(["list_internal_tools"]);
 const STOP_TOKENS = new Set([
   "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "get", "help", "how", "i", "if", "in", "into", "is", "it", "me", "my", "of", "on", "or", "our", "show", "something", "task", "that", "the", "this", "to", "tool", "tools", "use", "using", "want", "what", "with", "you",
 ]);
@@ -243,9 +242,8 @@ function buildCatalog(api: ExtensionAPI, includeParameters: boolean): ToolCatalo
   const platformVisibleTools = process.platform === "win32" && api.getAllTools().some((tool) => tool.name === "powershell")
     ? api.getAllTools().filter((tool) => tool.name !== "bash")
     : api.getAllTools();
-  const visibleTools = platformVisibleTools.filter((tool) => !HIDDEN_DISCOVERY_ALIAS_NAMES.has(tool.name));
-  const defaultSet = new Set(getEffectiveDefaultActiveToolNames(visibleTools));
-  return visibleTools
+  const defaultSet = new Set(getEffectiveDefaultActiveToolNames(platformVisibleTools));
+  return platformVisibleTools
     .map((tool) => {
       const capability = getToolCapability(tool.name);
       const activation: ToolActivation = defaultSet.has(tool.name) ? "default" : "on-demand";
@@ -522,20 +520,16 @@ const HINT = [
 ].join("\n");
 
 const PRIMARY_TOOL_NAME = "list_tools";
-const DEPRECATED_ALIAS_TOOL_NAME = "list_internal_tools";
 const PRIMARY_TOOL_DESCRIPTION = "List available internal tools with brief descriptions. Each result includes capability metadata (kind: read-only/mutating/mixed, weight: lightweight/standard/heavy, activation: default/on-demand) and toolset groupings. Start with query-filtered compact summaries; use intent for compact recommendations when you know the goal but not the tool name.";
 const PRIMARY_TOOL_PROMPT_SNIPPET = "list_tools: Discover available tools with compact summaries first, or use intent for a compact recommendation shortlist before requesting schema details.";
 const VISIBLE_TOOL_HINT = "Hint: use query when you know the capability area, use intent when you know the goal, and request parameters only after shortlisting a tool.";
-const DEPRECATED_ALIAS_NOTICE = `Deprecated alias: use ${PRIMARY_TOOL_NAME} instead.`;
-
-/** Extension factory that registers list_tools plus a deprecated compatibility alias. */
+/** Extension factory that registers list_tools. */
 export const internalTools: ExtensionFactory = (pi: ExtensionAPI) => {
   pi.on("before_agent_start", async (event) => ({
     systemPrompt: `${event.systemPrompt}\n\n${HINT}`,
   }));
 
   const executeListTools = async (
-    toolName: string,
     params: { query?: string; intent?: string; limit?: number; include_parameters?: boolean },
   ): Promise<AgentToolResult<Record<string, unknown>>> => {
       const query = params.query?.trim().toLowerCase() || "";
@@ -557,18 +551,14 @@ export const internalTools: ExtensionFactory = (pi: ExtensionAPI) => {
           const fallbackText = queryHint
             ? `No strong recommendation for "${intent}". Try ${PRIMARY_TOOL_NAME}(query="${queryHint}") to narrow the catalog first.`
             : `No strong recommendation for "${intent}".`;
-          const contentText = toolName === DEPRECATED_ALIAS_TOOL_NAME
-            ? `${DEPRECATED_ALIAS_NOTICE}\n${fallbackText}`
-            : fallbackText;
           return {
-            content: [{ type: "text", text: contentText }],
+            content: [{ type: "text", text: fallbackText }],
             details: {
               total: filtered.length,
               count: 0,
               intent,
               ...(query ? { query: params.query?.trim() } : {}),
               recommendations: [],
-              ...(toolName === DEPRECATED_ALIAS_TOOL_NAME ? { deprecated_alias_of: PRIMARY_TOOL_NAME } : {}),
             },
           };
         }
@@ -584,13 +574,12 @@ export const internalTools: ExtensionFactory = (pi: ExtensionAPI) => {
 
         const bodyText = `${header}\n${VISIBLE_TOOL_HINT}\n${lines.join("\n")}`;
         return {
-          content: [{ type: "text", text: toolName === DEPRECATED_ALIAS_TOOL_NAME ? `${DEPRECATED_ALIAS_NOTICE}\n${bodyText}` : bodyText }],
+          content: [{ type: "text", text: bodyText }],
           details: {
             total: filtered.length,
             count: recommendations.length,
             intent,
             ...(query ? { query: params.query?.trim() } : {}),
-            ...(toolName === DEPRECATED_ALIAS_TOOL_NAME ? { deprecated_alias_of: PRIMARY_TOOL_NAME } : {}),
             recommendations: recommendations.map(({ tool, score, matchedTerms, matchedSources, reasons }) => ({
               name: tool.name,
               summary: tool.summary,
@@ -615,13 +604,12 @@ export const internalTools: ExtensionFactory = (pi: ExtensionAPI) => {
       if (tools.length === 0) {
         const emptyText = query ? `No tools found matching "${params.query}".` : "No tools available.";
         return {
-          content: [{ type: "text", text: toolName === DEPRECATED_ALIAS_TOOL_NAME ? `${DEPRECATED_ALIAS_NOTICE}\n${emptyText}` : emptyText }],
+          content: [{ type: "text", text: emptyText }],
           details: {
             total: filtered.length,
             count: 0,
             query: params.query?.trim(),
             tools: [],
-            ...(toolName === DEPRECATED_ALIAS_TOOL_NAME ? { deprecated_alias_of: PRIMARY_TOOL_NAME } : {}),
           },
         };
       }
@@ -639,12 +627,11 @@ export const internalTools: ExtensionFactory = (pi: ExtensionAPI) => {
 
       const bodyText = `${header}\n${VISIBLE_TOOL_HINT}\n${lines.join("\n")}`;
       return {
-        content: [{ type: "text", text: toolName === DEPRECATED_ALIAS_TOOL_NAME ? `${DEPRECATED_ALIAS_NOTICE}\n${bodyText}` : bodyText }],
+        content: [{ type: "text", text: bodyText }],
         details: {
           total: filtered.length,
           count: tools.length,
           query: params.query?.trim() || undefined,
-          ...(toolName === DEPRECATED_ALIAS_TOOL_NAME ? { deprecated_alias_of: PRIMARY_TOOL_NAME } : {}),
           tools: tools.map((tool) => ({
             name: tool.name,
             description: tool.description,
@@ -669,18 +656,7 @@ export const internalTools: ExtensionFactory = (pi: ExtensionAPI) => {
     promptSnippet: PRIMARY_TOOL_PROMPT_SNIPPET,
     parameters: InternalToolsSchema,
     async execute(_toolCallId, params) {
-      return executeListTools(PRIMARY_TOOL_NAME, params);
-    },
-  });
-
-  pi.registerTool({
-    name: DEPRECATED_ALIAS_TOOL_NAME,
-    label: DEPRECATED_ALIAS_TOOL_NAME,
-    description: `${DEPRECATED_ALIAS_NOTICE} ${PRIMARY_TOOL_DESCRIPTION}`,
-    promptSnippet: `${DEPRECATED_ALIAS_TOOL_NAME}: deprecated alias for ${PRIMARY_TOOL_NAME}. Prefer ${PRIMARY_TOOL_NAME} for staged tool discovery.`,
-    parameters: InternalToolsSchema,
-    async execute(_toolCallId, params) {
-      return executeListTools(DEPRECATED_ALIAS_TOOL_NAME, params);
+      return executeListTools(params);
     },
   });
 };

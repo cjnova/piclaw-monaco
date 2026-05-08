@@ -5,6 +5,7 @@ import {
   DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
   isContextPressureFailure,
   isNonRecoverableFailure,
+  isProviderAuthConfigFailure,
   isTransientFailure,
 } from "../../src/agent-pool/automatic-recovery.js";
 
@@ -45,8 +46,42 @@ test("treats timeout-before-finalization during compaction intent as compact-the
   expect(decision.strategy).toBe("compact_then_retry");
 });
 
-test("classifies auth, invalid-request, and aborted failures as non-recoverable", () => {
-  expect(isNonRecoverableFailure("Unauthorized: token expired")).toBe(true);
+test("classifies provider auth/config failures as terminal auth_config", () => {
+  expect(isProviderAuthConfigFailure("No API key for provider: openai-codex")).toBe(true);
+  expect(isProviderAuthConfigFailure("Token refresh failed: 401")).toBe(true);
+
+  const noKeyDecision = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "No API key for provider: openai-codex",
+    recoveryAttemptsUsed: 0,
+    elapsedMs: 1000,
+    snapshot: {
+      hadToolActivity: false,
+      hadPartialOutput: false,
+    },
+  });
+
+  expect(noKeyDecision.recover).toBe(false);
+  expect(noKeyDecision.classifier).toBe("auth_config");
+  expect(noKeyDecision.strategy).toBeNull();
+
+  const refreshDecision = decideAutomaticRecovery({
+    config: DEFAULT_AUTOMATIC_RECOVERY_CONFIG,
+    errorText: "Token refresh failed: 401",
+    recoveryAttemptsUsed: 0,
+    elapsedMs: 1000,
+    snapshot: {
+      hadToolActivity: true,
+      hadPartialOutput: true,
+    },
+  });
+
+  expect(refreshDecision.recover).toBe(false);
+  expect(refreshDecision.classifier).toBe("auth_config");
+  expect(refreshDecision.strategy).toBeNull();
+});
+
+test("classifies invalid-request and aborted failures as non-recoverable", () => {
   expect(isNonRecoverableFailure("invalid_request_error: malformed schema")).toBe(true);
   expect(isNonRecoverableFailure("Request was aborted")).toBe(true);
 

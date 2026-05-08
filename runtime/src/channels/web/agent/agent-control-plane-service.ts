@@ -9,8 +9,11 @@
 
 import type { AgentPool } from "../../../agent-pool.js";
 import {
+  clearInflightMarker,
   getInflightMessageId,
+  getInflightRuns,
   getMessageThreadRootIdById,
+  getPreflightRuns,
   type InteractionRow,
 } from "../../../db.js";
 import { createLogger } from "../../../utils/logger.js";
@@ -22,6 +25,7 @@ import {
   getAddonStatusPanelPayload,
   runAddonStatusPanelAction,
 } from "../../../addons/runtime-contributions.js";
+import { getTrackedPhasesSnapshot } from "../../../runtime/progress-watchdog.js";
 
 const log = createLogger("web");
 
@@ -49,6 +53,8 @@ type ControlPlaneAgentPool = AgentPool & {
   pruneChatBranch?: (chatJid: string) => Promise<unknown>;
   permanentPurgeChatBranch?: (chatJid: string) => Promise<unknown>;
   restoreChatBranch?: (chatJid: string, options?: { agentName?: string | null }) => Promise<unknown>;
+  applySlashCommand?: (chatJid: string, rawText: string) => Promise<{ status: string; message?: string }>;
+  listActiveChats?: () => unknown[];
 };
 
 type ControlPlaneQueuedLifecycle = Pick<
@@ -73,6 +79,7 @@ export interface WebAgentControlPlaneServiceOptions {
     options?: StoreMessageOptions,
   ): InteractionRow | null;
   processChat(chatJid: string, agentId: string, threadRootId?: number | null): Promise<void> | void;
+  getAgentStatus?: (chatJid: string) => Record<string, unknown> | null;
   getInflightMessageId?: typeof getInflightMessageId;
   getMessageThreadRootIdById?: typeof getMessageThreadRootIdById;
   getAutoresearchWidgetPayload?: (chatJid: string) => unknown;
@@ -95,6 +102,7 @@ export interface WebAgentControlPlaneChannelLike {
     options?: StoreMessageOptions,
   ): InteractionRow | null;
   processChat(chatJid: string, agentId: string, threadRootId?: number | null): Promise<void> | void;
+  getAgentStatus?(chatJid: string): Record<string, unknown> | null;
 }
 
 export function createWebAgentControlPlaneService(
@@ -113,6 +121,7 @@ export function createWebAgentControlPlaneService(
     storeMessage: (chatJid, content, isBot, mediaIds, options) =>
       channel.storeMessage(chatJid, content, isBot, mediaIds, options),
     processChat: (chatJid, agentId, threadRootId) => channel.processChat(chatJid, agentId, threadRootId),
+    getAgentStatus: (chatJid) => channel.getAgentStatus?.(chatJid) ?? null,
   });
 }
 
@@ -373,6 +382,123 @@ export class WebAgentControlPlaneService {
     }
   }
 
+  async handleAgentRuns(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const requestedChatJid = typeof url.searchParams.get("chat_jid") === "string"
+      ? url.searchParams.get("chat_jid")!.trim()
+      : "";
+    const activeChats = typeof this.options.agentPool.listActiveChats === "function"
+      ? this.options.agentPool.listActiveChats()
+      : [];
+    const inflightRuns = getInflightRuns();
+    const preflightRuns = getPreflightRuns();
+    const progressByChat = new Map(getTrackedPhasesSnapshot().map((entry) => [entry.chatJid, entry]));
+    const chatJids = new Set<string>();
+    for (const chat of activeChats as Array<{ chat_jid?: unknown }>) {
+      if (typeof chat.chat_jid === "string") chatJids.add(chat.chat_jid);
+    }
+    for (const run of inflightRuns) chatJids.add(run.chatJid);
+    for (const run of preflightRuns) chatJids.add(run.chatJid);
+    if (requestedChatJid) chatJids.add(requestedChatJid);
+
+    const runs = [...chatJids]
+      .filter((chatJid) => !requestedChatJid || chatJid === requestedChatJid)
+      .map((chatJid) => {
+        const active = (activeChats as unknown as Array<Record<string, unknown>>).find((chat) => chat.chat_jid === chatJid) ?? null;
+        const status = this.options.getAgentStatus?.(chatJid) ?? null;
+        const inflight = inflightRuns.find((run) => run.chatJid === chatJid) ?? null;
+        const preflight = preflightRuns.find((run) => run.chatJid === chatJid) ?? null;
+        const progress = progressByChat.get(chatJid) ?? null;
+        const queued = this.options.queuedFollowupLifecycle.listQueuedStateItems(chatJid);
+        return {
+          chat_jid: chatJid,
+          active,
+          is_active: Boolean((active as { is_active?: unknown } | null)?.is_active || status || progress),
+          status,
+          inflight,
+          preflight,
+          progress,
+          queue_count: queued.length,
+          stale_child_tools: Boolean((active as { is_active?: unknown } | null)?.is_active && progress?.phase === "tool_execution"),
+        };
+      });
+
+    return this.options.json({ runs, inflight: inflightRuns, preflight: preflightRuns }, 200);
+  }
+
+  async handleAgentRunAbort(req: Request): Promise<Response> {
+    const parsed = await parseJsonObjectRequest(req);
+    if (!parsed.ok) return this.options.json({ error: parsed.error }, 400);
+    const payload = parsed.payload as { chat_jid?: string; turn_id?: string };
+    const chatJid = this.resolveRequiredChatJid(payload.chat_jid);
+    if (!chatJid) return this.options.json({ error: "Missing chat_jid" }, 400);
+
+    const expectedTurnId = typeof payload.turn_id === "string" ? payload.turn_id.trim() : "";
+    const status = this.options.getAgentStatus?.(chatJid) ?? null;
+    const activeTurnId = typeof status?.turn_id === "string"
+      ? status.turn_id
+      : typeof status?.turnId === "string"
+        ? status.turnId
+        : "";
+    if (expectedTurnId && activeTurnId && expectedTurnId !== activeTurnId) {
+      return this.options.json({ error: "turn_id does not match the active run", chat_jid: chatJid, active_turn_id: activeTurnId }, 409);
+    }
+    if (typeof this.options.agentPool.applySlashCommand !== "function") {
+      return this.options.json({ error: "Run abort is not available." }, 501);
+    }
+
+    log.warn("Operator requested agent run abort", {
+      operation: "operator_run.abort",
+      chatJid,
+      requestedTurnId: expectedTurnId || null,
+      activeTurnId: activeTurnId || null,
+    });
+    const result = await this.options.agentPool.applySlashCommand(chatJid, "/abort");
+    return this.options.json({ status: "ok", chat_jid: chatJid, turn_id: activeTurnId || null, result }, 200);
+  }
+
+  async handleAgentRunClearStale(req: Request): Promise<Response> {
+    const parsed = await parseJsonObjectRequest(req);
+    if (!parsed.ok) return this.options.json({ error: parsed.error }, 400);
+    const payload = parsed.payload as { chat_jid?: string };
+    const chatJid = this.resolveRequiredChatJid(payload.chat_jid);
+    if (!chatJid) return this.options.json({ error: "Missing chat_jid" }, 400);
+    const hadInflight = getInflightRuns().some((run) => run.chatJid === chatJid);
+    const hadPreflight = getPreflightRuns().some((run) => run.chatJid === chatJid);
+    clearInflightMarker(chatJid);
+    log.warn("Operator cleared stale run markers", {
+      operation: "operator_run.clear_stale",
+      chatJid,
+      hadInflight,
+      hadPreflight,
+    });
+    return this.options.json({ status: "ok", chat_jid: chatJid, cleared: hadInflight || hadPreflight, had_inflight: hadInflight, had_preflight: hadPreflight }, 200);
+  }
+
+  async handleAgentRunDrainQueue(req: Request): Promise<Response> {
+    const parsed = await parseJsonObjectRequest(req);
+    if (!parsed.ok) return this.options.json({ error: parsed.error }, 400);
+    const payload = parsed.payload as { chat_jid?: string };
+    const chatJid = this.resolveRequiredChatJid(payload.chat_jid);
+    if (!chatJid) return this.options.json({ error: "Missing chat_jid" }, 400);
+    const items = this.options.queuedFollowupLifecycle.listQueuedStateItems(chatJid) as Array<{ rowId?: unknown; row_id?: unknown }>;
+    let removedCount = 0;
+    for (const item of items) {
+      const rowId = this.parseRowId((item.rowId ?? item.row_id) as number | string | undefined);
+      if (rowId === null) continue;
+      const { removed } = await this.removeQueuedFollowupForAction(chatJid, rowId);
+      if (removed) removedCount += 1;
+    }
+    log.warn("Operator drained queued follow-ups", {
+      operation: "operator_run.drain_queue",
+      chatJid,
+      queuedCount: items.length,
+      removedCount,
+    });
+    this.options.broadcastEvent("agent_followup_drained", { chat_jid: chatJid, removed_count: removedCount });
+    return this.options.json({ status: "ok", chat_jid: chatJid, removed_count: removedCount }, 200);
+  }
+
   async handleAgentBranchFork(req: Request): Promise<Response> {
     const parsed = await parseJsonObjectRequest(req);
     if (!parsed.ok) return this.options.json({ error: parsed.error }, 400);
@@ -575,7 +701,10 @@ export class WebAgentControlPlaneService {
 
   private parseRowId(rawRowId: number | string | undefined): number | null {
     const rowId = typeof rawRowId === "string" ? Number(rawRowId) : rawRowId;
-    return Number.isFinite(rowId) ? Number(rowId) : null;
+    if (!Number.isFinite(rowId)) return null;
+    if (!Number.isInteger(rowId)) return null;
+    if (rowId === 0) return null;
+    return Number(rowId);
   }
 
   private async removeQueuedFollowupForAction(

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 type FakeState = {
   tools: Map<string, any>;
@@ -51,24 +51,6 @@ function createFakeApi(): { api: ExtensionAPI; state: FakeState } {
   } as unknown as ExtensionAPI;
 
   return { api, state };
-}
-
-function withRouteCapture<T>(state: FakeState, fn: () => Promise<T>): Promise<T> {
-  const previous = (globalThis as any).__piclaw_registerRoute;
-  (globalThis as any).__piclaw_registerRoute = (prefix: string, _handler: unknown, extensionDir: string) => {
-    const key = `${prefix}::${extensionDir}`;
-    const count = (state.routeRegistrations.get(key) ?? 0) + 1;
-    state.routeRegistrations.set(key, count);
-    if (count === 1) {
-      state.routes.push({ prefix, extensionDir });
-      return "created";
-    }
-    return "updated";
-  };
-  return fn().finally(() => {
-    if (previous === undefined) delete (globalThis as any).__piclaw_registerRoute;
-    else (globalThis as any).__piclaw_registerRoute = previous;
-  });
 }
 
 describe("bundled optional extensions", () => {

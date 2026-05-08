@@ -88,18 +88,25 @@ describe("feature: web UI", () => {
   featureTest("index page returns 200 with expected HTML shell", async () => {
     const res = await fetchText(`${base()}/`);
     expect(res.status).toBe(200);
-    expect(res.text).toContain("<title>PiClaw");
+    expect(res.text).toContain("<title>PiClaw</title>");
     expect(res.text).toContain("app.bundle.js");
+    expect(res.text).toContain("app.bundle.css");
   });
 
   featureTest("static CSS bundle is served", async () => {
-    const cssRes = await fetchText(`${base()}/static/dist/app.bundle.css`);
+    const html = await fetchText(`${base()}/`);
+    const cssMatch = html.text.match(/app\.bundle\.css\?v=([a-f0-9]+)/);
+    expect(cssMatch).toBeTruthy();
+    const cssRes = await fetchText(`${base()}/static/dist/app.bundle.css?v=${cssMatch![1]}`);
     expect(cssRes.status).toBe(200);
     expect(cssRes.text.length).toBeGreaterThan(1000);
   });
 
   featureTest("static JS bundle is served", async () => {
-    const jsRes = await fetchText(`${base()}/static/dist/app.bundle.js`);
+    const html = await fetchText(`${base()}/`);
+    const jsMatch = html.text.match(/app\.bundle\.js\?v=([a-f0-9]+)/);
+    expect(jsMatch).toBeTruthy();
+    const jsRes = await fetchText(`${base()}/static/dist/app.bundle.js?v=${jsMatch![1]}`);
     expect(jsRes.status).toBe(200);
     expect(jsRes.text.length).toBeGreaterThan(10000);
   });
@@ -300,7 +307,10 @@ describe("feature: vendored libraries", () => {
   });
 
   featureTest("codemirror editor bundle", async () => {
-    const res = await fetchText(`${base()}/editor-vendor/codemirror.js`);
+    const html = await fetchText(`${base()}/`);
+    const m = html.text.match(/codemirror\.js\?v=([a-f0-9]+)/);
+    expect(m).toBeTruthy();
+    const res = await fetchText(`${base()}/editor-vendor/codemirror.js?v=${m![1]}`);
     expect(res.status).toBe(200);
     expect(res.text.length).toBeGreaterThan(10000);
   });
@@ -325,7 +335,7 @@ describe("feature: tool catalog", () => {
     const required = [
       "attach_file", "read_attachment", "export_attachment", "messages",
       "get_model_state", "list_models", "switch_model", "switch_thinking",
-      "list_tools", "list_internal_tools", "list_scripts",
+      "list_tools", "list_scripts",
       "activate_tools", "reset_active_tools", "introspect_sql",
       "search_workspace", "refresh_workspace_index",
       "send_adaptive_card", "send_dashboard_widget",

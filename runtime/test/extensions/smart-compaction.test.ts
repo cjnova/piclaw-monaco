@@ -113,12 +113,12 @@ function buildLargeConversation(messageCount: number) {
 // ---------------------------------------------------------------------------
 
 // Mock completeSimple before importing the module under test
-vi.mock("@mariozechner/pi-ai", () => ({
+vi.mock("@earendil-works/pi-ai", () => ({
   completeSimple: vi.fn(),
 }));
 
 // Mock convertToLlm with the upstream behaviors we care about in these tests.
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   convertToLlm: (msgs: any[]) => msgs.flatMap((m: any) => {
     switch (m.role) {
       case "compactionSummary":
@@ -151,8 +151,12 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   }),
 }));
 
-import { completeSimple } from "@mariozechner/pi-ai";
-import { smartCompaction } from "../../src/extensions/smart-compaction.js";
+import { completeSimple } from "@earendil-works/pi-ai";
+import {
+  buildProgressiveCompactionChunks,
+  getProgressiveCompactionBudget,
+  smartCompaction,
+} from "../../src/extensions/smart-compaction.js";
 
 describe("smart-compaction", () => {
   let handler: ((event: any, ctx: any) => Promise<any>) | null = null;
@@ -171,8 +175,8 @@ describe("smart-compaction", () => {
 
   function makeCtx(overrides: Partial<any> = {}) {
     return {
-      ui: { notify: vi.fn(), setWorkingIndicator: vi.fn(), clearWorkingIndicator: vi.fn(), setWorkingMessage: vi.fn() },
-      model: { provider: "test", id: "test-model", reasoning: false },
+      ui: { notify: vi.fn(), setWorkingIndicator: vi.fn(), clearWorkingIndicator: vi.fn(), setWorkingMessage: vi.fn(), setStatus: vi.fn() },
+      model: { provider: "test", id: "test-model", reasoning: false, contextWindow: 128000 },
       modelRegistry: {
         getApiKeyAndHeaders: vi.fn().mockResolvedValue({ ok: true, apiKey: "test-key" }),
         getAll: vi.fn().mockReturnValue([]),
@@ -254,6 +258,23 @@ describe("smart-compaction", () => {
       "Smart compaction complete ✓",
       "info",
     );
+    expect(ctx.ui.setStatus).toHaveBeenCalledWith(
+      "context_usage",
+      expect.stringContaining('"source":"smart_compaction"'),
+    );
+    const contextStatusPayloads = ctx.ui.setStatus.mock.calls
+      .filter(([key]: [string]) => key === "context_usage")
+      .map(([, text]: [string, string]) => JSON.parse(text));
+    expect(contextStatusPayloads.map((payload: any) => payload.phase)).toEqual(
+      expect.arrayContaining(["scanning", "generating_summary", "completed_estimate"]),
+    );
+    expect(contextStatusPayloads[0]).toMatchObject({
+      tokens: 6000,
+      contextWindow: 128000,
+      estimated: true,
+      source: "smart_compaction",
+      phase: "scanning",
+    });
   });
 
   it("forwards apiKey-only auth to completeSimple", async () => {
@@ -572,6 +593,82 @@ describe("smart-compaction", () => {
     const promptContent = call[1].messages[0].content[0].text;
     expect(promptContent).toContain("Previous Summary");
     expect(promptContent).toContain("Previous goal");
+  });
+
+  describe("progressive iterative compaction", () => {
+    it("derives smaller prompt budgets for smaller-context models", () => {
+      const small = getProgressiveCompactionBudget({ contextWindow: 8_000 });
+      const large = getProgressiveCompactionBudget({ contextWindow: 128_000 });
+
+      expect(small.promptBudgetChars).toBeLessThan(large.promptBudgetChars);
+      expect(small.chunkBudgetChars).toBeLessThanOrEqual(small.promptBudgetChars);
+      expect(large.promptBudgetChars).toBeLessThanOrEqual(60_000);
+    });
+
+    it("splits deterministic chunks in order without dropping key continuity facts", () => {
+      const messages = Array.from({ length: 12 }, (_, i) => userMsg(`fact-${String(i).padStart(2, "0")} ${"x".repeat(180)}`));
+      const chunks = buildProgressiveCompactionChunks(messages as any, 500, new Set(messages.map((_, i) => i)));
+      const joined = chunks.map((chunk) => chunk.text).join("\n");
+
+      expect(chunks.length).toBeGreaterThan(1);
+      expect(chunks.map((chunk) => chunk.index)).toEqual(chunks.map((_, i) => i + 1));
+      expect(chunks[0].startMessageIndex).toBe(0);
+      expect(chunks.at(-1)?.endMessageIndex).toBe(11);
+      expect(joined).toContain("fact-00");
+      expect(joined).toContain("fact-11");
+      for (let i = 1; i < chunks.length; i++) {
+        expect(chunks[i].startMessageIndex).toBeGreaterThan(chunks[i - 1].endMessageIndex);
+      }
+    });
+
+    it("uses chunk summaries and an ordered final merge when selective prompt exceeds model budget", async () => {
+      const longMessages: any[] = [];
+      for (let i = 0; i < 70; i++) {
+        longMessages.push(userMsg(`Important continuity fact ${i}: ${"x".repeat(900)}`));
+        longMessages.push(_assistantTextMsg(`Acknowledged fact ${i}.`));
+      }
+
+      (completeSimple as any).mockImplementation(async (_model: any, context: any) => {
+        const prompt = context.messages[0].content[0].text as string;
+        if (prompt.includes("deterministic chunk")) {
+          const range = prompt.match(/Message index range: ([0-9-]+)/)?.[1] ?? "unknown";
+          return {
+            content: [{ type: "text", text: `## Chunk Range\n- ${range}\n\n## Goals / User Intent\n- Preserve chunk ${range}\n\n## Constraints & Preferences\n- none\n\n## Decisions\n- none\n\n## Files / Commands / Tool Outcomes\n- none\n\n## Progress\n- Done: chunk summarized\n- In progress: final merge\n- Blocked: none\n\n## Open Questions / Next Steps\n- merge\n\n## Key Continuity Facts\n- Important continuity fact in ${range}` }],
+            stopReason: "end",
+          };
+        }
+        return {
+          content: [{ type: "text", text: "## Goal\nProgressive final goal\n\n## Current Active Topic\n- progressive compaction\n\n## Historical / Background Context\n- ordered chunk summaries preserved\n\n## Constraints & Preferences\n- preserve facts\n\n## Progress\n### Done\n- [x] chunks summarized\n\n### In Progress\n- [ ] final validation\n\n### Blocked\n- none\n\n## Key Decisions\n- **Progressive mode**: chunk then merge\n\n## Next Steps\n1. validate\n\n## Critical Context\n- Important continuity fact 0\n- Important continuity fact 69" }],
+          stopReason: "end",
+        };
+      });
+
+      const ctx = makeCtx({ model: { provider: "test", id: "small-context", contextWindow: 8_000, reasoning: false } });
+      const result = await handler!(
+        {
+          preparation: makePreparation(longMessages.length, {
+            messagesToSummarize: longMessages,
+            tokensBefore: 90_000,
+            fileOps: {
+              read: new Set<string>(),
+              written: new Set<string>(),
+              edited: new Set(["/workspace/progressive.ts"]),
+            },
+          }),
+          branchEntries: [],
+          signal: new AbortController().signal,
+        },
+        ctx,
+      );
+
+      expect(result.compaction.summary).toContain("Progressive final goal");
+      expect(result.compaction.summary).toContain("Important continuity fact 69");
+      expect((completeSimple as any).mock.calls.length).toBeGreaterThan(1);
+      const prompts = (completeSimple as any).mock.calls.map((call: any[]) => call[1].messages[0].content[0].text as string);
+      expect(prompts.filter((prompt: string) => prompt.includes("deterministic chunk")).length).toBeGreaterThan(1);
+      expect(prompts.at(-1)).toContain("Ordered Intermediate Summaries");
+      expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Progressive compaction"), "info");
+    });
   });
 
   describe("session isolation", () => {
