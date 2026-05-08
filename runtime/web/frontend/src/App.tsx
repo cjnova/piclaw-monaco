@@ -123,7 +123,7 @@ function AppContent() {
     return () => { clearTimeout(timeout); if (interval !== null) clearInterval(interval); };
   }, [clockText]);
 
-  // Redirect away from archived sessions on load
+  // Redirect away from archived or non-existent sessions on load
   useEffect(() => {
     const chatJid = getChatJid();
     if (chatJid === "web:default") return;
@@ -133,7 +133,7 @@ function AppContent() {
         if (!data) return;
         const chats = Array.isArray(data) ? data : (data.chats ?? []);
         const current = chats.find((c: Record<string, unknown>) => (c.chat_jid ?? c.jid) === chatJid);
-        if (current?.archived_at) {
+        if (!current || current.archived_at) {
           window.location.href = "/?chat_jid=web:default";
         }
       })
