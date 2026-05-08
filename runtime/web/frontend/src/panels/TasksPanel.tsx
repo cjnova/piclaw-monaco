@@ -324,8 +324,10 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        console.warn(`[tasks] ${actionKey} failed:`, res.status);
-        setActionError(errorMessage);
+        const errBody = await res.json().catch(() => null);
+        const apiError = typeof errBody?.error === "string" ? errBody.error : null;
+        console.warn(`[tasks] ${actionKey} failed:`, res.status, apiError);
+        setActionError(apiError || errorMessage);
         return null;
       }
       const payload = await res.json().catch(() => null);

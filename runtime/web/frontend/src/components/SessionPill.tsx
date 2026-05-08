@@ -87,7 +87,11 @@ export function SessionPill() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        const apiError = typeof errBody?.error === "string" ? errBody.error : `HTTP ${res.status}`;
+        throw new Error(apiError);
+      }
 
       const payload = await res.json().catch(() => null);
       await loadSessions();
