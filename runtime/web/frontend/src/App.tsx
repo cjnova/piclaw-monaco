@@ -19,6 +19,7 @@ import { useConnectionStatus } from "./app/useConnectionStatus";
 import { useTabs } from "./app/useTabs";
 import { TerminalPanel } from "./app/TerminalPanel";
 import { ExtensionFrame } from "./app/ExtensionFrame";
+import { useDialog } from "./hooks/useDialog";
 
 const PANEL_NAMES: Record<string, string> = {
   explorer: "Workspace", search: "Search", extensions: "Addons",
@@ -45,6 +46,7 @@ function AppContent() {
   const terminalRef = useRef<HTMLDivElement>(null);
 
   const { tabs, activeTabId, closeTab } = useTabs(terminalVisible, terminalMaximized);
+  const { DialogHost } = useDialog();
 
   const isSettingsActive = activePanel.value === "settings";
 
@@ -237,6 +239,7 @@ function AppContent() {
         </div>
       </main>
       <CommandPalette visible={paletteVisible.value} onClose={() => { paletteVisible.value = false; }} />
+      <DialogHost />
     </div>
   );
 }

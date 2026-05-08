@@ -50,6 +50,7 @@
   --overlay-black-40: rgba(0, 0, 0, 0.4);
   --overlay-black-50: rgba(0, 0, 0, 0.5);
   --overlay-black-85: rgba(0, 0, 0, 0.85);
+  --modal-z-index: 10020;
   /* Progressive font sizing */
   --font-size-sm: clamp(11px, 1.1vw, 13px);
   --font-size-md: clamp(13px, 1.3vw, 15px);
@@ -351,6 +352,117 @@ body {
   padding: 6px 8px;
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.modal-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--modal-z-index);
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-dialog,
+.modal-dialog:focus,
+.modal-dialog:focus-visible {
+  width: min(440px, 92vw);
+  background: #1e2030;
+  border: none;
+  border-radius: 10px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px rgba(0, 0, 0, 0.6);
+  outline: none !important;
+}
+
+.modal-dialog__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.modal-dialog__description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.modal-dialog__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.modal-dialog__input:focus {
+  border-color: var(--accent);
+}
+
+.modal-dialog__input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.modal-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-dialog__btn {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.modal-dialog__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-dialog__btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #111;
+  font-weight: 600;
+}
+
+.modal-dialog__btn--primary:hover {
+  background: var(--accent);
+  filter: brightness(1.15);
+  color: #111;
+}
+
+.modal-dialog__btn--destructive {
+  border-color: var(--error);
+  background: var(--error);
+  color: #fff;
+  font-weight: 600;
+}
+
+.modal-dialog__btn--destructive:hover {
+  background: var(--error);
+  filter: brightness(1.15);
+  color: #fff;
 }
 
 /* System stats bar */

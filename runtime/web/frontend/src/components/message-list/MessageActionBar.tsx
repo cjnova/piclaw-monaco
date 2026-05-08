@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { useDialog } from "../../hooks/useDialog";
 
 interface MessageActionBarProps {
   messageId: number;
@@ -16,9 +17,15 @@ export function MessageActionBar({
   onDelete,
 }: MessageActionBarProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const { showConfirm } = useDialog();
 
-  const handleDelete = () => {
-    if (confirm("Delete this message?")) {
+  const handleDelete = async () => {
+    const confirmed = await showConfirm({
+      title: "Delete this message?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (confirmed) {
       onDelete();
     }
   };
@@ -97,7 +104,7 @@ export function MessageActionBar({
       </button>
       <button
         className="message-action-bar__btn message-action-bar__btn--delete"
-        onClick={handleDelete}
+        onClick={() => { void handleDelete(); }}
         title="Delete message"
         aria-label="Delete message"
         type="button"

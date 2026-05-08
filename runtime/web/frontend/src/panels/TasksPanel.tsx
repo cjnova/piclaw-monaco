@@ -7,6 +7,7 @@ import {
   sanitizeSessionName,
   type SessionEntry,
 } from "../utils/session";
+import { useDialog } from "../hooks/useDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -279,6 +280,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { showPrompt, showConfirm } = useDialog();
 
   const navigateToChat = (chatJid: string) => {
     window.location.href = `/?chat_jid=${encodeURIComponent(chatJid)}`;
@@ -343,7 +345,13 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   }, [actionBusy, loadData]);
 
   const handleRenameSession = useCallback(async (chatJid: string) => {
-    const name = sanitizeSessionName(prompt("Enter new session name:"));
+    const session = allSessions.find((entry) => entry.jid === chatJid);
+    const input = await showPrompt({
+      title: "Enter new session name:",
+      placeholder: "session-name",
+      defaultValue: session ? chatName(session) : "",
+    });
+    const name = sanitizeSessionName(input);
     if (!name) return;
     await runSessionAction(
       `rename-${chatJid}`,
@@ -351,10 +359,15 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       { chat_jid: chatJid, agent_name: name },
       "Couldn't rename session. Please try again.",
     );
-  }, [runSessionAction]);
+  }, [allSessions, runSessionAction, showPrompt]);
 
   const handleDeleteSession = useCallback(async (chatJid: string) => {
-    const confirmed = confirm("Delete this session permanently? This cannot be undone.");
+    const confirmed = await showConfirm({
+      title: "Delete this session permanently?",
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
     if (!confirmed) return;
     const nextChatJid = await runSessionAction(
       `delete-${chatJid}`,
@@ -365,7 +378,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     if (chatJid === activeChatJid && nextChatJid) {
       navigateToChat(nextChatJid);
     }
-  }, [activeChatJid, runSessionAction]);
+  }, [activeChatJid, runSessionAction, showConfirm]);
 
   const handleNewBranch = useCallback(async () => {
     const nextChatJid = await runSessionAction(
@@ -378,7 +391,11 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   }, [activeChatJid, runSessionAction]);
 
   const handleNewRoot = useCallback(async () => {
-    const name = sanitizeSessionName(prompt("Enter root session name:"));
+    const input = await showPrompt({
+      title: "Enter root session name:",
+      placeholder: "session-name",
+    });
+    const name = sanitizeSessionName(input);
     if (!name) return;
     const nextChatJid = await runSessionAction(
       "new-root",
@@ -387,7 +404,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       "Couldn't create root session. Please try again.",
     );
     if (nextChatJid) navigateToChat(nextChatJid);
-  }, [runSessionAction]);
+  }, [runSessionAction, showPrompt]);
 
   const handleMergeParent = useCallback(async () => {
     const nextChatJid = await runSessionAction(
