@@ -48,6 +48,7 @@ function AppContent() {
   const terminalRef = useRef<HTMLDivElement>(null);
 
   const { tabs, activeTabId, closeTab } = useTabs(terminalVisible, terminalMaximized);
+  const activeExtension = useSignal<string | null>(null);
   const { DialogHost } = useDialog();
 
   const isSettingsActive = activePanel.value === "settings";
@@ -122,7 +123,7 @@ function AppContent() {
     return () => { clearTimeout(timeout); if (interval !== null) clearInterval(interval); };
   }, [clockText]);
 
-  // Redirect away from archived sessions on load
+  // Redirect away from archived or non-existent sessions on load
   useEffect(() => {
     const chatJid = getChatJid();
     if (chatJid === "web:default") return;
@@ -132,7 +133,7 @@ function AppContent() {
         if (!data) return;
         const chats = Array.isArray(data) ? data : (data.chats ?? []);
         const current = chats.find((c: Record<string, unknown>) => (c.chat_jid ?? c.jid) === chatJid);
-        if (current?.archived_at) {
+        if (!current || current.archived_at) {
           window.location.href = "/?chat_jid=web:default";
         }
       })
@@ -175,9 +176,11 @@ function AppContent() {
                 <TabBar
                   tabs={tabs.value}
                   activeTabId={activeTabId.value}
-                  onSelectTab={(id) => { activeTabId.value = id; }}
+                  onSelectTab={(id) => { activeTabId.value = id; activeExtension.value = null; }}
                   onCloseTab={closeTab}
                   clockText={clockText.value}
+                  activeExtension={activeExtension.value}
+                  onSelectExtension={(prefix) => { activeExtension.value = prefix; }}
                 />
                 <div className="app-layout__tab-viewport">
                   {isExtensionPageOpen ? (
@@ -190,7 +193,7 @@ function AppContent() {
                   ) : (
                     <>
                       <div className={isWidgetActive || isTerminalActive ? "app-layout__tab-content--hidden" : "app-layout__tab-content"}>
-                        <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
+                        <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} activeExtension={activeExtension.value} />
                       </div>
                       {hasTerminalTab && (
                         <div className={isTerminalActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>

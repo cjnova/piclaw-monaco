@@ -60,11 +60,17 @@ export function extractChatJidFromAction(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const maybePayload = payload as {
     branch?: { chat_jid?: unknown };
+    parent?: { chat_jid?: unknown };
     chat_jid?: unknown;
   };
 
   if (typeof maybePayload.branch?.chat_jid === "string" && maybePayload.branch.chat_jid) {
     return maybePayload.branch.chat_jid;
+  }
+
+  // Merge response returns parent.chat_jid
+  if (typeof maybePayload.parent?.chat_jid === "string" && maybePayload.parent.chat_jid) {
+    return maybePayload.parent.chat_jid;
   }
 
   if (typeof maybePayload.chat_jid === "string" && maybePayload.chat_jid) {

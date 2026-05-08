@@ -4,16 +4,12 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
-import { extractDisplayName } from "../utils/extractDisplayName";
 import { isSafeExtensionUrl } from "../utils/isSafeExtensionUrl";
 
-interface ExtensionRoute {
-  prefix: string;
-  extensionPath: string;
-}
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
+  activeExtension?: string | null;
 }
 
 interface Attachment {
@@ -31,11 +27,9 @@ interface Attachment {
 const HISTORY_KEY = "piclaw:compose-history";
 const MAX_HISTORY = 50;
 
-export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
+export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeTab = useSignal<string>("chat");
-  const extensionPages = useSignal<ExtensionRoute[]>([]);
   const isSending = useSignal(false);
   const sendError = useSignal<string | null>(null);
   const isAgentRunning = useSignal(false);
@@ -74,15 +68,6 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     };
     window.addEventListener("piclaw:agent-status", agentStatusHandler);
 
-    fetch("/api/extension-routes", { credentials: "include" })
-      .then((res) => res.json())
-      .then((routes: ExtensionRoute[]) => {
-        const pages = routes.filter((r) => r.prefix.endsWith("-page"));
-        extensionPages.value = pages;
-      })
-      .catch((err) => {
-        console.warn("[chat] extension route discovery failed:", err);
-      });
 
   // Handle widget submissions as user messages
   const widgetSubmissionHandler = (e: Event) => {
@@ -460,34 +445,11 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     }
   };
 
-  const pages = extensionPages.value;
-  const showTabs = pages.length > 0;
+  const effectiveTab = activeExtension ?? "chat";
 
   return (
     <section className="chat">
-      {showTabs && (
-        <div className="chat-tabs">
-          <button
-            type="button"
-            className={`chat-tabs__tab${activeTab.value === "chat" ? " chat-tabs__tab--active" : ""}`}
-            onClick={() => { activeTab.value = "chat"; }}
-          >
-            Chat
-          </button>
-          {pages.map((page) => (
-            <button
-              key={page.prefix}
-              type="button"
-              className={`chat-tabs__tab${activeTab.value === page.prefix ? " chat-tabs__tab--active" : ""}`}
-              onClick={() => { activeTab.value = page.prefix; }}
-            >
-              {extractDisplayName(page.extensionPath)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {activeTab.value === "chat" ? (
+      {effectiveTab === "chat" ? (
         <>
           {/* Chat content */}
           <div className="chat__messages">
@@ -669,14 +631,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
             </div>
           )}
         </>
-      ) : isSafeExtensionUrl(activeTab.value) ? (
+      ) : isSafeExtensionUrl(effectiveTab) ? (
         <>
           {/* Security: allow-same-origin required for extension API access. allow-scripts required for interactivity. Popups restricted. See #168. */}
           <iframe
             className="chat-tabs__iframe"
-            src={activeTab.value}
+            src={effectiveTab}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
+            title={"Dashboard"}
           />
         </>
       ) : (

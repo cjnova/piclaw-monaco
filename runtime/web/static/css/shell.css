@@ -1759,6 +1759,91 @@ body {
   border-bottom-color: var(--accent);
 }
 
+/* Extension menu — replaces horizontal tabs */
+.chat-extension-menu {
+  position: relative;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-extension-menu__toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.chat-extension-menu__toggle:hover {
+  color: var(--text);
+  background: var(--overlay-white-07);
+}
+
+.chat-extension-menu__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+  z-index: 100;
+  min-width: 180px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+}
+
+.chat-extension-menu__item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.chat-extension-menu__item:hover {
+  background: var(--overlay-white-07);
+}
+
+/* Extension bar — shows when viewing an addon page */
+.chat-extension-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.chat-extension-bar__name {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.chat-extension-bar__back {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.chat-extension-bar__back:hover {
+  color: var(--text);
+  background: var(--overlay-white-07);
+}
+
 .chat-tabs__iframe {
   flex: 1;
   width: 100%;
@@ -1790,6 +1875,54 @@ body {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+.tab-bar__dashboards {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.tab-bar__caret {
+  font-size: 10px;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+
+.tab-bar__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  min-width: 180px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+}
+
+.tab-bar__dropdown-item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.tab-bar__dropdown-item:hover {
+  background: var(--overlay-white-07);
+}
+
+.tab-bar__dropdown-item--active {
+  color: var(--accent);
+  background: var(--tint-blue-08);
 }
 
 .tab-bar::-webkit-scrollbar {
