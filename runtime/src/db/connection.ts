@@ -871,8 +871,6 @@ export function initDatabase(): void {
   db.exec(useMemory ? "PRAGMA journal_mode = MEMORY;" : "PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA busy_timeout = 5000;");
   db.exec("PRAGMA secure_delete = ON;");
-  // Checkpoint WAL every 100 pages (~400KB) to prevent data loss on hard kill
-  if (!useMemory) db.exec("PRAGMA wal_autocheckpoint = 100;");
   migrateLegacyConfigTables(db);
   createSchema(db);
   ensureChatBranchConstraints(db);
