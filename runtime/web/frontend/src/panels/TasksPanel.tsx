@@ -575,12 +575,15 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
             <i className="codicon codicon-git-branch" /> New branch
           </button>
           <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
-            <i className="codicon codicon-add" /> New root
+            <i className="codicon codicon-add" /> New root…
           </button>
           <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}
             title={currentSession?.parent_jid ? "Merge this branch into its parent" : "Root sessions cannot be merged"}
           >
             <i className="codicon codicon-git-merge" /> Merge to parent
+          </button>
+          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRenameSession(activeChatJid); }}>
+            <i className="codicon codicon-edit" /> Rename…
           </button>
           <button
             type="button"

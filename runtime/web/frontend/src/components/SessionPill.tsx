@@ -222,13 +222,13 @@ export function SessionPill() {
               <i className="codicon codicon-git-branch" /> New branch
             </button>
             <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleNewRoot}>
-              <i className="codicon codicon-add" /> New root
+              <i className="codicon codicon-add" /> New root…
             </button>
             <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleMergeParent}>
               <i className="codicon codicon-git-merge" /> Merge parent
             </button>
             <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleRename}>
-              <i className="codicon codicon-edit" /> Rename
+              <i className="codicon codicon-edit" /> Rename…
             </button>
             <button type="button" className="session-pill__action session-pill__action--danger" disabled={Boolean(actionBusy)} onClick={handleDelete}>
               <i className="codicon codicon-trash" /> Delete current…
