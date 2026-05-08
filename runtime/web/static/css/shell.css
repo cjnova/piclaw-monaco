@@ -662,6 +662,8 @@ body {
   font-size: 13px;
   flex-shrink: 0;
   gap: 14px;
+  overflow: hidden;
+  position: relative;
 }
 
 .app-layout__status-bar--flash {
@@ -713,6 +715,10 @@ body {
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 40%;
 }
 
 .status-bar__flash--error {
