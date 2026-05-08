@@ -110,6 +110,7 @@ export function SessionPill() {
   }, [actionBusy, loadSessions]);
 
   const handleFork = () => {
+    setIsOpen(false);
     void runAction("fork", "/agent/branch-fork", { source_chat_jid: activeChatJid });
   };
 
@@ -125,6 +126,7 @@ export function SessionPill() {
   };
 
   const handleMergeParent = () => {
+    setIsOpen(false);
     void runAction("merge", "/agent/branch-merge-parent", { chat_jid: activeChatJid });
   };
 
