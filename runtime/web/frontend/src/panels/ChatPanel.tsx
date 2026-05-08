@@ -461,29 +461,50 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   };
 
   const pages = extensionPages.value;
-  const showTabs = pages.length > 0;
+  const showExtensions = pages.length > 0;
+  const extensionMenuOpen = useSignal(false);
+  const activePage = pages.find((p) => p.prefix === activeTab.value);
 
   return (
     <section className="chat">
-      {showTabs && (
-        <div className="chat-tabs">
+      {showExtensions && activeTab.value !== "chat" && (
+        <div className="chat-extension-bar">
+          <span className="chat-extension-bar__name">
+            🧩 {activePage ? extractDisplayName(activePage.extensionPath) : ""}
+          </span>
           <button
             type="button"
-            className={`chat-tabs__tab${activeTab.value === "chat" ? " chat-tabs__tab--active" : ""}`}
+            className="chat-extension-bar__back"
             onClick={() => { activeTab.value = "chat"; }}
           >
-            Chat
+            ← Chat
           </button>
-          {pages.map((page) => (
-            <button
-              key={page.prefix}
-              type="button"
-              className={`chat-tabs__tab${activeTab.value === page.prefix ? " chat-tabs__tab--active" : ""}`}
-              onClick={() => { activeTab.value = page.prefix; }}
-            >
-              {extractDisplayName(page.extensionPath)}
-            </button>
-          ))}
+        </div>
+      )}
+      {showExtensions && activeTab.value === "chat" && (
+        <div className="chat-extension-menu">
+          <button
+            type="button"
+            className="chat-extension-menu__toggle"
+            onClick={() => { extensionMenuOpen.value = !extensionMenuOpen.value; }}
+            title="Open addon dashboards"
+          >
+            🧩 Dashboards ▾
+          </button>
+          {extensionMenuOpen.value && (
+            <div className="chat-extension-menu__dropdown">
+              {pages.map((page) => (
+                <button
+                  key={page.prefix}
+                  type="button"
+                  className="chat-extension-menu__item"
+                  onClick={() => { activeTab.value = page.prefix; extensionMenuOpen.value = false; }}
+                >
+                  {extractDisplayName(page.extensionPath)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
