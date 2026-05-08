@@ -763,41 +763,44 @@ body {
   background: var(--overlay-white-07);
 }
 
-.session-pill__actions {
+.session-pill__toolbar {
   border-top: 1px solid var(--border);
-  padding: 6px;
+  padding: 6px 8px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
-.session-pill__action {
+.session-pill__icon-btn {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-soft);
-  font-size: 11px;
-  line-height: 1;
+  color: var(--text-muted);
+  font-size: 14px;
   padding: 5px 7px;
-  text-align: left;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   transition: color 0.15s, background 0.15s;
 }
 
-.session-pill__action:hover {
+.session-pill__icon-btn:hover {
   color: var(--text);
-  background: var(--overlay-white-04);
+  background: var(--overlay-white-07);
 }
 
-.session-pill__action--danger {
+.session-pill__icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.session-pill__icon-btn--danger:hover {
+  color: var(--error, #f38ba8);
+  background: rgba(255, 68, 68, 0.1);
+}
   color: var(--error);
-}
-
-.session-pill__action--danger:hover {
-  background: var(--tint-red-10);
 }
 
 .session-pill__empty {

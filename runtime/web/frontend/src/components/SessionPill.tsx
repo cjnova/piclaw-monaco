@@ -234,21 +234,21 @@ export function SessionPill() {
             })}
           </div>
 
-          <div className="session-pill__actions" role="group" aria-label="Session actions">
-            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleFork}>
-              <i className="codicon codicon-git-branch" /> New branch
+          <div className="session-pill__toolbar" role="group" aria-label="Session actions">
+            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleFork} title="New branch">
+              <i className="codicon codicon-git-branch" />
             </button>
-            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleNewRoot}>
-              <i className="codicon codicon-add" /> New root…
+            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleNewRoot} title="New root…">
+              <i className="codicon codicon-add" />
             </button>
-            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleMergeParent}>
-              <i className="codicon codicon-git-merge" /> Merge parent
+            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleMergeParent} title="Merge to parent">
+              <i className="codicon codicon-git-merge" />
             </button>
-            <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleRename}>
-              <i className="codicon codicon-edit" /> Rename…
+            <button type="button" className="session-pill__icon-btn" disabled={Boolean(actionBusy)} onClick={handleRename} title="Rename…">
+              <i className="codicon codicon-edit" />
             </button>
-            <button type="button" className="session-pill__action session-pill__action--danger" disabled={Boolean(actionBusy)} onClick={handleDelete}>
-              <i className="codicon codicon-trash" /> Delete current…
+            <button type="button" className="session-pill__icon-btn session-pill__icon-btn--danger" disabled={Boolean(actionBusy)} onClick={handleDelete} title="Delete current…">
+              <i className="codicon codicon-trash" />
             </button>
           </div>
         </div>
