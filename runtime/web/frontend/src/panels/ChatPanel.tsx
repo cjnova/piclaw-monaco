@@ -467,6 +467,13 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     <section className="chat">
       {showTabs && (
         <div className="chat-tabs">
+          <button
+            type="button"
+            className={`chat-tabs__tab${activeTab.value === "chat" ? " chat-tabs__tab--active" : ""}`}
+            onClick={() => { activeTab.value = "chat"; }}
+          >
+            Chat
+          </button>
           {pages.map((page) => (
             <button
               key={page.prefix}
@@ -477,15 +484,6 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               {extractDisplayName(page.extensionPath)}
             </button>
           ))}
-          {activeTab.value !== "chat" && (
-            <button
-              type="button"
-              className="chat-tabs__tab"
-              onClick={() => { activeTab.value = "chat"; }}
-            >
-              ← Back to Chat
-            </button>
-          )}
         </div>
       )}
 
