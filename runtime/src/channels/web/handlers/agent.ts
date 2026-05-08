@@ -128,7 +128,7 @@ function isRateLimitError(errorText: string | null | undefined): boolean {
 
 function isAuthError(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
-  return /authentication failed|credentials may have expired|no api key found|re-authenticate|unauthorized|\b401\b|\b403\b|invalid.*api.*key|api.*key.*invalid|token.*expired|oauth.*expired|refresh.*token/i.test(errorText);
+  return /authentication failed|credentials may have expired|no api key(?: found| for provider)?|token refresh failed\s*:\s*401|re-authenticate|unauthorized|\b401\b|\b403\b|invalid.*api.*key|api.*key.*invalid|token.*expired|oauth.*expired|refresh.*token/i.test(errorText);
 }
 
 function isModelConfigError(errorText: string | null | undefined): boolean {
@@ -256,15 +256,19 @@ function buildErrorOutcomeMarker(
   }
 
   if (isAuthError(errorText) || isQuotaError(errorText) || isModelConfigError(errorText)) {
+    const authGuidance = isAuthError(errorText)
+      ? "Sign in with /login or configure provider credentials, then retry."
+      : null;
+    const baseDetail = errorText.slice(0, 500);
     return buildTurnOutcomeMarker({
       kind: "provider",
       label: "provider",
       title: isAuthError(errorText)
-        ? "Provider authentication failed"
+        ? "Provider authentication/configuration required"
         : isQuotaError(errorText)
           ? "Provider quota exceeded"
           : "Model configuration error",
-      detail: errorText.slice(0, 500),
+      detail: [baseDetail, authGuidance].filter(Boolean).join(" — "),
       severity: options.severity ?? "error",
       draftRecovered: options.draftRecovered,
       attemptsUsed: options.attemptsUsed,

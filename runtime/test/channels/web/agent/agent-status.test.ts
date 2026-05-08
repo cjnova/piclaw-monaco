@@ -28,7 +28,7 @@ describe("web agent status helpers", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Server-Timing")).toContain("agent_status;dur=");
-    expect(await res.json()).toEqual({ status: "idle", data: null });
+    expect(await res.json()).toEqual({ status: "idle", state: "idle", chat_jid: "web:default", data: null });
   });
 
   test("handleAgentStatusRequest triggers stale inflight recovery when no active status exists", async () => {
@@ -44,7 +44,7 @@ describe("web agent status helpers", () => {
 
     expect(res.status).toBe(200);
     expect(calls).toEqual([{ chatJid: "web:ux", hasActiveStatus: false }]);
-    expect(await res.json()).toEqual({ status: "idle", data: null });
+    expect(await res.json()).toEqual({ status: "idle", state: "idle", chat_jid: "web:ux", data: null });
   });
 
   test("handleAgentStatusRequest includes thought/draft buffers when available", async () => {
@@ -63,9 +63,43 @@ describe("web agent status helpers", () => {
     expect(res.headers.get("Server-Timing")).toContain("agent_status;dur=");
     const body = await res.json();
     expect(body.status).toBe("active");
+    expect(body.state).toBe("thinking");
+    expect(body.chat_jid).toBe("web:custom");
     expect(body.data.chatJid).toBe("web:custom");
     expect(body.thought).toEqual({ text: "thought text", totalLines: 2 });
     expect(body.draft).toEqual({ text: "draft text", totalLines: 1 });
+  });
+
+  test("handleAgentStatusRequest classifies auth failures as blocked_auth", async () => {
+    const req = new Request("https://example.com/agent/status?chat_jid=web:auth");
+    const res = handleAgentStatusRequest(req, createContext({
+      getAgentStatus: () => ({
+        type: "error",
+        title: "No API key for provider: openai-codex",
+        detail: "Token refresh failed: 401",
+      }),
+    }));
+
+    const body = await res.json();
+    expect(body.status).toBe("active");
+    expect(body.state).toBe("blocked_auth");
+    expect(body.classifier).toBeNull();
+  });
+
+  test("handleAgentStatusRequest exposes recovery_suppressed classifier state", async () => {
+    const req = new Request("https://example.com/agent/status?chat_jid=web:suppressed");
+    const res = handleAgentStatusRequest(req, createContext({
+      getAgentStatus: () => ({
+        type: "error",
+        title: "Automatic recovery suppressed",
+        classifier: "recovery_suppressed",
+        recovery_suppressed_reason: "Repeated identical failures in recovery window.",
+      }),
+    }));
+
+    const body = await res.json();
+    expect(body.state).toBe("recovery_suppressed");
+    expect(body.recovery_suppressed_reason).toBe("Repeated identical failures in recovery window.");
   });
 
   test("handleAgentContextRequest returns null fields when usage is unavailable", async () => {

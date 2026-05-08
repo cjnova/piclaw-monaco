@@ -2580,3 +2580,76 @@ test("runAgentPrompt ignores a queued late-timeout callback after prompt complet
     globalThis.clearTimeout = originalClearTimeout;
   }
 });
+
+test("runAgentPrompt suppresses repeated automatic recovery loops for the same error signature", async () => {
+  const restoreEnv = setEnv({
+    PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",
+    PICLAW_TURN_AUTO_RECOVERY_MAX_ATTEMPTS: "6",
+    PICLAW_RECOVERY_LOOP_GUARD_ENABLED: "1",
+    PICLAW_RECOVERY_LOOP_GUARD_MAX_FAILURES: "2",
+    PICLAW_RECOVERY_LOOP_GUARD_WINDOW_MS: String(10 * 60 * 1000),
+  });
+
+  class StubSession {
+    private listeners: Array<(event: any) => void> = [];
+    sessionManager = { getLeafId: () => "leaf-loop-guard" };
+    isStreaming = false;
+    isCompacting = false;
+    isRetrying = false;
+    promptCalls = 0;
+    subscribe(listener: (event: any) => void) {
+      this.listeners.push(listener);
+      return () => {
+        this.listeners = this.listeners.filter((entry) => entry !== listener);
+      };
+    }
+    async prompt() {
+      this.promptCalls += 1;
+      throw new Error("Response timed out before finalization");
+    }
+    async abort() {}
+  }
+
+  try {
+    const session = new StubSession();
+    const recoveryEvents: Array<{ type: string; classifier?: string }> = [];
+    const turnCoordinator = new AgentTurnCoordinator({
+      takeAttachments: () => [],
+      touchSession: () => {},
+      recordMessageUsage: () => {},
+    });
+
+    const result = await runAgentPrompt("loop guard", "web:default", {
+      timeoutMs: 0,
+      onEvent: (event) => {
+        if (event.type === "recovery_start" || event.type === "recovery_end") {
+          recoveryEvents.push({
+            type: String(event.type),
+            classifier: typeof (event as any).classifier === "string" ? (event as any).classifier : undefined,
+          });
+        }
+      },
+    }, {
+      getOrCreateRuntime: async () => createRuntime(session, { maxRetries: 6, baseDelayMs: 1, maxDelayMs: 60000 }) as any,
+      turnCoordinator,
+      clearAttachments: () => {},
+      takeAttachments: () => [],
+      logsDir: createTestLogsDir(),
+      setActiveForkBaseLeaf: () => {},
+      clearActiveForkBaseLeaf: () => {},
+    });
+
+    expect(result.status).toBe("error");
+    expect(result.recovery).toEqual(expect.objectContaining({
+      exhausted: true,
+      lastClassifier: "recovery_suppressed",
+    }));
+    expect(session.promptCalls).toBe(2);
+    expect(recoveryEvents).toEqual([
+      { type: "recovery_start", classifier: "transient" },
+      { type: "recovery_end", classifier: "recovery_suppressed" },
+    ]);
+  } finally {
+    restoreEnv();
+  }
+});

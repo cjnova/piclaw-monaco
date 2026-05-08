@@ -718,6 +718,7 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
           type: "intent",
           title: "Recovered after automatic continuation",
           detail: `Attempts: ${e.attemptsUsed ?? 0}${e.classifier ? ` · ${e.classifier}` : ""}`,
+          classifier: e.classifier ?? null,
           intent_key: "recovery",
         });
       } else if (e.outcome === "exhausted") {
@@ -726,6 +727,7 @@ export function createStreamingEventHandler(options: StreamingEventHandlerOption
           type: "error",
           title: "Automatic recovery exhausted",
           detail: e.errorMessage || undefined,
+          classifier: e.classifier ?? null,
           intent_key: "recovery",
         });
       }
