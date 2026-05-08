@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
+import { useDialog } from "../../hooks/useDialog";
 
 interface KeychainEntry {
   name: string;
@@ -23,6 +24,7 @@ export function KeychainSection() {
   const loading = useSignal(true);
   const loadError = useSignal<string | null>(null);
   const keychainErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showConfirm } = useDialog();
 
   const showKeychainError = (msg: string) => {
     keychainError.value = msg;
@@ -80,7 +82,12 @@ export function KeychainSection() {
   };
 
   const deleteEntry = async (name: string) => {
-    if (!confirm(`Delete keychain entry "${name}"?`)) return;
+    const confirmed = await showConfirm({
+      title: `Delete keychain entry "${name}"?`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch("/agent/keychain", {
         method: "DELETE",

@@ -12,6 +12,7 @@ import {
   getErrorMessage,
   type WorkspaceMutationPayload,
 } from "./workspace/workspaceUtils";
+import { useDialog } from "../hooks/useDialog";
 
 // ─── FilePreview ──────────────────────────────────────────────────────────────
 
@@ -22,12 +23,18 @@ interface FilePreviewProps {
 
 function FilePreview({ node, onMutate }: FilePreviewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const { showConfirm, showAlert } = useDialog();
   const { preview, status, errorMessage, kind, content, rawUrl, downloadUrl } =
     useWorkspacePreview(node);
 
   const handleDelete = useCallback(async () => {
     if (isDeleting) return;
-    const confirmed = window.confirm(`Delete ${node.name}? This cannot be undone.`);
+    const confirmed = await showConfirm({
+      title: `Delete ${node.name}?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
     if (!confirmed) return;
 
     setIsDeleting(true);
@@ -43,11 +50,14 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
       onMutate({ nextNode: null });
     } catch (error) {
       console.error("[WorkspacePanel] Failed to delete file:", error);
-      window.alert(toUserFacingMessage(error, "Failed to delete file"));
+      await showAlert({
+        title: "Failed to delete file",
+        description: toUserFacingMessage(error, "Failed to delete file"),
+      });
     } finally {
       setIsDeleting(false);
     }
-  }, [isDeleting, node.name, node.path, onMutate]);
+  }, [isDeleting, node.name, node.path, onMutate, showAlert, showConfirm]);
 
   return (
     <div className="workspace__preview-info">

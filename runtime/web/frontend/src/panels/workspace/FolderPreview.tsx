@@ -14,6 +14,7 @@ import {
   makeTreeNodeFromMutation,
   type WorkspaceMutationPayload,
 } from "./workspaceUtils";
+import { useDialog } from "../../hooks/useDialog";
 
 // ─── Sunburst helpers ─────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ export function FolderPreview({ node, onMutate }: FolderPreviewProps) {
   const [viewMode, setViewMode] = useState<"list" | "chart">("list");
   const [actionBusy, setActionBusy] = useState<"create" | "upload" | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const { showPrompt, showAlert } = useDialog();
 
   useEffect(() => {
     setChildren(null);
@@ -297,7 +299,11 @@ export function FolderPreview({ node, onMutate }: FolderPreviewProps) {
 
   const handleCreateFile = useCallback(async () => {
     if (actionBusy) return;
-    const name = window.prompt("New file name", "untitled.txt")?.trim();
+    const name = (await showPrompt({
+      title: "New file name",
+      placeholder: "untitled.txt",
+      defaultValue: "untitled.txt",
+    }))?.trim();
     if (!name) return;
 
     setActionBusy("create");
@@ -315,11 +321,14 @@ export function FolderPreview({ node, onMutate }: FolderPreviewProps) {
       onMutate({ nextNode: makeTreeNodeFromMutation("file", data ?? {}) });
     } catch (error) {
       console.error("[WorkspacePanel] Failed to create file:", error);
-      window.alert(toUserFacingMessage(error, "Failed to create file"));
+      await showAlert({
+        title: "Failed to create file",
+        description: toUserFacingMessage(error, "Failed to create file"),
+      });
     } finally {
       setActionBusy(null);
     }
-  }, [actionBusy, node.path, onMutate]);
+  }, [actionBusy, node.path, onMutate, showAlert, showPrompt]);
 
   const handleUploadFiles = useCallback(async (files: FileList | null) => {
     if (!files?.length || actionBusy) return;
@@ -347,12 +356,15 @@ export function FolderPreview({ node, onMutate }: FolderPreviewProps) {
       }
     } catch (error) {
       console.error("[WorkspacePanel] Failed to upload file:", error);
-      window.alert(toUserFacingMessage(error, "Failed to upload file"));
+      await showAlert({
+        title: "Failed to upload file",
+        description: toUserFacingMessage(error, "Failed to upload file"),
+      });
     } finally {
       if (uploadInputRef.current) uploadInputRef.current.value = "";
       setActionBusy(null);
     }
-  }, [actionBusy, node.path, onMutate]);
+  }, [actionBusy, node.path, onMutate, showAlert]);
 
   return (
     <div className="workspace__preview-info">

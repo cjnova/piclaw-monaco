@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { getChatJid } from "../api/chat-jid";
+import { useDialog } from "../hooks/useDialog";
 import {
   chatName,
   extractChatJidFromAction,
@@ -25,6 +26,7 @@ export function SessionPill() {
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const rootRef = useRef<HTMLSpanElement>(null);
   const activeChatJid = getChatJid();
+  const { showPrompt, showConfirm } = useDialog();
 
   const loadSessions = useCallback(async () => {
     setStatus("loading");
@@ -111,8 +113,12 @@ export function SessionPill() {
     void runAction("fork", "/agent/branch-fork", { source_chat_jid: activeChatJid });
   };
 
-  const handleNewRoot = () => {
-    const name = sanitizeSessionName(prompt("Enter root session name:"));
+  const handleNewRoot = async () => {
+    const input = await showPrompt({
+      title: "Enter root session name:",
+      placeholder: "session-name",
+    });
+    const name = sanitizeSessionName(input);
     if (!name) return;
     void runAction("root", "/agent/root-session", { agent_name: name });
   };
@@ -121,14 +127,24 @@ export function SessionPill() {
     void runAction("merge", "/agent/branch-merge-parent", { chat_jid: activeChatJid });
   };
 
-  const handleRename = () => {
-    const name = sanitizeSessionName(prompt("Enter new session name:"));
+  const handleRename = async () => {
+    const input = await showPrompt({
+      title: "Enter new session name:",
+      placeholder: "session-name",
+      defaultValue: chatName(activeSession ?? { jid: activeChatJid }),
+    });
+    const name = sanitizeSessionName(input);
     if (!name) return;
     void runAction("rename", "/agent/branch-rename", { chat_jid: activeChatJid, agent_name: name });
   };
 
-  const handleDelete = () => {
-    const confirmed = confirm("Delete current session permanently? This cannot be undone.");
+  const handleDelete = async () => {
+    const confirmed = await showConfirm({
+      title: "Delete current session permanently?",
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
     if (!confirmed) return;
     void runAction("delete", "/agent/branch-purge", { chat_jid: activeChatJid });
   };
@@ -187,7 +203,7 @@ export function SessionPill() {
                         role="button"
                         tabIndex={0}
                         title="Rename…"
-                        onClick={(e) => { e.stopPropagation(); handleRename(); }}
+                        onClick={(e) => { e.stopPropagation(); void handleRename(); }}
                       >
                         <i className="codicon codicon-edit" />
                       </span>
@@ -196,7 +212,7 @@ export function SessionPill() {
                         role="button"
                         tabIndex={0}
                         title="Delete…"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                        onClick={(e) => { e.stopPropagation(); void handleDelete(); }}
                       >
                         <i className="codicon codicon-trash" />
                       </span>
@@ -225,7 +241,7 @@ export function SessionPill() {
             <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={handleFork} title="New branch">
               <i className="codicon codicon-repo-forked" /> Fork
             </button>
-            <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={handleNewRoot} title="New root…">
+            <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }} title="New root…">
               <i className="codicon codicon-add" /> New root…
             </button>
             <button type="button" className="session-pill__toolbar-btn" disabled={Boolean(actionBusy)} onClick={handleMergeParent} title="Merge to parent">
