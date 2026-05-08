@@ -483,6 +483,9 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     );
   }
 
+  const currentSession = allSessions.find(s => s.jid === activeChatJid);
+  const isRootDefault = activeChatJid === "web:default" || (!currentSession?.parent_jid && allSessions.length <= 1);
+
   return (
     <div className="tasks-panel__sessions">
       <div className="tasks-panel__list tasks-panel__sessions-list">
@@ -575,14 +578,17 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
           <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
             <i className="codicon codicon-add" /> New root
           </button>
-          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}>
+          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}
+            title={currentSession?.parent_jid ? "Merge this branch into its parent" : "Root sessions cannot be merged"}
+          >
             <i className="codicon codicon-git-merge" /> Merge to parent
           </button>
           <button
             type="button"
             className="settings-panel__provider-btn settings-panel__provider-btn--logout"
-            disabled={Boolean(actionBusy)}
+            disabled={Boolean(actionBusy) || isRootDefault || allSessions.length <= 1}
             onClick={() => { void handleDeleteSession(activeChatJid); }}
+            title={isRootDefault ? "Cannot delete the root default session" : allSessions.length <= 1 ? "Cannot delete the only session" : "Permanently delete this session"}
           >
             <i className="codicon codicon-trash" /> Delete current
           </button>

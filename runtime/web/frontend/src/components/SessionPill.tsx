@@ -105,6 +105,8 @@ export function SessionPill() {
     [sessions, activeChatJid],
   );
 
+  const isRootDefault = activeChatJid === "web:default" || sessions.length <= 1;
+
   const goToChat = (chatJid: string) => {
     window.location.href = `/?chat_jid=${encodeURIComponent(chatJid)}`;
   };
@@ -230,7 +232,7 @@ export function SessionPill() {
             <button type="button" className="session-pill__action" disabled={Boolean(actionBusy)} onClick={handleRename}>
               <i className="codicon codicon-edit" /> Rename
             </button>
-            <button type="button" className="session-pill__action session-pill__action--danger" disabled={Boolean(actionBusy)} onClick={handleDelete}>
+            <button type="button" className="session-pill__action session-pill__action--danger" disabled={Boolean(actionBusy) || isRootDefault || sessions.length <= 1} onClick={handleDelete}>
               <i className="codicon codicon-trash" /> Delete current
             </button>
           </div>
