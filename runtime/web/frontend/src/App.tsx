@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { SystemStats } from "./components/SystemStats";
 import { ModelContextBar } from "./components/ModelContextBar";
+import { SessionPill } from "./components/SessionPill";
 import { CommandPalette } from "./components/CommandPalette";
 import { WidgetPane } from "./components/WidgetPane";
 import { PanelRouter, ChatPanel, SettingsPanel } from "./panels";
@@ -198,6 +199,7 @@ function AppContent() {
             <span className={`status-bar__conn-dot ${connected ? "status-bar__conn-dot--connected" : "status-bar__conn-dot--disconnected"}`} />
             <span className="status-bar__conn-text">{connected ? "Connected" : "Disconnected"}</span>
           </span>
+          <SessionPill />
           <ModelContextBar />
           {statusFlash.value && (
             <span className={`status-bar__flash status-bar__flash--${statusFlash.value.type}`} role="status" aria-live="polite">
@@ -223,6 +225,7 @@ function AppContent() {
         </div>
         {/* Mobile bottom toolbar */}
         <div className="mobile-toolbar">
+          <SessionPill />
           <span className="mobile-toolbar__model-slot"><ModelContextBar /></span>
           <button
             type="button"
