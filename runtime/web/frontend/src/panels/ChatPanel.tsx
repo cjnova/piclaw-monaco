@@ -4,6 +4,13 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
+import { extractDisplayName } from "../utils/extractDisplayName";
+import { isSafeExtensionUrl } from "../utils/isSafeExtensionUrl";
+
+interface ExtensionRoute {
+  prefix: string;
+  extensionPath: string;
+}
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
@@ -27,6 +34,8 @@ const MAX_HISTORY = 50;
 export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeTab = useSignal<string>("chat");
+  const extensionPages = useSignal<ExtensionRoute[]>([]);
   const isSending = useSignal(false);
   const sendError = useSignal<string | null>(null);
   const isAgentRunning = useSignal(false);
@@ -65,24 +74,33 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     };
     window.addEventListener("piclaw:agent-status", agentStatusHandler);
 
-    // Handle widget submissions as user messages
-    const widgetSubmissionHandler = (e: Event) => {
-      const text = (e as CustomEvent).detail?.text;
-      if (text) {
-        fetch(getMessageUrl(), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ content: text }),
-        }).catch(console.error);
-      }
-    };
-    window.addEventListener("piclaw:widget-submission", widgetSubmissionHandler);
+    fetch("/api/extension-routes", { credentials: "include" })
+      .then((res) => res.json())
+      .then((routes: ExtensionRoute[]) => {
+        const pages = routes.filter((r) => r.prefix.endsWith("-page"));
+        extensionPages.value = pages;
+      })
+      .catch((err) => {
+        console.warn("[chat] extension route discovery failed:", err);
+      });
 
-    return () => {
-      window.removeEventListener("piclaw:agent-status", agentStatusHandler);
-      window.removeEventListener("piclaw:widget-submission", widgetSubmissionHandler);
-    };
+  // Handle widget submissions as user messages
+  const widgetSubmissionHandler = (e: Event) => {
+    const text = (e as CustomEvent).detail?.text;
+    if (text) {
+      fetch(getMessageUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ content: text }),
+      }).catch(console.error);
+    }
+  };
+  window.addEventListener("piclaw:widget-submission", widgetSubmissionHandler);
+  return () => {
+    window.removeEventListener("piclaw:agent-status", agentStatusHandler);
+    window.removeEventListener("piclaw:widget-submission", widgetSubmissionHandler);
+  };
   }, []);
 
   const hasText = useSignal(false);
@@ -442,9 +460,38 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
     }
   };
 
+  const pages = extensionPages.value;
+  const showTabs = pages.length > 0;
+
   return (
     <section className="chat">
-      {/* Chat content */}
+      {showTabs && (
+        <div className="chat-tabs">
+          {pages.map((page) => (
+            <button
+              key={page.prefix}
+              type="button"
+              className={`chat-tabs__tab${activeTab.value === page.prefix ? " chat-tabs__tab--active" : ""}`}
+              onClick={() => { activeTab.value = page.prefix; }}
+            >
+              {extractDisplayName(page.extensionPath)}
+            </button>
+          ))}
+          {activeTab.value !== "chat" && (
+            <button
+              type="button"
+              className="chat-tabs__tab"
+              onClick={() => { activeTab.value = "chat"; }}
+            >
+              ← Back to Chat
+            </button>
+          )}
+        </div>
+      )}
+
+      {activeTab.value === "chat" ? (
+        <>
+          {/* Chat content */}
           <div className="chat__messages">
             <MessageList />
           </div>
@@ -617,11 +664,25 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
               </button>
             )}
           </div>
-      {sendError.value && (
-        <div className="chat__send-error">
-          {sendError.value}
-          <button type="button" className="chat__send-error-dismiss" onClick={() => (sendError.value = null)}>✕</button>
-        </div>
+          {sendError.value && (
+            <div className="chat__send-error">
+              {sendError.value}
+              <button type="button" className="chat__send-error-dismiss" onClick={() => (sendError.value = null)}>✕</button>
+            </div>
+          )}
+        </>
+      ) : isSafeExtensionUrl(activeTab.value) ? (
+        <>
+          {/* Security: allow-same-origin required for extension API access. allow-scripts required for interactivity. Popups restricted. See #168. */}
+          <iframe
+            className="chat-tabs__iframe"
+            src={activeTab.value}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
+          />
+        </>
+      ) : (
+        <div className="chat-tabs__blocked">Blocked: unsafe extension URL</div>
       )}
     </section>
   );

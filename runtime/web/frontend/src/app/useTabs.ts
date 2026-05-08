@@ -2,7 +2,6 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useCallback } from "preact/hooks";
 import type { Signal } from "@preact/signals";
 import type { Tab } from "./tabTypes";
-import { extractDisplayName } from "../utils/extractDisplayName";
 
 const CHAT_TAB: Tab = { id: "chat", label: "Chat", icon: "💬", closable: false, type: "chat" };
 
@@ -74,35 +73,6 @@ export function useTabs(terminalVisible: Signal<boolean>, terminalMaximized?: Si
       }
     });
   }, [terminalMaximized, terminalVisible, ensureTab, tabs, activeTabId, isMobile]);
-
-  useEffect(() => {
-    fetch("/api/extension-routes", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data || !Array.isArray(data)) return;
-        const pages = data.filter((r: { prefix: string }) => r.prefix.endsWith("-page"));
-        const existingIds = new Set(tabs.value.map((t) => t.id));
-        const extensionTabs = pages
-          .map((page: { prefix: string; extensionPath: string }) => {
-            const tabId = `ext-${page.prefix}`;
-            if (existingIds.has(tabId)) return null;
-            return {
-              id: tabId,
-              label: extractDisplayName(page.extensionPath),
-              icon: "🧩",
-              closable: false,
-              type: "extension" as const,
-              extensionUrl: page.prefix,
-            };
-          })
-          .filter((tab): tab is Tab => tab !== null);
-
-        if (extensionTabs.length > 0) {
-          tabs.value = [...tabs.value, ...extensionTabs];
-        }
-      })
-      .catch(() => {});
-  }, [tabs]);
 
   // Widget events → widget tabs
   useEffect(() => {
