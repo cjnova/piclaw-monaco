@@ -150,7 +150,9 @@ export function SessionPill() {
       confirmLabel: "Archive",
     });
     if (!confirmed) return;
-    void runAction("archive", "/agent/branch-prune", { chat_jid: activeChatJid });
+    await runAction("archive", "/agent/branch-prune", { chat_jid: activeChatJid });
+    // Navigate to default after archiving current session
+    goToChat("web:default");
   };
 
   const handleDelete = async (jid: string) => {

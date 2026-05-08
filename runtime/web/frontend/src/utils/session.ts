@@ -77,7 +77,7 @@ export function extractChatJidFromAction(payload: unknown): string | null {
 export async function loadMergedSessions(activeChatJid: string): Promise<{ sessions: SessionEntry[]; unauthorized: boolean }> {
   const [chatsRes, branchesRes] = await Promise.all([
     fetch("/agent/active-chats", { credentials: "same-origin" }),
-    fetch(`/agent/branches?chat_jid=${encodeURIComponent(activeChatJid)}`, { credentials: "same-origin" }),
+    fetch(`/agent/branches?include_archived=1`, { credentials: "same-origin" }),
   ]);
 
   if (chatsRes.status === 401 || branchesRes.status === 401) {

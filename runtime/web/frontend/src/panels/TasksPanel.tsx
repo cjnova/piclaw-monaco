@@ -374,7 +374,9 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
       { chat_jid: chatJid },
       "Couldn't archive session. Please try again.",
     );
-  }, [runSessionAction, showConfirm]);
+    // Navigate to default if we archived the current session
+    if (chatJid === activeChatJid) navigateToChat("web:default");
+  }, [activeChatJid, runSessionAction, showConfirm]);
 
   const handleDeleteSession = useCallback(async (chatJid: string) => {
     const confirmed = await showConfirm({
