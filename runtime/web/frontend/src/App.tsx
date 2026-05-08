@@ -230,10 +230,12 @@ function AppContent() {
         )}
 
         <div className={`app-layout__status-bar ${statusFlash.value ? `app-layout__status-bar--flash app-layout__status-bar--flash-${statusFlash.value.type}` : ""}`}>
-          <span className="status-bar__conn">
-            <span className={`status-bar__conn-dot ${connected ? "status-bar__conn-dot--connected" : "status-bar__conn-dot--disconnected"}`} />
-            <span className="status-bar__conn-text">{connected ? "" : "Offline"}</span>
-          </span>
+          {!connected && (
+            <span className="status-bar__conn">
+              <span className="status-bar__conn-dot status-bar__conn-dot--disconnected" />
+              <span className="status-bar__conn-text">Offline</span>
+            </span>
+          )}
           <SessionPill />
           <ModelContextBar />
           {statusFlash.value && (
