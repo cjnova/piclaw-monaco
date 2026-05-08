@@ -1877,6 +1877,54 @@ body {
   flex-shrink: 0;
 }
 
+.tab-bar__dashboards {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.tab-bar__caret {
+  font-size: 10px;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+
+.tab-bar__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  min-width: 180px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+}
+
+.tab-bar__dropdown-item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.tab-bar__dropdown-item:hover {
+  background: var(--overlay-white-07);
+}
+
+.tab-bar__dropdown-item--active {
+  color: var(--accent);
+  background: var(--tint-blue-08);
+}
+
 .tab-bar::-webkit-scrollbar {
   display: none;
 }

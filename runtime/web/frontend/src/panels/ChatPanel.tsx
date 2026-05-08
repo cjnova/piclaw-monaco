@@ -14,6 +14,7 @@ interface ExtensionRoute {
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
+  activeExtension?: string | null;
 }
 
 interface Attachment {
@@ -31,7 +32,7 @@ interface Attachment {
 const HISTORY_KEY = "piclaw:compose-history";
 const MAX_HISTORY = 50;
 
-export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
+export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeTab = useSignal<string>("chat");
@@ -461,54 +462,12 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   };
 
   const pages = extensionPages.value;
-  const showExtensions = pages.length > 0;
-  const extensionMenuOpen = useSignal(false);
-  const activePage = pages.find((p) => p.prefix === activeTab.value);
+  // When extension is controlled from TabBar, use that; otherwise internal state
+  const effectiveTab = activeExtension ?? activeTab.value;
 
   return (
     <section className="chat">
-      {showExtensions && activeTab.value !== "chat" && (
-        <div className="chat-extension-bar">
-          <span className="chat-extension-bar__name">
-            🧩 {activePage ? extractDisplayName(activePage.extensionPath) : ""}
-          </span>
-          <button
-            type="button"
-            className="chat-extension-bar__back"
-            onClick={() => { activeTab.value = "chat"; }}
-          >
-            ← Chat
-          </button>
-        </div>
-      )}
-      {showExtensions && activeTab.value === "chat" && (
-        <div className="chat-extension-menu">
-          <button
-            type="button"
-            className="chat-extension-menu__toggle"
-            onClick={() => { extensionMenuOpen.value = !extensionMenuOpen.value; }}
-            title="Open addon dashboards"
-          >
-            🧩 Dashboards ▾
-          </button>
-          {extensionMenuOpen.value && (
-            <div className="chat-extension-menu__dropdown">
-              {pages.map((page) => (
-                <button
-                  key={page.prefix}
-                  type="button"
-                  className="chat-extension-menu__item"
-                  onClick={() => { activeTab.value = page.prefix; extensionMenuOpen.value = false; }}
-                >
-                  {extractDisplayName(page.extensionPath)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab.value === "chat" ? (
+      {effectiveTab === "chat" ? (
         <>
           {/* Chat content */}
           <div className="chat__messages">
@@ -690,14 +649,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
             </div>
           )}
         </>
-      ) : isSafeExtensionUrl(activeTab.value) ? (
+      ) : isSafeExtensionUrl(effectiveTab) ? (
         <>
           {/* Security: allow-same-origin required for extension API access. allow-scripts required for interactivity. Popups restricted. See #168. */}
           <iframe
             className="chat-tabs__iframe"
-            src={activeTab.value}
+            src={effectiveTab}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            title={extractDisplayName(pages.find((p) => p.prefix === activeTab.value)?.extensionPath ?? "")}
+            title={extractDisplayName(pages.find((p) => p.prefix === effectiveTab)?.extensionPath ?? "")}
           />
         </>
       ) : (
