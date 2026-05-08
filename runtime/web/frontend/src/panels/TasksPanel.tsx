@@ -36,7 +36,12 @@ interface SessionsTabProps {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function chatName(entry: { jid: string; name?: string; display_name?: string }): string {
-  return entry.display_name ?? entry.name ?? entry.jid.split(":").pop() ?? entry.jid;
+  if (entry.display_name) return entry.display_name;
+  const jidTail = entry.jid.split(":").pop() ?? entry.jid;
+  // When name matches the JID tail "default", show the assistant identity instead
+  if (entry.name && entry.name !== jidTail) return entry.name;
+  if (jidTail === "default") return "piclaw";
+  return entry.name ?? jidTail;
 }
 
 // ─── Tasks Tab ────────────────────────────────────────────────────────────────
