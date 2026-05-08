@@ -5943,3 +5943,63 @@ pre.frontmatter-block {
   color: var(--text-muted);
   min-width: 28px;
 }
+
+/* ── Progressive status bar compression ── */
+
+/* < 1066px: stats already collapsed to dropdown (above) */
+
+/* < 860px: hide connection text, compress model name */
+@media (max-width: 860px) {
+  .status-bar__conn-text {
+    display: none;
+  }
+  .model-badge__name-wrapper {
+    max-width: 140px;
+  }
+  .model-badge {
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+  .thinking-badge {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+  .session-pill {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .status-bar__terminal-btn {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .app-layout__status-bar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+}
+
+/* < 700px: further compress, icon-only terminal */
+@media (max-width: 700px) {
+  .model-badge__provider {
+    display: none;
+  }
+  .model-badge__name-wrapper {
+    max-width: 100px;
+  }
+  .status-bar__terminal-btn {
+    font-size: 0;
+  }
+  .status-bar__terminal-btn::before {
+    content: "⬛";
+    font-size: 12px;
+  }
+  .session-pill {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .app-layout__status-bar {
+    gap: 6px;
+    padding: 0 6px;
+  }
+}
