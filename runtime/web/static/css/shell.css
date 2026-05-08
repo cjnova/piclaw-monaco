@@ -607,6 +607,108 @@ body {
   opacity: 0.85;
 }
 
+.session-pill-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--overlay-white-05);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.session-pill:hover {
+  background: var(--overlay-white-08);
+}
+
+.session-pill__dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 320px;
+  overflow: auto;
+  z-index: 10010;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 -8px 24px var(--overlay-black-40);
+}
+
+.session-pill__section {
+  padding: 6px;
+}
+
+.session-pill__item {
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 6px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+}
+
+.session-pill__item:hover {
+  background: var(--overlay-white-06);
+}
+
+.session-pill__item--active {
+  background: var(--tint-blue-13);
+  color: var(--accent);
+}
+
+.session-pill__item-badge {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.session-pill__actions {
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding: 8px;
+}
+
+.session-pill__action {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--overlay-white-04);
+  color: var(--text);
+  font-size: 11px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.session-pill__action:hover {
+  background: var(--overlay-white-10);
+}
+
+.session-pill__empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
 @keyframes status-bar-flash {
   0% {
     filter: brightness(1.1);
@@ -3281,6 +3383,7 @@ body {
   padding: 8px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .tasks-panel__action-btn {
   padding: 4px 10px;
@@ -3292,6 +3395,37 @@ body {
   cursor: pointer;
 }
 .tasks-panel__action-btn:hover { background: var(--accent); color: #fff; }
+.tasks-panel__action-btn--danger {
+  border-color: var(--error);
+  color: var(--error);
+  background: var(--tint-red-10);
+}
+.tasks-panel__action-btn--danger:hover {
+  background: var(--error);
+  color: #fff;
+}
+.tasks-panel__session-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.tasks-panel__session-row .tasks-panel__item {
+  flex: 1;
+}
+.tasks-panel__restore-btn {
+  border: 1px solid var(--border);
+  background: var(--overlay-white-04);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.tasks-panel__restore-btn:hover {
+  background: var(--tint-green-08);
+  color: var(--success);
+  border-color: var(--success);
+}
 
 /* ── Tasks filter tabs ── */
 .tasks-panel__filter-tabs {
@@ -5041,6 +5175,9 @@ pre.frontmatter-block {
   .status-bar__terminal-btn {
     display: none;
   }
+  .app-layout__status-bar .session-pill-wrap {
+    display: none;
+  }
 
   /* Bottom mobile toolbar */
   .mobile-toolbar {
@@ -5053,6 +5190,22 @@ pre.frontmatter-block {
     flex-shrink: 0;
   }
 
+
+  .mobile-toolbar .session-pill-wrap {
+    flex-shrink: 0;
+  }
+  .mobile-toolbar .session-pill {
+    font-size: 11px;
+    padding: 4px 9px;
+  }
+  .mobile-toolbar .session-pill__dropdown {
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: auto;
+    min-width: 200px;
+    max-width: min(320px, calc(100vw - 24px));
+    max-height: 250px;
+  }
 
   .mobile-toolbar__model-slot {
     flex: 1;

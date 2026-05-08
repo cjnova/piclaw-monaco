@@ -3,13 +3,13 @@ import { getChatJid } from "../api/chat-jid";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ActiveChat {
+export interface ActiveChat {
   jid: string;
   name?: string;
   display_name?: string;
 }
 
-interface Branch {
+export interface Branch {
   jid: string;
   name?: string;
   display_name?: string;
@@ -17,9 +17,13 @@ interface Branch {
   archived?: boolean;
 }
 
+interface SessionsTabProps {
+  activeChatJid: string;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function chatName(entry: { jid: string; name?: string; display_name?: string }): string {
+export function chatName(entry: { jid: string; name?: string; display_name?: string }): string {
   return entry.display_name ?? entry.name ?? entry.jid.split(":").pop() ?? entry.jid;
 }
 
@@ -284,8 +288,12 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState<string>("");
-  const [actionBusy, setActionBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const navigateToChat = (chatJid: string) => {
+    window.location.href = `/?chat_jid=${encodeURIComponent(chatJid)}`;
+  };
 
   const loadData = useCallback(async () => {
     setStatus("loading");
@@ -320,56 +328,111 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
     loadData();
   }, [loadData]);
 
-  const handleNewSession = useCallback(async () => {
+  const runSessionAction = useCallback(async (
+    actionKey: string,
+    endpoint: string,
+    body: Record<string, unknown>,
+    errorMessage: string,
+  ) => {
     if (actionBusy) return;
-    setActionBusy(true);
+    setActionBusy(actionKey);
     setActionError(null);
     try {
-      const res = await fetch("/agent/respond", {
+      const res = await fetch(endpoint, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "/new-session", chat_jid: activeChatJid }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        console.warn("[tasks] new session failed:", res.status);
-        setActionError("Couldn't create session. Please try again.");
-        return;
+        console.warn(`[tasks] ${actionKey} failed:`, res.status);
+        setActionError(errorMessage);
+        return null;
       }
+      const payload = await res.json().catch(() => null);
       await loadData();
+      const branchChatJid = payload?.branch?.chat_jid;
+      const responseChatJid = payload?.chat_jid;
+      return typeof branchChatJid === "string" && branchChatJid
+        ? branchChatJid
+        : typeof responseChatJid === "string" && responseChatJid
+          ? responseChatJid
+          : null;
     } catch (err) {
-      console.warn("[tasks] new session failed:", err);
-      setActionError("Failed to create session.");
+      console.warn(`[tasks] ${actionKey} failed:`, err);
+      setActionError(errorMessage);
+      return null;
     } finally {
-      setActionBusy(false);
+      setActionBusy(null);
     }
-  }, [actionBusy, activeChatJid, loadData]);
+  }, [actionBusy, loadData]);
 
-  const handleRename = useCallback(async () => {
-    const newName = prompt("Enter new session name:");
-    if (!newName) return;
-    setActionBusy(true);
-    setActionError(null);
-    try {
-      const res = await fetch("/agent/respond", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `/session-name ${newName}`, chat_jid: activeChatJid }),
-      });
-      if (!res.ok) {
-        console.warn("[tasks] rename failed:", res.status);
-        setActionError("Couldn't rename session. Please try again.");
-        return;
-      }
+  const handleNewBranch = useCallback(async () => {
+    const nextChatJid = await runSessionAction(
+      "fork",
+      "/agent/branch-fork",
+      { chat_jid: activeChatJid },
+      "Couldn't create branch. Please try again.",
+    );
+    if (nextChatJid) navigateToChat(nextChatJid);
+  }, [activeChatJid, runSessionAction]);
+
+  const handleNewRoot = useCallback(async () => {
+    const name = prompt("Enter root session name:")?.trim();
+    if (!name) return;
+    const nextChatJid = await runSessionAction(
+      "new-root",
+      "/agent/root-session",
+      { name },
+      "Couldn't create root session. Please try again.",
+    );
+    if (nextChatJid) navigateToChat(nextChatJid);
+  }, [runSessionAction]);
+
+  const handleMergeParent = useCallback(async () => {
+    const nextChatJid = await runSessionAction(
+      "merge-parent",
+      "/agent/branch-merge-parent",
+      { chat_jid: activeChatJid },
+      "Couldn't merge session into parent. Please try again.",
+    );
+    if (nextChatJid) navigateToChat(nextChatJid);
+  }, [activeChatJid, runSessionAction]);
+
+  const handleRenameCurrent = useCallback(async () => {
+    const name = prompt("Enter new session name:")?.trim();
+    if (!name) return;
+    await runSessionAction(
+      "rename",
+      "/agent/branch-rename",
+      { chat_jid: activeChatJid, name },
+      "Couldn't rename session. Please try again.",
+    );
+  }, [activeChatJid, runSessionAction]);
+
+  const handleDeleteCurrent = useCallback(async () => {
+    const confirmed = confirm("Delete current session permanently? This cannot be undone.");
+    if (!confirmed) return;
+    const nextChatJid = await runSessionAction(
+      "delete",
+      "/agent/branch-purge",
+      { chat_jid: activeChatJid },
+      "Couldn't delete session. Please try again.",
+    );
+    if (nextChatJid) navigateToChat(nextChatJid);
+  }, [activeChatJid, runSessionAction]);
+
+  const handleRestore = useCallback(async (branchJid: string) => {
+    const nextChatJid = await runSessionAction(
+      `restore-${branchJid}`,
+      "/agent/branch-restore",
+      { chat_jid: branchJid },
+      "Couldn't restore branch. Please try again.",
+    );
+    if (nextChatJid && nextChatJid === activeChatJid) {
       await loadData();
-    } catch (err) {
-      console.warn("[tasks] rename failed:", err);
-      setActionError("Failed to rename session.");
-    } finally {
-      setActionBusy(false);
     }
-  }, [actionBusy, activeChatJid, loadData]);
+  }, [activeChatJid, loadData, runSessionAction]);
 
   if (status === "loading") {
     return (
@@ -404,9 +467,7 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
               key={session.jid}
               type="button"
               className={`tasks-panel__item${isCurrent ? " tasks-panel__item--active" : ""}`}
-              onClick={() => {
-                window.location.href = `/?chat_jid=${encodeURIComponent(session.jid)}`;
-              }}
+              onClick={() => navigateToChat(session.jid)}
             >
               <span className="tasks-panel__item-name">@{chatName(session)}</span>
               <span className="tasks-panel__item-sep"> — </span>
@@ -422,21 +483,30 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
           const isCurrent = branch.jid === activeChatJid;
           const isArchived = branch.archived || branch.status === "archived";
           return (
-            <button
-              key={branch.jid}
-              type="button"
-              className={`tasks-panel__item tasks-panel__item--archived${isCurrent ? " tasks-panel__item--active" : ""}`}
-              onClick={() => {
-                window.location.href = `/?chat_jid=${encodeURIComponent(branch.jid)}`;
-              }}
-            >
-              <span className="tasks-panel__item-name">@{chatName(branch)}</span>
-              <span className="tasks-panel__item-sep"> — </span>
-              <span className="tasks-panel__item-jid">{branch.jid}</span>
-              <span className={`tasks-panel__item-badge tasks-panel__item-badge--${isArchived ? "archived" : "branch"}`}>
-                {isArchived ? "archived" : "branch"}
-              </span>
-            </button>
+            <div key={branch.jid} className="tasks-panel__session-row">
+              <button
+                type="button"
+                className={`tasks-panel__item tasks-panel__item--archived${isCurrent ? " tasks-panel__item--active" : ""}`}
+                onClick={() => navigateToChat(branch.jid)}
+              >
+                <span className="tasks-panel__item-name">@{chatName(branch)}</span>
+                <span className="tasks-panel__item-sep"> — </span>
+                <span className="tasks-panel__item-jid">{branch.jid}</span>
+                <span className={`tasks-panel__item-badge tasks-panel__item-badge--${isArchived ? "archived" : "branch"}`}>
+                  {isArchived ? "archived" : "branch"}
+                </span>
+              </button>
+              {isArchived && (
+                <button
+                  type="button"
+                  className="tasks-panel__restore-btn"
+                  disabled={actionBusy === `restore-${branch.jid}`}
+                  onClick={() => { void handleRestore(branch.jid); }}
+                >
+                  Restore
+                </button>
+              )}
+            </div>
           );
         })}
       </div>
@@ -445,23 +515,20 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
         {actionError && (
           <div className="tasks-panel__error tasks-panel__error--action">{actionError}</div>
         )}
-        <button
-          type="button"
-          className="tasks-panel__action-btn"
-          disabled={actionBusy}
-          onClick={handleNewSession}
-          title="Create a new session"
-        >
-          New
+        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewBranch(); }}>
+          New branch
         </button>
-        <button
-          type="button"
-          className="tasks-panel__action-btn"
-          disabled={actionBusy}
-          onClick={handleRename}
-          title="Rename current session"
-        >
-          Rename
+        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleNewRoot(); }}>
+          New root…
+        </button>
+        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleMergeParent(); }}>
+          Merge current w/ parent
+        </button>
+        <button type="button" className="tasks-panel__action-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRenameCurrent(); }}>
+          Rename current…
+        </button>
+        <button type="button" className="tasks-panel__action-btn tasks-panel__action-btn--danger" disabled={Boolean(actionBusy)} onClick={() => { void handleDeleteCurrent(); }}>
+          Delete current…
         </button>
       </div>
     </div>
