@@ -560,18 +560,6 @@ function SessionsTab({ activeChatJid }: SessionsTabProps) {
           >
             <i className="codicon codicon-git-merge" /> Merge to parent
           </button>
-          <button type="button" className="settings-panel__provider-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRenameSession(activeChatJid); }}>
-            <i className="codicon codicon-edit" /> Rename…
-          </button>
-          <button
-            type="button"
-            className="settings-panel__provider-btn settings-panel__provider-btn--logout"
-            disabled={Boolean(actionBusy)}
-            onClick={() => { void handleDeleteSession(activeChatJid); }}
-            title="Permanently delete this session"
-          >
-            <i className="codicon codicon-trash" /> Delete current…
-          </button>
         </div>
       </div>
     </div>
