@@ -493,14 +493,15 @@ body {
 .sys-stats__metric {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .sys-stats__icon {
-  width: 11px;
-  font-size: 11px;
+  width: 14px;
+  font-size: 12px;
   line-height: 1;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .sys-stats__value {
