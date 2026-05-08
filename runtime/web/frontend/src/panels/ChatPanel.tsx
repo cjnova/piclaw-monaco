@@ -4,13 +4,8 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
-import { extractDisplayName } from "../utils/extractDisplayName";
 import { isSafeExtensionUrl } from "../utils/isSafeExtensionUrl";
 
-interface ExtensionRoute {
-  prefix: string;
-  extensionPath: string;
-}
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
@@ -35,8 +30,6 @@ const MAX_HISTORY = 50;
 export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeTab = useSignal<string>("chat");
-  const extensionPages = useSignal<ExtensionRoute[]>([]);
   const isSending = useSignal(false);
   const sendError = useSignal<string | null>(null);
   const isAgentRunning = useSignal(false);
@@ -75,15 +68,6 @@ export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {
     };
     window.addEventListener("piclaw:agent-status", agentStatusHandler);
 
-    fetch("/api/extension-routes", { credentials: "include" })
-      .then((res) => res.json())
-      .then((routes: ExtensionRoute[]) => {
-        const pages = routes.filter((r) => r.prefix.endsWith("-page"));
-        extensionPages.value = pages;
-      })
-      .catch((err) => {
-        console.warn("[chat] extension route discovery failed:", err);
-      });
 
   // Handle widget submissions as user messages
   const widgetSubmissionHandler = (e: Event) => {
@@ -461,9 +445,7 @@ export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {
     }
   };
 
-  const pages = extensionPages.value;
-  // When extension is controlled from TabBar, use that; otherwise internal state
-  const effectiveTab = activeExtension ?? activeTab.value;
+  const effectiveTab = activeExtension ?? "chat";
 
   return (
     <section className="chat">
@@ -656,7 +638,7 @@ export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {
             className="chat-tabs__iframe"
             src={effectiveTab}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            title={extractDisplayName(pages.find((p) => p.prefix === effectiveTab)?.extensionPath ?? "")}
+            title={"Dashboard"}
           />
         </>
       ) : (
