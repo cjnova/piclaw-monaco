@@ -2392,6 +2392,22 @@ body {
   color: var(--text);
 }
 
+.attachment-chip__action {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px;
+  border-radius: 3px;
+  text-decoration: none;
+  display: inline-flex;
+  transition: color 0.15s, background 0.15s;
+}
+
+.attachment-chip__action:hover {
+  color: var(--accent);
+  background: var(--overlay-white-07);
+}
+
 .message-list__attachments {
   display: flex;
   flex-wrap: wrap;

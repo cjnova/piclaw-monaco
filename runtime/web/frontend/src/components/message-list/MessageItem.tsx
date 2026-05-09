@@ -286,17 +286,35 @@ export function MessageItem({
                 const filename = String(b.filename ?? b.name ?? "file");
                 const mediaId = interaction.media_ids?.[i];
                 return (
-                  <a
-                    key={i}
-                    className="attachment-chip"
-                    href={mediaId ? `/media/${mediaId}` : "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`Open ${filename}`}
-                  >
+                  <span key={i} className="attachment-chip">
                     <span className="attachment-chip__icon">📄</span>
                     <span className="attachment-chip__name">{filename}</span>
-                  </a>
+                    {mediaId && (
+                      <>
+                        <a
+                          className="attachment-chip__action"
+                          href={`/media/${mediaId}`}
+                          download={filename}
+                          title="Download"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <i className="codicon codicon-desktop-download" />
+                        </a>
+                        <span
+                          className="attachment-chip__action"
+                          role="button"
+                          tabIndex={0}
+                          title="Preview"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`/media/${mediaId}`, '_blank');
+                          }}
+                        >
+                          <i className="codicon codicon-eye" />
+                        </span>
+                      </>
+                    )}
+                  </span>
                 );
               })}
           </div>
