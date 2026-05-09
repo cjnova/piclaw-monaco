@@ -305,9 +305,21 @@ export function MessageItem({
                           role="button"
                           tabIndex={0}
                           title="Preview"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            window.open(`/media/${mediaId}`, '_blank');
+                            try {
+                              const res = await fetch(`/media/${mediaId}`);
+                              const text = await res.text();
+                              const isMarkdown = filename.endsWith('.md');
+                              const html = isMarkdown
+                                ? `<div style="font-family:system-ui;padding:24px;max-width:800px;margin:0 auto;color:#cdd6f4;background:#1e1e2e;min-height:100%"><pre style="white-space:pre-wrap;word-wrap:break-word;font-size:13px;line-height:1.6">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></div>`
+                                : `<pre style="font-family:monospace;padding:24px;color:#cdd6f4;background:#1e1e2e;min-height:100%;white-space:pre-wrap;font-size:13px">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+                              window.dispatchEvent(new CustomEvent('piclaw:widget-open', {
+                                detail: { title: filename, html, widget_id: `preview-${mediaId}` }
+                              }));
+                            } catch {
+                              window.open(`/media/${mediaId}`, '_blank');
+                            }
                           }}
                         >
                           <i className="codicon codicon-eye" />
