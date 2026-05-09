@@ -2352,6 +2352,53 @@ body {
   border-radius: 0;
 }
 
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--overlay-white-04);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.attachment-chip:hover {
+  background: var(--overlay-white-10);
+}
+
+.attachment-chip__icon {
+  font-size: 14px;
+}
+
+.attachment-chip__name {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.attachment-chip__preview {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  line-height: 1;
+}
+
+.attachment-chip__preview:hover {
+  color: var(--text);
+}
+
+.message-list__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 /* Draft */
 .message-list__draft {
   display: flex;

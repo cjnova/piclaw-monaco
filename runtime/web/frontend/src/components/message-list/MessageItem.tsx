@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { ImageLightbox } from "../ImageLightbox";
+import { AttachmentChip } from "../AttachmentChip";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
 import { relativeTime, getBlockKey } from "./helpers";
 import { MessageActionBar } from "./MessageActionBar";
@@ -66,6 +67,47 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
 
 // ── MessageItem ────────────────────────────────────────────────────────────
 
+interface ParsedAttachment {
+  mediaId: number;
+  filename: string;
+}
+
+function parseUserContent(content: string): {
+  cleanedContent: string;
+  attachments: ParsedAttachment[];
+} {
+  const lines = content.split(/\r?\n/);
+  const textLines: string[] = [];
+  const attachments: ParsedAttachment[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (/^attachments:\s*$/i.test(trimmed)) {
+      continue;
+    }
+
+    const normalized = trimmed.replace(/^[-*]\s*/, "");
+    const match = normalized.match(/^attachment:(\d+)\s*\(([^)]+)\)\s*$/i);
+    if (match) {
+      attachments.push({
+        mediaId: Number.parseInt(match[1], 10),
+        filename: match[2].trim(),
+      });
+      continue;
+    }
+
+    textLines.push(line);
+  }
+
+  const cleanedContent = textLines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return { cleanedContent, attachments };
+}
+
 interface MessageItemProps {
   interaction: Interaction;
   isCollapsed: boolean;
@@ -88,6 +130,27 @@ export function MessageItem({
       const src = (target as HTMLImageElement).src;
       if (src) setLightboxSrc(src);
     }
+  };
+
+  const renderUserContent = (content: string) => {
+    const { cleanedContent, attachments } = parseUserContent(content);
+
+    return (
+      <>
+        {cleanedContent}
+        {attachments.length > 0 && (
+          <div className="message-list__attachments">
+            {attachments.map((attachment, idx) => (
+              <AttachmentChip
+                key={`${attachment.mediaId}-${attachment.filename}-${idx}`}
+                mediaId={attachment.mediaId}
+                filename={attachment.filename}
+              />
+            ))}
+          </div>
+        )}
+      </>
+    );
   };
 
   // Pair tool_use with their tool_result blocks
@@ -226,7 +289,7 @@ export function MessageItem({
                 : { __html: renderMarkdown(interaction.content) }
             }
           >
-            {isUser ? interaction.content : undefined}
+            {isUser ? renderUserContent(interaction.content) : undefined}
           </div>
         )}
         {interaction.content_blocks?.some((b) => b.type === "generated_widget") && (
