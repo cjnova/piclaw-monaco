@@ -73,7 +73,8 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
         if (opt != null) { sendCommand(`${selectedCommand} ${opt}`); onClose(); }
       } else {
         const trimmed = query.trim();
-        if (trimmed) { sendCommand(`${selectedCommand} ${trimmed}`); onClose(); }
+        sendCommand(trimmed ? `${selectedCommand} ${trimmed}` : selectedCommand);
+        onClose();
       }
       return;
     }
