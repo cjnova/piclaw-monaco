@@ -18,7 +18,9 @@ cd /home/agent/piclaw
 # bun installs from GitHub. The build steps below handle everything.
 bun update --ignore-scripts
 bun install --ignore-scripts
-bun run build
+# Skip tsc type-check in Docker builds — Bun runs TypeScript directly.
+# Type-checking is handled by CI instead.
+# bun run build
 bun run build:web
 find runtime/web/static/dist -type f -name '*.map' -delete
 
