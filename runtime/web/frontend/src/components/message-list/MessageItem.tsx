@@ -284,11 +284,19 @@ export function MessageItem({
               .filter((b: Record<string, unknown>) => b.type === "file")
               .map((b: Record<string, unknown>, i: number) => {
                 const filename = String(b.filename ?? b.name ?? "file");
+                const mediaId = interaction.media_ids?.[i];
                 return (
-                  <span key={i} className="attachment-chip">
+                  <a
+                    key={i}
+                    className="attachment-chip"
+                    href={mediaId ? `/media/${mediaId}` : "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open ${filename}`}
+                  >
                     <span className="attachment-chip__icon">📄</span>
                     <span className="attachment-chip__name">{filename}</span>
-                  </span>
+                  </a>
                 );
               })}
           </div>
@@ -325,7 +333,7 @@ export function MessageItem({
             📊 Open Widget
           </button>
         )}
-        {interaction.media_ids && interaction.media_ids.length > 0 && (
+        {interaction.media_ids && interaction.media_ids.length > 0 && !interaction.content_blocks?.some((b: Record<string, unknown>) => b.type === "file") && (
           <div className="message-list__media" onClick={handleContentClick}>
             {interaction.media_ids.map((id) => (
               <img
