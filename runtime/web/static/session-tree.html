@@ -202,7 +202,7 @@ function renderTree(data) {
 
     var indent = document.createElement('div');
     indent.className = 'st-indent';
-    indent.style.width = ((node.depth || 0) * 16 + 8) + 'px';
+    indent.style.width = Math.min((node.depth || 0) * 16 + 8, 320) + 'px';
     row.appendChild(indent);
 
     var dot = document.createElement('div');
