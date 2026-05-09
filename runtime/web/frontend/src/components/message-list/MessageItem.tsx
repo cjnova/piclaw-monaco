@@ -386,10 +386,8 @@ export function MessageItem({
             onClick={() => {
               const block = interaction.content_blocks?.find((b) => b.type === "generated_widget") as Record<string, unknown> | undefined;
               if (block) {
-                const artifact = block.artifact as Record<string, unknown> | undefined;
-                const html = (artifact?.html as string) || (block.html as string) || "";
                 window.dispatchEvent(new CustomEvent("piclaw:widget-open", {
-                  detail: { title: block.title || "Widget", html, widget_id: block.widget_id }
+                  detail: block
                 }));
               }
             }}
