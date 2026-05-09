@@ -29,6 +29,12 @@ const MAX_HISTORY = 50;
 
 export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus chat input on mount
+  useEffect(() => {
+    const t = setTimeout(() => textareaRef.current?.focus(), 100);
+    return () => clearTimeout(t);
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isSending = useSignal(false);
   const sendError = useSignal<string | null>(null);
@@ -535,6 +541,7 @@ export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {
                 className="chat__input"
                 placeholder={isAgentRunning.value ? "Type to queue (sent after current turn)" : "Type a message..."}
                 rows={3}
+                autoFocus
                 onInput={handleInput}
                 onPaste={handlePaste as any}
                 onKeyDown={(e) => {
