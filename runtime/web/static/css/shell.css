@@ -2361,7 +2361,7 @@ body {
   border-radius: 6px;
   background: var(--overlay-white-04);
   font-size: 12px;
-  cursor: pointer;
+  cursor: default;
   transition: background 0.15s;
 }
 
