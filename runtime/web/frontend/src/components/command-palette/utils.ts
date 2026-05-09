@@ -24,13 +24,16 @@ export function sendCommand(command: string) {
  */
 export async function fetchAutocompleteOptions(
   fetchUrl: string,
-  extractField?: string
+  extractField?: string,
+  mapLabel?: string
 ): Promise<string[]> {
   try {
     const res = await fetch(fetchUrl, { credentials: "same-origin" });
     const data = await res.json();
     const raw = extractField ? data[extractField] ?? [] : [];
-    return Array.isArray(raw) ? raw : [];
+    if (!Array.isArray(raw)) return [];
+    if (mapLabel) return raw.map((item: Record<string, unknown>) => String(item[mapLabel] ?? "")).filter(Boolean);
+    return raw;
   } catch (err) {
     console.warn("[CommandPalette] Failed to fetch autocomplete options:", err);
     return [];
