@@ -278,6 +278,21 @@ export function MessageItem({
             postId={interaction.id}
           />
         )}
+        {interaction.content_blocks?.some((b: Record<string, unknown>) => b.type === "file") && (
+          <div className="message-list__attachments">
+            {interaction.content_blocks
+              .filter((b: Record<string, unknown>) => b.type === "file")
+              .map((b: Record<string, unknown>, i: number) => {
+                const filename = String(b.filename ?? b.name ?? "file");
+                return (
+                  <span key={i} className="attachment-chip">
+                    <span className="attachment-chip__icon">📄</span>
+                    <span className="attachment-chip__name">{filename}</span>
+                  </span>
+                );
+              })}
+          </div>
+        )}
         {interaction.content && (
           <div
             className="message-list__content"
