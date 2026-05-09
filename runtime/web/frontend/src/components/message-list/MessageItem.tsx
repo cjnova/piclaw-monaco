@@ -278,6 +278,93 @@ export function MessageItem({
             postId={interaction.id}
           />
         )}
+        {interaction.content_blocks?.some((b: Record<string, unknown>) => b.type === "file") && (
+          <div className="message-list__attachments">
+            {interaction.content_blocks
+              .filter((b: Record<string, unknown>) => b.type === "file")
+              .map((b: Record<string, unknown>, i: number) => {
+                const filename = String(b.filename ?? b.name ?? "file");
+                const mediaId = interaction.media_ids?.[i];
+                return (
+                  <span key={i} className="attachment-chip">
+                    <span className="attachment-chip__icon">📄</span>
+                    <span className="attachment-chip__name">{filename}</span>
+                    {mediaId && (
+                      <>
+                        <span
+                          className="attachment-chip__action"
+                          role="button"
+                          tabIndex={0}
+                          title="Download"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(`/media/${mediaId}`);
+                              const blob = await res.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = filename;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch {
+                              window.open(`/media/${mediaId}`, '_blank');
+                            }
+                          }}
+                        >
+                          <i className="codicon codicon-desktop-download" />
+                        </span>
+                        <span
+                          className="attachment-chip__action"
+                          role="button"
+                          tabIndex={0}
+                          title="Preview"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(`/media/${mediaId}`);
+                              const text = await res.text();
+                              const previewHtml = `
+                                <style>
+                                  :root { color-scheme: light dark; }
+                                  body { font-family: -apple-system, system-ui, sans-serif; padding: 32px 48px; max-width: 860px; margin: 0 auto; line-height: 1.6; font-size: 14px; color: #1e1e1e; background: #fff; }
+                                  h1, h2, h3 { color: #2563eb; margin-top: 24px; }
+                                  h1 { font-size: 22px; border-bottom: 1px solid #d4d4d4; padding-bottom: 8px; }
+                                  h2 { font-size: 18px; }
+                                  h3 { font-size: 15px; color: #16a34a; }
+                                  pre { background: #f5f5f5; padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+                                  code { font-family: monospace; background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-size: 13px; }
+                                  ul, ol { padding-left: 24px; }
+                                  li { margin: 4px 0; }
+                                  a { color: #2563eb; }
+                                  @media (prefers-color-scheme: dark) {
+                                    body { color: #cdd6f4; background: #1e1e2e; }
+                                    h1, h2, h3 { color: #89b4fa; }
+                                    h1 { border-bottom-color: #45475a; }
+                                    h3 { color: #a6e3a1; }
+                                    pre, code { background: #181825; }
+                                    a { color: #89b4fa; }
+                                  }
+                                </style>
+                                ${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/\n/g, '<br>')}
+                              `;
+                              window.dispatchEvent(new CustomEvent('piclaw:widget-open', {
+                                detail: { title: filename, html: previewHtml, widget_id: `preview-${mediaId}` }
+                              }));
+                            } catch {
+                              window.open(`/media/${mediaId}`, '_blank');
+                            }
+                          }}
+                        >
+                          <i className="codicon codicon-eye" />
+                        </span>
+                      </>
+                    )}
+                  </span>
+                );
+              })}
+          </div>
+        )}
         {interaction.content && (
           <div
             className="message-list__content"
@@ -310,7 +397,7 @@ export function MessageItem({
             📊 Open Widget
           </button>
         )}
-        {interaction.media_ids && interaction.media_ids.length > 0 && (
+        {interaction.media_ids && interaction.media_ids.length > 0 && !interaction.content_blocks?.some((b: Record<string, unknown>) => b.type === "file") && (
           <div className="message-list__media" onClick={handleContentClick}>
             {interaction.media_ids.map((id) => (
               <img
