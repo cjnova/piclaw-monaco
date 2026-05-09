@@ -48,7 +48,6 @@ function AppContent() {
   const terminalRef = useRef<HTMLDivElement>(null);
 
   const { tabs, activeTabId, closeTab } = useTabs(terminalVisible, terminalMaximized);
-  const activeExtension = useSignal<string | null>(null);
   const { DialogHost } = useDialog();
 
   const isSettingsActive = activePanel.value === "settings";
@@ -176,11 +175,9 @@ function AppContent() {
                 <TabBar
                   tabs={tabs.value}
                   activeTabId={activeTabId.value}
-                  onSelectTab={(id) => { activeTabId.value = id; activeExtension.value = null; }}
+                  onSelectTab={(id) => { activeTabId.value = id; }}
                   onCloseTab={closeTab}
                   clockText={clockText.value}
-                  activeExtension={activeExtension.value}
-                  onSelectExtension={(prefix) => { activeExtension.value = prefix; }}
                 />
                 <div className="app-layout__tab-viewport">
                   {isExtensionPageOpen ? (
@@ -193,7 +190,7 @@ function AppContent() {
                   ) : (
                     <>
                       <div className={isWidgetActive || isTerminalActive ? "app-layout__tab-content--hidden" : "app-layout__tab-content"}>
-                        <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} activeExtension={activeExtension.value} />
+                        <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
                       </div>
                       {hasTerminalTab && (
                         <div className={isTerminalActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>

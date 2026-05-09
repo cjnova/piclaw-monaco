@@ -4,12 +4,10 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
-import { isSafeExtensionUrl } from "../utils/isSafeExtensionUrl";
 
 
 interface ChatPanelProps {
   onOpenPalette?: () => void;
-  activeExtension?: string | null;
 }
 
 interface Attachment {
@@ -27,7 +25,7 @@ interface Attachment {
 const HISTORY_KEY = "piclaw:compose-history";
 const MAX_HISTORY = 50;
 
-export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {}) {
+export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-focus chat input on mount
@@ -451,14 +449,10 @@ export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {
     }
   };
 
-  const effectiveTab = activeExtension ?? "chat";
-
   return (
     <section className="chat">
-      {effectiveTab === "chat" ? (
-        <>
-          {/* Chat content */}
-          <div className="chat__messages">
+      {/* Chat content */}
+      <div className="chat__messages">
             <MessageList />
           </div>
 
@@ -631,25 +625,11 @@ export function ChatPanel({ onOpenPalette, activeExtension }: ChatPanelProps = {
               </button>
             )}
           </div>
-          {sendError.value && (
-            <div className="chat__send-error">
-              {sendError.value}
-              <button type="button" className="chat__send-error-dismiss" onClick={() => (sendError.value = null)}>✕</button>
-            </div>
-          )}
-        </>
-      ) : isSafeExtensionUrl(effectiveTab) ? (
-        <>
-          {/* Security: allow-same-origin required for extension API access. allow-scripts required for interactivity. Popups restricted. See #168. */}
-          <iframe
-            className="chat-tabs__iframe"
-            src={effectiveTab}
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            title={"Dashboard"}
-          />
-        </>
-      ) : (
-        <div className="chat-tabs__blocked">Blocked: unsafe extension URL</div>
+      {sendError.value && (
+        <div className="chat__send-error">
+          {sendError.value}
+          <button type="button" className="chat__send-error-dismiss" onClick={() => (sendError.value = null)}>✕</button>
+        </div>
       )}
     </section>
   );
