@@ -2,6 +2,8 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useCallback } from "preact/hooks";
 import type { Signal } from "@preact/signals";
 import type { Tab } from "./tabTypes";
+import { getChatJid } from "../api/chat-jid";
+import { buildWidgetTabFromOpenDetail, type WidgetOpenDetail } from "./widgetOpen";
 
 const CHAT_TAB: Tab = { id: "chat", label: "Chat", icon: "💬", closable: false, type: "chat" };
 
@@ -77,13 +79,11 @@ export function useTabs(terminalVisible: Signal<boolean>, terminalMaximized?: Si
   // Widget events → widget tabs
   useEffect(() => {
     const handleOpen = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?._redispatch) return;
-      const title = detail?.title || "Widget";
-      const html = detail?.artifact?.html || detail?.html || "";
-      const widgetId = detail?.widget_id || `w-${Date.now()}`;
-      const tabId = `widget-${widgetId}`;
-      ensureTab({ id: tabId, label: title, icon: "📊", closable: true, type: "widget", widgetHtml: html });
+      const detail = (e as CustomEvent<WidgetOpenDetail>).detail;
+      if (!detail || typeof detail !== "object" || detail._redispatch) return;
+      const tab = buildWidgetTabFromOpenDetail(detail, getChatJid());
+      if (!tab) return;
+      ensureTab(tab);
     };
 
     const handleClose = (e: Event) => {
