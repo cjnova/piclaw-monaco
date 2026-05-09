@@ -324,13 +324,22 @@ export function MessageItem({
                             try {
                               const res = await fetch(`/media/${mediaId}`);
                               const text = await res.text();
-                              const isMarkdown = filename.endsWith('.md');
-                              const html = isMarkdown
-                                ? `<div style="font-family:system-ui;padding:24px;max-width:800px;margin:0 auto;color:#cdd6f4;background:#1e1e2e;min-height:100%"><pre style="white-space:pre-wrap;word-wrap:break-word;font-size:13px;line-height:1.6">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></div>`
-                                : `<pre style="font-family:monospace;padding:24px;color:#cdd6f4;background:#1e1e2e;min-height:100%;white-space:pre-wrap;font-size:13px">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
-                              window.dispatchEvent(new CustomEvent('piclaw:widget-open', {
-                                detail: { title: filename, html, widget_id: `preview-${mediaId}` }
-                              }));
+                              const html = `<html><head><style>
+                                body { font-family: -apple-system, system-ui, sans-serif; padding: 32px 48px; max-width: 860px; margin: 0 auto; color: #cdd6f4; background: #1e1e2e; line-height: 1.6; font-size: 14px; }
+                                h1, h2, h3 { color: #89b4fa; margin-top: 24px; }
+                                h1 { font-size: 22px; border-bottom: 1px solid #45475a; padding-bottom: 8px; }
+                                h2 { font-size: 18px; }
+                                h3 { font-size: 15px; color: #a6e3a1; }
+                                pre { background: #181825; padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+                                code { font-family: monospace; background: #181825; padding: 2px 5px; border-radius: 3px; font-size: 13px; }
+                                ul, ol { padding-left: 24px; }
+                                li { margin: 4px 0; }
+                                a { color: #89b4fa; }
+                              </style></head><body>${text.replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/\n/g, '<br>')}</body></html>`;
+                              const blob = new Blob([html], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              window.open(url, '_blank');
+                              setTimeout(() => URL.revokeObjectURL(url), 5000);
                             } catch {
                               window.open(`/media/${mediaId}`, '_blank');
                             }
