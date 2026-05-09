@@ -617,7 +617,8 @@ body {
 }
 
 .app-layout__tab-content {
-  display: contents;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
