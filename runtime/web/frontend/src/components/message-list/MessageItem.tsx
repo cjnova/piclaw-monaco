@@ -291,15 +291,29 @@ export function MessageItem({
                     <span className="attachment-chip__name">{filename}</span>
                     {mediaId && (
                       <>
-                        <a
+                        <span
                           className="attachment-chip__action"
-                          href={`/media/${mediaId}`}
-                          download={filename}
+                          role="button"
+                          tabIndex={0}
                           title="Download"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(`/media/${mediaId}`);
+                              const blob = await res.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = filename;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch {
+                              window.open(`/media/${mediaId}`, '_blank');
+                            }
+                          }}
                         >
                           <i className="codicon codicon-desktop-download" />
-                        </a>
+                        </span>
                         <span
                           className="attachment-chip__action"
                           role="button"
