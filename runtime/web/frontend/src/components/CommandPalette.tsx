@@ -59,7 +59,8 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     if (!param || param.type === "bare") { sendCommand(name); onClose(); return; }
     if (param.type === "autocomplete") {
       const opts = param.options ?? (param.fetch ? await fetchAutocompleteOptions(param.fetch, param.extractField, param.mapLabel) : []);
-      enterParameterStep(name, opts, "", param.allowEmpty);
+      const finalOpts = param.allowEmpty ? ["(no parent — root session)", ...opts] : opts;
+      enterParameterStep(name, finalOpts, "", param.allowEmpty);
       return;
     }
     if (param.type === "text") {
@@ -71,8 +72,11 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     if (step === "parameter") {
       if (autoCompleteOptions.length > 0) {
         const opt = (results as string[])[selectedIndex];
-        if (opt != null) { sendCommand(`${selectedCommand} ${opt}`); onClose(); }
-        else if (paramAllowEmpty) { sendCommand(selectedCommand); onClose(); }
+        if (opt != null) {
+          if (opt.startsWith("(no parent")) { sendCommand(selectedCommand); }
+          else { sendCommand(`${selectedCommand} ${opt}`); }
+          onClose();
+        }
       } else {
         const trimmed = query.trim();
         sendCommand(trimmed ? `${selectedCommand} ${trimmed}` : selectedCommand);
