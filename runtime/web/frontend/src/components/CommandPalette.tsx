@@ -12,6 +12,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
   const [selectedCommand, setSelectedCommand] = useState<string>("");
   const [autoCompleteOptions, setAutoCompleteOptions] = useState<string[]>([]);
   const [paramPlaceholder, setParamPlaceholder] = useState<string>("");
+  const [paramAllowEmpty, setParamAllowEmpty] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -45,9 +46,9 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     setStep("command"); setSelectedCommand(""); setAutoCompleteOptions([]); setQuery("");
   };
 
-  const enterParameterStep = (name: string, options: string[], placeholder: string) => {
+  const enterParameterStep = (name: string, options: string[], placeholder: string, allowEmpty = false) => {
     setSelectedCommand(name); setAutoCompleteOptions(options);
-    setParamPlaceholder(placeholder); setStep("parameter");
+    setParamPlaceholder(placeholder); setParamAllowEmpty(allowEmpty); setStep("parameter");
     setSelectedIndex(0); setQuery("");
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
@@ -57,8 +58,8 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
     const param = COMMAND_PARAMS[name];
     if (!param || param.type === "bare") { sendCommand(name); onClose(); return; }
     if (param.type === "autocomplete") {
-      const opts = param.options ?? (param.fetch ? await fetchAutocompleteOptions(param.fetch, param.extractField) : []);
-      enterParameterStep(name, opts, "");
+      const opts = param.options ?? (param.fetch ? await fetchAutocompleteOptions(param.fetch, param.extractField, param.mapLabel) : []);
+      enterParameterStep(name, opts, "", param.allowEmpty);
       return;
     }
     if (param.type === "text") {
@@ -71,6 +72,7 @@ export function CommandPalette({ visible, onClose }: CommandPaletteProps) {
       if (autoCompleteOptions.length > 0) {
         const opt = (results as string[])[selectedIndex];
         if (opt != null) { sendCommand(`${selectedCommand} ${opt}`); onClose(); }
+        else if (paramAllowEmpty) { sendCommand(selectedCommand); onClose(); }
       } else {
         const trimmed = query.trim();
         sendCommand(trimmed ? `${selectedCommand} ${trimmed}` : selectedCommand);

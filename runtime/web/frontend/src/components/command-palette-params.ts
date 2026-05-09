@@ -4,6 +4,7 @@ export interface CommandParam {
   type: ParamType;
   fetch?: string;
   extractField?: string;
+  mapLabel?: string;
   placeholder?: string;
   options?: string[];
   allowEmpty?: boolean;
@@ -35,7 +36,7 @@ const COMMAND_PARAMS: Record<string, CommandParam> = {
   "/steering-mode": { type: "autocomplete", options: ["all", "one-at-a-time"] },
   "/followup-mode": { type: "autocomplete", options: ["all", "one-at-a-time"] },
   "/session-name": { type: "text", placeholder: "Session name", allowEmpty: true },
-  "/new-session": { type: "text", placeholder: "Parent session path (optional)", allowEmpty: true },
+  "/new-session": { type: "autocomplete", fetch: "/agent/branches?include_archived=0", extractField: "chats", mapLabel: "chat_jid", allowEmpty: true },
   "/switch-session": { type: "text", placeholder: "Session file path" },
   "/session-rotate": { type: "text", placeholder: "Instructions (optional)", allowEmpty: true },
   "/fork": { type: "text", placeholder: "Entry ID" },
