@@ -55,6 +55,15 @@ export function handleExportTimeline(req: Request, ctx: ExportTimelineContext): 
   const userAvatar = config?.user?.userAvatar ? "/avatar/user" : null;
   const userAvatarBg = String(config?.user?.userAvatarBackground || "").trim().toLowerCase();
 
+  // Inline avatars as data URIs so wkhtmltopdf can render them without
+  // needing to fetch from localhost (which may require auth headers).
+  const agentAvatarDataUri = agentAvatar ? resolveAvatarDataUri(url.origin, agentAvatar, internalSecret) : null;
+  const userAvatarDataUri = userAvatar ? resolveAvatarDataUri(url.origin, userAvatar, internalSecret) : null;
+
+  // Build a lookup of referenced message previews for pill rendering.
+  const referencedRowIds = extractReferencedRowIds(messages);
+  const referencedPreviews = referencedRowIds.size > 0 ? loadReferencedPreviews(chatJid, referencedRowIds) : new Map();
+
   const html = buildExportHtml({
     theme,
     css,
@@ -63,9 +72,10 @@ export function handleExportTimeline(req: Request, ctx: ExportTimelineContext): 
     messages,
     agentName,
     userName,
-    agentAvatar,
-    userAvatar,
+    agentAvatar: agentAvatarDataUri || agentAvatar,
+    userAvatar: userAvatarDataUri || userAvatar,
     userAvatarBg,
+    referencedPreviews,
   });
 
   return new Response(html, {
@@ -249,6 +259,95 @@ function formatSize(bytes: number | null | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Fetch an avatar URL from localhost and return a data URI, or null on failure. */
+function resolveAvatarDataUri(origin: string, avatarPath: string, authKey: string): string | null {
+  try {
+    const url = avatarPath.startsWith("http") ? avatarPath : `${origin}${avatarPath}`;
+    const res = Bun.spawnSync(
+      ["curl", "-sf", "--max-time", "5", "-H", `Authorization: Bearer ${authKey}`, url],
+      { stdout: "pipe" },
+    );
+    if (!res.stdout || res.stdout.length === 0) return null;
+    const buf = Buffer.from(res.stdout);
+    if (buf.length < 8) return null;
+    let mime = "image/png";
+    if (buf[0] === 0x52 && buf[1] === 0x49) mime = "image/webp";
+    else if (buf[0] === 0xff && buf[1] === 0xd8) mime = "image/jpeg";
+    else if (buf[0] === 0x89 && buf[1] === 0x50) mime = "image/png";
+    else if (buf[0] === 0x47 && buf[1] === 0x49) mime = "image/gif";
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Extract all `message:<rowid>` references from message content. */
+function extractReferencedRowIds(messages: ExportMessage[]): Set<number> {
+  const ids = new Set<number>();
+  const pattern = /message:(\d+)/g;
+  for (const msg of messages) {
+    const text = msg.content || "";
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      ids.add(Number(match[1]));
+    }
+  }
+  return ids;
+}
+
+/** Load short previews of referenced messages for pill rendering. */
+function loadReferencedPreviews(chatJid: string, rowIds: Set<number>): Map<number, { sender_name: string; preview: string; is_bot: boolean }> {
+  const db = getDb();
+  const ids = Array.from(rowIds);
+  const rows = db.prepare(
+    `SELECT rowid, sender_name, content, is_bot_message
+     FROM messages
+     WHERE rowid IN (${ids.map(() => "?").join(",")})`
+  ).all(...ids) as Array<{ rowid: number; sender_name: string | null; content: string | null; is_bot_message: number }>;
+  const map = new Map<number, { sender_name: string; preview: string; is_bot: boolean }>();
+  for (const row of rows) {
+    const text = (row.content || "").replace(/\n/g, " ").trim();
+    const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
+    map.set(row.rowid, {
+      sender_name: row.sender_name || "Unknown",
+      preview,
+      is_bot: row.is_bot_message === 1,
+    });
+  }
+  return map;
+}
+
+/** Replace `Referenced messages:\n- message:<id>` blocks with styled pills. */
+function renderReferencedPills(
+  html: string,
+  previews: Map<number, { sender_name: string; preview: string; is_bot: boolean }>,
+): string {
+  // The markdown renderer turns the content into:
+  //   <p>Referenced messages:</p>\n<ul>\n<li>message:12345</li>\n</ul>
+  // or sometimes just: ...message:12345...
+  // Replace the full block first, then any inline remnants.
+  html = html.replace(
+    /<p>Referenced messages:<\/p>\s*<ul>([\s\S]*?)<\/ul>/gi,
+    (_match, listContent: string) => {
+      const pills = listContent.replace(/message:(\d+)/g, (_m: string, id: string) => {
+        const rowId = Number(id);
+        const ref = previews.get(rowId);
+        if (!ref) return `<span class="ref-pill ref-missing">message:${esc(id)}</span>`;
+        return `<span class="ref-pill${ref.is_bot ? " ref-agent" : ""}"><span class="ref-pill-author">${esc(ref.sender_name)}</span> <span class="ref-pill-preview">${esc(ref.preview)}</span></span>`;
+      });
+      return `<div class="ref-pills">${pills.replace(/<\/?li>/g, "").trim()}</div>`;
+    },
+  );
+  // Catch any remaining inline message:NNN references
+  html = html.replace(/message:(\d+)/g, (_m, id) => {
+    const rowId = Number(id);
+    const ref = previews.get(rowId);
+    if (!ref) return `<span class="ref-pill ref-missing">message:${id}</span>`;
+    return `<span class="ref-pill${ref.is_bot ? " ref-agent" : ""}"><span class="ref-pill-author">${esc(ref.sender_name)}</span> <span class="ref-pill-preview">${esc(ref.preview)}</span></span>`;
+  });
+  return html;
+}
+
 function renderAvatar(params: {
   name: string;
   url: string | null;
@@ -287,6 +386,7 @@ function buildExportHtml(opts: {
   agentAvatar: string | null;
   userAvatar: string | null;
   userAvatarBg: string;
+  referencedPreviews: Map<number, { sender_name: string; preview: string; is_bot: boolean }>;
 }): string {
   const isDark = opts.theme === "dark";
   const fg = isDark ? "#e7e9ea" : "#0f1419";
@@ -449,6 +549,35 @@ function buildExportHtml(opts: {
     }
     .post:hover { background: transparent !important; }
     .post-actions, .post-delete-btn, .compose-box, .sidebar, .header-bar, .dock-panel { display: none !important; }
+    .ref-pills { margin: 6px 0 8px !important; }
+    .ref-pill {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      gap: 6px !important;
+      padding: 4px 10px !important;
+      border: 1px solid ${border} !important;
+      border-radius: 9999px !important;
+      font-size: 12px !important;
+      margin: 2px 4px 2px 0 !important;
+      color: ${muted} !important;
+      background: ${subtle} !important;
+      max-width: 100% !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+    }
+    .ref-pill-author {
+      font-weight: 600 !important;
+      color: ${fg} !important;
+      flex-shrink: 0 !important;
+    }
+    .ref-pill-preview {
+      color: ${muted} !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+    .ref-pill.ref-agent { border-left: 3px solid ${accent} !important; }
+    .ref-pill.ref-missing { opacity: 0.5 !important; font-style: italic !important; }
   `;
 
   const posts = opts.messages.map((msg) => {
@@ -462,7 +591,7 @@ function buildExportHtml(opts: {
           <span class="post-author">${esc(name)}</span>
           <span class="post-time">${formatTime(msg.timestamp)}</span>
         </div>
-        <div class="post-content">${renderMarkdown(msg.content || "")}</div>
+        <div class="post-content">${renderReferencedPills(renderMarkdown(msg.content || ""), opts.referencedPreviews)}</div>
         ${renderMedia(msg.media || [], opts.origin)}
       </div>
     </div>`;
