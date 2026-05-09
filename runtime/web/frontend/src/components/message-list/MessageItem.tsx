@@ -325,16 +325,25 @@ export function MessageItem({
                               const res = await fetch(`/media/${mediaId}`);
                               const text = await res.text();
                               const html = `<html><head><style>
-                                body { font-family: -apple-system, system-ui, sans-serif; padding: 32px 48px; max-width: 860px; margin: 0 auto; color: #cdd6f4; background: #1e1e2e; line-height: 1.6; font-size: 14px; }
-                                h1, h2, h3 { color: #89b4fa; margin-top: 24px; }
-                                h1 { font-size: 22px; border-bottom: 1px solid #45475a; padding-bottom: 8px; }
+                                :root { color-scheme: light dark; }
+                                body { font-family: -apple-system, system-ui, sans-serif; padding: 32px 48px; max-width: 860px; margin: 0 auto; line-height: 1.6; font-size: 14px; color: #1e1e1e; background: #fff; }
+                                h1, h2, h3 { color: #2563eb; margin-top: 24px; }
+                                h1 { font-size: 22px; border-bottom: 1px solid #d4d4d4; padding-bottom: 8px; }
                                 h2 { font-size: 18px; }
-                                h3 { font-size: 15px; color: #a6e3a1; }
-                                pre { background: #181825; padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
-                                code { font-family: monospace; background: #181825; padding: 2px 5px; border-radius: 3px; font-size: 13px; }
+                                h3 { font-size: 15px; color: #16a34a; }
+                                pre { background: #f5f5f5; padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+                                code { font-family: monospace; background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-size: 13px; }
                                 ul, ol { padding-left: 24px; }
                                 li { margin: 4px 0; }
-                                a { color: #89b4fa; }
+                                a { color: #2563eb; }
+                                @media (prefers-color-scheme: dark) {
+                                  body { color: #cdd6f4; background: #1e1e2e; }
+                                  h1, h2, h3 { color: #89b4fa; }
+                                  h1 { border-bottom-color: #45475a; }
+                                  h3 { color: #a6e3a1; }
+                                  pre, code { background: #181825; }
+                                  a { color: #89b4fa; }
+                                }
                               </style></head><body>${text.replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/\n/g, '<br>')}</body></html>`;
                               const blob = new Blob([html], { type: 'text/html' });
                               const url = URL.createObjectURL(blob);
