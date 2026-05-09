@@ -91,16 +91,54 @@
     --text: #1e1e1e;
     --text-muted: #6e6e6e;
     --text-soft: #4b5563;
-    --accent: #89b4fa;
+    --accent: #2563eb;
     --success: #16a34a;
     --warning: #ca8a04;
     --error: #dc2626;
-    --handle-hover: #89b4fa;
+    --handle-hover: #2563eb;
     --handle: #d4d4d4;
     --input-bg: #ffffff;
     --input-border: #d4d4d4;
     --bg-elevated: #ebebeb;
     --overlay: rgba(31, 41, 55, 0.22);
+
+    /* Overlay: black transparency for light backgrounds */
+    --overlay-white-02: rgba(0, 0, 0, 0.02);
+    --overlay-white-03: rgba(0, 0, 0, 0.03);
+    --overlay-white-04: rgba(0, 0, 0, 0.04);
+    --overlay-white-05: rgba(0, 0, 0, 0.05);
+    --overlay-white-06: rgba(0, 0, 0, 0.06);
+    --overlay-white-07: rgba(0, 0, 0, 0.07);
+    --overlay-white-08: rgba(0, 0, 0, 0.08);
+    --overlay-white-10: rgba(0, 0, 0, 0.10);
+    --overlay-white-12: rgba(0, 0, 0, 0.12);
+    --overlay-white-15: rgba(0, 0, 0, 0.15);
+    --overlay-white-18: rgba(0, 0, 0, 0.18);
+    --overlay-white-25: rgba(0, 0, 0, 0.25);
+    --overlay-white-28: rgba(0, 0, 0, 0.28);
+    --overlay-black-35: rgba(0, 0, 0, 0.2);
+    --overlay-black-40: rgba(0, 0, 0, 0.25);
+    --overlay-black-50: rgba(0, 0, 0, 0.35);
+    --overlay-black-85: rgba(0, 0, 0, 0.6);
+
+    /* Tints: use light-theme-appropriate base colors */
+    --tint-blue-08: rgba(37, 99, 235, 0.08);
+    --tint-blue-13: rgba(37, 99, 235, 0.13);
+    --tint-blue-15: rgba(37, 99, 235, 0.15);
+    --tint-blue-27: rgba(37, 99, 235, 0.27);
+    --tint-green-08: rgba(22, 163, 74, 0.08);
+    --tint-green-10: rgba(22, 163, 74, 0.10);
+    --tint-green-13: rgba(22, 163, 74, 0.13);
+    --tint-green-15: rgba(22, 163, 74, 0.15);
+    --tint-green-18: rgba(22, 163, 74, 0.18);
+    --tint-green-27: rgba(22, 163, 74, 0.27);
+    --tint-red-10: rgba(220, 38, 38, 0.10);
+    --tint-red-13: rgba(220, 38, 38, 0.13);
+    --tint-red-15: rgba(220, 38, 38, 0.15);
+    --tint-red-25: rgba(220, 38, 38, 0.25);
+    --tint-red-27: rgba(220, 38, 38, 0.27);
+    --tint-red-40: rgba(220, 38, 38, 0.40);
+
     /* Syntax highlighting (Catppuccin Latte) */
     --syn-keyword: #8839ef;
     --syn-operator: #179299;
