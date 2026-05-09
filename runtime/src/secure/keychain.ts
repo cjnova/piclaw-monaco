@@ -205,9 +205,9 @@ export async function setKeychainEntry(entry: KeychainEntry): Promise<void> {
   ).run(
     entry.name,
     entry.type,
-    Buffer.from(payload.ciphertext),
-    Buffer.from(payload.nonce),
-    Buffer.from(payload.salt),
+    payload.ciphertext,
+    payload.nonce,
+    payload.salt,
     payload.kdf,
     payload.kdfIterations,
     String(entry.userNote ?? ""),

@@ -51,7 +51,7 @@ export async function resizeImage(
 
   try {
     const sharp = await getSharp();
-    const pipeline = sharp(Buffer.from(input))
+    const pipeline = sharp(input)
       .rotate() // auto-rotate from EXIF
       .resize(maxWidth, maxHeight, {
         fit: "inside",
