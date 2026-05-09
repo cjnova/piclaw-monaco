@@ -15,7 +15,7 @@ export function ExtensionFrame({ extensionPageUrl, extensionPageName, extensionP
           onClick={onBack}
         >
           <i className="codicon codicon-arrow-left" />
-          {" "}← Back to Chat
+          {" "}Back to Chat
         </button>
         <span className="extension-frame__title">{extensionPageName}</span>
       </div>
