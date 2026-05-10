@@ -48,6 +48,7 @@ interface ComposeAgentStatusLifecycleOptionsInput {
   setAgentPlan: StateSetter<any>;
   setAgentThought: StateSetter<any>;
   setPendingRequest: StateSetter<any>;
+  setExtensionWorkingState: StateSetter<any>;
   setActiveTurn: (turnId: string | null | undefined) => void;
   noteAgentActivity: (options?: Record<string, unknown>) => void;
   clearLastActivityFlag: () => void;
@@ -102,6 +103,7 @@ export function composeAgentStatusLifecycleOptions(input: ComposeAgentStatusLife
     setAgentPlan: input.setAgentPlan,
     setAgentThought: input.setAgentThought,
     setPendingRequest: input.setPendingRequest,
+    setExtensionWorkingState: input.setExtensionWorkingState,
     setActiveTurn: input.setActiveTurn,
     noteAgentActivity: input.noteAgentActivity,
     clearLastActivityFlag: input.clearLastActivityFlag,

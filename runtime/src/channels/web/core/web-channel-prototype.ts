@@ -232,6 +232,12 @@ export function installWebChannelPrototype(
       value: withRuntimePublicSurface((service, chatJid: string): Record<string, unknown> | null =>
         service.getAgentStatus(chatJid)),
     },
+    getExtensionWorkingState: {
+      configurable: true,
+      writable: true,
+      value: withRuntimePublicSurface((service, chatJid: string): Record<string, unknown> | null =>
+        service.getExtensionWorkingState(chatJid)),
+    },
     setContextUsage: {
       configurable: true,
       writable: true,

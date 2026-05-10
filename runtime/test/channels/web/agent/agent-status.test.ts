@@ -12,6 +12,7 @@ function createContext(overrides: Partial<AgentStatusContext> = {}): AgentStatus
     defaultChatJid: "web:default",
     json: createJsonResponder(),
     getAgentStatus: () => null,
+    getExtensionWorkingState: () => null,
     recoverStaleInflightRun: () => false,
     getBuffer: () => undefined,
     getContextUsageForChat: async () => null,
@@ -33,6 +34,7 @@ describe("web agent status helpers", () => {
       state: "idle",
       chat_jid: "web:default",
       data: null,
+      extension_working: null,
       addon_api: { degraded: false, entries: [] },
     });
   });
@@ -55,6 +57,7 @@ describe("web agent status helpers", () => {
       state: "idle",
       chat_jid: "web:ux",
       data: null,
+      extension_working: null,
       addon_api: { degraded: false, entries: [] },
     });
   });
@@ -65,6 +68,7 @@ describe("web agent status helpers", () => {
       req,
       createContext({
         getAgentStatus: (chatJid) => ({ chatJid, turn_id: "turn-1", state: "thinking" }),
+        getExtensionWorkingState: () => ({ message: "Compacting context…", indicator: { mode: "default" }, visible: true }),
         getBuffer: (_turnId, panel) =>
           panel === "thought"
             ? { text: "thought text", totalLines: 2, updatedAt: 1 }
@@ -78,6 +82,7 @@ describe("web agent status helpers", () => {
     expect(body.state).toBe("thinking");
     expect(body.chat_jid).toBe("web:custom");
     expect(body.data.chatJid).toBe("web:custom");
+    expect(body.extension_working).toEqual({ message: "Compacting context…", indicator: { mode: "default" }, visible: true });
     expect(body.thought).toEqual({ text: "thought text", totalLines: 2 });
     expect(body.draft).toEqual({ text: "draft text", totalLines: 1 });
   });

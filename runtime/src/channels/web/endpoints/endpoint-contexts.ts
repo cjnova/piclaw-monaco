@@ -50,6 +50,7 @@ export function createPostMutationsContext(deps: PostMutationsContextDeps): Post
 export interface AgentStatusContextDeps extends JsonLike {
   defaultChatJid: string;
   getAgentStatus(chatJid: string): Record<string, unknown> | null;
+  getExtensionWorkingState(chatJid: string): Record<string, unknown> | null;
   recoverStaleInflightRun(chatJid: string, options?: { hasActiveStatus?: boolean; minAgeMs?: number }): boolean;
   getBuffer(turnId: string, panel: "thought" | "draft"): WebAgentBufferEntry | undefined;
   getContextUsageForChat(
@@ -65,6 +66,7 @@ export function createAgentStatusContext(deps: AgentStatusContextDeps): AgentSta
     defaultChatJid: deps.defaultChatJid,
     json: deps.json,
     getAgentStatus: deps.getAgentStatus,
+    getExtensionWorkingState: deps.getExtensionWorkingState,
     recoverStaleInflightRun: deps.recoverStaleInflightRun,
     getBuffer: deps.getBuffer,
     getContextUsageForChat: deps.getContextUsageForChat,

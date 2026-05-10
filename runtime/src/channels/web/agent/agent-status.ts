@@ -11,6 +11,7 @@ export interface AgentStatusContext {
   defaultChatJid: string;
   json(payload: unknown, status?: number): Response;
   getAgentStatus(chatJid: string): Record<string, unknown> | null;
+  getExtensionWorkingState(chatJid: string): Record<string, unknown> | null;
   recoverStaleInflightRun(chatJid: string, options?: { hasActiveStatus?: boolean; minAgeMs?: number }): boolean;
   getBuffer(turnId: string, panel: "thought" | "draft"): WebAgentBufferEntry | undefined;
   getContextUsageForChat(
@@ -62,7 +63,7 @@ export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext):
     const status = ctx.getAgentStatus(chatJid);
     if (!status) {
       ctx.recoverStaleInflightRun(chatJid, { hasActiveStatus: false });
-      return ctx.json({ status: "idle", state: "idle", chat_jid: chatJid, data: null, addon_api: getAddonApiHealthSnapshot() });
+      return ctx.json({ status: "idle", state: "idle", chat_jid: chatJid, data: null, extension_working: ctx.getExtensionWorkingState(chatJid), addon_api: getAddonApiHealthSnapshot() });
     }
 
     const turnId = (status.turn_id || status.turnId) as string | undefined;
@@ -96,6 +97,7 @@ export function handleAgentStatusRequest(req: Request, ctx: AgentStatusContext):
       data: status,
       thought,
       draft,
+      extension_working: ctx.getExtensionWorkingState(chatJid),
       addon_api: getAddonApiHealthSnapshot(),
     });
   });

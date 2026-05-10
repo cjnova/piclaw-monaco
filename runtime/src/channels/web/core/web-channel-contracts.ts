@@ -77,6 +77,7 @@ export interface WebChannelLike
   postDashboardWidget(chatJid: string, options?: { threadId?: number | null; text?: string; widgetId?: string }): Promise<void>;
   updateAgentStatus(chatJid: string, status: Record<string, unknown>): void;
   getAgentStatus(chatJid: string): Record<string, unknown> | null;
+  getExtensionWorkingState?(chatJid: string): Record<string, unknown> | null;
   setContextUsage(chatJid: string, usage: Record<string, unknown> | null): void;
   getContextUsage(chatJid: string): Record<string, unknown> | null;
   getBuffer(turnId: string, panel: "thought" | "draft"): WebAgentBufferEntry | undefined;
