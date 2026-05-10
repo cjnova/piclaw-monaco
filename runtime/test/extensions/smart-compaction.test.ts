@@ -157,6 +157,7 @@ import {
   clampKeepRecentTokens,
   estimatePostCompactionFit,
   getProgressiveCompactionBudget,
+  getSafeCompactionMaxTokens,
   smartCompaction,
 } from "../../src/extensions/smart-compaction.js";
 
@@ -276,6 +277,12 @@ describe("smart-compaction", () => {
       estimated: true,
       source: "smart_compaction",
       phase: "scanning",
+    });
+    const completed = contextStatusPayloads.find((payload: any) => payload.phase === "completed_selective");
+    expect(completed?.tokens).toBeGreaterThan(6000);
+    expect(contextStatusPayloads.at(-1)).toMatchObject({
+      phase: "compaction_done",
+      tokens: completed?.tokens,
     });
   });
 
@@ -664,7 +671,7 @@ describe("smart-compaction", () => {
         };
       });
 
-      const ctx = makeCtx({ model: { provider: "test", id: "small-context", contextWindow: 8_000, reasoning: false } });
+      const ctx = makeCtx({ model: { provider: "test", id: "small-context", contextWindow: 16_000, reasoning: false } });
       const result = await handler!(
         {
           preparation: makePreparation(longMessages.length, {
@@ -724,6 +731,19 @@ describe("smart-compaction", () => {
       expect(fit.fits).toBe(true);
       expect(fit.margin).toBeGreaterThan(0);
       expect(fit.estimatedTotal).toBe(fit.summaryTokens + 10_000 + fit.overheadTokens);
+    });
+
+    it("caps requested maxTokens so prompt + output fits the model window", () => {
+      const safe = getSafeCompactionMaxTokens({ contextWindow: 8_000 }, "x".repeat(4_000), 16_000);
+      expect(safe.promptTokens).toBeGreaterThan(4_000);
+      expect(safe.maxTokens).toBeLessThan(16_000);
+      expect(safe.promptTokens + safe.maxTokens).toBeLessThanOrEqual(8_000);
+    });
+
+    it("rejects compaction prompts with no safe output room", () => {
+      expect(() => getSafeCompactionMaxTokens({ contextWindow: 8_000 }, "x".repeat(40_000), 16_000)).toThrow(
+        /exceeds safe model budget/,
+      );
     });
   });
 
