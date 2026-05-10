@@ -6,7 +6,7 @@
 
 This document captures every failure mode, attempted fix, and the final confirmed solution for the iOS standalone PWA viewport height bug. It exists to prevent regressions. **Read this before changing any layout CSS, viewport meta tags, or mobile-viewport JS.**
 
-> **2026-05 regression addendum:** the `100dvh` CSS default only remains safe if standalone mode sets `--app-height: 100vh` **before the bundled CSS can paint** and the runtime restores `100vh` whenever text entry is not focused. Do not remove the inline `index.html` bootstrap, the `mobile-viewport.ts` override, or the code comments pointing here without testing a freshly installed iOS standalone PWA.
+> **2026-05 regression addendum:** the `100dvh` CSS default only remains safe if standalone mode sets `--app-height: 100vh` **before the bundled CSS can paint** and the runtime restores `100vh` whenever text entry is not focused. Do not remove the inline `index.html` bootstrap, the `mobile-viewport.ts` override, or the code comments pointing here without testing a freshly installed iOS standalone PWA. Also keep `.container` to a **single** `height: var(--app-height, ...)` declaration; a duplicate `height: 100%` can be reordered after it by the CSS minifier and silently disable every `--app-height` fix.
 
 ---
 
@@ -456,7 +456,7 @@ window.matchMedia('(display-mode: standalone)').matches
 |---|---|---|
 | `runtime/web/static/index.html` | Meta tags + pre-CSS bootstrap | `viewport-fit=cover`, `apple-mobile-web-app-capable`, `status-bar-style=black-translucent`, inline standalone `--app-height: 100vh` before bundled CSS |
 | `runtime/web/static/css/base.css` | Root layout | `--app-height: 100dvh` browser default plus comments pointing here, `body { position: fixed; inset: 0 }`, `text-size-adjust: 100%` |
-| `runtime/web/static/css/editor.css` | Container & editor pane | `.container { height: var(--app-height, 100dvh); padding-top: env(safe-area-inset-top) }`, `.editor-pane-container { height: var(--app-height, 100dvh) }` |
+| `runtime/web/static/css/editor.css` | Container & editor pane | `.container` must have exactly one height declaration: `height: var(--app-height, 100dvh)` plus `padding-top: env(safe-area-inset-top)`; `.editor-pane-container { height: var(--app-height, 100dvh) }` |
 | `runtime/web/static/css/workspace.css` | Workspace sidebar | `.workspace-sidebar { height: var(--app-height, 100dvh) }` |
 | `runtime/web/static/css/agent.css` | Agent panel | `max-height: calc(var(--app-height, 100dvh) - 32px)` |
 | `runtime/web/static/css/chat.css` | Compose box | `.compose-box { padding: var(--spacing-sm) var(--spacing-md) 2px }` |
@@ -473,7 +473,7 @@ index.html (meta tags + standalone pre-CSS --app-height: 100vh bootstrap)
       → mobile-viewport.ts (keeps --app-height at 100vh in standalone unless keyboard/text entry is active)
 ```
 
-**Critical invariant**: The CSS fallback (`100dvh`) must be correct for browser mode. The inline/runtime JS override (`100vh`) must run before standalone iOS paints and must be restored after keyboard/focusout. If either side is wrong, one mode breaks.
+**Critical invariant**: The CSS fallback (`100dvh`) must be correct for browser mode. The inline/runtime JS override (`100vh`) must run before standalone iOS paints and must be restored after keyboard/focusout. `.container` must not also declare `height: 100%`; duplicate height declarations can be reordered during bundling so the fixed value wins and the app-height override is ignored. If either side is wrong, one mode breaks.
 
 ---
 
@@ -567,7 +567,7 @@ After any change to layout CSS, meta tags, or mobile-viewport.ts:
 
 | Date | Commit | Change |
 |---|---|---|
-| 2026-05-10 | pending | Added pre-CSS standalone `--app-height: 100vh` bootstrap plus code comments/tests so the April PWA notes are enforced |
+| 2026-05-10 | pending | Added pre-CSS standalone `--app-height: 100vh` bootstrap and removed duplicate `.container height: 100%` so bundled CSS cannot override app-height |
 | 2026-04-15 | `078054c6` | Final fix: `100dvh` default, `100vh` override in standalone JS |
 | 2026-04-15 | `ca7d3db2` | Replaced all `100dvh` with `100vh` (too aggressive — broke browser mode) |
 | 2026-04-15 | `3f0fca88` | Tried `calc(100dvh + 1px)` (caused animation on keyboard close) |

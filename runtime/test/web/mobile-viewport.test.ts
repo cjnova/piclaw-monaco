@@ -1,6 +1,15 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
+function readCssRule(css: string, selector: string): string {
+  const index = css.indexOf(`\n${selector} {`);
+  if (index < 0) return '';
+  const start = css.indexOf('{', index);
+  const end = css.indexOf('}', start);
+  if (start < 0 || end < 0) return '';
+  return css.slice(start + 1, end);
+}
+
 import {
   installStandaloneMobileViewportFix,
   readViewportHeight,
@@ -39,6 +48,13 @@ test('index bootstraps standalone app height before loading bundled CSS', () => 
   expect(bootstrapIndex).toBeGreaterThan(0);
   expect(cssIndex).toBeGreaterThan(bootstrapIndex);
   expect(html).toContain("document.documentElement.style.setProperty('--app-height', '100vh')");
+});
+
+test('container CSS has one app-height declaration so minification cannot override it with height 100%', () => {
+  const css = readFileSync(new URL('../../web/static/css/editor.css', import.meta.url), 'utf8');
+  const rule = readCssRule(css, '.container');
+  expect(rule).toContain('height: var(--app-height, 100dvh);');
+  expect(rule).not.toContain('height: 100%;');
 });
 
 test('readViewportHeight prefers visualViewport height when available', () => {
