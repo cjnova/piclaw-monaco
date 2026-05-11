@@ -27,7 +27,7 @@
 -->
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta id="piclaw-viewport" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta id="dynamic-theme-color" name="theme-color" content="#ffffff">
     <meta id="theme-color-light" name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
     <meta id="theme-color-dark" name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
@@ -35,6 +35,32 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>PiClaw</title>
     <meta name="apple-mobile-web-app-title" content="PiClaw">
+    <script>
+        // Android standalone PWA scale guard: apply the saved display scale before CSS loads.
+        (function() {
+            try {
+                var isAndroid = /Android/i.test(navigator.userAgent || '');
+                var standalone = false;
+                if (window.matchMedia) {
+                    standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                        window.matchMedia('(display-mode: fullscreen)').matches ||
+                        window.matchMedia('(display-mode: minimal-ui)').matches;
+                }
+                var raw = localStorage.getItem('piclawPwaDisplayScalePercent');
+                var parsed = raw && raw.trim().endsWith('%') ? Number(raw.trim().slice(0, -1)) : Number(raw);
+                if (parsed > 0 && parsed <= 2) parsed *= 100;
+                if (!Number.isFinite(parsed)) parsed = 100;
+                var percent = Math.min(115, Math.max(20, Math.round(parsed)));
+                if (isAndroid && standalone && percent !== 100) {
+                    var scale = (percent / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+                    var viewport = document.getElementById('piclaw-viewport') || document.querySelector('meta[name="viewport"]');
+                    if (viewport) {
+                        viewport.setAttribute('content', 'width=device-width, initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=' + scale + ', user-scalable=no, viewport-fit=cover');
+                    }
+                }
+            } catch(e) {}
+        })();
+    </script>
     <script>
         // iOS standalone PWA guard: set --app-height before CSS loads.
         // WebKit can cold-start 100dvh too short, leaving a bottom gap below compose.
@@ -51,8 +77,8 @@
             } catch(e) {}
         })();
     </script>
-    <link rel="stylesheet" href="/static/dist/app.bundle.css?v=50b1590a6f72">
-    <link id="dynamic-manifest" rel="manifest" href="/manifest.json?v=50b1590a6f72">
+    <link rel="stylesheet" href="/static/dist/app.bundle.css?v=ca76e21b68f1">
+    <link id="dynamic-manifest" rel="manifest" href="/manifest.json?v=ca76e21b68f1">
     <link id="dynamic-favicon" rel="icon" href="/favicon.ico">
     <link id="dynamic-apple-touch-icon" rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link id="dynamic-apple-touch-icon-180" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png">
@@ -148,6 +174,6 @@
       }
     }
     </script>
-    <script type="module" src="/static/dist/app.bundle.js?v=50b1590a6f72"></script>
+    <script type="module" src="/static/dist/app.bundle.js?v=ca76e21b68f1"></script>
 </body>
 </html>

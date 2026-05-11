@@ -31,6 +31,15 @@ import {
     readWorkspaceClientSettings,
 } from '../ui/workspace-settings.js';
 import { hasSpecializedWorkspaceTab, shouldAutoOpenWorkspaceFile } from '../ui/workspace-auto-open.js';
+import {
+    MAX_PWA_DISPLAY_SCALE_PERCENT,
+    MIN_PWA_DISPLAY_SCALE_PERCENT,
+    PWA_DISPLAY_SCALE_EVENT,
+    PWA_DISPLAY_SCALE_STEP_PERCENT,
+    PWA_DISPLAY_SCALE_STORAGE_KEY,
+    persistPwaDisplayScalePercent,
+    readStoredPwaDisplayScalePercent,
+} from '../ui/pwa-display-scale.js';
 
 const isHiddenNode = (node) => {
     if (!node || !node.name) return false;
@@ -637,6 +646,8 @@ export function WorkspaceExplorer({
         stored: getLocalStorageItem(WORKSPACE_SCALE_STORAGE_KEY),
         ...readWorkspaceScaleEnvironment(),
     }));
+    const [pwaDisplayScalePercent, setPwaDisplayScalePercent] = useState(() => readStoredPwaDisplayScalePercent());
+    const [pwaDisplayScaleDraft, setPwaDisplayScaleDraft] = useState(() => String(readStoredPwaDisplayScalePercent()));
     const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
     const refreshIntervalMs = Math.max(15000, (Number(workspaceClientSettings?.refreshIntervalSec) || 60) * 1000);
     const folderPreviewDepth = Math.max(0, Number(workspaceClientSettings?.folderPreviewDepth) || 0);
@@ -753,6 +764,28 @@ export function WorkspaceExplorer({
             window.removeEventListener('storage', onStorage);
             removeMediaListener(pointerMedia, onResize);
             removeMediaListener(hoverMedia, onResize);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const syncPwaDisplayScale = () => {
+            const next = readStoredPwaDisplayScalePercent();
+            setPwaDisplayScalePercent(next);
+            setPwaDisplayScaleDraft(String(next));
+        };
+        const onStorage = (event) => {
+            if (!event || event.key === null || event.key === PWA_DISPLAY_SCALE_STORAGE_KEY) syncPwaDisplayScale();
+        };
+
+        window.addEventListener('focus', syncPwaDisplayScale);
+        window.addEventListener('storage', onStorage);
+        window.addEventListener(PWA_DISPLAY_SCALE_EVENT, syncPwaDisplayScale);
+        return () => {
+            window.removeEventListener('focus', syncPwaDisplayScale);
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener(PWA_DISPLAY_SCALE_EVENT, syncPwaDisplayScale);
         };
     }, []);
 
@@ -1442,6 +1475,27 @@ export function WorkspaceExplorer({
     const showWorkspaceIndexIndicator = workspaceIndexState !== 'ready';
 
     const closeHeaderMenu = useCallback(() => setHeaderMenuOpen(false), []);
+
+    const handlePwaDisplayScaleInput = useCallback((event) => {
+        setPwaDisplayScaleDraft(String(event?.currentTarget?.value ?? ''));
+    }, []);
+
+    const commitPwaDisplayScale = useCallback((value) => {
+        const next = persistPwaDisplayScalePercent(value);
+        setPwaDisplayScalePercent(next);
+        setPwaDisplayScaleDraft(String(next));
+    }, []);
+
+    const handlePwaDisplayScaleCommit = useCallback((event) => {
+        commitPwaDisplayScale(event?.currentTarget?.value);
+    }, [commitPwaDisplayScale]);
+
+    const handlePwaDisplayScaleKeyDown = useCallback((event) => {
+        if (event?.key === 'Enter') {
+            commitPwaDisplayScale(event?.currentTarget?.value);
+            event?.currentTarget?.blur?.();
+        }
+    }, [commitPwaDisplayScale]);
 
     const runMenuAction = useCallback(async (fn) => {
         closeHeaderMenu();
@@ -2275,6 +2329,28 @@ export function WorkspaceExplorer({
                                 <button class=${`workspace-menu-item${showHidden ? ' active' : ''}`} role="menuitem" onClick=${handleMenuToggleHidden}>
                                     ${showHidden ? 'Hide hidden files' : 'Show hidden files'}
                                 </button>
+                                <div class="workspace-menu-scale-control" role="none">
+                                    <label for="workspace-pwa-display-scale">Scale</label>
+                                    <div class="workspace-menu-scale-input-wrap">
+                                        <input
+                                            id="workspace-pwa-display-scale"
+                                            class="workspace-menu-scale-input"
+                                            type="number"
+                                            inputmode="numeric"
+                                            min=${MIN_PWA_DISPLAY_SCALE_PERCENT}
+                                            max=${MAX_PWA_DISPLAY_SCALE_PERCENT}
+                                            step=${PWA_DISPLAY_SCALE_STEP_PERCENT}
+                                            value=${pwaDisplayScaleDraft}
+                                            aria-label=${`PWA display scale percentage, currently ${pwaDisplayScalePercent}%`}
+                                            onClick=${(event) => event.stopPropagation()}
+                                            onInput=${handlePwaDisplayScaleInput}
+                                            onChange=${handlePwaDisplayScaleCommit}
+                                            onBlur=${handlePwaDisplayScaleCommit}
+                                            onKeyDown=${handlePwaDisplayScaleKeyDown}
+                                        />
+                                        <span aria-hidden="true">%</span>
+                                    </div>
+                                </div>
 
                                 ${(onOpenTerminalTab || onOpenVncTab || onToggleTerminal) && html`<div class="workspace-menu-separator"></div>`}
                                 ${onOpenTerminalTab && html`
