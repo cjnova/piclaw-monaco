@@ -15,6 +15,7 @@ import {
   createToolOutputSearchTool,
   getToolResultCompactionEnabled,
   getToolResultCompactionThresholdsByTool,
+  getToolResultCompactionTools,
   readToolOutputFile,
   saveToolOutput,
 } from "../../src/extensions/context-mode-api.js";
@@ -24,7 +25,6 @@ const DEFAULT_STORE_THRESHOLD_LINES = parseInt(process.env.PICLAW_TOOL_OUTPUT_ST
 const PREVIEW_LINES = parseInt(process.env.PICLAW_TOOL_OUTPUT_PREVIEW_LINES || "8", 10);
 const PREVIEW_LINE_CHARS = parseInt(process.env.PICLAW_TOOL_OUTPUT_PREVIEW_LINE_CHARS || "200", 10);
 const STORED_OUTPUT_CACHE_MAX = 512;
-const COMPACTION_EXCLUDED_TOOL_NAMES = new Set(["read"]);
 
 const storedOutputByDigest = new Map<string, ReturnType<typeof saveToolOutput>>();
 
@@ -125,9 +125,11 @@ function normalizeToolName(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function isToolExcludedFromCompaction(toolName: unknown): boolean {
+function isToolCompactionEnabledForTool(toolName: unknown): boolean {
   const normalized = normalizeToolName(toolName);
-  return !!normalized && COMPACTION_EXCLUDED_TOOL_NAMES.has(normalized);
+  if (!normalized) return false;
+  const configured = getToolResultCompactionTools();
+  return configured.some((name) => name === normalized);
 }
 
 function resolveStoreThresholds(toolName: unknown): { bytes: number; lines: number } {
@@ -141,7 +143,7 @@ function resolveStoreThresholds(toolName: unknown): { bytes: number; lines: numb
 }
 
 function shouldStoreOutput(text: string, lineCount: number, toolName: unknown): boolean {
-  if (isToolExcludedFromCompaction(toolName)) return false;
+  if (!isToolCompactionEnabledForTool(toolName)) return false;
   const bytes = Buffer.byteLength(text || "", "utf8");
   const thresholds = resolveStoreThresholds(toolName);
   return bytes > thresholds.bytes || lineCount > thresholds.lines;
@@ -226,7 +228,7 @@ function compactLegacyToolResultContent(content: unknown, toolName: unknown): {
   modified: boolean;
 } {
   if (!Array.isArray(content)) return { content, modified: false };
-  if (isToolExcludedFromCompaction(toolName)) return { content, modified: false };
+  if (!isToolCompactionEnabledForTool(toolName)) return { content, modified: false };
   if (hasImageOrBinaryBlocks(content)) return { content, modified: false };
 
   const text = extractText(content);
@@ -291,7 +293,7 @@ export default function (pi: any) {
   pi.on("tool_result", async (event: any) => {
     if (!getToolResultCompactionEnabled()) return;
     if (event?.isError) return;
-    if (isToolExcludedFromCompaction(event?.toolName)) return;
+    if (!isToolCompactionEnabledForTool(event?.toolName)) return;
     if (hasExistingStoredOutputDetails(event?.details)) return;
     if (hasImageOrBinaryBlocks(event?.content)) return;
     const text = extractText(event?.content);

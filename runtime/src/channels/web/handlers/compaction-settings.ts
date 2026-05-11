@@ -5,8 +5,10 @@ import {
 import {
   getCompactionRuntimeConfig,
   getToolResultCompactionEnabled,
+  getToolResultCompactionTools,
   setCompactionRuntimeConfig,
   setToolResultCompactionEnabled,
+  setToolResultCompactionTools,
 } from "../../../core/config.js";
 import { getTrackedPhasesSnapshot } from "../../../runtime/progress-watchdog.js";
 import {
@@ -23,6 +25,7 @@ export interface CompactionSettingsData {
   progressWatchdogEnabled: boolean;
   progressWatchdogTimeoutSec: number;
   toolResultCompactionEnabled: boolean;
+  toolResultCompactionTools: string[];
   compactionBackoffs: Array<{
     chatJid: string;
     failureCount: number;
@@ -48,6 +51,7 @@ export interface CompactionSettingsInput {
   progressWatchdogEnabled?: unknown;
   progressWatchdogTimeoutSec?: unknown;
   toolResultCompactionEnabled?: unknown;
+  toolResultCompactionTools?: unknown;
 }
 
 function normalizeOptionalInt(value: unknown, min: number, max: number): number | undefined {
@@ -59,6 +63,14 @@ function normalizeOptionalInt(value: unknown, min: number, max: number): number 
 
 function normalizeOptionalBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
+}
+
+function normalizeOptionalStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 export function getCompactionSettingsData(): CompactionSettingsData {
@@ -73,6 +85,7 @@ export function getCompactionSettingsData(): CompactionSettingsData {
     progressWatchdogEnabled: config.progressWatchdogEnabled,
     progressWatchdogTimeoutSec: Math.max(0, Math.round(config.progressWatchdogTimeoutMs / 1000)),
     toolResultCompactionEnabled: getToolResultCompactionEnabled(),
+    toolResultCompactionTools: [...getToolResultCompactionTools()],
     compactionBackoffs: getAllChatCompactionBackoffs()
       .filter((entry) => {
         const untilMs = Date.parse(entry.backoffUntil);
@@ -147,6 +160,7 @@ export async function saveCompactionSettings(input: CompactionSettingsInput): Pr
   }
 
   const nextToolResultCompactionEnabled = normalizeOptionalBoolean(input.toolResultCompactionEnabled);
+  const nextToolResultCompactionTools = normalizeOptionalStringArray(input.toolResultCompactionTools);
 
   if (Object.keys(patch).length > 0) {
     const saved = setCompactionRuntimeConfig(patch);
@@ -159,6 +173,10 @@ export async function saveCompactionSettings(input: CompactionSettingsInput): Pr
 
   if (nextToolResultCompactionEnabled !== undefined) {
     setToolResultCompactionEnabled(nextToolResultCompactionEnabled);
+  }
+
+  if (nextToolResultCompactionTools !== undefined) {
+    setToolResultCompactionTools(nextToolResultCompactionTools);
   }
 
   return getCompactionSettingsData();

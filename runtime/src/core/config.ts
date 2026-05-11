@@ -99,6 +99,7 @@ const envConfig = readEnvFile([
   "PICLAW_PROGRESS_WATCHDOG_ENABLED",
   "PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS",
   "PICLAW_TOOL_RESULT_COMPACTION_ENABLED",
+  "PICLAW_TOOL_RESULT_COMPACTION_TOOLS",
   "PICLAW_TOOL_OUTPUT_STORE_THRESHOLDS_BY_TOOL",
   "PICLAW_WORKSPACE_SEARCH_ROOTS",
   "PICLAW_INTERNAL_SECRET",
@@ -919,6 +920,10 @@ const configToolResultThresholdsByToolRaw =
   compactionConfig.toolResultThresholdsByTool ?? compactionConfig.tool_result_thresholds_by_tool;
 const envToolResultThresholdsByToolRaw =
   process.env.PICLAW_TOOL_OUTPUT_STORE_THRESHOLDS_BY_TOOL ?? envConfig.PICLAW_TOOL_OUTPUT_STORE_THRESHOLDS_BY_TOOL;
+const configToolResultCompactionToolsRaw =
+  compactionConfig.toolResultCompactionTools ?? compactionConfig.tool_result_compaction_tools;
+const envToolResultCompactionToolsRaw =
+  process.env.PICLAW_TOOL_RESULT_COMPACTION_TOOLS ?? envConfig.PICLAW_TOOL_RESULT_COMPACTION_TOOLS;
 const hasExplicitEnvProgressWatchdogTimeout = hasDefinedConfigValue({
   PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS: process.env.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS ?? envConfig.PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS,
 }, ["PICLAW_PROGRESS_WATCHDOG_TIMEOUT_MS"]);
@@ -1100,9 +1105,50 @@ function parseToolResultCompactionThresholdsByTool(
   return normalizeToolResultCompactionThresholdsByTool(raw);
 }
 
+const DEFAULT_TOOL_RESULT_COMPACTION_TOOLS = ["bash", "powershell", "exec_batch"];
+
+function normalizeToolResultCompactionTools(input: unknown): string[] {
+  if (!input) return [];
+  const source = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(/[\s,]+/)
+      : [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of source) {
+    if (typeof value !== "string") continue;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function parseToolResultCompactionTools(raw: unknown): string[] | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return normalizeToolResultCompactionTools(parsed);
+    } catch {
+      return normalizeToolResultCompactionTools(raw);
+    }
+  }
+  return normalizeToolResultCompactionTools(raw);
+}
+
 /** Runtime toggle for universal tool-result compaction. Default on. */
 export let TOOL_RESULT_COMPACTION_ENABLED =
   envToolResultCompactionEnabled ?? configToolResultCompactionEnabled ?? true;
+
+/** Tool names eligible for tool-result compaction. */
+export let TOOL_RESULT_COMPACTION_TOOLS = Object.freeze(
+  parseToolResultCompactionTools(envToolResultCompactionToolsRaw)
+  ?? parseToolResultCompactionTools(configToolResultCompactionToolsRaw)
+  ?? [...DEFAULT_TOOL_RESULT_COMPACTION_TOOLS]
+);
 
 /** Optional per-tool compaction threshold overrides. */
 export let TOOL_RESULT_COMPACTION_THRESHOLDS_BY_TOOL = Object.freeze(
@@ -1130,6 +1176,38 @@ export function getToolResultCompactionEnabled(): boolean {
 export function getToolResultCompactionThresholdsByTool(): Readonly<Record<string, ToolResultCompactionThresholdPolicy>> {
   return parseToolResultCompactionThresholdsByTool(process.env.PICLAW_TOOL_OUTPUT_STORE_THRESHOLDS_BY_TOOL)
     ?? TOOL_RESULT_COMPACTION_THRESHOLDS_BY_TOOL;
+}
+
+/** Return tool names currently eligible for tool-result compaction. */
+export function getToolResultCompactionTools(): ReadonlyArray<string> {
+  return parseToolResultCompactionTools(process.env.PICLAW_TOOL_RESULT_COMPACTION_TOOLS)
+    ?? TOOL_RESULT_COMPACTION_TOOLS;
+}
+
+/** Persist and apply tool names eligible for tool-result compaction. */
+export function setToolResultCompactionTools(tools: string[]): string[] {
+  const nextTools = normalizeToolResultCompactionTools(tools);
+  const config = readJsonConfig(getConfigPath());
+  const compaction =
+    config.compaction && typeof config.compaction === "object"
+      ? { ...(config.compaction as Record<string, unknown>) }
+      : {};
+  const clearKeys = [
+    "toolResultCompactionTools",
+    "tool_result_compaction_tools",
+    "PICLAW_TOOL_RESULT_COMPACTION_TOOLS",
+  ];
+  for (const key of clearKeys) {
+    delete compaction[key];
+    delete config[key];
+  }
+  compaction.toolResultCompactionTools = nextTools;
+  config.compaction = compaction;
+  writeJsonConfig(getConfigPath(), config);
+
+  TOOL_RESULT_COMPACTION_TOOLS = Object.freeze([...nextTools]);
+  process.env.PICLAW_TOOL_RESULT_COMPACTION_TOOLS = nextTools.join(",");
+  return [...TOOL_RESULT_COMPACTION_TOOLS];
 }
 
 /** Persist and apply the runtime tool-result compaction toggle. */

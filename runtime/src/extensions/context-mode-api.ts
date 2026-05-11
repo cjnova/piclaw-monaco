@@ -20,4 +20,5 @@ export {
 export {
   getToolResultCompactionEnabled,
   getToolResultCompactionThresholdsByTool,
+  getToolResultCompactionTools,
 } from "../core/config.js";
