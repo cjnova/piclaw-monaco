@@ -35,5 +35,8 @@ workspaces/
 !bun.lock
 !docs/install-from-repo.md
 
+# Upstream piclaw UI — replaced by piclaw-monaco frontend
+runtime/web/src/
+
 # Keep the repo-local kanban board out of Docker build context
 kanban/
