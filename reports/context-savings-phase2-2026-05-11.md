@@ -88,28 +88,47 @@ Recommendation:
 - Do **not** run global write-mode blindly.
 - Run batched write-mode migrations in this order:
   1. `web_default-14` ✅ executed
-  2. `web_default`
+  2. `web_default` ✅ executed
   3. high-debt branch chats from the existing impact report
 
-Executed staged write-mode migration:
+Executed staged write-mode migrations:
 
 ```bash
 bun ./scripts/migrate-legacy-inline-tool-results.ts --write --chat web_default-14
+bun ./scripts/migrate-legacy-inline-tool-results.ts --write --chat web_default
 ```
 
-Observed result (`web_default-14`):
+Observed results:
 
-- Candidate entries rewritten: 63
-- Estimated bytes before: 541.3 KB
-- Estimated bytes after: 39.7 KB
-- Estimated reduction: 501.6 KB (92.7%)
+- `web_default-14`
+  - Candidate entries rewritten: 63
+  - Estimated bytes before: 541.3 KB
+  - Estimated bytes after: 39.7 KB
+  - Estimated reduction: 501.6 KB (92.7%)
+- `web_default`
+  - Candidate entries rewritten: 1,966
+  - Estimated bytes before: 13.6 MB
+  - Estimated bytes after: 1.2 MB
+  - Estimated reduction: 12.5 MB (91.5%)
 
-Post-write validation dry-run:
+Post-write validation dry-runs:
 
 ```bash
 bun ./scripts/migrate-legacy-inline-tool-results.ts --dry-run --chat web_default-14
+bun ./scripts/migrate-legacy-inline-tool-results.ts --dry-run --chat web_default
 ```
 
-- Remaining candidates: 0
+- Remaining candidates: 0 (both chats)
 
-Next step: apply the same staged process to `web_default`, validate, then continue chat-by-chat.
+Updated global remaining debt after staged writes:
+
+```bash
+bun ./scripts/migrate-legacy-inline-tool-results.ts --dry-run
+```
+
+- Remaining candidates: 7,187
+- Estimated bytes before: 68.0 MB
+- Estimated bytes after: 3.9 MB
+- Estimated reduction potential: 64.1 MB (94.2%)
+
+Next step: continue staged write-mode on high-debt branch chats (non-global batch).
