@@ -135,8 +135,8 @@ export function TimelineMenu({
                 </button>
 
                 ${(onOpenTerminalTab || onOpenVncTab || onToggleTerminal) && html`<div class="workspace-menu-separator"></div>`}
-                ${onOpenTerminalTab && html`<button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen || chatOnlyMode} onClick=${() => run(onOpenTerminalTab)}>Open terminal in tab</button>`}
-                ${onOpenVncTab && html`<button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen || chatOnlyMode} onClick=${() => run(onOpenVncTab)}>Open VNC in tab</button>`}
+                ${onOpenTerminalTab && html`<button class="workspace-menu-item" role="menuitem" disabled=${chatOnlyMode} onClick=${() => run(onOpenTerminalTab)}>Open terminal in tab</button>`}
+                ${onOpenVncTab && html`<button class="workspace-menu-item" role="menuitem" disabled=${chatOnlyMode} onClick=${() => run(onOpenVncTab)}>Open VNC in tab</button>`}
                 ${onToggleTerminal && html`<button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen || chatOnlyMode} onClick=${() => run(onToggleTerminal)}>${terminalVisible ? 'Hide terminal dock' : 'Show terminal dock'}</button>`}
 
                 <div class="workspace-menu-separator"></div>
