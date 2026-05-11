@@ -172,6 +172,7 @@
     "@uiw/codemirror-theme-github": "4.25.9",
     "assemblyscript": "0.28.17",
     "codemirror": "6.0.2",
+    "esbuild": "^0.28.0",
     "eslint": "10.3.0",
     "globals": "17.6.0",
     "playwright": "1.59.1",
