@@ -62,6 +62,7 @@ const ROUTING_SAMPLES: Record<string, string> = {
   "/settings": "/settings",
   "/logout": "/logout",
   "/commands": "/commands",
+  "/meters": "/meters on",
 };
 
 const MALFORMED_CASES = [
