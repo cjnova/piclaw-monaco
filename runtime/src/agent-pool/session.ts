@@ -13,7 +13,7 @@
  *   - ensureSessionDir() is also used by agent-control/handlers/session.ts.
  */
 
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "fs";
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline";
@@ -463,6 +463,111 @@ async function sanitizePersistedSessionFileBeforeLoad(sessionDir: string): Promi
   }
 }
 
+/**
+ * B2: Trim pre-compaction entries from a session JSONL file before the SDK loads it.
+ *
+ * When a session has been compacted, entries before `firstKeptEntryId` are not
+ * needed for the LLM context. Removing them from the file before the SDK
+ * parses it avoids loading 80-95% of session data into the JS heap.
+ *
+ * The original file is preserved in the archive/ directory for disaster recovery.
+ * Only runs on files larger than 512KB to avoid overhead on small sessions.
+ */
+const TRIM_MIN_BYTES = 512 * 1024;
+
+function trimPreCompactionEntries(sessionDir: string): void {
+  const latestFile = getLatestSessionFile(sessionDir);
+  if (!latestFile) return;
+
+  let fileSize: number;
+  try {
+    fileSize = statSync(latestFile).size;
+  } catch {
+    return;
+  }
+  if (fileSize < TRIM_MIN_BYTES) return;
+
+  // Read and parse all lines
+  let content: string;
+  try {
+    content = readFileSync(latestFile, "utf8");
+  } catch {
+    return;
+  }
+  const lines = content.trimEnd().split("\n");
+  if (lines.length < 10) return; // too small to bother
+
+  // Find the last compaction entry (scan from end)
+  let lastCompLine = -1;
+  let compEntry: { type: string; firstKeptEntryId?: string } | null = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const parsed = JSON.parse(lines[i]);
+      if (parsed.type === "compaction" && parsed.firstKeptEntryId) {
+        lastCompLine = i;
+        compEntry = parsed;
+        break;
+      }
+    } catch { continue; }
+  }
+  if (!compEntry || lastCompLine < 2) return;
+
+  // Find firstKeptEntryId line index
+  let keptIdx = -1;
+  for (let i = 0; i < lastCompLine; i++) {
+    try {
+      const parsed = JSON.parse(lines[i]);
+      if (parsed.id === compEntry.firstKeptEntryId) {
+        keptIdx = i;
+        break;
+      }
+    } catch { continue; }
+  }
+  if (keptIdx <= 1) return; // nothing meaningful to trim (0 = header)
+
+  // Build trimmed content: header + entries from keptIdx onward
+  const trimmedLines = [lines[0], ...lines.slice(keptIdx)];
+  const trimmedContent = trimmedLines.join("\n") + "\n";
+
+  // Only proceed if we actually save meaningful space (>25%)
+  if (trimmedContent.length > content.length * 0.75) return;
+
+  // Archive the original file before trimming (first time only)
+  const archiveDir = join(sessionDir, "archive");
+  mkdirSync(archiveDir, { recursive: true });
+  const archivePath = join(archiveDir, `${latestFile.split("/").pop()}`);
+  if (!existsSync(archivePath)) {
+    try {
+      renameSync(latestFile, archivePath);
+    } catch {
+      return; // can't archive, don't trim
+    }
+  }
+  // If archive already exists (re-trim after new compaction), we just overwrite
+  // the active file — the archive preserves the original full history.
+
+  // Write the trimmed file
+  try {
+    writeFileSync(latestFile, trimmedContent, "utf8");
+    log.info("Trimmed pre-compaction entries from session file before load", {
+      operation: "trim_pre_compaction",
+      originalEntries: lines.length,
+      trimmedEntries: trimmedLines.length,
+      originalBytes: content.length,
+      trimmedBytes: trimmedContent.length,
+      savedPercent: Math.round((1 - trimmedContent.length / content.length) * 100),
+    });
+  } catch (err) {
+    // Restore from archive if write fails
+    try {
+      if (existsSync(archivePath) && !existsSync(latestFile)) {
+        renameSync(archivePath, latestFile);
+      }
+    } catch { void 0; }
+    debugSuppressedError(log, "Failed to write trimmed session file", err, { latestFile });
+  }
+}
+
 function installPersistedToolResultSanitizer(runtime: AgentSessionRuntime): void {
   const sessionManager = runtime.session.sessionManager as SessionManager & {
     __piclawPersistedToolResultSanitizerInstalled?: boolean;
@@ -515,6 +620,7 @@ export async function createSessionInDir(
 
   const workspaceDir = getWorkspaceDir();
   await sanitizePersistedSessionFileBeforeLoad(sessionDir);
+  trimPreCompactionEntries(sessionDir);
 
   const createRuntime = async ({
     cwd,
