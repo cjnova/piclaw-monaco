@@ -4,6 +4,15 @@
  */
 
 import { html, useState, useEffect, useRef, useCallback, useLayoutEffect, render } from '../vendor/preact-htm.js';
+import {
+    MAX_PWA_DISPLAY_SCALE_PERCENT,
+    MIN_PWA_DISPLAY_SCALE_PERCENT,
+    PWA_DISPLAY_SCALE_EVENT,
+    PWA_DISPLAY_SCALE_STEP_PERCENT,
+    PWA_DISPLAY_SCALE_STORAGE_KEY,
+    persistPwaDisplayScalePercent,
+    readStoredPwaDisplayScalePercent,
+} from '../ui/pwa-display-scale.js';
 
 export function TimelineMenu({
     workspaceOpen,
@@ -15,6 +24,8 @@ export function TimelineMenu({
     terminalVisible,
 }) {
     const [open, setOpen] = useState(false);
+    const [pwaDisplayScalePercent, setPwaDisplayScalePercent] = useState(() => readStoredPwaDisplayScalePercent());
+    const [pwaDisplayScaleDraft, setPwaDisplayScaleDraft] = useState(() => String(readStoredPwaDisplayScalePercent()));
     const [showHidden, setShowHidden] = useState(() => {
         try { return localStorage.getItem('workspaceShowHidden') === 'true'; } catch { return false; }
     });
@@ -97,6 +108,46 @@ export function TimelineMenu({
 
     useEffect(() => { setOpen(false); }, [workspaceOpen]);
 
+    useEffect(() => {
+        const syncPwaDisplayScale = () => {
+            const next = readStoredPwaDisplayScalePercent();
+            setPwaDisplayScalePercent(next);
+            setPwaDisplayScaleDraft(String(next));
+        };
+        const onStorage = (event) => {
+            if (!event || event.key === null || event.key === PWA_DISPLAY_SCALE_STORAGE_KEY) syncPwaDisplayScale();
+        };
+        window.addEventListener('storage', onStorage);
+        window.addEventListener('focus', syncPwaDisplayScale);
+        window.addEventListener(PWA_DISPLAY_SCALE_EVENT, syncPwaDisplayScale);
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener('focus', syncPwaDisplayScale);
+            window.removeEventListener(PWA_DISPLAY_SCALE_EVENT, syncPwaDisplayScale);
+        };
+    }, []);
+
+    const handlePwaDisplayScaleInput = useCallback((event) => {
+        setPwaDisplayScaleDraft(String(event?.currentTarget?.value ?? ''));
+    }, []);
+
+    const commitPwaDisplayScale = useCallback((value) => {
+        const next = persistPwaDisplayScalePercent(value);
+        setPwaDisplayScalePercent(next);
+        setPwaDisplayScaleDraft(String(next));
+    }, []);
+
+    const handlePwaDisplayScaleCommit = useCallback((event) => {
+        commitPwaDisplayScale(event?.currentTarget?.value);
+    }, [commitPwaDisplayScale]);
+
+    const handlePwaDisplayScaleKeyDown = useCallback((event) => {
+        if (event?.key === 'Enter') {
+            commitPwaDisplayScale(event?.currentTarget?.value);
+            event?.currentTarget?.blur?.();
+        }
+    }, [commitPwaDisplayScale]);
+
     const run = useCallback((fn) => { setOpen(false); fn?.(); }, []);
 
     const toggleChatOnly = useCallback(() => {
@@ -151,6 +202,28 @@ export function TimelineMenu({
                 })}>
                     ${showHidden ? 'Hide hidden files' : 'Show hidden files'}
                 </button>
+                <div class="workspace-menu-scale-control" role="none">
+                    <label for="timeline-pwa-display-scale">Scale</label>
+                    <div class="workspace-menu-scale-input-wrap">
+                        <input
+                            id="timeline-pwa-display-scale"
+                            class="workspace-menu-scale-input"
+                            type="number"
+                            inputmode="numeric"
+                            min=${MIN_PWA_DISPLAY_SCALE_PERCENT}
+                            max=${MAX_PWA_DISPLAY_SCALE_PERCENT}
+                            step=${PWA_DISPLAY_SCALE_STEP_PERCENT}
+                            value=${pwaDisplayScaleDraft}
+                            aria-label=${`PWA display scale percentage, currently ${pwaDisplayScalePercent}%`}
+                            onClick=${(event) => event.stopPropagation()}
+                            onInput=${handlePwaDisplayScaleInput}
+                            onChange=${handlePwaDisplayScaleCommit}
+                            onBlur=${handlePwaDisplayScaleCommit}
+                            onKeyDown=${handlePwaDisplayScaleKeyDown}
+                        />
+                        <span aria-hidden="true">%</span>
+                    </div>
+                </div>
                 <button class="workspace-menu-item" role="menuitem" onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:open-settings')))}>Settings</button>
             </div>
         `}

@@ -315,6 +315,19 @@
     color: var(--danger-color, #d9534f);
 }
 
+.timeline-menu-dropdown {
+    max-height: min(520px, calc(100dvh - 48px));
+}
+
+.timeline-menu-dropdown .workspace-menu-item {
+    min-height: 30px;
+    padding: 5px 10px;
+}
+
+.timeline-menu-dropdown .workspace-menu-separator {
+    margin: 3px 0;
+}
+
 .workspace-menu-scale-control {
     display: flex;
     align-items: center;
@@ -354,6 +367,15 @@
     height: 1px;
     margin: 2px 4px;
     background: var(--border-color);
+}
+
+.timeline-menu-dropdown .workspace-menu-scale-control {
+    min-height: 30px;
+    padding: 5px 10px;
+}
+
+.timeline-menu-dropdown .workspace-menu-scale-input {
+    height: 26px;
 }
 
 .workspace-download:disabled,
