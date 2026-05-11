@@ -51,7 +51,11 @@ test("build:web produces bundle assets", async () => {
 
   const appBundle = readFileSync(appBundlePath, "utf8");
   const editorBundle = readFileSync(editorBundlePath, "utf8");
-  expect(appBundle).toContain('#editor-vendor/codemirror');
+  // app.bundle.js is now built from the piclaw-monaco frontend (esbuild) which
+  // does NOT externalise #editor-vendor/codemirror — that alias is only used
+  // by the editor extension and the upstream src/ tree, not by the monaco UI.
+  // Verify piclaw-monaco fingerprint instead.
+  expect(appBundle).toContain('ModelContextBar');
   expect(editorBundle).toContain('#editor-vendor/codemirror');
 
   expect(statSync(appBundlePath).size).toBeLessThan(1_500_000);
