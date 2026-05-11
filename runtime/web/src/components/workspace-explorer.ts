@@ -855,6 +855,20 @@ export function WorkspaceExplorer({
         window.addEventListener('workspace-reveal-path', handleReveal);
         return () => window.removeEventListener('workspace-reveal-path', handleReveal);
     }, []);
+
+    // Listen for hamburger menu "Show/Hide hidden files" toggle
+    useEffect(() => {
+        const onToggleHidden = (e: any) => {
+            const next = Boolean(e?.detail?.showHidden);
+            setShowHidden(next);
+            showHiddenRef.current = next;
+            setWorkspaceVisibility(true, next).catch(() => {});
+            lastSigRef.current = '';
+            loadTreeFnRef.current?.();
+        };
+        window.addEventListener('piclaw:toggle-hidden-files', onToggleHidden);
+        return () => window.removeEventListener('piclaw:toggle-hidden-files', onToggleHidden);
+    }, []);
     useEffect(() => { dragActiveRef.current = dragActive; }, [dragActive]);
     useEffect(() => { dragModeRef.current = dragMode; }, [dragMode]);
     useEffect(() => { selectedPathRef.current = selectedPath; }, [selectedPath]);

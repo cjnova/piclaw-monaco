@@ -15,6 +15,9 @@ export function TimelineMenu({
     terminalVisible,
 }) {
     const [open, setOpen] = useState(false);
+    const [showHidden, setShowHidden] = useState(() => {
+        try { return localStorage.getItem('workspaceShowHidden') === 'true'; } catch { return false; }
+    });
     const [pos, setPos] = useState({ top: 8, left: 8 });
 
     const getSafeAreaTop = () => {
@@ -137,6 +140,14 @@ export function TimelineMenu({
                 ${onToggleTerminal && !chatOnlyMode && workspaceOpen && html`<button class="workspace-menu-item" role="menuitem" onClick=${() => run(onToggleTerminal)}>${terminalVisible ? 'Hide terminal dock' : 'Show terminal dock'}</button>`}
 
                 <div class="workspace-menu-separator"></div>
+                <button class=${`workspace-menu-item${showHidden ? ' active' : ''}`} role="menuitem" onClick=${() => run(() => {
+                    const next = !showHidden;
+                    setShowHidden(next);
+                    try { localStorage.setItem('workspaceShowHidden', String(next)); } catch {}
+                    window.dispatchEvent(new CustomEvent('piclaw:toggle-hidden-files', { detail: { showHidden: next } }));
+                })}>
+                    ${showHidden ? 'Hide hidden files' : 'Show hidden files'}
+                </button>
                 <button class="workspace-menu-item" role="menuitem" onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:open-settings')))}>Settings</button>
             </div>
         `}
