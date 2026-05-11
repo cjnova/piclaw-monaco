@@ -36,7 +36,13 @@ workspaces/
 !docs/install-from-repo.md
 
 # Upstream piclaw UI — replaced by piclaw-monaco frontend
-runtime/web/src/
+# Keep runtime/web/src/vendor/ (shared vendor entry points used by build:vendor)
+runtime/web/src/components/
+runtime/web/src/panes/
+runtime/web/src/ui/
+runtime/web/src/utils/
+runtime/web/src/app.ts
+runtime/web/src/login.ts
 
 # Keep the repo-local kanban board out of Docker build context
 kanban/
