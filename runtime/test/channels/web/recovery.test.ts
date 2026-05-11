@@ -85,6 +85,83 @@ describe("web recovery helpers", () => {
     }]);
   });
 
+  test("recoverInflightRuns triggers backoff after repeated fresh compaction failures", () => {
+    const clearedCompactions: string[] = [];
+    const backoffs: Array<{ chatJid: string; failureCount: number; backoffUntil: string }> = [];
+
+    const ctx: WebRecoveryContext = {
+      assistantName: "Pi",
+      defaultAgentId: "default",
+      enqueue: async () => {},
+      processChat: async () => {},
+      // Compaction marker is only 30s old — well under the 4-minute stale threshold
+      now: () => new Date("2026-01-01T00:00:30Z").getTime(),
+    };
+
+    const store: WebRecoveryStore = {
+      getPreflightRuns: () => [],
+      // Compaction started 30s ago (fresh, not stale)
+      getActiveChatCompactions: () => [{ chatJid: "web:loop", startedAt: "2026-01-01T00:00:00Z", reason: "threshold" }],
+      getInflightRuns: () => [],
+      transaction: (run) => run(),
+      getAgentReplyStateAfter: () => "none",
+      clearChatCompactionActive: (chatJid) => { clearedCompactions.push(chatJid); },
+      // Simulate 2 prior failures — this will be the 3rd, which should trigger backoff
+      getChatCompactionBackoff: () => ({ chatJid: "web:loop", failureCount: 2, lastFailedAt: "2026-01-01T00:00:00Z", backoffUntil: "2026-01-01T00:00:00Z", lastErrorMessage: null }),
+      setChatCompactionBackoff: (chatJid, backoff) => { backoffs.push({ chatJid, failureCount: backoff.failureCount, backoffUntil: backoff.backoffUntil }); },
+      clearInflightMarker: () => {},
+      rollbackInflightRun: () => {},
+      getAllChatCursors: () => ({}),
+      getKnownChatJids: () => [],
+      getDeferredQueuedFollowups: () => [],
+      getMessagesSince: () => [],
+    };
+
+    recoverInflightRuns(ctx, store);
+
+    expect(clearedCompactions).toEqual(["web:loop"]);
+    // After 3 failures, backoff should be set with a future timestamp
+    expect(backoffs.length).toBe(1);
+    expect(backoffs[0].failureCount).toBe(3);
+    expect(new Date(backoffs[0].backoffUntil).getTime()).toBeGreaterThan(new Date("2026-01-01T00:00:30Z").getTime());
+  });
+
+  test("recoverInflightRuns increments failure count for fresh compaction without triggering backoff below threshold", () => {
+    const backoffs: Array<{ chatJid: string; failureCount: number; backoffUntil: string }> = [];
+
+    const ctx: WebRecoveryContext = {
+      assistantName: "Pi",
+      defaultAgentId: "default",
+      enqueue: async () => {},
+      processChat: async () => {},
+      now: () => new Date("2026-01-01T00:00:30Z").getTime(),
+    };
+
+    const store: WebRecoveryStore = {
+      getPreflightRuns: () => [],
+      getActiveChatCompactions: () => [{ chatJid: "web:fresh", startedAt: "2026-01-01T00:00:00Z", reason: "threshold" }],
+      getInflightRuns: () => [],
+      transaction: (run) => run(),
+      getAgentReplyStateAfter: () => "none",
+      clearChatCompactionActive: () => {},
+      // First failure — no prior backoff
+      getChatCompactionBackoff: () => null,
+      setChatCompactionBackoff: (_chatJid, backoff) => { backoffs.push({ chatJid: _chatJid, failureCount: backoff.failureCount, backoffUntil: backoff.backoffUntil }); },
+      clearInflightMarker: () => {},
+      rollbackInflightRun: () => {},
+      getAllChatCursors: () => ({}),
+      getKnownChatJids: () => [],
+      getDeferredQueuedFollowups: () => [],
+      getMessagesSince: () => [],
+    };
+
+    recoverInflightRuns(ctx, store);
+
+    // Should increment failure count but not set a future backoff (count=1 < threshold=3)
+    expect(backoffs.length).toBe(1);
+    expect(backoffs[0].failureCount).toBe(1);
+  });
+
   test("recoverInflightRuns quarantines stale preflight markers instead of requeueing compaction", () => {
     const clearedPreflight: string[] = [];
     const quarantined: Array<{ chatJid: string; messageId: string; reason: string; backoffUntil?: string | null }> = [];
