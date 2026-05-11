@@ -86,15 +86,30 @@ Per-tool overrides should remain optional and only be applied when a specific to
 Recommendation:
 
 - Do **not** run global write-mode blindly.
-- If/when approved, run batched write-mode migrations in this order:
-  1. `web_default-14`
+- Run batched write-mode migrations in this order:
+  1. `web_default-14` ✅ executed
   2. `web_default`
   3. high-debt branch chats from the existing impact report
 
-Suggested guarded invocation pattern:
+Executed staged write-mode migration:
 
 ```bash
 bun ./scripts/migrate-legacy-inline-tool-results.ts --write --chat web_default-14
 ```
 
-then validate behavior/searchability, and only then continue with additional chats.
+Observed result (`web_default-14`):
+
+- Candidate entries rewritten: 63
+- Estimated bytes before: 541.3 KB
+- Estimated bytes after: 39.7 KB
+- Estimated reduction: 501.6 KB (92.7%)
+
+Post-write validation dry-run:
+
+```bash
+bun ./scripts/migrate-legacy-inline-tool-results.ts --dry-run --chat web_default-14
+```
+
+- Remaining candidates: 0
+
+Next step: apply the same staged process to `web_default`, validate, then continue chat-by-chat.
