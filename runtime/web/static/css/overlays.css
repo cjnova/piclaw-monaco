@@ -744,6 +744,10 @@
     touch-action: none;
 }
 
+.image-annotator-preview-canvas {
+    pointer-events: none;
+}
+
 .image-annotator-text-input-wrap {
     position: absolute;
     z-index: 10;
