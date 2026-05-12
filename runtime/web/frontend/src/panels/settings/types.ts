@@ -23,6 +23,14 @@ export interface WatchdogPhase {
   lastHeartbeat?: string;
 }
 
+export interface CompactionBackoff {
+  chatJid: string;
+  failureCount: number;
+  lastFailedAt: string;
+  backoffUntil: string;
+  lastErrorMessage: string | null;
+}
+
 export interface WorkspaceSettings {
   webTerminalEnabled?: boolean;
   vncAllowDirect?: boolean;
@@ -67,8 +75,16 @@ export interface SettingsData {
   compactionBackoffMaxMin?: number;
   progressWatchdogEnabled?: boolean;
   progressWatchdogTimeoutSec?: number;
-  compactionBackoffs?: string[];
+  compactionBackoffs?: CompactionBackoff[];
   progressWatchdogPhases?: WatchdogPhase[];
+  toolResultCompactionEnabled?: boolean;
+  toolResultCompactionTools?: string[];
+  toolResultSemanticSummaryEnabled?: boolean;
+  toolResultSemanticSummaryMaxInputChars?: number;
+  toolResultSemanticSummaryMaxTokens?: number;
+  toolResultSemanticSummaryTimeoutSec?: number;
+  /* models */
+  scopedModelsOnly?: boolean;
   /* workspace */
   workspaceSettings?: WorkspaceSettings;
   /* providers */
