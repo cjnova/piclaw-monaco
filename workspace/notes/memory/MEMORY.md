@@ -2,15 +2,15 @@
 
 Dream-maintained memory index generated from the message database plus human-readable daily notes.
 
-Generated: 2026-05-06T05:17:45.115Z
+Generated: 2026-05-12T15:08:40.009Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 6
+- Complete days: 4
 - Partial days: 0
 - Unsummarised days: 0
-- Latest complete day: 2026-05-05
+- Latest complete day: 2026-05-12
 
 ## Memory types
 
@@ -21,18 +21,14 @@ Generated: 2026-05-06T05:17:45.115Z
 
 ## Recent daily memories
 
+- [2026-05-12](../daily/2026-05-12.md)
+  - Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent co…
+- [2026-05-08](../daily/2026-05-08.md)
+  - Light housekeeping day (13:40–21:38 UTC, 60 messages across 2 sessions). Two `/compact` runs: first reduced c…
+- [2026-05-07](../daily/2026-05-07.md)
+  - Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functiona…
 - [2026-05-05](../daily/2026-05-05.md)
   - Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission chec…
-- [2026-05-04](../daily/2026-05-04.md)
-  - Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ rep…
-- [2026-05-03](../daily/2026-05-03.md)
-  - Afternoon UI testing session (15:35–16:34 UTC). User tested web frontend rendering: multiple greeting message…
-- [2026-05-02](../daily/2026-05-02.md)
-  - Brief evening session with 6 messages (3 user, 3 assistant) in a ~2-minute window (20:45–20:47 UTC). Single s…
-- [2026-04-30](../daily/2026-04-30.md)
-  - Full-day session with 41 messages (20 user, 21 assistant) spanning 00:00–19:31 UTC. Early morning activity (1…
-- [2026-04-29](../daily/2026-04-29.md)
-  - Bootstrap day: Dream memory system initialized with foundational note structure and memory layer. No user int…
 
 ## Sources
 

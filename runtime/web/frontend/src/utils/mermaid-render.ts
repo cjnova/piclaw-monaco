@@ -4,10 +4,28 @@
  * Finds .mermaid-container[data-mermaid] elements and renders SVG.
  */
 
-/** Sanitize SVG output from mermaid renderer using DOMPurify vendor global. */
+import _DOMPurifyModule from "dompurify";
+
+/** Get DOMPurify instance (browser + Bun/Node safe). */
+let _purifyInstance: typeof _DOMPurifyModule | null = null;
+function getDOMPurifyInstance(): typeof _DOMPurifyModule | null {
+  if (_purifyInstance !== null) return _purifyInstance;
+  try {
+    if (typeof _DOMPurifyModule.sanitize === "function") {
+      _purifyInstance = _DOMPurifyModule;
+    } else if (typeof (_DOMPurifyModule as unknown as (win: unknown) => typeof _DOMPurifyModule) === "function") {
+      _purifyInstance = (_DOMPurifyModule as unknown as (win: unknown) => typeof _DOMPurifyModule)(globalThis);
+    }
+  } catch {
+    // not usable
+  }
+  return _purifyInstance;
+}
+
+/** Sanitize SVG output from mermaid renderer using bundled DOMPurify. */
 function sanitizeSvg(svg: string): string {
-  const purify = window.DOMPurify;
-  if (!purify) return svg; // fallback: accept as-is if DOMPurify not loaded
+  const purify = getDOMPurifyInstance();
+  if (!purify) return svg; // fallback: accept as-is if DOMPurify not available
   return purify.sanitize(svg, {
     USE_PROFILES: { svg: true, svgFilters: true },
     ADD_TAGS: ["foreignObject"],

@@ -4,16 +4,6 @@ interface PiclawMarked {
   parse(src: string, options?: { headerIds?: boolean; mangle?: boolean }): string;
 }
 
-interface PiclawDOMPurify {
-  sanitize(html: string, config?: {
-    USE_PROFILES?: { html?: boolean; svg?: boolean; svgFilters?: boolean };
-    ADD_TAGS?: string[];
-    ADD_ATTR?: string[];
-    ALLOW_DATA_ATTR?: boolean;
-    ADD_URI_SAFE_ATTR?: string[];
-  }): string;
-}
-
 interface PiclawKaTeX {
   renderToString(tex: string, options?: { displayMode?: boolean; throwOnError?: boolean }): string;
 }

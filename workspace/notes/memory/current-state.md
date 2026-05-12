@@ -1,53 +1,41 @@
 # Current Dream state
 
-Generated: 2026-05-06T05:17:45.115Z
+Generated: 2026-05-12T15:08:40.009Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 6
+- Complete days: 4
 - Partial days: 0
 - Unsummarised days: 0
-- Latest complete day: 2026-05-05
+- Latest complete day: 2026-05-12
 
 ## Complete days
 
+- 2026-05-12
+  - Summary: Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent confirmed **PiClaw v2.3.2**. No project work, decisi…
+  - Summarised until: 2026-05-12T15:06:13.962Z
+  - Messages: 2
+  - Session trees: 1
+  - Session chats: 1
+- 2026-05-08
+  - Summary: Light housekeeping day (13:40–21:38 UTC, 60 messages across 2 sessions). Two `/compact` runs: first reduced context from 175.7K tokens, second from 44.7K token…
+  - Summarised until: 2026-05-08T21:38:17.412Z
+  - Messages: 60
+  - Session trees: 2
+  - Session chats: 2
+- 2026-05-07
+  - Summary: Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functionality: initial `/widget test` slash command failed …
+  - Summarised until: 2026-05-07T15:24:21.657Z
+  - Messages: 24
+  - Session trees: 1
+  - Session chats: 1
 - 2026-05-05
   - Summary: Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message test…
   - Summarised until: 2026-05-05T15:10:31.114Z
   - Messages: 68
   - Session trees: 1
   - Session chats: 1
-- 2026-05-04
-  - Summary: Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ repeated "Write 5 paragraphs about TypeScript" reques…
-  - Summarised until: 2026-05-04T16:19:15.200Z
-  - Messages: 49
-  - Session trees: 1
-  - Session chats: 1
-- 2026-05-03
-  - Summary: Afternoon UI testing session (15:35–16:34 UTC). User tested web frontend rendering: multiple greeting messages for connectivity, a comprehensive Markdown featu…
-  - Summarised until: 2026-05-03T16:34:21.145Z
-  - Messages: 11
-  - Session trees: 1
-  - Session chats: 1
-- 2026-05-02
-  - Summary: Brief evening session with 6 messages (3 user, 3 assistant) in a ~2-minute window (20:45–20:47 UTC). Single short interaction in one chat session.
-  - Summarised until: 2026-05-02T20:47:38.520Z
-  - Messages: 6
-  - Session trees: 1
-  - Session chats: 1
-- 2026-04-30
-  - Summary: Full-day session with 41 messages (20 user, 21 assistant) spanning 00:00–19:31 UTC. Early morning activity (15 messages through ~00:51 UTC) followed by continu…
-  - Summarised until: 2026-04-30T19:31:04.076Z
-  - Messages: 41
-  - Session trees: 1
-  - Session chats: 1
-- 2026-04-29
-  - Summary: Bootstrap day: Dream memory system initialized with foundational note structure and memory layer. No user interactions recorded.
-  - Summarised until: 2026-04-29T23:59:59.999Z
-  - Messages: 0
-  - Session trees: 0
-  - Session chats: 0
 
 ## Source
 

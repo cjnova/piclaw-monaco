@@ -2,26 +2,18 @@
 
 ## Ongoing work and recent outcomes
 
+### 2026-05-12
+
+- Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent confirmed **PiClaw v2.3.2**. No project work, decisions, or feedback.
+
+### 2026-05-08
+
+- Light housekeeping day (13:40–21:38 UTC, 60 messages across 2 sessions). Two `/compact` runs: first reduced context from 175.7K tokens, second from 44.7K tokens. Interspersed casual greetings ("hi") with no substantive requests or project work. No feature dev…
+
+### 2026-05-07
+
+- Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functionality: initial `/widget test` slash command failed (not a valid command), then requested widget tests via natural language — agent delivered test widge…
+
 ### 2026-05-05
 
 - Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message testing (multiple probes confirming steer receipt). Long-form content generation stress tests: history o…
-
-### 2026-05-04
-
-- Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ repeated "Write 5 paragraphs about TypeScript" requests — stress-testing long-form content generation and rendering. Mid-session: workspace exploration c…
-
-### 2026-05-03
-
-- Afternoon UI testing session (15:35–16:34 UTC). User tested web frontend rendering: multiple greeting messages for connectivity, a comprehensive Markdown features test (tables, KaTeX math equations, task lists, blockquotes, nested lists), and a Bicep code syn…
-
-### 2026-05-02
-
-- Brief evening session with 6 messages (3 user, 3 assistant) in a ~2-minute window (20:45–20:47 UTC). Single short interaction in one chat session.
-
-### 2026-04-30
-
-- Full-day session with 41 messages (20 user, 21 assistant) spanning 00:00–19:31 UTC. Early morning activity (15 messages through ~00:51 UTC) followed by continued interaction throughout the day with 26 additional messages through 19:31 UTC. Single session tree…
-
-### 2026-04-29
-
-- Bootstrap day: Dream memory system initialized with foundational note structure and memory layer. No user interactions recorded.
