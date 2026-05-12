@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { useComputed } from "@preact/signals";
+import { addonHealthSignal } from "../components/model-context-bar/addonHealthSignal";
 
 interface AddonSkill {
   name: string;
@@ -35,6 +37,13 @@ export function AddonsPanel() {
   const [needsRestart, setNeedsRestart] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const addonHealthWarning = useComputed(() => {
+    const s = addonHealthSignal.value;
+    if (!s || s.healthy !== false) return null;
+    const names = s.degraded_addons?.join(", ");
+    return names ? `Some add-ons are experiencing issues: ${names}` : "Some add-ons are experiencing issues.";
+  });
 
   const loadAddons = useCallback(async () => {
     const scrollTop = listRef.current?.scrollTop ?? 0;
@@ -215,6 +224,11 @@ export function AddonsPanel() {
       )}
       {source && (
         <div className="addons-panel__source">Catalog from {source}</div>
+      )}
+      {addonHealthWarning.value && (
+        <div className="addons-panel__degraded-warning">
+          ⚠ {addonHealthWarning.value}
+        </div>
       )}
       <div className="addons-panel__notice">
         Add-ons install via Bun package manager. A restart is required after install or uninstall.
