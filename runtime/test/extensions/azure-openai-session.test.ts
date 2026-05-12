@@ -108,6 +108,57 @@ describe("azure-openai session shim", () => {
     expect(observedModel).toBe(model);
   });
 
+  test("ignores stale context getters during context replay", async () => {
+    const handlers: Array<{ event: string; handler: (...args: any[]) => any }> = [];
+    let providerLoaded = 0;
+
+    setAzureOpenAiSessionModuleLoadersForTests({
+      provider: async () => {
+        providerLoaded += 1;
+        return {
+          repairAzureContext: async () => ({ messages: [] }),
+        } as any;
+      },
+    });
+
+    const api: ExtensionAPI = {
+      on(event: string, handler: (...args: any[]) => any) { handlers.push({ event, handler }); },
+      registerTool() {},
+      registerCommand() {},
+      registerShortcut() {},
+      registerFlag() {},
+      getFlag() { return undefined; },
+      registerMessageRenderer() {},
+      sendMessage() {},
+      sendUserMessage() {},
+      appendEntry() {},
+      setSessionName() {},
+      getSessionName() { return undefined; },
+      setLabel() {},
+      exec: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+      getActiveTools: () => [],
+      getAllTools: () => [],
+      setActiveTools() {},
+      getCommands: () => [],
+      setModel: async () => true,
+      getThinkingLevel: () => "off" as any,
+      setThinkingLevel() {},
+      registerProvider() {},
+      unregisterProvider() {},
+    } as unknown as ExtensionAPI;
+
+    const ctx = {
+      get model() {
+        throw new Error("This extension ctx is stale after session replacement or reload.");
+      },
+    };
+
+    azureOpenAiSessionExtension(api);
+    await handlers.find((entry) => entry.event === "context")?.handler({ messages: [] }, ctx);
+
+    expect(providerLoaded).toBe(0);
+  });
+
   test("keeps provider and image modules lazy until the matching hook runs", async () => {
     const handlers: Array<{ event: string; handler: (...args: any[]) => any }> = [];
     const commands = new Map<string, CommandDef>();
@@ -117,6 +168,8 @@ describe("azure-openai session shim", () => {
       repaired: 0,
       image: [] as string[],
       flux: [] as string[],
+      imageMessenger: null as unknown,
+      fluxMessenger: null as unknown,
     };
 
     setAzureOpenAiSessionModuleLoadersForTests({
@@ -128,12 +181,14 @@ describe("azure-openai session shim", () => {
         },
       } as any),
       images: async () => ({
-        executeAzureImageCommand: async (_pi: unknown, input: string) => {
+        executeAzureImageCommand: async (messenger: unknown, input: string) => {
           calls.images += 1;
+          calls.imageMessenger = messenger;
           calls.image.push(input);
         },
-        executeAzureFluxCommand: async (_pi: unknown, input: string) => {
+        executeAzureFluxCommand: async (messenger: unknown, input: string) => {
           calls.images += 1;
+          calls.fluxMessenger = messenger;
           calls.flux.push(input);
         },
       } as any),
@@ -173,6 +228,8 @@ describe("azure-openai session shim", () => {
       repaired: 0,
       image: [],
       flux: [],
+      imageMessenger: null,
+      fluxMessenger: null,
     });
 
     await handlers.find((entry) => entry.event === "context")?.handler({ messages: [] }, { model: undefined });
@@ -180,14 +237,18 @@ describe("azure-openai session shim", () => {
     expect(calls.repaired).toBe(1);
     expect(calls.images).toBe(0);
 
-    await commands.get("image")?.handler("draw cat");
+    const commandCtx = { sendMessage() {} };
+
+    await commands.get("image")?.handler("draw cat", commandCtx);
     expect(calls.images).toBe(1);
     expect(calls.image).toEqual(["draw cat"]);
     expect(calls.flux).toEqual([]);
+    expect(calls.imageMessenger).toBe(commandCtx);
 
-    await commands.get("flux")?.handler("draw dog");
+    await commands.get("flux")?.handler("draw dog", commandCtx);
     expect(calls.images).toBe(2);
     expect(calls.image).toEqual(["draw cat"]);
     expect(calls.flux).toEqual(["draw dog"]);
+    expect(calls.fluxMessenger).toBe(commandCtx);
   });
 });

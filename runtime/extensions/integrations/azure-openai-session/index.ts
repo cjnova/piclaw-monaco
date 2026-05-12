@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 let cachedProviderModule: Promise<typeof import("../azure-openai.ts")> | null = null;
 let cachedImagesModule: Promise<typeof import("../azure-openai-images.ts")> | null = null;
@@ -28,26 +28,40 @@ export function setAzureOpenAiSessionModuleLoadersForTests(loaders?: {
   }
 }
 
+function isStaleExtensionContextError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error || "");
+  return /extension ctx is stale after session replacement or reload/i.test(text);
+}
+
 export default function register(pi: ExtensionAPI) {
   pi.on("context", async (event, ctx) => {
-    const currentModel = (ctx as { model?: any }).model;
+    let currentModel: unknown;
+    try {
+      currentModel = (ctx as { model?: unknown }).model;
+    } catch (error) {
+      if (isStaleExtensionContextError(error)) return;
+      throw error;
+    }
+
     const mod = await loadProviderModuleImpl();
     return await mod.repairAzureContext(event as { messages: any[] }, { model: currentModel });
   });
 
   pi.registerCommand("image", {
     description: "Generate an image with Azure OpenAI",
-    handler: async (input) => {
+    handler: async (input, ctx) => {
       const mod = await loadImagesModuleImpl();
-      await mod.executeAzureImageCommand(pi, input || "");
+      const messenger = (ctx as ExtensionCommandContext | undefined) ?? pi;
+      await mod.executeAzureImageCommand(messenger, input || "");
     },
   });
 
   pi.registerCommand("flux", {
     description: "Generate an image with Azure Foundry (FLUX.2-pro)",
-    handler: async (input) => {
+    handler: async (input, ctx) => {
       const mod = await loadImagesModuleImpl();
-      await mod.executeAzureFluxCommand(pi, input || "");
+      const messenger = (ctx as ExtensionCommandContext | undefined) ?? pi;
+      await mod.executeAzureFluxCommand(messenger, input || "");
     },
   });
 }
