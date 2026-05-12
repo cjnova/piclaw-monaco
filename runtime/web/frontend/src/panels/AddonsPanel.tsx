@@ -63,7 +63,7 @@ export function AddonsPanel() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: slug }),
+        body: JSON.stringify({ slug }),
       });
       if (!res.ok) {
         console.warn("[addons] install failed:", res.status);
@@ -91,7 +91,7 @@ export function AddonsPanel() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: slug }),
+        body: JSON.stringify({ slug }),
       });
       if (!res.ok) {
         console.warn("[addons] uninstall failed:", res.status);
