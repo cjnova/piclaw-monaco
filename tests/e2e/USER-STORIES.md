@@ -334,6 +334,9 @@
 | US-25 Safe area / layout | ★★★ | ★★★ | ★★ | Always (PWA) | Medium |
 | US-26 PWA scale / preview | ★★ | ★★★ | ★ | Occasional | Low |
 | US-27 Context scoping | ★★★ | ★★ | ★★★ | Every session switch | High |
+| US-28 Image annotation | ☆ | ★★★ | ☆ | iPad image review | Medium |
+| US-29 Text highlighting | ★★ | ★★★ | ★★ | Post review | Medium |
+| US-30 Compaction settings | ★★ | ★ | ★★★ | Settings config | Low |
 | US-23 Mobile PWA viewport/theme | ★★★ | ★★★ | ☆ | Every mobile webapp session | Very high |
 
 ## Test implementation priority
@@ -365,4 +368,7 @@
 25. **US-25** — Safe area and layout fixes
 26. **US-26** — PWA display scale and editor preview
 27. **US-27** — Context scoping and compaction
+28. **US-28** — Image annotation (iPad)
+29. **US-29** — Text highlighting
+30. **US-30** — Compaction and context mode settings pane
 23. **US-23** — Mobile PWA viewport and themed safe-area coverage
