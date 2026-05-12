@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
 interface AddonSkill {
   name: string;
@@ -32,8 +32,12 @@ export function AddonsPanel() {
   const [filter, setFilter] = useState<string>("");
   const [actionState, setActionState] = useState<Record<string, "installing" | "uninstalling">>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [needsRestart, setNeedsRestart] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const loadAddons = useCallback(async () => {
+    const scrollTop = listRef.current?.scrollTop ?? 0;
     setStatus("loading");
     try {
       const res = await fetch("/agent/addons", { credentials: "same-origin" });
@@ -46,6 +50,10 @@ export function AddonsPanel() {
       setAddons(Array.isArray(data.addons) ? data.addons : []);
       setSource(data.source ?? (data.sources ? data.sources.join(", ") : ""));
       setStatus("done");
+      // Restore scroll position after re-render
+      requestAnimationFrame(() => {
+        if (listRef.current) listRef.current.scrollTop = scrollTop;
+      });
     } catch {
       setStatus("error");
     }
@@ -70,6 +78,7 @@ export function AddonsPanel() {
         setActionError("Couldn't install add-on. Please try again.");
         return;
       }
+      setNeedsRestart(true);
       await loadAddons();
     } catch (err) {
       console.warn("[addons] install failed:", err);
@@ -98,6 +107,7 @@ export function AddonsPanel() {
         setActionError("Couldn't uninstall add-on. Please try again.");
         return;
       }
+      setNeedsRestart(true);
       await loadAddons();
     } catch (err) {
       console.warn("[addons] uninstall failed:", err);
@@ -111,6 +121,41 @@ export function AddonsPanel() {
     }
   }, [loadAddons]);
 
+  const handleRestart = useCallback(async () => {
+    setRestarting(true);
+    try {
+      const res = await fetch("/agent/addons/restart", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.error) {
+        setActionError(data.error);
+        setRestarting(false);
+        return;
+      }
+      setNeedsRestart(false);
+      // Poll until backend is back, then refresh addon list
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const probe = await fetch("/agent/addons", { credentials: "same-origin", signal: AbortSignal.timeout(3000) });
+          if (probe.ok) {
+            await loadAddons();
+            setRestarting(false);
+            return;
+          }
+        } catch { /* backend not ready yet */ }
+      }
+      // Backend didn't come back — reload page manually
+      setRestarting(false);
+      setActionError("Backend did not return in time. Reload the page manually.");
+    } catch {
+      setRestarting(false);
+      setActionError("Restart failed.");
+    }
+  }, [loadAddons]);
+
   const filteredAddons = addons.filter((addon) => {
     if (!filter) return true;
     const q = filter.toLowerCase();
@@ -121,7 +166,7 @@ export function AddonsPanel() {
     );
   });
 
-  if (status === "loading") {
+  if (status === "loading" && addons.length === 0) {
     return (
       <div className="addons-panel">
         <div className="addons-panel__empty">Loading catalog…</div>
@@ -153,13 +198,28 @@ export function AddonsPanel() {
           onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
         />
       </div>
+      {needsRestart && (
+        <div className="addons-panel__restart-banner">
+          <span>Restart required to apply changes.</span>
+          <button
+            className="addons-panel__restart-btn"
+            onClick={handleRestart}
+            disabled={restarting}
+          >
+            {restarting ? "Restarting…" : "Restart now"}
+          </button>
+        </div>
+      )}
       {actionError && (
         <div className="addons-panel__error">{actionError}</div>
       )}
       {source && (
         <div className="addons-panel__source">Catalog from {source}</div>
       )}
-      <div className="addons-panel__list">
+      <div className="addons-panel__notice">
+        Add-ons install via Bun package manager. A restart is required after install or uninstall.
+      </div>
+      <div className="addons-panel__list" ref={listRef}>
         {filteredAddons.length === 0 && filter ? (
           <div className="addons-panel__empty">No add-ons match &ldquo;{filter}&rdquo;</div>
         ) : filteredAddons.length === 0 ? (
