@@ -3,6 +3,7 @@ import { useSignal, useComputed } from "@preact/signals";
 import { getChatJid } from "../../api/chat-jid";
 import type { AgentStatus, AgentContext, ModelInfo, ProviderUsage, ModelEntry } from "./types";
 import { fmtTokens } from "./types";
+import { addonHealthSignal } from "./addonHealthSignal";
 
 export interface UseStatusPollingResult {
   agentStatus: ReturnType<typeof useSignal<AgentStatus | null>>;
@@ -67,7 +68,10 @@ export function useStatusPolling(): UseStatusPollingResult {
       // Discard stale response if a newer request has started
       if (statusVersion.current !== myVersion) return;
       if (res.ok) {
-        agentStatus.value = await res.json() as AgentStatus;
+        const statusData = await res.json() as AgentStatus;
+        agentStatus.value = statusData;
+        // Update shared addon health signal
+        addonHealthSignal.value = statusData.addon_api ?? null;
         error.value = false;
         lastSuccessAt.value = Date.now();
       } else {

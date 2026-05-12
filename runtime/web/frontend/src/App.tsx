@@ -8,6 +8,7 @@ import { TabBar } from "./components/TabBar";
 import { SystemStats, formatClock } from "./components/SystemStats";
 import { ModelContextBar } from "./components/ModelContextBar";
 import { SessionPill } from "./components/SessionPill";
+import { AddonHealthBadge } from "./components/AddonHealthBadge";
 import { CommandPalette } from "./components/CommandPalette";
 import { WidgetPane } from "./components/WidgetPane";
 import { PanelRouter, ChatPanel, SettingsPanel } from "./panels";
@@ -51,6 +52,11 @@ function AppContent() {
   const { DialogHost } = useDialog();
 
   const isSettingsActive = activePanel.value === "settings";
+
+  const handleOpenAddons = useCallback(() => {
+    activePanel.value = "extensions";
+    sidebarCollapsed.value = false;
+  }, [activePanel, sidebarCollapsed]);
 
   const { onTermDragStart, onSidebarMouseDown, onSidebarKeyDown } = useResizeHandlers({
     sidebarWidth, sidebarCollapsed, terminalHeight, terminalMaximized,
@@ -234,6 +240,7 @@ function AppContent() {
             </span>
           )}
           <SessionPill />
+          <AddonHealthBadge onOpenAddons={handleOpenAddons} />
           <ModelContextBar />
           {statusFlash.value && (
             <span className={`status-bar__flash status-bar__flash--${statusFlash.value.type}`} role="status" aria-live="polite">

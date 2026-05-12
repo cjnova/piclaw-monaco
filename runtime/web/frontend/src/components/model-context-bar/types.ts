@@ -1,5 +1,11 @@
+export interface AddonApiStatus {
+  healthy: boolean;
+  degraded_addons?: string[];
+}
+
 export interface AgentStatus {
   status: "active" | "idle";
+  addon_api?: AddonApiStatus;
   data?: {
     model?: string;
     thinking_level?: string;
