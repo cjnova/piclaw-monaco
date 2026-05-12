@@ -11,6 +11,26 @@
  */
 
 import { applySyntaxHighlighting } from "./code-highlighting";
+import _DOMPurifyModule from "dompurify";
+
+// ── DOMPurify lazy init (browser + Bun/Node safe) ─────────────────────────
+
+let _purifyInstance: typeof _DOMPurifyModule | null = null;
+
+function getDOMPurifyInstance(): typeof _DOMPurifyModule | null {
+  if (_purifyInstance !== null) return _purifyInstance;
+  try {
+    if (typeof _DOMPurifyModule.sanitize === "function") {
+      _purifyInstance = _DOMPurifyModule;
+    } else if (typeof (_DOMPurifyModule as unknown as (win: unknown) => typeof _DOMPurifyModule) === "function") {
+      // Factory form returned by dompurify in non-browser environments (Bun/Node)
+      _purifyInstance = (_DOMPurifyModule as unknown as (win: unknown) => typeof _DOMPurifyModule)(globalThis);
+    }
+  } catch {
+    // DOMPurify not usable in this environment
+  }
+  return _purifyInstance;
+}
 
 /** Get the marked library from the deferred vendor global. */
 function getMarked(): PiclawMarked | null {
@@ -75,9 +95,9 @@ function escapeHtmlAttr(value: string): string {
 
 // ── Stage 5: Sanitization (DOMPurify — battle-tested) ──────────────────────
 
-/** Get DOMPurify from the deferred vendor global. */
-function getDOMPurify(): PiclawDOMPurify | null {
-  return window.DOMPurify ?? null;
+/** Get DOMPurify (bundled ESM, with Bun/Node guard). */
+function getDOMPurify(): typeof _DOMPurifyModule | null {
+  return getDOMPurifyInstance();
 }
 
 /** DOMPurify configuration: allow KaTeX/MathML, data attributes, classes. */

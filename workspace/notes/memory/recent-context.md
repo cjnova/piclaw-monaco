@@ -1,78 +1,18 @@
 # Agent-ready recent context
 
-Generated: 2026-05-06T05:17:45.115Z
+Generated: 2026-05-12T15:08:40.009Z
 
 Source: `/workspace/piclaw-monaco/workspace/notes/daily`
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 6
+- Complete days: 4
 - Partial days: 0
 - Unsummarised days: 0
-- Latest complete day: 2026-05-05
+- Latest complete day: 2026-05-12
 
 ## Recent complete days
-
-### 2026-04-29
-
-- State: complete
-- Summarised until: 2026-04-29T23:59:59.999Z
-- Messages: 0
-- Session trees: 0
-- Session chats: 0
-
-#### Summary
-
-- Bootstrap day: Dream memory system initialized with foundational note structure and memory layer. No user interactions recorded.
-
-### 2026-04-30
-
-- State: complete
-- Summarised until: 2026-04-30T19:31:04.076Z
-- Messages: 41
-- Session trees: 1
-- Session chats: 1
-
-#### Summary
-
-- Full-day session with 41 messages (20 user, 21 assistant) spanning 00:00–19:31 UTC. Early morning activity (15 messages through ~00:51 UTC) followed by continued interaction throughout the day with 26 additional messages through 19:31 UTC. Single session tree across one chat.
-
-### 2026-05-02
-
-- State: complete
-- Summarised until: 2026-05-02T20:47:38.520Z
-- Messages: 6
-- Session trees: 1
-- Session chats: 1
-
-#### Summary
-
-- Brief evening session with 6 messages (3 user, 3 assistant) in a ~2-minute window (20:45–20:47 UTC). Single short interaction in one chat session.
-
-### 2026-05-03
-
-- State: complete
-- Summarised until: 2026-05-03T16:34:21.145Z
-- Messages: 11
-- Session trees: 1
-- Session chats: 1
-
-#### Summary
-
-- Afternoon UI testing session (15:35–16:34 UTC). User tested web frontend rendering: multiple greeting messages for connectivity, a comprehensive Markdown features test (tables, KaTeX math equations, task lists, blockquotes, nested lists), and a Bicep code syntax highlighting check. No project decisions or substantive work — purely QA/rendering verification.
-
-### 2026-05-04
-
-- State: complete
-- Summarised until: 2026-05-04T16:19:15.200Z
-- Messages: 49
-- Session trees: 1
-- Session chats: 1
-
-#### Summary
-
-- Full-day QA and development session (08:08–16:19 UTC). Morning phase: connectivity testing followed by 7+ repeated "Write 5 paragraphs about TypeScript" requests — stress-testing long-form content generation and rendering. Mid-session: workspace exploration commands, attempted file/image uploads that arrived empty (attachment handling appears broken on the UI side), and elapsed-time alignment checks. Afternoon phase: active feature development on branch `feat/276-tool-context` — repeated `git status` monitoring showing ChatPanel.tsx edits, creation of `runtime/test/monaco/components/send-stop.test.ts`, and bundle rebuilds. No substantive project decisions; mix of UI stress-testing and active coding.
 
 ### 2026-05-05
 
@@ -85,3 +25,39 @@ Source: `/workspace/piclaw-monaco/workspace/notes/daily`
 #### Summary
 
 - Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message testing (multiple probes confirming steer receipt). Long-form content generation stress tests: history of computing essay, detailed neural networks explanation (with CNN/transformer additions), and comprehensive quantum computing guide (qubits, gates, QEC, real-world applications). Markdown table rendering tests (server status table, quantum vs classical comparison). Simple greeting/countdown tests. No project decisions or feature development — purely functional QA covering steering, notifications, long-form streaming, and rich markdown rendering.
+
+### 2026-05-07
+
+- State: complete
+- Summarised until: 2026-05-07T15:24:21.657Z
+- Messages: 24
+- Session trees: 1
+- Session chats: 1
+
+#### Summary
+
+- Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functionality: initial `/widget test` slash command failed (not a valid command), then requested widget tests via natural language — agent delivered test widgets and a dice roller widget. User submitted multiple dice rolls from the widget back into chat, confirming the widget→chat submission pipeline works correctly. Purely QA — no project decisions or feature development.
+
+### 2026-05-08
+
+- State: complete
+- Summarised until: 2026-05-08T21:38:17.412Z
+- Messages: 60
+- Session trees: 2
+- Session chats: 2
+
+#### Summary
+
+- Light housekeeping day (13:40–21:38 UTC, 60 messages across 2 sessions). Two `/compact` runs: first reduced context from 175.7K tokens, second from 44.7K tokens. Interspersed casual greetings ("hi") with no substantive requests or project work. No feature development, no decisions, no feedback.
+
+### 2026-05-12
+
+- State: complete
+- Summarised until: 2026-05-12T15:06:13.962Z
+- Messages: 2
+- Session trees: 1
+- Session chats: 1
+
+#### Summary
+
+- Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent confirmed **PiClaw v2.3.2**. No project work, decisions, or feedback.
