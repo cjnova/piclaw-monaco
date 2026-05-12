@@ -482,7 +482,8 @@ function trimPreCompactionEntries(sessionDir: string): void {
   let fileSize: number;
   try {
     fileSize = statSync(latestFile).size;
-  } catch {
+  } catch (e) {
+    void e;
     return;
   }
   if (fileSize < TRIM_MIN_BYTES) return;
@@ -491,7 +492,8 @@ function trimPreCompactionEntries(sessionDir: string): void {
   let content: string;
   try {
     content = readFileSync(latestFile, "utf8");
-  } catch {
+  } catch (e) {
+    void e;
     return;
   }
   const lines = content.trimEnd().split("\n");
@@ -508,7 +510,7 @@ function trimPreCompactionEntries(sessionDir: string): void {
         compEntry = parsed;
         break;
       }
-    } catch { continue; }
+    } catch (e) { void e; continue; }
   }
   if (!compEntry || lastCompLine < 2) return;
 
@@ -521,7 +523,7 @@ function trimPreCompactionEntries(sessionDir: string): void {
         keptIdx = i;
         break;
       }
-    } catch { continue; }
+    } catch (e) { void e; continue; }
   }
   if (keptIdx <= 1) return; // nothing meaningful to trim (0 = header)
 
@@ -532,23 +534,27 @@ function trimPreCompactionEntries(sessionDir: string): void {
   // Only proceed if we actually save meaningful space (>25%)
   if (trimmedContent.length > content.length * 0.75) return;
 
-  // Archive the original file before trimming (first time only)
+  // Archive the original file before trimming (first time only).
+  // On subsequent trims (new compaction in same file), the archive already
+  // holds the original full history — just overwrite the active file.
   const archiveDir = join(sessionDir, "archive");
-  mkdirSync(archiveDir, { recursive: true });
-  const archivePath = join(archiveDir, `${latestFile.split("/").pop()}`);
+  const fileName = latestFile.split("/").pop()!;
+  const archivePath = join(archiveDir, fileName);
   if (!existsSync(archivePath)) {
+    mkdirSync(archiveDir, { recursive: true });
     try {
       renameSync(latestFile, archivePath);
-    } catch {
+    } catch (e) {
+      void e;
       return; // can't archive, don't trim
     }
   }
-  // If archive already exists (re-trim after new compaction), we just overwrite
-  // the active file — the archive preserves the original full history.
 
-  // Write the trimmed file
+  // Write the trimmed file (atomic: write to temp, then rename)
+  const tmpPath = `${latestFile}.trim.tmp`;
   try {
-    writeFileSync(latestFile, trimmedContent, "utf8");
+    writeFileSync(tmpPath, trimmedContent, "utf8");
+    renameSync(tmpPath, latestFile);
     log.info("Trimmed pre-compaction entries from session file before load", {
       operation: "trim_pre_compaction",
       originalEntries: lines.length,
@@ -558,12 +564,13 @@ function trimPreCompactionEntries(sessionDir: string): void {
       savedPercent: Math.round((1 - trimmedContent.length / content.length) * 100),
     });
   } catch (err) {
-    // Restore from archive if write fails
+    // Clean up temp file and restore from archive if write fails
+    try { rmSync(tmpPath, { force: true }); } catch (e) { void e; }
     try {
-      if (existsSync(archivePath) && !existsSync(latestFile)) {
+      if (!existsSync(latestFile) && existsSync(archivePath)) {
         renameSync(archivePath, latestFile);
       }
-    } catch { void 0; }
+    } catch (e) { void e; }
     debugSuppressedError(log, "Failed to write trimmed session file", err, { latestFile });
   }
 }

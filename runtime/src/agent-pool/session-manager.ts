@@ -532,10 +532,8 @@ export class AgentSessionManager {
           const sm = runtime.session.sessionManager as unknown as { fileEntries?: unknown[]; byId?: Map<unknown, unknown> };
           if (sm.fileEntries) sm.fileEntries = [];
           if (sm.byId) sm.byId.clear();
-          const agentState = (runtime.session as { agent?: { state?: { messages?: unknown[] } } }).agent?.state;
-          if (agentState) {
-            (runtime.session as any).agent.state.messages = [];
-          }
+          const agent = (runtime.session as unknown as { agent?: { state?: { messages?: unknown[] } } }).agent;
+          if (agent?.state?.messages) agent.state.messages = [];
         } catch (err) {
           this.options.onWarn?.("Failed to release disposed session references", { err });
         }
