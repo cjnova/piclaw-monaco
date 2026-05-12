@@ -430,6 +430,7 @@
 .compose-box textarea {
     flex: 1;
     width: 100%;
+    max-width: 100%;
     min-height: 50px;
     max-height: min(40vh, 300px);
     border: none;
