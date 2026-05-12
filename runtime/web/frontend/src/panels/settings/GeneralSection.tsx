@@ -75,6 +75,26 @@ export function GeneralSection({
         </div>
       </div>
 
+      <h3 className="settings-panel__subsection-title">Models</h3>
+
+      <div className="settings-panel__field settings-panel__checkbox-row">
+        <input
+          id="scopedModelsOnly"
+          type="checkbox"
+          checked={data.scopedModelsOnly ?? false}
+          onChange={(e) =>
+            onSaveGeneral(
+              "scopedModelsOnly",
+              (e.target as HTMLInputElement).checked
+            )
+          }
+        />
+        <label htmlFor="scopedModelsOnly" className="settings-panel__label">
+          Restrict to scoped models only
+        </label>
+        <span className="settings-panel__description">Limit the model picker to models that have been explicitly scoped to this instance.</span>
+      </div>
+
       <h3 className="settings-panel__subsection-title">Authentication</h3>
       <div className="settings-panel__field">
         <label className="settings-panel__label">TOTP setup QR</label>
