@@ -6030,3 +6030,41 @@ pre.frontmatter-block {
     padding: 0 6px;
   }
 }
+
+/* ─── Addons panel restart banner & notice ─── */
+.addons-panel__restart-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 0 0 8px;
+  background: color-mix(in srgb, #f38ba8 12%, transparent);
+  border: 1px solid color-mix(in srgb, #f38ba8 40%, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #f38ba8;
+}
+.addons-panel__restart-btn {
+  padding: 4px 12px;
+  border: 1px solid #f38ba8;
+  border-radius: 4px;
+  background: transparent;
+  color: #f38ba8;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.addons-panel__restart-btn:hover {
+  background: color-mix(in srgb, #f38ba8 20%, transparent);
+}
+.addons-panel__restart-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.addons-panel__notice {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 4px 6px;
+}
