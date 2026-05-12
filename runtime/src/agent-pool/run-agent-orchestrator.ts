@@ -27,7 +27,7 @@ import { detectChannel } from "../router.js";
 import { pruneOrphanToolResults } from "./orphan-tool-results.js";
 import { writeAgentLog } from "./logging.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
-import { getSessionFileLineCount, getSessionFileSize, rotateSession } from "../session-rotation.js";
+import { getSessionFileLineCount, getSessionFileSize, isRotationFallbackCompactionError, rotateSession } from "../session-rotation.js";
 import { getCompactionSuccessCount, resetCompactionSuccessCount } from "./compaction.js";
 import { withChatContext } from "../core/chat-context.js";
 import {
@@ -445,8 +445,26 @@ async function runRecoveryCompaction(
   );
   if (!compactionResult.ok) {
     const aborted = isCompactionCancellationError(compactionResult.errorMessage);
-    if (!aborted) {
+    const benign = isRotationFallbackCompactionError(compactionResult.errorMessage);
+    if (!aborted && !benign) {
       noteCompactionFailure(chatJid, compactionResult.errorMessage);
+    }
+    if (benign) {
+      // "Nothing to compact (session too small)" etc. — not a real failure,
+      // skip compaction and let the retry proceed without it.
+      options.onInfo?.("Recovery compaction skipped (benign: session too small or already compacted)", {
+        operation: "run_agent.recovery_compact_benign_skip",
+        chatJid,
+        errorMessage: compactionResult.errorMessage,
+      });
+      emitAgentSessionEvent(runOptions.onEvent, {
+        type: "compaction_end",
+        reason: "overflow",
+        result: undefined,
+        aborted: false,
+        willRetry: true,
+      });
+      return { ok: true };
     }
     emitAgentSessionEvent(runOptions.onEvent, {
       type: "compaction_end",
