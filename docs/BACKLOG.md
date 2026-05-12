@@ -1,455 +1,58 @@
 # PiClaw Monaco — Backlog & Current State
 
-Updated: 2026-05-07
-Total open issues: 8
-Upstream synced: v2.2.2 (Lothlórien)
+Updated: 2026-05-12
+Total open issues: 11
+Upstream synced: v2.3.7 (The Conversation)
 
 ## Vision
 
 Fork of rcarmo/piclaw replacing the embedded GUI with a **VS Code-style shell layout** using cherry-picked web components. The agent conversation remains the primary interaction, wrapped in a familiar developer shell.
 
-### Target Layout
+## In Progress
 
-```
-┌────┬──────────────────┬────────────────────────────────────┐
-│    │  SIDEBAR          │  CHAT (always visible)              │
-│ A  │  (controlled by   │  Agent messages, streaming          │
-│ c  │   Activity Bar)   │  Markdown, code blocks              │
-│ t  │                   │  Adaptive cards, widgets            │
-│ i  │  📁 = file tree   │                                    │
-│ v  │       + preview   │                                    │
-│ i  │  🔍 = search      │                                    │
-│ t  │  🧩 = addons      │                                    │
-│ y  │  🤖 = focus chat  │  [Compose box — multiline]         │
-│    │  ⚙️ = settings    ├────────────────────────────────────┤
-│ B  │                   │  TERMINAL (ghostty-web, docked)     │
-│ a  │                   ├────────────────────────────────────┤
-│ r  │                   │  STATUS BAR                         │
-└────┴──────────────────┴────────────────────────────────────┘
+| # | Title | Branch | Status |
+|---|---|---|---|
+| 96 | Provider setup wizard (OAuth + API key + custom) | `feat/96-provider-wizard` | Testing on `v2.3.7-rc3` Docker image |
 
-Status Bar:
-[● Connected] [provider / model  thinking  ● tokens/total] [↗ CPU%  ··· RAM] [date — HH:MM] [Terminal]
-```
+## Open Issues — High Priority
 
-## Architecture
+| # | Title | Score | Notes |
+|---|---|---|---|
+| 359 | Spending/cost budget tracking with alerts and limits | 10/10 | Phased: pricing table → accumulated totals → limits + alerts |
+| 316 | Authentication section in Settings (TOTP + passkey) | 10/10 | Backend ready, needs frontend component |
+| 320 | Recovery substates — show blocked/backing-off/retrying in UI | 9/10 | Backend has state field, needs UI indicators |
+| 319 | Operator controls — abort hung run, clear stale, drain queue | 9/10 | Power user feature, backend endpoints exist |
+| 323 | Progress watchdog — hung-run detection + user notification | 8/10 | Backend ready (v2.3.7), needs UI toast/badge |
 
-```
-upstream: rcarmo/piclaw (full runtime with web UI)
-     │
-     └─ fork ──→ cjnova/piclaw-monaco
-                    │
-                    ├── runtime/web/frontend/  ← NEW Preact SPA (VS Code layout)
-                    ├── runtime/web/static/    ← built assets served by backend
-                    ├── runtime/src/           ← UNTOUCHED backend (channels, tools, agent)
-                    └── Dockerfile, CI, etc.
-```
+## Open Issues — Medium Priority
 
-### Tech Stack
-- **Frontend**: Preact + Preact Signals + esbuild
-- **Icons**: @vscode/codicons
-- **Fonts**: IBM Plex Sans (UI), JetBrains Mono NF (code/terminal), Inter (fallback)
-- **Terminal**: ghostty-web (WASM-based terminal emulator)
-- **Backend**: Unchanged piclaw (Bun, WebSocket/SSE, REST API)
-- **Docker**: debian:trixie-slim (same as upstream)
-- **CI**: GitHub Actions (build + typecheck on PR, Docker publish on manual/tag)
-- **Registry**: ghcr.io/cjnova/piclaw-monaco
+| # | Title | Score | Notes |
+|---|---|---|---|
+| 353 | Refactor status panels to card-style with 'more…' button | 9/10 | UI polish, upstream comparison documented |
+| 321 | Session recordings — list, playback, export in UI | 9/10 | Needs backend research for recording format |
+| 315 | Avatar upload UI (click-on-avatar popover) | 9/10 | Backend upload endpoints exist |
+| 86 | QR code pairing/linking in Settings panel | 8/10 | Needs backend endpoint for QR generation |
 
-## Completed (Waves 1–9)
+## Open Issues — Low Priority
 
-| Wave | Tasks Done |
-|---|---|
-| 1 | Fork repo, set up dev environment |
-| 2 | Strip old frontend SPA |
-| 3 | Scaffold new Preact SPA + esbuild pipeline |
-| 4 | Wire backend API (WebSocket client) + Codicons |
-| 5 | Activity Bar + Dockerfile |
-| 6 | Panel router + Docker Compose |
-| 7 | Split pane (now inline resize) + Command registry + GHCR workflow |
-| 8 | Sidebar container + Bottom panel (terminal dock) + Command palette |
-| 9 | Real terminal (ghostty-web) + Full command palette + Status bar + Model picker |
+| # | Title | Score | Notes |
+|---|---|---|---|
+| 358 | Bundle codicons.css + fonts.css into CSS build | 8/10 | 2 fewer HTTP requests, cosmetic |
 
-### What Works Now
+## Recently Completed
 
-- [x] Activity Bar with 5 icons (Workspace, Search, Addons, Agent, Settings)
-- [x] Click icon = toggle sidebar; click different icon = switch + open
-- [x] Sidebar with titled header, resizable via drag handle (persisted)
-- [x] Panel router: shows placeholder per panel
-- [x] **Terminal**: real ghostty-web terminal connected to backend PTY via WebSocket
-- [x] Terminal dock: show/hide (Ctrl+\`/º), resize, maximize, pop-out, new-tab, close
-- [x] **Terminal standalone page**: `/static/terminal.html` for popout/new-tab
-- [x] **Command palette**: Ctrl+Shift+P, fuzzy search, keyboard nav (arrows, PgUp/PgDn, Home/End)
-- [x] **Real piclaw commands**: palette fetches `/agent/commands` (slash commands, extensions, skills)
-- [x] **18 local UI commands**: navigation, terminal, theme, session, general
-- [x] **Slash trigger**: typing "/" in chat auto-opens command palette
-- [x] **Backspace to close**: pressing Backspace on empty palette input closes it
-- [x] **Status bar**: connection dot, model/context badge, CPU/RAM stats, date/time clock, Terminal button
-- [x] **Model picker**: click badge → dropdown with available models, switch via `/model <id>`
-- [x] **Thinking level picker**: click thinking level → dropdown, switch via `/thinking <level>`
-- [x] **Context indicator**: filled circle (green/yellow/red) + consumed/total tokens (1M notation), click to compact
-- [x] **Model dropdown**: shows context window size per model (e.g., 200k, 1.0M)
-- [x] **Chat compose box**: multiline textarea, auto-grows up to 25vh, thin scrollbar
-- [x] **Theme toggle**: dark/light via command palette
-- [x] **Theme**: Catppuccin Mocha dark, brighter textMuted (#9399b2) for readability
-- [x] WebSocket connection manager with auto-reconnect
-- [x] Font stack loaded (IBM Plex Sans, JetBrains Mono NF, codicons)
-- [x] Layout persists across refreshes (localStorage)
-- [x] CI: build + typecheck on every push/PR
-- [x] Code review hardening pass (delta CPU stats, stale state detection, CSRF, AbortController, noopener)
-- [x] Refactored all inline styles to BEM CSS classes
-- [x] Switched system metrics to builtin `/agent/system-metrics` (CPU, RAM, RSS, SWP)
-- [x] Terminal sends `clear` on panel close
-
-### New Keyboard Shortcuts (Wave 9)
-
-| Shortcut | Action |
-|---|---|
-| Ctrl+Shift+P | Command palette |
-| Ctrl+\` / Ctrl+º | Toggle terminal |
-| Ctrl+B | Toggle sidebar |
-| Ctrl+Shift+E | Show Workspace (Explorer) |
-| Ctrl+Shift+F | Show Search |
-| Ctrl+Shift+X | Show Addons |
-| Ctrl+Shift+A | Show Agent (collapse sidebar) |
-| Ctrl+, | Show Settings |
-
-## Remaining Work
-
-### Wave 10 — Real Content ✅
-
-| Task | Description | Status |
+| # | Title | Date |
 |---|---|---|
-| 011-task-tree-data-provider | Backend API for workspace file listing | ✅ |
-| 012-task-tree-view-component | File tree component in Workspace sidebar | ✅ |
-| 015-task-message-list-component | Chat message list in Agent panel | ✅ |
-| 029-task-extensions-api-endpoint | Backend API for installed extensions | ✅ |
-| 037-task-search-backend | Backend search endpoint (ripgrep) | ✅ (uses existing /search) |
-| 038-task-search-sidebar-ui | Search input + results UI in sidebar | ✅ |
-| chat-send | Wire compose box to POST /agent/message | ✅ |
+| 356 | Sync upstream PiClaw v2.3.7 (backend + extensions) | 2026-05-12 |
+| 355 | Fix addon install/uninstall wrong field name | 2026-05-12 |
+| 350 | Widget tab content visibility (flex chain + indent cap) | 2026-05-09 |
+| 336 | Vendor lib migration (DOMPurify bundled, 131 languages) | 2026-05-12 |
+| 322 | Add-on health indicator — degraded badge | 2026-05-12 |
+| 346 | Remove Dashboards from TabBar | 2026-05-09 |
 
-### Completed / Closed Items
+## Infrastructure
 
-| Issue | Status |
-|---|---|
-| #125 color contrast | ✅ |
-| #126 main landmark | ✅ |
-| #131 minify + ESM | ✅ (Phase 1) |
-| #132 LCP lazy-load | ✅ |
-| #134 dropped | ❌ closed / won't do |
-| #135 font preload | ✅ (closed — no benefit on HTTP/1.1) |
-| #136 compression | ✅ (closed — coming from upstream) |
-| #142 side-prompt | ✅ (closed — superseded by #230) |
-| #168 security fix | ✅ |
-| #169 security fix | ✅ |
-| #173 CSP meta tag | ✅ (reverted after validation) |
-| #178 review bug | ✅ |
-| #179 review bug | ✅ |
-| #180 review bug | ✅ |
-| #181 review bug | ✅ |
-| #182 review bug | ✅ |
-| #183 review bug | ✅ |
-| #189 review bug | ✅ |
-| #215 terminal popup | ✅ |
-| #219 file tree state persistence | ✅ |
-| #195 TTS + copy | ✅ |
-| #209 message collapse + delete | ✅ |
-| #245 Fleet iframe fix | ✅ |
-| #230 real-time agent turn progress | ✅ |
-| #252 thoughts panel | ✅ |
-| #253 tool call progress | ✅ |
-| #254 panel polish | ✅ |
-| #229 CI test expansion | ✅ |
-| #148 adaptive cards renderer | ✅ |
-| #149 widget iframe host | ✅ |
-| #265 send/stop cycle | ✅ |
-| #266 attachment pills + clip icon | ✅ |
-| #267 image paste | ✅ |
-| #268 file drag & drop | ✅ |
-| #276 tool card context + icons | ✅ |
-| #281 attachment references fix | ✅ |
-| #282 workspace sidebar single scrollbar + icon-only buttons | ✅ |
-| #289 browser notifications | ✅ (closed, included in #140) |
-| #290 steer queue stack PR | ✅ (closes #270/#271) |
-| #291 steer/edit/move/remove PR | ✅ (part of #270) |
-| #292 upstream sync — merge piclaw v2.2.1 | ✅ |
-| #293 rgba() CSS variables PR | ✅ |
-| #295 upstream sync merge PR | ✅ |
-| #287 workspace file attach from sidebar | ✅ |
-| #288 STT + browser notifications + compose toolbar | ✅ |
-| #147 streaming improvements | ❌ closed (superseded by #230) |
-| #145 tool lifecycle events | ❌ closed (superseded by #230) |
-
-### Wave 10b — Upstream Sync & Foundation
-
-| Task | Description | Status |
-|---|---|---|
-| merge-upstream-v2-1-0 | Merge upstream v2.1.0 tag, resolve conflicts, rebuild | ✅ |
-| adopt-security-freeze-extension-routes | Verify extension route freeze works with our frontend | ✅ (workaround: defer freeze to session init) |
-| configure-dev-provider | Configure model provider on dev instance for testing | ✅ |
-| verify-all-panels-post-merge | Smoke test all panels after merge | ✅ |
-
-> Wave 10b complete. SSE reconnection, chat_jid URL params, single SSE connection (like upstream), agent responses visible in real-time. Upstream sync: merged piclaw v2.2.1 (PR #295). Upstream bug reported: rcarmo/piclaw#512.
-
-### Wave 10c — Settings Panel
-
-| Task | Description | Status |
-|---|---|---|
-| wire-settings-panel-to-piclaw-config | Full settings panel (9 categories, all wired) | ✅ |
-| adopt-passkey-authentication-support | Wire passkey enrollment/management into Settings | ⏳ |
-| wire-passkey-management-to-settings | Passkey list/register/delete UI | ⏳ |
-| wire-scheduled-tasks-api | Wire GET /agent/scheduled-tasks endpoint + scheduled task cards in Tasks panel (#104) | ⏳ |
-| wire-tasks-panel-to-activity-bar | Tasks panel in Activity Bar (scheduled task management) | ✅ |
-| wire-provider-billing-tracking-to-status | Provider billing/usage tracking in status bar or settings | ✅ |
-| leverage-smart-compaction-improvements | Validate context ring reflects improved compaction | ✅ |
-| open-file-in-central-pane | Open files from workspace preview in central pane (reuse viewer routes) | ✅ |
-| browser-voice-integration | Speech-to-text input + text-to-speech output (browser APIs) | ⏳ |
-
-### Wave 10d — Notepad Panel
-
-| Task | Description | Status |
-|---|---|---|
-| notepad-panel | Activity Bar scratchpad — atomic editable notes, send to chat (#100) | ✅ |
-
-### Wave 10e — Code Quality Fixes (from review)
-
-**Wave 1 (sequential):**
-
-| Task | Description | Status |
-|---|---|---|
-| dead-code-cleanup | Remove orphaned files, unused modules/exports, stale CSS/localStorage (#109) | ✅ |
-| fix-hardcoded-chat-jid | Use active chat JID instead of hardcoded web:default (#106) | ✅ |
-
-**Wave 2 (after Wave 1):**
-
-| Task | Description | Status |
-|---|---|---|
-| fix-silent-errors | Add user-facing error feedback across all panels (#107) | ✅ |
-| accessibility-keyboard-aria | Add keyboard nav + ARIA roles to interactive elements (#108) | ✅ |
-| settings-panel-refactor | Split SettingsPanel.tsx into section modules, fix timer leak + types (#110) | ✅ |
-
-**Wave 3 (after Wave 2):**
-
-| Task | Description | Status |
-|---|---|---|
-| localstorage-robustness | Guard quota/parse/blocked errors in localStorage (#112) | ✅ |
-| sse-reconnection-races | Fix SSE error recovery + timeline load races (#113) | ✅ |
-| theming-debt | Replace hardcoded colors with CSS variables in ModelContextBar (#111) | ✅ |
-| minor-cleanup | Unused memo deps, inline DOM styling, duplicate CSS selectors (#114) | ✅ |
-
-### Next: Wave 11a — Refactors (do BEFORE new features)
-
-Technical debt cleanup. Each PR includes regression tests.
-
-| # | Task | Issue | Severity | Status |
-|---|---|---|---|---|
-| 1 | Restore type safety in markdown/rendering utils | #172 | High | ✅ |
-| 2 | Break up oversized controller components | #174 | Medium | ✅ |
-| 3 | Remove deprecated dead code + duplicate metadata | #175 | Medium | ✅ |
-| 4 | Harden ModelContextBar polling races | #176 | Medium | ✅ |
-| 5 | Wire or remove unused workspace settings | #177 | Low | ✅ |
-| 6 | Prune unused shell.css selectors | #193 | Medium | ✅ |
-
-> Wave 11a complete. CI re-enabled.
-
-### Wave 11b — UX Polish (after refactors)
-
-| Task | Description | Status |
-|---|---|---|
-| real-time-agent-turn-progress | Unified AgentProgressPanel — thoughts, draft, tools, MCP progress (positioned between timeline and compose box, like upstream). Requires lifting SSE state out of MessageList. Sub-issues #252-254 exist but need redesign. | ✅ |
-| #252 | (PR #255 closed — needs redesign as part of unified panel) | ✅ |
-| message-collapse-delete-actions | Message collapse + delete actions (#209) | ✅ |
-| message-tts-playback-audio-controls | Message TTS playback + audio controls bar (#195) | ✅ |
-| separate-frontend-ci-test-suite | Expand Monaco CI test suite (#229) | ✅ (307 tests across 31 files) |
-| #276 | Tool card context → Wave 11b | ✅ |
-
-### Wave 11c — Compose Bar
-
-| Task | Description | Status |
-|---|---|---|
-| #265 | Send/Stop cycle | ✅ |
-| #266 | Attachment pills | ✅ |
-| #272 | Session pill | ⏳ |
-| #267 | Image paste | ✅ |
-| #268 | File drag & drop | ✅ |
-| #269 | Workspace file attach | ✅ |
-| #270 | Steer | ✅ |
-| #271 | Queued followups | ✅ |
-
-### Wave 11 — Full Functionality (after UX polish)
-
-| Task | Description | Status |
-|---|---|---|
-| 018-task-adaptive-cards-renderer | Adaptive cards in chat (#148) | ✅ |
-| 019-task-widget-iframe-host | Dashboard widgets in chat (#149, depends on #148) | ✅ |
-| widget pane not opening | Bug (#264) | ⏳ |
-| #278 | Attachment preview lightbox → Wave 11 | ⏳ |
-| #141 | Full compose bar redesign | ✅ closed (all sub-features complete) |
-| #269 | Workspace file attach | ✅ |
-| #270 | Steer | ✅ |
-| #271 | Queued followups | ✅ |
-| #272 | Session pill | ⏳ |
-| #296 | CLS column-reverse fix | ✅ |
-| central-pane-tab-bar | Chat / Dashboards / Terminal tabs (#89) | ⏳ |
-| #279 | File preview button alignment → Wave 10e or cleanup | ⏳ |
-| 024-task-terminal-tabs | Multi-tab terminal (#150) | ⏳ |
-| wire-terminal-profile-selector | Terminal profiles — Shell, Pi TUI (#144) | ⏳ |
-| wire-scheduled-tasks-api | Scheduled task cards in Tasks panel (#104) | ⏳ |
-| search-scope-media-filters | Search scope + media filters (#85) | ⏳ |
-| wire-side-prompt-panel-to-monaco | Side-prompt panel (#142) | ⏳ |
-| wire-fleet-batch-to-command-palette | Fleet batch via UI (#143) | ⏳ |
-| qr-code-pairing-settings | QR code pairing (#86) | ⏳ |
-| inline-provider-setup | Provider setup form in Settings (#96) | ⏳ |
-
-### Wave 12 — Performance & Cleanup
-
-| Task | Issue | Status |
-|---|---|---|
-| LCP: Code-split ghostty-web | #131 | ✅ (Phase 1: minify + ESM done. Full code-split deferred to post-HTTP/2) |
-| LCP: Lazy-load marked + DOMPurify | #132 | ✅ |
-| LCP: Subset JetBrains Mono fonts | #133 | ⏳ |
-| LCP: Purge unused CSS | #134 | ❌ closed / won't do |
-| LCP: Preload critical UI fonts | #135 | ✅ closed (no benefit on HTTP/1.1) |
-| LCP: Enable gzip/brotli compression | #136 | ✅ (coming from upstream sync) |
-| #283 | CLS: Improve layout stability | ✅ closed (#296 column-reverse fix) |
-| #251 | Extract rgba CSS variables | ✅ |
-| #292 | Upstream sync v2.2.1 | ✅ |
-| #300 | Upstream sync v2.2.2 | ✅ |
-| Virtualize chat timeline | #184 | ⏳ |
-
-### Wave 13 — A11y & Polish
-
-| Task | Issue | Status |
-|---|---|---|
-| Replace custom click targets with semantic controls | #170 | ⏳ |
-| Associate labels with inputs | #171 | ⏳ |
-| #185 | Mobile responsive UI | ✅ |
-| #186 | SEO metadata | ✅ closed (no benefit for private app) |
-| #187 | Browser compat fallbacks | ✅ closed (no benefit on HTTP/1.1) |
-
-### Unscheduled
-
-| Task | Issue | Status |
-|---|---|---|
-| Copilot agents integration | #19 | ⏳ |
-| Passkey auth support | #139 | ⏳ |
-| Passkey management UI | #151 (depends on #139) | ⏳ |
-| Browser voice integration | #140 | ⏳ |
-
-### Future (V2)
-
-- Monaco editor tabs in main panel
-- Split views (editor + chat)
-- Diff viewer
-- LSP/IntelliSense integration
-
-## Development
-
-```bash
-# Clone
-git clone https://github.com/cjnova/piclaw-monaco.git
-cd piclaw-monaco
-
-# Install
-bun install
-
-# Build vendor assets (ghostty-web WASM, etc.)
-cd runtime && bun run build:vendor:ghostty-web
-
-# Build frontend
-bun run runtime/web/frontend/build.ts
-
-# Dev (watch mode)
-bun run runtime/web/frontend/build.ts --watch
-
-# Run (use --workspace to avoid inheriting main piclaw auth)
-bun run runtime/src/index.ts --port 9090 --workspace /workspace/piclaw-monaco/workspace
-
-# Typecheck
-bunx tsc -p runtime/web/frontend/tsconfig.json --noEmit
-```
-
-## Conventions
-
-- **Branch per task**: `feat/<task-id>`
-- **Commit format**: `feat(<task-id>): <description>`
-- **PR to main**: squash merge
-- **CI gate**: build + typecheck must pass
-- **Docker publish**: manual dispatch or version tags only
-- **Workitems**: in workspace `workitems/00-inbox/piclaw-monaco/` (kanban style)
-
-## Notes
-
-- Activity Bar icons: click active = toggle sidebar, click different = switch + open
-- Terminal: real ghostty-web (WASM), connects to backend PTY at `/terminal/ws`
-- Anonymous terminal access via `?client=<uuid>` query param (stored in localStorage)
-- All layout state persisted in localStorage
-- Backend is completely untouched — all changes are in `runtime/web/frontend/` and `runtime/web/static/`
-- Model/context badge polls `/agent/status` (5s) and `/agent/context` (10s)
-- System stats poll `/api/system-stats` (3s) — CPU % and RAM (no frequency in containers)
-- Upstream sync: `git fetch upstream && git merge upstream/main`
-
-## Layout Clarification (2026-04-29)
-
-### Main Panel = ALWAYS Chat
-The central/main panel is **always** the chat timeline. It never switches. Activity Bar icons only control the **left sidebar** content.
-
-### Sidebar Panels
-
-**📁 Workspace** (split vertically):
-```
-┌─────────────────────┐
-│ WORKSPACE           │
-├─────────────────────┤
-│ File tree           │
-│  ▸ notes/       27  │
-│  ▸ repos/           │
-│    file.md          │ ← selected
-│  ▸ workitems/    7  │
-├─────────────────────┤
-│ file.md [+][✏️][🗑][↓]│
-│ type: markdown      │
-│ size: 11.1 KB       │
-│ modified: date      │
-├─────────────────────┤
-│ PREVIEW             │
-│ (rendered markdown   │
-│  or folder donut     │
-│  chart)              │
-└─────────────────────┘
-```
-
-When **folder** selected: action bar shows `[+] create [↑] upload [↓] download zip` + donut chart preview
-When **file** selected: action bar shows `[+] create [✏️] edit [🗑] delete [↓] download` + metadata + rendered preview (markdown, code, etc.)
-
-**🔍 Search**: search input + results (future)
-**🧩 Addons**: extension list + details (future)
-**🤖 Agent**: focuses compose box (chat is always visible)
-**⚙️ Settings**: existing piclaw settings panels
-
-### Recently Closed
-
-| Issue | Status |
-|---|---|
-| #185 | Mobile responsive UI | ✅ |
-| #296 | CLS column-reverse fix | ✅ |
-| #297 | INP gear icon (won't fix — marginal gain) | ❌ |
-| #300 | Upstream sync v2.2.2 | ✅ |
-| #133 | Font subset (no gain on localhost) | ❌ |
-| #184 | Virtualize timeline (unnecessary with pagination) | ❌ |
-| #304 | Search scope + media filters (#85) | ✅ |
-| #305 | Dream model bug (upstream issue) | ❌ |
-| #307 | Tasks panel enrich | ✅ |
-| #308 | Upstream sync v2.2.3 | ✅ |
-
-### Open Issues (8)
-
-| # | Issue | Category |
-|---|---|---|
-| 89 | Central pane tab bar | Feature |
-| 264 | Widget pane not opening (blocked by #89) | Bug |
-| 139 | Passkey auth (backend) | Security |
-| 151 | Passkey management UI | Security |
-| 96 | Provider setup form | Feature |
-| 86 | QR code pairing | Feature |
-| 150 | Multi-tab terminal | Nice to have |
-| 144 | Terminal profiles (Shell + Pi TUI) | Nice to have |
-| 306 | Environment settings section | Feature |
+- **Build**: `make build-web` uses piclaw-monaco frontend (`runtime/web/frontend/build.ts`)
+- **Docker**: `docker-publish.yml` with `provenance: false`, semver + latest tags only
+- **Upstream UI**: `runtime/web/src/` kept for vendor entries + merge compat, not built for app bundle
+- **Dependencies added**: `esbuild`, `@preact/signals`, `dompurify`
