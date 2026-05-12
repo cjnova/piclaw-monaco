@@ -27,6 +27,24 @@ The hamburger menu button uses `position: fixed` and appears:
 - **Max session size** (MB)
 - **Web terminal** toggle
 
+### Compaction (order 13)
+- **Enable tool-result compaction** runtime gate
+- **Semantic summaries for compacted tool results** toggle
+- Semantic summary controls:
+  - input character cap
+  - output token cap
+  - timeout (sec)
+- Auto-compaction controls:
+  - compaction threshold %
+  - compaction timeout
+  - failure backoff base/max + decay
+- Watchdog controls:
+  - enable/disable watchdog
+  - watchdog timeout
+- Operational tables:
+  - active compaction suppressions (with per-chat clear action)
+  - live watchdog phases
+
 ### Providers (order 20)
 - Lists all supported AI providers with auth state from `~/.pi/agent/auth.json`
 - Green left border for configured providers; auth type badge (oauth/api_key)
@@ -66,7 +84,7 @@ The hamburger menu button uses `position: fixed` and appears:
 - Searchable (filter in title bar)
 - Grouped by toolset with SVG icons from tool-status-hints vocabulary
 - Group checkboxes collapse/expand tool lists
-- Per-tool: name, kind badge (🔍 read-only / ✏️ mutating / 🔄 mixed), summary, source label
+- Per-tool: name, **Compact** checkbox (tool-result compaction allowlist), kind badge (🔍 read-only / ✏️ mutating / 🔄 mixed), summary, source label
 - 12 toolsets: core, discovery, attachments, model-control, data, workspace, automation, remote, browser, ui, experiments, lifecycle
 
 ### Add-ons (order 90)

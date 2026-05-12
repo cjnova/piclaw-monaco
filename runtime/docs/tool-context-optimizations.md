@@ -132,10 +132,20 @@ Tool-result compaction is runtime-gated in **Settings → Compaction** and tool 
 - **Enable tool-result compaction** checkbox (persisted through `/agent/settings/compaction`)
 - **Compact** column checkboxes per tool in Settings → Tools (persisted through `/agent/settings/compaction` as `toolResultCompactionTools`)
 
-Persisted/runtime key:
+Persisted/runtime keys:
 
 - `compaction.toolResultCompactionEnabled` in `.piclaw/config.json`
+- `compaction.toolResultCompactionTools` in `.piclaw/config.json`
+- `compaction.toolResultSemanticSummaryEnabled` in `.piclaw/config.json`
+- `compaction.toolResultSemanticSummaryMaxInputChars` in `.piclaw/config.json`
+- `compaction.toolResultSemanticSummaryMaxTokens` in `.piclaw/config.json`
+- `compaction.toolResultSemanticSummaryTimeoutMs` in `.piclaw/config.json`
 - `PICLAW_TOOL_RESULT_COMPACTION_ENABLED` env override (`1/0`, `true/false`, etc.)
+- `PICLAW_TOOL_RESULT_COMPACTION_TOOLS` env override
+- `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_ENABLED` env override
+- `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_MAX_INPUT_CHARS` env override
+- `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_MAX_TOKENS` env override
+- `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_TIMEOUT_MS` env override
 
 When disabled, `context-mode` skips compaction and leaves tool results inline.
 
@@ -167,3 +177,4 @@ Useful flags:
 - If summaries are too terse/noisy, tune preview lines/chars.
 - If `search_tool_output` misses expected text, confirm handle and retention window.
 - Add-ons that already emit stored-output handles are intentionally not re-compacted.
+- Stored-output dedupe reuses persisted output identity, but semantic summary text is recomputed per event to avoid stale preview/semantic fallback carry-over.
