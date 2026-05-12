@@ -31,7 +31,7 @@ Fork of rcarmo/piclaw replacing the embedded GUI with a **VS Code-style shell la
 | 353 | Refactor status panels to card-style with 'more…' button | 9/10 | UI polish, upstream comparison documented |
 | 321 | Session recordings — list, playback, export in UI | 9/10 | Needs backend research for recording format |
 | 315 | Avatar upload UI (click-on-avatar popover) | 9/10 | Backend upload endpoints exist |
-| 360 | VS Code theme import — map JSON themes to CSS variables | 9/10 | Phased: mapping table → import UI → preview |
+| 360 | VS Code theme import — map JSON themes to CSS variables | 10/10 | Phased: mapping table → import UI → preview |
 | 86 | QR code pairing/linking in Settings panel | 8/10 | Needs backend endpoint for QR generation |
 
 ## Open Issues — Low Priority
