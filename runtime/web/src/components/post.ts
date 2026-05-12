@@ -1042,22 +1042,29 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
     };
 
     const handleHighlightSelection = useCallback(async (color) => {
-        if (!highlightPopup) return;
+        if (!highlightPopup) {
+            console.warn('[post-highlight] No highlightPopup state — handler called with stale closure');
+            return;
+        }
         const highlight: PostHighlight = {
             type: 'highlight',
             text: highlightPopup.text,
             textOffset: highlightPopup.textOffset,
             color,
         };
-        // Clear popup immediately so user sees feedback
+        // Clear popup and selection immediately
         setHighlightPopup(null);
         window.getSelection()?.removeAllRanges();
+        // Apply highlight locally first for immediate visual feedback
+        if (contentRef.current) {
+            applyHighlightsToElement(contentRef.current, [highlight]);
+        }
+        // Persist to DB
         try {
             const updated = await persistHighlight(post.id, post.chat_jid, data.annotations, highlight);
-            // Update local post data so re-render picks up the new annotation
             data.annotations = updated;
         } catch (err) {
-            console.warn('[post] Failed to persist highlight:', err);
+            console.warn('[post-highlight] Failed to persist highlight:', err);
         }
         setHighlightVersion((v) => v + 1);
     }, [highlightPopup, post.id, post.chat_jid, data]);
@@ -1662,7 +1669,6 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
                         class="post-highlight-color-btn"
                         style="background:${c.value}; border:1px solid rgba(128,128,128,0.3)"
                         onClick=${(e) => { e.preventDefault(); e.stopPropagation(); handleHighlightSelection(c.value); }}
-                        onPointerDown=${(e) => { e.preventDefault(); e.stopPropagation(); handleHighlightSelection(c.value); }}
                         title=${`Highlight ${c.name}`}
                     />
                 `)}
