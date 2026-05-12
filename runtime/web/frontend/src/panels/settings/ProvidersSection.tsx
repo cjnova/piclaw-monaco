@@ -40,10 +40,16 @@ export function ProvidersSection({ providers }: { providers: Provider[] }) {
             {p.configured ? (
               <>
                 <button type="button" className="settings-panel__provider-btn settings-panel__provider-btn--logout" onClick={() => sendCommand(`/logout ${p.id}`)}>Logout</button>
-                <button type="button" className="settings-panel__provider-btn" onClick={() => sendCommand(`/login ${p.id}`)}>Reconfigure</button>
+                <button type="button" className="settings-panel__provider-btn" onClick={() => {
+                  window.dispatchEvent(new CustomEvent("piclaw:show-wizard", { detail: { providerId: p.id } }));
+                  window.dispatchEvent(new CustomEvent("piclaw:close-sidebar"));
+                }}>Reconfigure</button>
               </>
             ) : (
-              <button type="button" className="settings-panel__provider-btn" onClick={() => sendCommand(`/login ${p.id}`)}>Set up</button>
+              <button type="button" className="settings-panel__provider-btn" onClick={() => {
+                window.dispatchEvent(new CustomEvent("piclaw:show-wizard", { detail: { providerId: p.id } }));
+                window.dispatchEvent(new CustomEvent("piclaw:close-sidebar"));
+              }}>Set up</button>
             )}
           </div>
         </div>

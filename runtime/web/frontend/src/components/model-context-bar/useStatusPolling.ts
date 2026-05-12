@@ -4,6 +4,7 @@ import { getChatJid } from "../../api/chat-jid";
 import type { AgentStatus, AgentContext, ModelInfo, ProviderUsage, ModelEntry } from "./types";
 import { fmtTokens } from "./types";
 import { addonHealthSignal } from "./addonHealthSignal";
+import { providerConfigured } from "../../app/providerState";
 
 export interface UseStatusPollingResult {
   agentStatus: ReturnType<typeof useSignal<AgentStatus | null>>;
@@ -87,6 +88,9 @@ export function useStatusPolling(): UseStatusPollingResult {
         // #60: store context_window from current model's definition
         const currentOpt = info.model_options?.find((m: Record<string, unknown>) => m.label === info.current || m.id === info.current);
         if (currentOpt?.context_window) modelContextWindow.value = currentOpt.context_window as number;
+        // Set provider configured state from oobe field
+        const oobeReady = info.oobe?.provider_ready_completed_instance;
+        providerConfigured.value = oobeReady !== undefined ? !!oobeReady : !!(info.current);
         // billing: store provider_usage (conditional on data shape)
         if (info.provider_usage) {
           providerUsage.value = info.provider_usage;

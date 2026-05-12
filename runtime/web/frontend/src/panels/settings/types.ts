@@ -14,6 +14,7 @@ export interface Provider {
   configured?: boolean;
   authType?: string | null;
   apiKeyHint?: string;
+  isCustom?: boolean;
 }
 
 export interface WatchdogPhase {

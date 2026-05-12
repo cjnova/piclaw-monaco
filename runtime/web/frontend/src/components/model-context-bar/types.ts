@@ -21,6 +21,11 @@ export interface AgentContext {
   percent: number | null;
 }
 
+export interface OobeStatus {
+  provider_ready_completed_instance?: boolean;
+  [key: string]: unknown;
+}
+
 export interface ModelInfo {
   current: string | null;
   models: string[];
@@ -30,6 +35,7 @@ export interface ModelInfo {
   supports_thinking: boolean;
   available_thinking_levels: string[];
   provider_usage?: ProviderUsage;
+  oobe?: OobeStatus;
 }
 
 export interface ProviderUsage {
