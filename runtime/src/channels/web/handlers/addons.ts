@@ -427,6 +427,17 @@ export function resolveAddonInstallSpec(addon: Pick<CatalogAddon, "name" | "vers
   };
 }
 
+function summarizeBunRemoveFailure(detail: string): string {
+  const text = String(detail || "");
+  const resolutionFailures = (text.match(/failed to resolve error/gi) || []).length;
+  const http404s = (text.match(/\b404 error\b/gi) || []).length;
+  const failureCount = resolutionFailures || http404s;
+  const suffix = failureCount > 0
+    ? ` (${failureCount} dependency resolution error${failureCount === 1 ? "" : "s"})`
+    : "";
+  return `bun remove failed first${suffix}; package files were removed manually. See server logs for full resolver output.`;
+}
+
 async function runBunCommand(args: string[], cwd: string): Promise<BunCommandResult> {
   try {
     const proc = Bun.spawn(args, {
@@ -997,7 +1008,7 @@ export async function handleUninstallAddon(
   const destDir = join(addonsDir, "node_modules", addon.name);
 
   try {
-    const removal = await runBunCommand(["bun", "remove", addon.name], addonsDir);
+    const removal = await (addonInstallTestHooks?.runBunCommand || runBunCommand)(["bun", "remove", addon.name], addonsDir);
     let cleanup = { removed: false, deferred: false };
     let dependencyCleanup: { cleaned: boolean; error?: string } = { cleaned: false };
     if (!removal.ok) {
@@ -1013,7 +1024,14 @@ export async function handleUninstallAddon(
     const warnings: string[] = [];
     if (!removal.ok) {
       const detail = removal.stderr || removal.stdout || `bun remove exited ${removal.exitCode}`;
-      warnings.push(`bun remove failed first: ${detail}`);
+      addonLog.warn("bun remove failed during addon uninstall; manual cleanup succeeded", {
+        operation: "addon_uninstall.bun_remove_fallback",
+        addon: addon.name,
+        slug,
+        exitCode: removal.exitCode,
+        detail,
+      });
+      warnings.push(summarizeBunRemoveFailure(detail));
       if (cleanup.deferred) warnings.push('Locked files were moved aside for cleanup on restart.');
       if (dependencyCleanup.error) warnings.push(`package.json cleanup failed: ${dependencyCleanup.error}`);
     }

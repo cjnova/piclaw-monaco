@@ -58,6 +58,7 @@ export interface RenderPanePopoutModeOptions {
   handleTabToggleDiff: (tabId: string) => void;
   editorContainerRef: { current: any };
   getPaneContent: () => string | null | undefined;
+  subscribePaneContentChange?: (cb: (content: string) => void) => (() => void) | void;
   panePopoutPath: string | null;
   canReattachPane?: boolean;
   handleReattachPane?: () => void;
@@ -79,6 +80,7 @@ export function renderPanePopoutMode(options: RenderPanePopoutModeOptions): any 
     handleTabToggleDiff,
     editorContainerRef,
     getPaneContent,
+    subscribePaneContentChange,
     panePopoutPath,
   } = options;
 
@@ -162,6 +164,7 @@ export function renderPanePopoutMode(options: RenderPanePopoutModeOptions): any 
         ${editorOpen && tabStripActiveId && previewTabs.has(tabStripActiveId) && html`
           <${MarkdownPreview}
             getContent=${getPaneContent}
+            subscribeContentChange=${subscribePaneContentChange}
             path=${tabStripActiveId}
             onClose=${() => handleTabTogglePreview(tabStripActiveId)}
           />

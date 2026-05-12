@@ -39,7 +39,38 @@ export interface PersistedDraftRecoveryEntry {
   updatedAt: number;
 }
 
-function persistInterruptedTurnOutcome(chatJid: string, inflight: InflightRun, assistantName: string): void {
+export type InterruptedTurnCause = "service_restart" | "runtime_stale";
+
+export function buildInterruptedTurnOutcomeMarker(cause: InterruptedTurnCause): Record<string, unknown> {
+  if (cause === "runtime_stale") {
+    return {
+      type: "turn_outcome_marker",
+      kind: "interrupted",
+      label: "interrupted",
+      title: "Turn interrupted",
+      detail: "The previous run stalled before the reply finished.",
+      severity: "warning",
+      cause,
+    };
+  }
+
+  return {
+    type: "turn_outcome_marker",
+    kind: "interrupted",
+    label: "interrupted",
+    title: "Turn interrupted",
+    detail: "The service restarted before the reply finished.",
+    severity: "warning",
+    cause,
+  };
+}
+
+function persistInterruptedTurnOutcome(
+  chatJid: string,
+  inflight: InflightRun,
+  assistantName: string,
+  cause: InterruptedTurnCause = "service_restart",
+): void {
   try {
     storeMessage({
       id: createUuid("web"),
@@ -47,14 +78,7 @@ function persistInterruptedTurnOutcome(chatJid: string, inflight: InflightRun, a
       sender: "web-agent",
       sender_name: assistantName,
       content: "",
-      content_blocks: [{
-        type: "turn_outcome_marker",
-        kind: "interrupted",
-        label: "interrupted",
-        title: "Turn interrupted",
-        detail: "The service restarted before the reply finished.",
-        severity: "warning",
-      }],
+      content_blocks: [buildInterruptedTurnOutcomeMarker(cause)],
       thread_id: getMessageThreadRootIdById(chatJid, inflight.messageId) ?? undefined,
       timestamp: new Date().toISOString(),
       is_from_me: true,
@@ -66,6 +90,7 @@ function persistInterruptedTurnOutcome(chatJid: string, inflight: InflightRun, a
       operation: "recover_inflight_runs.persist_interrupted_outcome",
       chatJid,
       inflightMessageId: inflight.messageId,
+      cause,
       err: error,
     });
   }
@@ -123,7 +148,7 @@ export interface WebRecoveryStore {
   getAgentReplyStateAfter(chatJid: string, prevTs: string): AgentReplyState;
   clearChatPreflight?(chatJid: string): void;
   clearChatCompactionActive?(chatJid: string): void;
-  getChatCompactionBackoff?(chatJid: string): { failureCount: number } | null;
+  getChatCompactionBackoff?(chatJid: string): { failureCount: number; backoffUntil?: string | null; lastErrorMessage?: string | null } | null;
   setChatCompactionBackoff?(chatJid: string, backoff: { failureCount: number; lastFailedAt: string; backoffUntil: string; lastErrorMessage?: string | null }): void;
   quarantineStalePreflightRun?(preflight: PreflightRun, options: { createdAt: string; reason: string; backoffUntil?: string | null }): StalePreflightRecoveryRecord | null;
   clearInflightMarker(chatJid: string): void;
@@ -281,7 +306,7 @@ export function recoverStaleInflightRun(
       ctx.clearDraftRecovery?.(inflight.chatJid);
       return true;
     }
-    persistInterruptedTurnOutcome(inflight.chatJid, inflight, ctx.assistantName);
+    persistInterruptedTurnOutcome(inflight.chatJid, inflight, ctx.assistantName, "runtime_stale");
     ctx.clearDraftRecovery?.(inflight.chatJid);
     return true;
   }
@@ -363,14 +388,50 @@ export function recoverInflightRuns(
         for (const compaction of activeCompactions) {
           const compactionAgeMs = getRunAgeMs(compaction.startedAt, now);
           if (compactionAgeMs < staleAgeMs) {
-            log.info("Active compaction marker recovered before stale age; clearing marker", {
-              operation: "recover_active_compactions.clear_fresh",
-              chatJid: compaction.chatJid,
-              startedAt: compaction.startedAt,
-              reason: compaction.reason,
-              compactionAgeSeconds: Math.round(compactionAgeMs / 1000),
-            });
-            store.clearChatCompactionActive?.(compaction.chatJid);
+            // Even "fresh" compaction markers that survived a restart indicate a
+            // failed compaction attempt (the process exited before completing it).
+            // Increment the failure counter so repeated fast crashes eventually
+            // trigger backoff instead of retrying the same doomed compaction
+            // indefinitely (watchdog fires at 120s, stale threshold is 240s).
+            const prev = store.getChatCompactionBackoff?.(compaction.chatJid) ?? null;
+            const freshFailureCount = (prev?.failureCount ?? 0) + 1;
+            if (freshFailureCount >= 3) {
+              const freshBackoffUntil = new Date(now + backoffMs).toISOString();
+              const detail = `Compaction for ${compaction.chatJid} failed ${freshFailureCount} times (cleared as fresh each restart); entering backoff`;
+              store.setChatCompactionBackoff?.(compaction.chatJid, {
+                failureCount: freshFailureCount,
+                lastFailedAt: recoveredAt,
+                backoffUntil: freshBackoffUntil,
+                lastErrorMessage: detail,
+              });
+              store.clearChatCompactionActive?.(compaction.chatJid);
+              store.clearInflightMarker(compaction.chatJid);
+              log.warn("Repeated fresh compaction failures triggered backoff", {
+                operation: "recover_active_compactions.fresh_backoff",
+                chatJid: compaction.chatJid,
+                startedAt: compaction.startedAt,
+                reason: compaction.reason,
+                compactionAgeSeconds: Math.round(compactionAgeMs / 1000),
+                failureCount: freshFailureCount,
+                backoffUntil: freshBackoffUntil,
+              });
+            } else {
+              store.setChatCompactionBackoff?.(compaction.chatJid, {
+                failureCount: freshFailureCount,
+                lastFailedAt: recoveredAt,
+                backoffUntil: prev?.backoffUntil ?? recoveredAt,
+                lastErrorMessage: prev?.lastErrorMessage ?? null,
+              });
+              store.clearChatCompactionActive?.(compaction.chatJid);
+              log.info("Active compaction marker recovered before stale age; clearing marker (failure count incremented)", {
+                operation: "recover_active_compactions.clear_fresh",
+                chatJid: compaction.chatJid,
+                startedAt: compaction.startedAt,
+                reason: compaction.reason,
+                compactionAgeSeconds: Math.round(compactionAgeMs / 1000),
+                failureCount: freshFailureCount,
+              });
+            }
             continue;
           }
 
@@ -476,7 +537,7 @@ export function recoverInflightRuns(
       continue;
     }
 
-    persistInterruptedTurnOutcome(inflight.chatJid, inflight, ctx.assistantName);
+    persistInterruptedTurnOutcome(inflight.chatJid, inflight, ctx.assistantName, "service_restart");
     ctx.clearDraftRecovery?.(inflight.chatJid);
   }
 }

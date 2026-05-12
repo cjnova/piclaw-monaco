@@ -275,6 +275,19 @@
 - Closing settings removes backdrop and restores workspace interactivity
 - No stacking context leakage from workspace tooltips (z-index: 9999)
 
+### US-23: Context Meter Tooltip
+> As a user, I want to see the current token values when I hover over the context meter, so that I know exactly how much context I'm using.
+
+**Acceptance criteria:**
+- Hovering over the context pie shows "Context: XK / YK tokens (Z%)"
+- Both used and total token counts are present
+- Percentage matches the visual fill of the pie arc
+- Tooltip includes "Compact context" action hint when not compacting
+- Tooltip shows compaction title + elapsed time during compaction
+- aria-label matches title for screen reader accessibility
+- Token values update after agent turns (usage increases)
+- Title attribute is always present (native tooltip on hover)
+
 ### US-23: Mobile PWA Viewport and Themed Safe Areas
 > As an iPhone/iPad home-screen webapp user, I want the compose area to remain flush with the bottom edge and the active theme to cover every safe-area/background surface, so that the app feels native and never shows a blank strip below compose.
 
@@ -316,6 +329,14 @@
 | US-20 Lightbox dismissal | ★★★ | ★★★ | ★★ | Every image view | Medium |
 | US-21 Swipe independence | ★★★ | ★★★ | ★ | Every session switch (touch) | High |
 | US-22 Settings layering | ★★★ | ★★ | ★★★ | Every settings open | Medium |
+| US-23 Context meter tooltip | ★★★ | ★★ | ★★★ | Every hover on pie | Low |
+| US-24 Hamburger menu items | ★★★ | ★★★ | ★★ | Every menu open | Medium |
+| US-25 Safe area / layout | ★★★ | ★★★ | ★★ | Always (PWA) | Medium |
+| US-26 PWA scale / preview | ★★ | ★★★ | ★ | Occasional | Low |
+| US-27 Context scoping | ★★★ | ★★ | ★★★ | Every session switch | High |
+| US-28 Image annotation | ☆ | ★★★ | ☆ | iPad image review | Medium |
+| US-29 Text highlighting | ★★ | ★★★ | ★★ | Post review | Medium |
+| US-30 Compaction settings | ★★ | ★ | ★★★ | Settings config | Low |
 | US-23 Mobile PWA viewport/theme | ★★★ | ★★★ | ☆ | Every mobile webapp session | Very high |
 
 ## Test implementation priority
@@ -342,4 +363,12 @@
 20. **US-20** — Lightbox dismissal (any key/click/tap)
 21. **US-21** — Session swipe independence from visible elements
 22. **US-22** — Settings dialog layering above workspace
+23. **US-23** — Context meter tooltip with token values
+24. **US-24** — Hamburger menu items and workspace state
+25. **US-25** — Safe area and layout fixes
+26. **US-26** — PWA display scale and editor preview
+27. **US-27** — Context scoping and compaction
+28. **US-28** — Image annotation (iPad)
+29. **US-29** — Text highlighting
+30. **US-30** — Compaction and context mode settings pane
 23. **US-23** — Mobile PWA viewport and themed safe-area coverage

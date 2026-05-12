@@ -11,6 +11,11 @@ function normalizeCompactionSettings(data: Record<string, any> = {}) {
         compactionBackoffMaxMin: data.compactionBackoffMaxMin ?? 360,
         compactionThresholdPercent: data.compactionThresholdPercent ?? 75,
         compactionBackoffDecayFactor: data.compactionBackoffDecayFactor ?? 0.5,
+        toolResultCompactionEnabled: Boolean(data.toolResultCompactionEnabled ?? true),
+        toolResultSemanticSummaryEnabled: Boolean(data.toolResultSemanticSummaryEnabled ?? true),
+        toolResultSemanticSummaryMaxInputChars: data.toolResultSemanticSummaryMaxInputChars ?? 12000,
+        toolResultSemanticSummaryMaxTokens: data.toolResultSemanticSummaryMaxTokens ?? 320,
+        toolResultSemanticSummaryTimeoutSec: data.toolResultSemanticSummaryTimeoutSec ?? 12,
         progressWatchdogEnabled: Boolean(data.progressWatchdogEnabled ?? false),
         progressWatchdogTimeoutSec: data.progressWatchdogTimeoutSec ?? 120,
         compactionBackoffs: Array.isArray(data.compactionBackoffs) ? data.compactionBackoffs : [],
@@ -32,6 +37,11 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
     const [compactionBackoffMaxMin, setCompactionBackoffMaxMin] = useState(360);
     const [compactionThresholdPercent, setCompactionThresholdPercent] = useState(75);
     const [compactionBackoffDecayFactor, setCompactionBackoffDecayFactor] = useState(0.5);
+    const [toolResultCompactionEnabled, setToolResultCompactionEnabled] = useState(true);
+    const [toolResultSemanticSummaryEnabled, setToolResultSemanticSummaryEnabled] = useState(true);
+    const [toolResultSemanticSummaryMaxInputChars, setToolResultSemanticSummaryMaxInputChars] = useState(12000);
+    const [toolResultSemanticSummaryMaxTokens, setToolResultSemanticSummaryMaxTokens] = useState(320);
+    const [toolResultSemanticSummaryTimeoutSec, setToolResultSemanticSummaryTimeoutSec] = useState(12);
     const [progressWatchdogEnabled, setProgressWatchdogEnabled] = useState(false);
     const [progressWatchdogTimeoutSec, setProgressWatchdogTimeoutSec] = useState(120);
     const [compactionBackoffs, setCompactionBackoffs] = useState([]);
@@ -53,6 +63,11 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
         setCompactionBackoffMaxMin(next.compactionBackoffMaxMin);
         setCompactionThresholdPercent(next.compactionThresholdPercent);
         setCompactionBackoffDecayFactor(next.compactionBackoffDecayFactor);
+        setToolResultCompactionEnabled(next.toolResultCompactionEnabled);
+        setToolResultSemanticSummaryEnabled(next.toolResultSemanticSummaryEnabled);
+        setToolResultSemanticSummaryMaxInputChars(next.toolResultSemanticSummaryMaxInputChars);
+        setToolResultSemanticSummaryMaxTokens(next.toolResultSemanticSummaryMaxTokens);
+        setToolResultSemanticSummaryTimeoutSec(next.toolResultSemanticSummaryTimeoutSec);
         setProgressWatchdogEnabled(next.progressWatchdogEnabled);
         setProgressWatchdogTimeoutSec(next.progressWatchdogTimeoutSec);
         setCompactionBackoffs(next.compactionBackoffs);
@@ -63,6 +78,11 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
             compactionBackoffMaxMin: next.compactionBackoffMaxMin,
             compactionThresholdPercent: next.compactionThresholdPercent,
             compactionBackoffDecayFactor: next.compactionBackoffDecayFactor,
+            toolResultCompactionEnabled: next.toolResultCompactionEnabled,
+            toolResultSemanticSummaryEnabled: next.toolResultSemanticSummaryEnabled,
+            toolResultSemanticSummaryMaxInputChars: next.toolResultSemanticSummaryMaxInputChars,
+            toolResultSemanticSummaryMaxTokens: next.toolResultSemanticSummaryMaxTokens,
+            toolResultSemanticSummaryTimeoutSec: next.toolResultSemanticSummaryTimeoutSec,
             progressWatchdogEnabled: next.progressWatchdogEnabled,
             progressWatchdogTimeoutSec: next.progressWatchdogTimeoutSec,
         });
@@ -78,17 +98,33 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
         compactionBackoffMaxMin,
         compactionThresholdPercent,
         compactionBackoffDecayFactor,
+        toolResultCompactionEnabled,
+        toolResultSemanticSummaryEnabled,
+        toolResultSemanticSummaryMaxInputChars,
+        toolResultSemanticSummaryMaxTokens,
+        toolResultSemanticSummaryTimeoutSec,
         progressWatchdogEnabled,
         progressWatchdogTimeoutSec,
-    }), [compactionTimeoutSec, compactionBackoffBaseMin, compactionBackoffMaxMin, compactionThresholdPercent, compactionBackoffDecayFactor, progressWatchdogEnabled, progressWatchdogTimeoutSec]);
+    }), [
+        compactionTimeoutSec,
+        compactionBackoffBaseMin,
+        compactionBackoffMaxMin,
+        compactionThresholdPercent,
+        compactionBackoffDecayFactor,
+        toolResultCompactionEnabled,
+        toolResultSemanticSummaryEnabled,
+        toolResultSemanticSummaryMaxInputChars,
+        toolResultSemanticSummaryMaxTokens,
+        toolResultSemanticSummaryTimeoutSec,
+        progressWatchdogEnabled,
+        progressWatchdogTimeoutSec,
+    ]);
 
     useEffect(() => {
         if (currentSnapshot === savedSnapshotRef.current) return;
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(async () => {
             if (!mountedRef.current) return;
-            const active = document.activeElement;
-            if (active && active.closest?.('.settings-number-stepper')) return;
             try {
                 setStatus?.('Saving compaction settings…', 'info');
                 const response = await fetch('/agent/settings/compaction', {
@@ -152,6 +188,62 @@ export function CompactionSection({ settingsData, setStatus, mergeSettingsData }
             `}
 
             <h3>Automatic compaction</h3>
+            <div class="settings-row">
+                <label>Enable tool-result compaction</label>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" checked=${toolResultCompactionEnabled} onChange=${e => setToolResultCompactionEnabled(Boolean(e.target.checked))} />
+                    <span class="settings-hint" style="margin:0">When disabled, large tool results stay inline and are not externalized into searchable tool-output handles.</span>
+                </div>
+            </div>
+            <div class="settings-row">
+                <label>Semantic summaries for compacted tool results</label>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" checked=${toolResultSemanticSummaryEnabled} onChange=${e => setToolResultSemanticSummaryEnabled(Boolean(e.target.checked))} />
+                    <span class="settings-hint" style="margin:0">When enabled, compacted outputs include a semantic summary generated with the active model (preview fallback on failure).</span>
+                </div>
+            </div>
+            <div class="settings-row">
+                <label>Semantic summary input limit (chars)</label>
+                <${NumberStepper}
+                    label="semantic summary input limit"
+                    value=${toolResultSemanticSummaryMaxInputChars}
+                    min=${500}
+                    max=${200000}
+                    fallback=${12000}
+                    width="100px"
+                    disabled=${!toolResultSemanticSummaryEnabled}
+                    onChange=${setToolResultSemanticSummaryMaxInputChars}
+                />
+                <span class="settings-hint" style="margin:0">Maximum characters sampled from full tool output for semantic summarization.</span>
+            </div>
+            <div class="settings-row">
+                <label>Semantic summary output max tokens</label>
+                <${NumberStepper}
+                    label="semantic summary max tokens"
+                    value=${toolResultSemanticSummaryMaxTokens}
+                    min=${64}
+                    max=${4096}
+                    fallback=${320}
+                    width="90px"
+                    disabled=${!toolResultSemanticSummaryEnabled}
+                    onChange=${setToolResultSemanticSummaryMaxTokens}
+                />
+                <span class="settings-hint" style="margin:0">Upper bound for generated summary length.</span>
+            </div>
+            <div class="settings-row">
+                <label>Semantic summary timeout (sec)</label>
+                <${NumberStepper}
+                    label="semantic summary timeout"
+                    value=${toolResultSemanticSummaryTimeoutSec}
+                    min=${1}
+                    max=${300}
+                    fallback=${12}
+                    width="90px"
+                    disabled=${!toolResultSemanticSummaryEnabled}
+                    onChange=${setToolResultSemanticSummaryTimeoutSec}
+                />
+                <span class="settings-hint" style="margin:0">Abort semantic summary generation after this timeout and fall back to preview compaction.</span>
+            </div>
             <div class="settings-row">
                 <label>Compaction threshold (%)</label>
                 <${NumberStepper}

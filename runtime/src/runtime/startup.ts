@@ -290,10 +290,10 @@ export function runWebStartupRecoveryBootstrap(web: StartupRecoveryWebChannel): 
       detail: "Resuming pending chats and queued follow-ups.",
       startedAt,
     }));
-    // Run an immediate pending-resume scan at startup so deferred queued
-    // follow-ups are picked up even before IPC workers process resume tasks.
-    // Queue dedupe keeps this safe when IPC-driven resume_pending runs too.
-    web.resumePendingChats();
+    // Defer the pending-resume scan so the HTTP server can bind and start
+    // accepting connections before heavy chat processing begins. Queue
+    // dedupe keeps this safe when IPC-driven resume_pending runs too.
+    setTimeout(() => web.resumePendingChats(), 0);
   } finally {
     web.updateAgentStatus(STARTUP_STATUS_CHAT_JID, {
       type: "done",

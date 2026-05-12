@@ -55,7 +55,13 @@ export async function handleContentPrimaryRoutes(
   }
 
   if (req.method === "PATCH" && pathname.startsWith("/post/")) {
-    const id = channel.parseOptionalInt(pathname.replace("/post/", ""));
+    const rest = pathname.slice(6); // after "/post/"
+    const annotationsMatch = rest.match(/^(\d+)\/annotations$/);
+    if (annotationsMatch) {
+      const id = parseInt(annotationsMatch[1]!, 10);
+      return await channel.handleUpdatePostAnnotations(req, id);
+    }
+    const id = channel.parseOptionalInt(rest);
     return await channel.handleUpdatePost(req, id);
   }
 

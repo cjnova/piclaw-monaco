@@ -31,6 +31,7 @@
     opacity: 1;
     transform: translateX(0);
     transition: width var(--ui-transition-fast), min-width var(--ui-transition-fast), opacity var(--ui-transition-fast), transform var(--ui-transition-fast);
+    padding-top: env(safe-area-inset-top, 0px);
 }
 
 .workspace-sidebar[data-workspace-scale="compact"] {
@@ -301,7 +302,7 @@
 }
 
 .workspace-menu-item:disabled {
-    opacity: 0.45;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
@@ -314,10 +315,67 @@
     color: var(--danger-color, #d9534f);
 }
 
+.timeline-menu-dropdown {
+    max-height: min(520px, calc(100dvh - 48px));
+}
+
+.timeline-menu-dropdown .workspace-menu-item {
+    min-height: 30px;
+    padding: 5px 10px;
+}
+
+.timeline-menu-dropdown .workspace-menu-separator {
+    margin: 3px 0;
+}
+
+.workspace-menu-scale-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    min-height: 36px;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.workspace-menu-scale-input-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-secondary);
+}
+
+.workspace-menu-scale-input {
+    width: 4.6rem;
+    min-height: 30px;
+    padding: 4px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: right;
+}
+
+.workspace-menu-scale-input:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 1px;
+}
+
 .workspace-menu-separator {
     height: 1px;
     margin: 2px 4px;
     background: var(--border-color);
+}
+
+.timeline-menu-dropdown .workspace-menu-scale-control {
+    min-height: 30px;
+    padding: 5px 10px;
+}
+
+.timeline-menu-dropdown .workspace-menu-scale-input {
+    height: 26px;
 }
 
 .workspace-download:disabled,
@@ -1051,3 +1109,22 @@
     height: 28px;
 }
 
+
+/* Recent files submenu */
+.workspace-menu-submenu-label {
+    padding: 6px 10px 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    user-select: none;
+}
+
+.workspace-menu-recent-item {
+    padding-left: 18px !important;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

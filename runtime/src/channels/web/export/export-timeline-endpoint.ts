@@ -10,6 +10,7 @@ import { join } from "path";
 import { marked } from "marked";
 import { getWebRuntimeConfig } from "../../../core/config.js";
 import { getDb } from "../../../db.js";
+import { getMediaById } from "../../../db/media.js";
 import { isInternalSecretRequestAuthorized } from "../auth/internal-secret.js";
 import { jsonResponse } from "../http/http-utils.js";
 
@@ -51,9 +52,18 @@ export function handleExportTimeline(req: Request, ctx: ExportTimelineContext): 
   const config = loadConfig();
   const agentName = config?.assistant?.assistantName || "Assistant";
   const userName = config?.user?.userName || "You";
-  const agentAvatar = config?.assistant?.assistantAvatar ? "/avatar/agent" : null;
-  const userAvatar = config?.user?.userAvatar ? "/avatar/user" : null;
+  const agentAvatarSource = String(config?.assistant?.assistantAvatar || "").trim() || null;
+  const userAvatarSource = String(config?.user?.userAvatar || "").trim() || null;
   const userAvatarBg = String(config?.user?.userAvatarBackground || "").trim().toLowerCase();
+
+  // Inline avatars as base64 data URIs so wkhtmltopdf renders them
+  // without needing to call back into the same server (deadlock).
+  const agentAvatar = agentAvatarSource ? resolveAvatarDataUri(agentAvatarSource) : null;
+  const userAvatar = userAvatarSource ? resolveAvatarDataUri(userAvatarSource) : null;
+
+  // Build a lookup of referenced message previews for pill rendering.
+  const referencedRowIds = extractReferencedRowIds(messages);
+  const referencedPreviews = referencedRowIds.size > 0 ? loadReferencedPreviews(chatJid, referencedRowIds) : new Map();
 
   const html = buildExportHtml({
     theme,
@@ -63,9 +73,10 @@ export function handleExportTimeline(req: Request, ctx: ExportTimelineContext): 
     messages,
     agentName,
     userName,
-    agentAvatar,
-    userAvatar,
+    agentAvatar: agentAvatar,
+    userAvatar: userAvatar,
     userAvatarBg,
+    referencedPreviews,
   });
 
   return new Response(html, {
@@ -199,14 +210,23 @@ function decodeHtmlAttribute(value: string): string {
     .replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(parseInt(dec, 10)));
 }
 
-function isSafeExportUrl(raw: string): boolean {
-  const value = Array.from(decodeHtmlAttribute(raw || "").trim())
+function normalizeExportUrlAttribute(raw: string): string {
+  return Array.from(decodeHtmlAttribute(raw || "").trim())
     .filter((ch) => {
       const code = ch.charCodeAt(0);
       return code > 0x1f && code !== 0x7f && !/\s/u.test(ch);
     })
     .join("");
+}
+
+function isSafeExportDataImageUrl(value: string): boolean {
+  return /^data:image\/(?:png|jpe?g|gif|webp|bmp|x-icon|svg\+xml);base64,[a-z0-9+/]+=*$/i.test(value);
+}
+
+function isSafeExportUrl(raw: string): boolean {
+  const value = normalizeExportUrlAttribute(raw);
   if (!value) return false;
+  if (isSafeExportDataImageUrl(value)) return true;
   try {
     const url = new URL(value, "https://export.local/");
     return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol);
@@ -223,10 +243,11 @@ function sanitizeMarkdownHtml(html: string): string {
 }
 
 function renderMarkdown(content: string): string {
+  // Escape < and & to prevent raw HTML injection, but preserve >
+  // so markdown blockquote syntax (> text) works correctly.
   const safe = (content || "")
     .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/</g, "&lt;");
   return sanitizeMarkdownHtml(String(marked.parse(safe, { async: false, gfm: true, breaks: true })));
 }
 
@@ -249,6 +270,102 @@ function formatSize(bytes: number | null | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Read an avatar from a local file path or remote URL and return a data URI. */
+function resolveAvatarDataUri(source: string): string | null {
+  try {
+    let buf: Buffer;
+    if (source.startsWith("http://") || source.startsWith("https://")) {
+      // Remote URL — fetch with curl (sync, short timeout)
+      const res = Bun.spawnSync(
+        ["curl", "-sfL", "--max-time", "5", source],
+        { stdout: "pipe" },
+      );
+      if (!res.stdout || res.stdout.length === 0) return null;
+      buf = Buffer.from(res.stdout);
+    } else {
+      // Local file path
+      if (!existsSync(source)) return null;
+      buf = Buffer.from(readFileSync(source));
+    }
+    if (buf.length < 8) return null;
+    let mime = "image/png";
+    if (buf[0] === 0x52 && buf[1] === 0x49) mime = "image/webp";
+    else if (buf[0] === 0xff && buf[1] === 0xd8) mime = "image/jpeg";
+    else if (buf[0] === 0x89 && buf[1] === 0x50) mime = "image/png";
+    else if (buf[0] === 0x47 && buf[1] === 0x49) mime = "image/gif";
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Extract all `message:<rowid>` references from message content. */
+function extractReferencedRowIds(messages: ExportMessage[]): Set<number> {
+  const ids = new Set<number>();
+  const pattern = /message:(\d+)/g;
+  for (const msg of messages) {
+    const text = msg.content || "";
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      ids.add(Number(match[1]));
+    }
+  }
+  return ids;
+}
+
+/** Load short previews of referenced messages for pill rendering. */
+function loadReferencedPreviews(chatJid: string, rowIds: Set<number>): Map<number, { sender_name: string; preview: string; is_bot: boolean }> {
+  const db = getDb();
+  const ids = Array.from(rowIds);
+  const rows = db.prepare(
+    `SELECT rowid, sender_name, content, is_bot_message
+     FROM messages
+     WHERE rowid IN (${ids.map(() => "?").join(",")})`
+  ).all(...ids) as Array<{ rowid: number; sender_name: string | null; content: string | null; is_bot_message: number }>;
+  const map = new Map<number, { sender_name: string; preview: string; is_bot: boolean }>();
+  for (const row of rows) {
+    const text = (row.content || "").replace(/\n/g, " ").trim();
+    const preview = text.length > 80 ? text.slice(0, 77) + "…" : text;
+    map.set(row.rowid, {
+      sender_name: row.sender_name || "Unknown",
+      preview,
+      is_bot: row.is_bot_message === 1,
+    });
+  }
+  return map;
+}
+
+/** Replace `Referenced messages:\n- message:<id>` blocks with styled pills. */
+function renderReferencedPills(
+  html: string,
+  previews: Map<number, { sender_name: string; preview: string; is_bot: boolean }>,
+): string {
+  // The markdown renderer turns the content into:
+  //   <p>Referenced messages:</p>\n<ul>\n<li>message:12345</li>\n</ul>
+  // or sometimes just: ...message:12345...
+  // Replace the full block first, then any inline remnants.
+  html = html.replace(
+    /<p>Referenced messages:<\/p>\s*<ul>([\s\S]*?)<\/ul>/gi,
+    (_match, listContent: string) => {
+      const pills = listContent.replace(/message:(\d+)/g, (_m: string, id: string) => {
+        const rowId = Number(id);
+        const ref = previews.get(rowId);
+        if (!ref) return `<span class="ref-pill ref-missing">message:${esc(id)}</span>`;
+        return `<span class="ref-pill${ref.is_bot ? " ref-agent" : ""}"><span class="ref-pill-author">${esc(ref.sender_name)}</span> <span class="ref-pill-preview">${esc(ref.preview)}</span></span>`;
+      });
+      return `<div class="ref-pills">${pills.replace(/<\/?li>/g, "").trim()}</div>`;
+    },
+  );
+  // Catch any remaining inline message:NNN references
+  html = html.replace(/message:(\d+)/g, (_m, id) => {
+    const rowId = Number(id);
+    const ref = previews.get(rowId);
+    if (!ref) return `<span class="ref-pill ref-missing">message:${id}</span>`;
+    return `<span class="ref-pill${ref.is_bot ? " ref-agent" : ""}"><span class="ref-pill-author">${esc(ref.sender_name)}</span> <span class="ref-pill-preview">${esc(ref.preview)}</span></span>`;
+  });
+  return html;
+}
+
 function renderAvatar(params: {
   name: string;
   url: string | null;
@@ -265,12 +382,25 @@ function renderAvatar(params: {
   return `<div class="${cls}"${style}>${initial}</div>`;
 }
 
-function renderMedia(media: NonNullable<ExportMessage["media"]>, origin: string): string {
+function mediaImageDataUri(id: number, contentType: string | null): string | null {
+  const type = String(contentType || "").trim().toLowerCase();
+  if (!type.startsWith("image/")) return null;
+  const media = getMediaById(id);
+  if (!media?.data?.length) return null;
+  const mime = String(media.content_type || type || "image/png").trim().toLowerCase();
+  if (!mime.startsWith("image/")) return null;
+  return `data:${mime};base64,${Buffer.from(media.data).toString("base64")}`;
+}
+
+function renderMedia(media: NonNullable<ExportMessage["media"]>, _origin: string): string {
   if (!media.length) return "";
   return `<div class="post-attachments" style="margin-top:6px">${media.map((item) => {
     const isImage = (item.content_type || "").startsWith("image/");
     if (isImage) {
-      return `<img src="${esc(`${origin}/media/${item.id}`)}" alt="${esc(item.filename || "")}" style="max-width:100%;border-radius:8px;margin:4px 0"/>`;
+      const src = mediaImageDataUri(item.id, item.content_type);
+      if (src) {
+        return `<img src="${esc(src)}" alt="${esc(item.filename || "")}" style="max-width:100%;border-radius:8px;margin:4px 0"/>`;
+      }
     }
     return `<div class="attachment-pill" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;margin:2px 4px 2px 0"><span>${esc(item.filename || `file-${item.id}`)}</span><span style="color:var(--text-secondary)">${esc(formatSize(item.size))}</span></div>`;
   }).join("")}</div>`;
@@ -287,6 +417,7 @@ function buildExportHtml(opts: {
   agentAvatar: string | null;
   userAvatar: string | null;
   userAvatarBg: string;
+  referencedPreviews: Map<number, { sender_name: string; preview: string; is_bot: boolean }>;
 }): string {
   const isDark = opts.theme === "dark";
   const fg = isDark ? "#e7e9ea" : "#0f1419";
@@ -429,10 +560,19 @@ function buildExportHtml(opts: {
       padding: 0 0 0 12px !important;
       border-left: 3px solid ${border} !important;
     }
+    .post-content img {
+      display: block !important;
+      max-width: 100% !important;
+      height: auto !important;
+      border-radius: 10px !important;
+      margin: 8px 0 !important;
+      border: 1px solid ${border} !important;
+    }
     .post-attachments { margin-top: 8px !important; }
     .post-attachments img {
       display: block !important;
       max-width: 100% !important;
+      height: auto !important;
       border-radius: 10px !important;
       margin: 6px 0 !important;
       border: 1px solid ${border} !important;
@@ -449,6 +589,35 @@ function buildExportHtml(opts: {
     }
     .post:hover { background: transparent !important; }
     .post-actions, .post-delete-btn, .compose-box, .sidebar, .header-bar, .dock-panel { display: none !important; }
+    .ref-pills { margin: 6px 0 8px !important; }
+    .ref-pill {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      gap: 6px !important;
+      padding: 4px 10px !important;
+      border: 1px solid ${border} !important;
+      border-radius: 9999px !important;
+      font-size: 12px !important;
+      margin: 2px 4px 2px 0 !important;
+      color: ${muted} !important;
+      background: ${subtle} !important;
+      max-width: 100% !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+    }
+    .ref-pill-author {
+      font-weight: 600 !important;
+      color: ${fg} !important;
+      flex-shrink: 0 !important;
+    }
+    .ref-pill-preview {
+      color: ${muted} !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+    .ref-pill.ref-agent { border-left: 3px solid ${accent} !important; }
+    .ref-pill.ref-missing { opacity: 0.5 !important; font-style: italic !important; }
   `;
 
   const posts = opts.messages.map((msg) => {
@@ -462,7 +631,7 @@ function buildExportHtml(opts: {
           <span class="post-author">${esc(name)}</span>
           <span class="post-time">${formatTime(msg.timestamp)}</span>
         </div>
-        <div class="post-content">${renderMarkdown(msg.content || "")}</div>
+        <div class="post-content">${renderReferencedPills(renderMarkdown(msg.content || ""), opts.referencedPreviews)}</div>
         ${renderMedia(msg.media || [], opts.origin)}
       </div>
     </div>`;

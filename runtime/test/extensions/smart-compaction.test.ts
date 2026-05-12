@@ -154,7 +154,10 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 import { completeSimple } from "@earendil-works/pi-ai";
 import {
   buildProgressiveCompactionChunks,
+  clampKeepRecentTokens,
+  estimatePostCompactionFit,
   getProgressiveCompactionBudget,
+  getSafeCompactionMaxTokens,
   smartCompaction,
 } from "../../src/extensions/smart-compaction.js";
 
@@ -249,14 +252,10 @@ describe("smart-compaction", () => {
     expect(result.compaction.firstKeptEntryId).toBe("kept-entry-1");
     expect(result.compaction.tokensBefore).toBe(6000);
 
-    // Should notify progress
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Smart compaction:"),
-      "info",
-    );
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      "Smart compaction complete ✓",
-      "info",
+    // Should use standard working-status feedback without notification/message panes.
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
+    expect(ctx.ui.setWorkingMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Smart compaction: generating selective summary"),
     );
     expect(ctx.ui.setStatus).toHaveBeenCalledWith(
       "context_usage",
@@ -266,7 +265,7 @@ describe("smart-compaction", () => {
       .filter(([key]: [string]) => key === "context_usage")
       .map(([, text]: [string, string]) => JSON.parse(text));
     expect(contextStatusPayloads.map((payload: any) => payload.phase)).toEqual(
-      expect.arrayContaining(["scanning", "generating_summary", "completed_estimate"]),
+      expect.arrayContaining(["scanning", "generating_summary", "completed_selective"]),
     );
     expect(contextStatusPayloads[0]).toMatchObject({
       tokens: 6000,
@@ -274,6 +273,12 @@ describe("smart-compaction", () => {
       estimated: true,
       source: "smart_compaction",
       phase: "scanning",
+    });
+    const completed = contextStatusPayloads.find((payload: any) => payload.phase === "completed_selective");
+    expect(completed?.tokens).toBeGreaterThan(6000);
+    expect(contextStatusPayloads.at(-1)).toMatchObject({
+      phase: "compaction_done",
+      tokens: completed?.tokens,
     });
   });
 
@@ -455,10 +460,7 @@ describe("smart-compaction", () => {
     );
 
     expect(result).toBeUndefined();
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Smart compaction LLM error"),
-      "warning",
-    );
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
   });
 
   it("falls through on too-short summary", async () => {
@@ -478,10 +480,7 @@ describe("smart-compaction", () => {
     );
 
     expect(result).toBeUndefined();
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("too short"),
-      "warning",
-    );
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
   });
 
   it("falls through when no auth is available", async () => {
@@ -515,10 +514,7 @@ describe("smart-compaction", () => {
     );
 
     expect(result).toBeUndefined();
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Network error"),
-      "warning",
-    );
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
   });
 
   it("respects abort signal", async () => {
@@ -605,6 +601,25 @@ describe("smart-compaction", () => {
       expect(large.promptBudgetChars).toBeLessThanOrEqual(60_000);
     });
 
+    it("subtracts system prompt overhead from budget calculations", () => {
+      // A model with 8k context should have much less budget than one with 128k
+      // because overhead eats a larger fraction of the small window
+      const tiny = getProgressiveCompactionBudget({ contextWindow: 8_000 });
+      const large = getProgressiveCompactionBudget({ contextWindow: 128_000 });
+
+      // The tiny model budget should be substantially smaller due to overhead subtraction
+      expect(tiny.promptBudgetChars).toBeLessThan(large.promptBudgetChars / 4);
+      // Budget should never exceed the context window * 4 (chars) * fraction * safety margin
+      expect(large.promptBudgetChars).toBeLessThan(128_000 * 4 * 0.42 * 0.86);
+    });
+
+    it("applies safety margin to prompt budgets", () => {
+      const budget = getProgressiveCompactionBudget({ contextWindow: 128_000 });
+      // Without safety margin, 128k * 4 * 0.42 = 215,040 chars, capped at 60k
+      // With 0.85 margin, should be <= 60k * 0.85 = 51k
+      expect(budget.promptBudgetChars).toBeLessThanOrEqual(51_000);
+    });
+
     it("splits deterministic chunks in order without dropping key continuity facts", () => {
       const messages = Array.from({ length: 12 }, (_, i) => userMsg(`fact-${String(i).padStart(2, "0")} ${"x".repeat(180)}`));
       const chunks = buildProgressiveCompactionChunks(messages as any, 500, new Set(messages.map((_, i) => i)));
@@ -643,7 +658,7 @@ describe("smart-compaction", () => {
         };
       });
 
-      const ctx = makeCtx({ model: { provider: "test", id: "small-context", contextWindow: 8_000, reasoning: false } });
+      const ctx = makeCtx({ model: { provider: "test", id: "small-context", contextWindow: 16_000, reasoning: false } });
       const result = await handler!(
         {
           preparation: makePreparation(longMessages.length, {
@@ -667,7 +682,56 @@ describe("smart-compaction", () => {
       const prompts = (completeSimple as any).mock.calls.map((call: any[]) => call[1].messages[0].content[0].text as string);
       expect(prompts.filter((prompt: string) => prompt.includes("deterministic chunk")).length).toBeGreaterThan(1);
       expect(prompts.at(-1)).toContain("Ordered Intermediate Summaries");
-      expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Progressive compaction"), "info");
+      expect(ctx.ui.notify).not.toHaveBeenCalled();
+      expect(ctx.ui.setWorkingMessage).toHaveBeenCalledWith(expect.stringContaining("Smart compaction:"));
+    });
+  });
+
+  describe("overhead and safety guards", () => {
+    it("clampKeepRecentTokens limits to 50% of effective context window", () => {
+      // For a 128k window with 4k overhead, effective = 124k, max = 62k
+      expect(clampKeepRecentTokens(100_000, 128_000)).toBeLessThanOrEqual(62_000);
+      // Small value should pass through unchanged
+      expect(clampKeepRecentTokens(10_000, 128_000)).toBe(10_000);
+      // Zero stays zero
+      expect(clampKeepRecentTokens(0, 128_000)).toBe(0);
+    });
+
+    it("clampKeepRecentTokens handles tiny context windows", () => {
+      // With 8k window and 4k overhead, effective = 4k, max = 2k
+      const clamped = clampKeepRecentTokens(50_000, 8_000);
+      expect(clamped).toBeLessThanOrEqual(2_000);
+    });
+
+    it("estimatePostCompactionFit detects overflow", () => {
+      // Summary of 50k tokens + 50k kept + 4k overhead = 104k > 100k context
+      const summary = "x".repeat(200_000); // ~50k tokens
+      const fit = estimatePostCompactionFit(summary, 50_000, 100_000);
+      expect(fit.fits).toBe(false);
+      expect(fit.margin).toBeLessThan(0);
+      expect(fit.summaryTokens).toBeGreaterThan(0);
+      expect(fit.overheadTokens).toBeGreaterThan(0);
+    });
+
+    it("estimatePostCompactionFit passes when there is room", () => {
+      const summary = "x".repeat(4_000); // ~1k tokens
+      const fit = estimatePostCompactionFit(summary, 10_000, 128_000);
+      expect(fit.fits).toBe(true);
+      expect(fit.margin).toBeGreaterThan(0);
+      expect(fit.estimatedTotal).toBe(fit.summaryTokens + 10_000 + fit.overheadTokens);
+    });
+
+    it("caps requested maxTokens so prompt + output fits the model window", () => {
+      const safe = getSafeCompactionMaxTokens({ contextWindow: 8_000 }, "x".repeat(4_000), 16_000);
+      expect(safe.promptTokens).toBeGreaterThan(4_000);
+      expect(safe.maxTokens).toBeLessThan(16_000);
+      expect(safe.promptTokens + safe.maxTokens).toBeLessThanOrEqual(8_000);
+    });
+
+    it("rejects compaction prompts with no safe output room", () => {
+      expect(() => getSafeCompactionMaxTokens({ contextWindow: 8_000 }, "x".repeat(40_000), 16_000)).toThrow(
+        /exceeds safe model budget/,
+      );
     });
   });
 
@@ -793,10 +857,10 @@ describe("smart-compaction", () => {
       expect(result.compaction.summary).toContain("split-turn"); // mechanical delta
       expect(result.compaction.summary).toContain("<modified-files>"); // file lists updated
 
-      // Should notify
-      expect(ctx.ui.notify).toHaveBeenCalledWith(
+      // Should use working-status feedback without notification/message panes.
+      expect(ctx.ui.notify).not.toHaveBeenCalled();
+      expect(ctx.ui.setWorkingMessage).toHaveBeenCalledWith(
         expect.stringContaining("split-turn continuation"),
-        "info",
       );
     });
 
@@ -845,9 +909,9 @@ describe("smart-compaction", () => {
       expect(result).toBeDefined();
       expect(result.compaction.summary).toContain("Explore codebase");
 
-      expect(ctx.ui.notify).toHaveBeenCalledWith(
-        expect.stringContaining("minimal content"),
-        "info",
+      expect(ctx.ui.notify).not.toHaveBeenCalled();
+      expect(ctx.ui.setWorkingMessage).toHaveBeenCalledWith(
+        expect.stringContaining("minimal-content compaction"),
       );
     });
 
@@ -1248,10 +1312,7 @@ describe("smart-compaction", () => {
       expect(completeSimple).toHaveBeenCalledTimes(1);
       expect(result).toBeDefined();
       expect(result.compaction.summary).toContain("Azure streaming");
-      expect(ctx.ui.notify).not.toHaveBeenCalledWith(
-        expect.stringContaining("minimal content"),
-        "info",
-      );
+      expect(ctx.ui.notify).not.toHaveBeenCalled();
     });
   });
 

@@ -14,6 +14,7 @@ import {
   getToolUseMessageBudget,
   getWebRuntimeConfig,
   getSearchMatchMode,
+  getScopedModelsOnly,
   setAssistantAvatar,
   setAssistantName,
   setSessionStorageConfig,
@@ -21,6 +22,7 @@ import {
   getToolOutputStoreThreshold,
   setToolOutputStoreThreshold,
   setSearchMatchMode,
+  setScopedModelsOnly,
   setUserAvatar,
   setUserAvatarBackground,
   setUserName,
@@ -59,6 +61,7 @@ export interface GeneralSettingsData {
   };
   sessionIsolation: "none" | "summary" | "full";
   searchMatchMode: "or" | "and";
+  scopedModelsOnly: boolean;
   uiTheme: string;
   uiTint: string | null;
   widgetToken: string;
@@ -80,6 +83,7 @@ export interface GeneralSettingsInput {
   sessionMaxCompactions?: unknown;
   sessionIsolation?: unknown;
   searchMatchMode?: unknown;
+  scopedModelsOnly?: unknown;
   uiTheme?: unknown;
   uiTint?: unknown;
 }
@@ -153,6 +157,7 @@ export function getGeneralSettingsData(): GeneralSettingsData {
     instanceTotp: buildTotpSettingsData(),
     sessionIsolation: getSessionIsolationLevel(),
     searchMatchMode: getSearchMatchMode(),
+    scopedModelsOnly: getScopedModelsOnly(),
     uiTheme: uiTheme.theme,
     uiTint: uiTheme.tint,
     widgetToken: getOrCreateWebWidgetToken(),
@@ -250,6 +255,11 @@ export async function saveGeneralSettings(input: GeneralSettingsInput): Promise<
   const nextSearchMatchMode = typeof input.searchMatchMode === "string" ? input.searchMatchMode.trim().toLowerCase() : undefined;
   if (nextSearchMatchMode === "or" || nextSearchMatchMode === "and") {
     setSearchMatchMode(nextSearchMatchMode as SearchMatchMode);
+  }
+
+  const nextScopedModelsOnly = normalizeOptionalBoolean(input.scopedModelsOnly);
+  if (nextScopedModelsOnly !== undefined) {
+    setScopedModelsOnly(nextScopedModelsOnly);
   }
 
   const nextUiTheme = typeof input.uiTheme === "string" ? input.uiTheme.trim().toLowerCase() : undefined;

@@ -325,7 +325,7 @@ describe("runtime startup helpers", () => {
     expect(typeof status.last_event_at).toBe("string");
   });
 
-  test("runWebStartupRecoveryBootstrap exposes startup phases and clears them when ready", () => {
+  test("runWebStartupRecoveryBootstrap exposes startup phases and clears them when ready", async () => {
     const events: Array<{ kind: string; chatJid?: string; status?: Record<string, unknown> }> = [];
 
     runWebStartupRecoveryBootstrap({
@@ -340,7 +340,7 @@ describe("runtime startup helpers", () => {
       },
     });
 
-    expect(events).toHaveLength(5);
+    expect(events).toHaveLength(4);
     expect(events[0]).toMatchObject({
       kind: "status",
       chatJid: STARTUP_STATUS_CHAT_JID,
@@ -362,8 +362,7 @@ describe("runtime startup helpers", () => {
         turn_id: STARTUP_STATUS_TURN_ID,
       },
     });
-    expect(events[3]).toEqual({ kind: "resume" });
-    expect(events[4]).toMatchObject({
+    expect(events[3]).toMatchObject({
       kind: "status",
       chatJid: STARTUP_STATUS_CHAT_JID,
       status: {
@@ -373,6 +372,9 @@ describe("runtime startup helpers", () => {
         title: "Startup ready",
       },
     });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events[4]).toEqual({ kind: "resume" });
   });
 
   test("queueStartupSessionWarmup is disabled by default", () => {

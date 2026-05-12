@@ -246,6 +246,17 @@ That means most users should prefer `/login` over setting raw provider env vars 
 | `PICLAW_TOOL_OUTPUT_RETENTION_MS` | `14400000` (4 h) | Milliseconds to retain stored tool outputs (preferred; overrides `_DAYS`) |
 | `PICLAW_TOOL_OUTPUT_RETENTION_DAYS` | _(legacy)_ | Days to retain stored tool outputs (deprecated; use `_MS`) |
 | `PICLAW_TOOL_OUTPUT_CLEANUP_INTERVAL_MS` | `900000` (15 min) | Cleanup interval (ms) |
+| `PICLAW_TOOL_OUTPUT_STORE_BYTES` | `4096` | Store tool output externally when payload exceeds this byte threshold |
+| `PICLAW_TOOL_OUTPUT_STORE_LINES` | `40` | Store tool output externally when payload exceeds this line threshold |
+| `PICLAW_TOOL_OUTPUT_STORE_THRESHOLDS_BY_TOOL` | _(empty)_ | Optional JSON map of per-tool byte/line thresholds, e.g. `{"proxmox":{"bytes":16384,"lines":200}}` |
+| `PICLAW_TOOL_OUTPUT_PREVIEW_LINES` | `8` | Preview lines shown in compacted tool-result summaries |
+| `PICLAW_TOOL_OUTPUT_PREVIEW_LINE_CHARS` | `200` | Max characters per preview line in compacted tool-result summaries |
+| `PICLAW_TOOL_RESULT_COMPACTION_ENABLED` | `1` | Master runtime gate for tool-result compaction |
+| `PICLAW_TOOL_RESULT_COMPACTION_TOOLS` | `bash,powershell,exec_batch` | Comma-separated or JSON-array allowlist of tools eligible for compaction |
+| `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_ENABLED` | `1` | Enable semantic summary generation for compacted tool results |
+| `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_MAX_INPUT_CHARS` | `12000` | Max sampled tool-output characters sent to semantic summarizer |
+| `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_MAX_TOKENS` | `320` | Max generated semantic summary tokens |
+| `PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_TIMEOUT_MS` | `12000` | Timeout for semantic summary generation before preview fallback |
 | `PICLAW_SESSION_IDLE_MAX_WAIT_MS` | `10000` | Max ms to wait for session idle before sending a turn response |
 | `PICLAW_SESSION_IDLE_COMPACTION_MAX_WAIT_MS` | `300000` | Max ms to wait for idle when a compaction is in progress |
 | `PICLAW_MAIN_SESSION_IDLE_TTL_MS` | _(empty)_ | Idle TTL for the main (interactive) session |
@@ -259,6 +270,8 @@ That means most users should prefer `/login` over setting raw provider env vars 
 Notes:
 
 - Tool output retention now defaults to **4 hours** (`PICLAW_TOOL_OUTPUT_RETENTION_MS`). The legacy `PICLAW_TOOL_OUTPUT_RETENTION_DAYS` is still accepted but superseded.
+- Tool-result compaction now supports both a global gate (`PICLAW_TOOL_RESULT_COMPACTION_ENABLED`) and per-tool allowlisting (`PICLAW_TOOL_RESULT_COMPACTION_TOOLS`).
+- Semantic summaries are enabled by default for compacted tool results; if generation fails or times out (`PICLAW_TOOL_RESULT_SEMANTIC_SUMMARY_TIMEOUT_MS`), Piclaw falls back to preview-based summaries.
 - Session idle timeouts are now tunable: `PICLAW_SESSION_IDLE_MAX_WAIT_MS` controls interactive turn flushing; `PICLAW_SESSION_IDLE_COMPACTION_MAX_WAIT_MS` (default 5 min) allows extra wait time during compaction so the agent does not cut off mid-summarisation.
 - Background/scheduled turns use `PICLAW_BACKGROUND_AGENT_TIMEOUT` when set, otherwise they fall back to `PICLAW_AGENT_TIMEOUT`.
 - On `systemd --user` installs, keep `PICLAW_WORKSPACE`, `PICLAW_STORE`, and `PICLAW_DATA` stable across restarts. Startup recovery relies on the persisted SQLite state plus writable IPC files under `PICLAW_DATA/ipc/tasks`.

@@ -79,6 +79,13 @@ describe("web channel runtime public surface service", () => {
           calls.push(`status-get:${chatJid}`);
           return status;
         },
+        setContextUsage: (chatJid, usage) => {
+          calls.push(`context-set:${chatJid}:${usage?.percent ?? "null"}`);
+        },
+        getContextUsage: (chatJid) => {
+          calls.push(`context-get:${chatJid}`);
+          return { percent: 42 };
+        },
         replaceQueuedFollowupPlaceholder: (chatJid, rowId, text, mediaIds, _contentBlocks, threadId, isTerminalAgentReply) => {
           calls.push(`replace:${chatJid}:${rowId}:${text}:${mediaIds.join(",")}:${threadId ?? "null"}:${isTerminalAgentReply ? 1 : 0}`);
           return interaction(4);
@@ -92,6 +99,11 @@ describe("web channel runtime public surface service", () => {
         },
         skipFailedOnModelSwitch: (chatJid) => {
           calls.push(`skip:${chatJid}`);
+          return true;
+        },
+        retryFailedOnModelSwitch: (chatJid) => {
+          calls.push(`retry:${chatJid}`);
+          return false;
         },
         recoverInflightRuns: () => {
           calls.push("recover");
@@ -157,10 +169,22 @@ describe("web channel runtime public surface service", () => {
     expect(service.consumePendingSteering("web:test")).toEqual(["2026-03-28T00:04:00.000Z"]);
     service.updateAgentStatus("web:test", status);
     expect(service.getAgentStatus("web:test")).toEqual(status);
+    service.setContextUsage("web:test", { percent: 42 });
+    expect(service.getContextUsage("web:test")).toEqual({ percent: 42 });
+    service.broadcastEvent("extension_ui_working", { chat_jid: "web:test", message: "Compacting context…" });
+    service.broadcastEvent("extension_ui_working_indicator", { chat_jid: "web:test", frames: ["a", "b"], interval_ms: 80 });
+    expect(service.getExtensionWorkingState("web:test")).toEqual({
+      message: "Compacting context…",
+      indicator: { mode: "custom", frames: ["a", "b"], intervalMs: 80 },
+      visible: true,
+    });
+    service.broadcastEvent("agent_response", { chat_jid: "web:test" });
+    expect(service.getExtensionWorkingState("web:test")).toBeNull();
     expect(service.replaceQueuedFollowupPlaceholder("web:test", 22, "updated", [1, 2], [{ type: "text" }], 6, true)?.id).toBe(4);
     expect(service.getThreadRootId("web:test", "m-1")).toBe(43);
     service.resumeChat("web:test", 12);
     service.skipFailedOnModelSwitch("web:test");
+    service.retryFailedOnModelSwitch("web:test");
     service.recoverInflightRuns();
     service.resumePendingChats("web:test");
     service.loadState();
@@ -189,10 +213,16 @@ describe("web channel runtime public surface service", () => {
       "pending-consume:web:test",
       "status-update:web:test:Thinking",
       "status-get:web:test",
+      "context-set:web:test:42",
+      "context-get:web:test",
+      "broadcast:extension_ui_working:{\"chat_jid\":\"web:test\",\"message\":\"Compacting context…\"}",
+      "broadcast:extension_ui_working_indicator:{\"chat_jid\":\"web:test\",\"frames\":[\"a\",\"b\"],\"interval_ms\":80}",
+      "broadcast:agent_response:{\"chat_jid\":\"web:test\"}",
       "replace:web:test:22:updated:1,2:6:1",
       "thread-root:web:test:m-1",
       "resume:web:test:12",
       "skip:web:test",
+      "retry:web:test",
       "recover",
       "resume-pending:web:test",
       "load",

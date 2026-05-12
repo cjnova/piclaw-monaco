@@ -13,6 +13,28 @@ interface RefBox<T> {
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 
+type ExtensionWorkingRestoreState = {
+  message: string | null;
+  indicator: unknown | null;
+  visible: boolean;
+};
+
+const CLEARED_EXTENSION_WORKING_STATE: ExtensionWorkingRestoreState = {
+  message: null,
+  indicator: null,
+  visible: true,
+};
+
+function resolveExtensionWorkingRestoreState(value: unknown): ExtensionWorkingRestoreState {
+  if (!value || typeof value !== 'object') return CLEARED_EXTENSION_WORKING_STATE;
+  const data = value as Record<string, unknown>;
+  return {
+    message: typeof data.message === 'string' && data.message.trim() ? data.message.trim() : null,
+    indicator: data.indicator && typeof data.indicator === 'object' ? data.indicator : null,
+    visible: data.visible !== false,
+  };
+}
+
 export interface RefreshAgentStatusForChatOptions {
   currentChatJid: string;
   getAgentStatus: (chatJid: string) => Promise<any>;
@@ -30,9 +52,11 @@ export interface RefreshAgentStatusForChatOptions {
   setAgentPlan: StateSetter<any>;
   setAgentThought: StateSetter<any>;
   setPendingRequest: StateSetter<any>;
+  setExtensionWorkingState: StateSetter<ExtensionWorkingRestoreState>;
   setActiveTurn: (turnId: string | null | undefined) => void;
   noteAgentActivity: (options?: Record<string, unknown>) => void;
   clearLastActivityFlag: () => void;
+  onStateAccessResult?: (failed: boolean) => void;
 }
 
 /** Refresh active agent status for the current chat while guarding against stale chat responses. */
@@ -54,6 +78,7 @@ export async function refreshAgentStatusForChat(options: RefreshAgentStatusForCh
     setAgentPlan,
     setAgentThought,
     setPendingRequest,
+    setExtensionWorkingState,
     setActiveTurn,
     noteAgentActivity,
     clearLastActivityFlag,
@@ -81,6 +106,7 @@ export async function refreshAgentStatusForChat(options: RefreshAgentStatusForCh
       setAgentDraft({ text: '', totalLines: 0 });
       setAgentPlan('');
       setAgentThought({ text: '', totalLines: 0 });
+      setExtensionWorkingState(resolveExtensionWorkingRestoreState(response?.extension_working));
       setPendingRequest(null);
       pendingRequestRef.current = null;
       return response ?? null;
@@ -100,6 +126,7 @@ export async function refreshAgentStatusForChat(options: RefreshAgentStatusForCh
     });
     clearLastActivityFlag();
     setAgentStatus(payload);
+    setExtensionWorkingState(resolveExtensionWorkingRestoreState(response.extension_working));
 
     const thoughtRestore = resolveAgentPreviewRestoreState(response.thought);
     if (thoughtRestore) {

@@ -56,7 +56,7 @@ export function getStandaloneTabUrl(path, { hasPopOutTab = false } = {}) {
         return '/office-viewer/?url=' + encodeURIComponent(rawUrl) + '&name=' + encodeURIComponent(name);
     }
     if (CSV_EXTENSIONS.test(normalizedPath)) {
-        return '/csv-viewer/?path=' + encodeURIComponent(normalizedPath);
+        return '/data-viewer/?path=' + encodeURIComponent(normalizedPath);
     }
     if (PDF_EXTENSIONS.test(normalizedPath)) {
         return '/workspace/raw?path=' + encodeURIComponent(normalizedPath);
@@ -118,6 +118,8 @@ export function TabStrip({ tabs, activeId, onActivate, onClose, onCloseOthers, o
     }, [tabs, activeId, onActivate, onClose]);
 
     const handleTabMouseDown = useCallback((e, id) => {
+        // Skip if the press landed on the close button — let close handle it.
+        if (e.target?.closest?.('.tab-close')) return;
         // Activate on press instead of waiting for click. Some embedded panes
         // and touch/pointer paths can swallow the synthetic click, but the
         // tab should still come to the front as soon as the primary press lands.
@@ -134,6 +136,7 @@ export function TabStrip({ tabs, activeId, onActivate, onClose, onCloseOthers, o
 
     const handleTabClick = useCallback((e, id) => {
         if (e.defaultPrevented) return;
+        if (e.target?.closest?.('.tab-close')) return;
         if (e.button === 0) {
             onActivate?.(id);
         }

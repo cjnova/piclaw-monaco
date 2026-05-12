@@ -217,3 +217,17 @@ export function getLatestTokenUsageModel(chatJid: string): LatestTokenUsageModel
 
   return row ?? null;
 }
+
+/**
+ * Delete token_usage rows older than the given retention period.
+ * All queries on this table use aggregations (SUM/COUNT/GROUP BY) or latest-row
+ * lookups, so individual old rows are not needed for correctness.
+ *
+ * @returns Number of deleted rows.
+ */
+export function pruneOldTokenUsage(retentionDays = 90): number {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - retentionDays * 86_400_000).toISOString();
+  const result = db.prepare(`DELETE FROM token_usage WHERE run_at < ?`).run(cutoff);
+  return result.changes;
+}

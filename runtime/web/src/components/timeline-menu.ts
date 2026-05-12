@@ -5,6 +5,16 @@
  */
 
 import { html, useState, useEffect, useRef, useCallback, useLayoutEffect, render } from '../vendor/preact-htm.js';
+import {
+    MAX_PWA_DISPLAY_SCALE_PERCENT,
+    MIN_PWA_DISPLAY_SCALE_PERCENT,
+    PWA_DISPLAY_SCALE_EVENT,
+    PWA_DISPLAY_SCALE_STEP_PERCENT,
+    PWA_DISPLAY_SCALE_STORAGE_KEY,
+    persistPwaDisplayScalePercent,
+    readStoredPwaDisplayScalePercent,
+} from '../ui/pwa-display-scale.js';
+import { getRecentFiles } from '../ui/recent-files.js';
 
 export function TimelineMenu({
     workspaceOpen,
@@ -16,7 +26,22 @@ export function TimelineMenu({
     terminalVisible,
 }) {
     const [open, setOpen] = useState(false);
+    const [pwaDisplayScalePercent, setPwaDisplayScalePercent] = useState(() => readStoredPwaDisplayScalePercent());
+    const [pwaDisplayScaleDraft, setPwaDisplayScaleDraft] = useState(() => String(readStoredPwaDisplayScalePercent()));
+    const [showHidden, setShowHidden] = useState(() => {
+        try { return localStorage.getItem('workspaceShowHidden') === 'true'; } catch { return false; }
+    });
     const [pos, setPos] = useState({ top: 8, left: 8 });
+
+    const getSafeAreaTop = () => {
+        if (typeof document === 'undefined') return 0;
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none';
+        document.body.appendChild(probe);
+        const h = probe.offsetHeight;
+        probe.remove();
+        return h;
+    };
     const menuRef = useRef(null);
     const btnRef = useRef(null);
     const portalRef = useRef(null);
@@ -32,14 +57,16 @@ export function TimelineMenu({
 
     useEffect(() => {
         const update = () => {
+            const safeTop = getSafeAreaTop();
+            const topOffset = safeTop > 0 ? safeTop + 4 : 8;
             if (workspaceOpen) {
                 const sidebar = document.querySelector('.workspace-sidebar');
                 if (sidebar) {
                     const r = sidebar.getBoundingClientRect();
-                    setPos({ top: r.top + 8, left: r.left + 8 });
+                    setPos({ top: r.top + topOffset, left: r.left + 8 });
                 }
             } else {
-                setPos({ top: 8, left: 8 });
+                setPos({ top: topOffset, left: 8 });
             }
         };
         update();
@@ -83,6 +110,46 @@ export function TimelineMenu({
 
     useEffect(() => { setOpen(false); }, [workspaceOpen]);
 
+    useEffect(() => {
+        const syncPwaDisplayScale = () => {
+            const next = readStoredPwaDisplayScalePercent();
+            setPwaDisplayScalePercent(next);
+            setPwaDisplayScaleDraft(String(next));
+        };
+        const onStorage = (event) => {
+            if (!event || event.key === null || event.key === PWA_DISPLAY_SCALE_STORAGE_KEY) syncPwaDisplayScale();
+        };
+        window.addEventListener('storage', onStorage);
+        window.addEventListener('focus', syncPwaDisplayScale);
+        window.addEventListener(PWA_DISPLAY_SCALE_EVENT, syncPwaDisplayScale);
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener('focus', syncPwaDisplayScale);
+            window.removeEventListener(PWA_DISPLAY_SCALE_EVENT, syncPwaDisplayScale);
+        };
+    }, []);
+
+    const handlePwaDisplayScaleInput = useCallback((event) => {
+        setPwaDisplayScaleDraft(String(event?.currentTarget?.value ?? ''));
+    }, []);
+
+    const commitPwaDisplayScale = useCallback((value) => {
+        const next = persistPwaDisplayScalePercent(value);
+        setPwaDisplayScalePercent(next);
+        setPwaDisplayScaleDraft(String(next));
+    }, []);
+
+    const handlePwaDisplayScaleCommit = useCallback((event) => {
+        commitPwaDisplayScale(event?.currentTarget?.value);
+    }, [commitPwaDisplayScale]);
+
+    const handlePwaDisplayScaleKeyDown = useCallback((event) => {
+        if (event?.key === 'Enter') {
+            commitPwaDisplayScale(event?.currentTarget?.value);
+            event?.currentTarget?.blur?.();
+        }
+    }, [commitPwaDisplayScale]);
+
     const run = useCallback((fn) => { setOpen(false); fn?.(); }, []);
 
     const toggleChatOnly = useCallback(() => {
@@ -123,9 +190,57 @@ export function TimelineMenu({
                 ${(onOpenTerminalTab || onOpenVncTab || onToggleTerminal) && html`<div class="workspace-menu-separator"></div>`}
                 ${onOpenTerminalTab && html`<button class="workspace-menu-item" role="menuitem" onClick=${() => run(onOpenTerminalTab)}>Open terminal in tab</button>`}
                 ${onOpenVncTab && html`<button class="workspace-menu-item" role="menuitem" onClick=${() => run(onOpenVncTab)}>Open VNC in tab</button>`}
-                ${onToggleTerminal && html`<button class="workspace-menu-item" role="menuitem" onClick=${() => run(onToggleTerminal)}>${terminalVisible ? 'Hide terminal dock' : 'Show terminal dock'}</button>`}
+                ${onToggleTerminal && html`<button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen} onClick=${() => run(onToggleTerminal)}>${terminalVisible ? 'Hide terminal dock' : 'Show terminal dock'}</button>`}
 
                 <div class="workspace-menu-separator"></div>
+                <button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen} onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:workspace-action', { detail: { action: 'new-file' } })))}>New file</button>
+                ${(() => {
+                    const recent = getRecentFiles();
+                    if (recent.length === 0) return null;
+                    return html`
+                        <div class="workspace-menu-separator"></div>
+                        <div class="workspace-menu-submenu-label">Open Recent</div>
+                        ${recent.map((path) => {
+                            const label = path.split('/').pop() || path;
+                            return html`
+                                <button class="workspace-menu-item workspace-menu-recent-item" role="menuitem" title=${path} onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:pane-open', { detail: { path, target: 'tab' } })))}>${label}</button>
+                            `;
+                        })}
+                    `;
+                })()}
+                <div class="workspace-menu-separator"></div>
+                <button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen} onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:workspace-action', { detail: { action: 'refresh' } })))}>Refresh tree</button>
+                <button class="workspace-menu-item" role="menuitem" disabled=${!workspaceOpen} onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:workspace-action', { detail: { action: 'reindex' } })))}>Reindex workspace</button>
+                <button class=${`workspace-menu-item${showHidden ? ' active' : ''}`} role="menuitem" disabled=${!workspaceOpen} onClick=${() => run(() => {
+                    const next = !showHidden;
+                    setShowHidden(next);
+                    try { localStorage.setItem('workspaceShowHidden', String(next)); } catch { setShowHidden(next); }
+                    window.dispatchEvent(new CustomEvent('piclaw:toggle-hidden-files', { detail: { showHidden: next } }));
+                })}>
+                    ${showHidden ? 'Hide hidden files' : 'Show hidden files'}
+                </button>
+                <div class="workspace-menu-scale-control" role="none">
+                    <label for="timeline-pwa-display-scale">Scale</label>
+                    <div class="workspace-menu-scale-input-wrap">
+                        <input
+                            id="timeline-pwa-display-scale"
+                            class="workspace-menu-scale-input"
+                            type="number"
+                            inputmode="numeric"
+                            min=${MIN_PWA_DISPLAY_SCALE_PERCENT}
+                            max=${MAX_PWA_DISPLAY_SCALE_PERCENT}
+                            step=${PWA_DISPLAY_SCALE_STEP_PERCENT}
+                            value=${pwaDisplayScaleDraft}
+                            aria-label=${`PWA display scale percentage, currently ${pwaDisplayScalePercent}%`}
+                            onClick=${(event) => event.stopPropagation()}
+                            onInput=${handlePwaDisplayScaleInput}
+                            onChange=${handlePwaDisplayScaleCommit}
+                            onBlur=${handlePwaDisplayScaleCommit}
+                            onKeyDown=${handlePwaDisplayScaleKeyDown}
+                        />
+                        <span aria-hidden="true">%</span>
+                    </div>
+                </div>
                 <button class="workspace-menu-item" role="menuitem" onClick=${() => run(() => window.dispatchEvent(new CustomEvent('piclaw:open-settings')))}>Settings</button>
             </div>
         `}

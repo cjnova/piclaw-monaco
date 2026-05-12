@@ -225,6 +225,31 @@ describe("core config", () => {
     });
   });
 
+  test("scopedModelsOnly loads from config/env and persists under models", async () => {
+    const workspace = createTempWorkspace("piclaw-config-");
+    try {
+      writeWorkspaceConfig(workspace.workspace, { models: { scopedModelsOnly: true } });
+      const snapshot = loadConfigInSubprocess(workspace, ["call:getScopedModelsOnly"], {
+        env: { PICLAW_SCOPED_MODELS_ONLY: undefined },
+      });
+      expect(snapshot["call:getScopedModelsOnly"]).toBe(true);
+    } finally {
+      workspace.cleanup();
+    }
+
+    await withFreshConfig(
+      { env: { PICLAW_SCOPED_MODELS_ONLY: undefined } },
+      async ({ workspace, config }) => {
+        expect(config.setScopedModelsOnly(false)).toBe(false);
+        expect(config.getScopedModelsOnly()).toBe(false);
+        expect(process.env.PICLAW_SCOPED_MODELS_ONLY).toBe("0");
+
+        const parsed = JSON.parse(readFileSync(join(workspace.workspace, ".piclaw", "config.json"), "utf8"));
+        expect(parsed.models).toEqual({ scopedModelsOnly: false });
+      },
+    );
+  });
+
   test("setWebTotpSecret persists updates while preserving unrelated web config and supports clearing", async () => {
     await withFreshConfig(
       {

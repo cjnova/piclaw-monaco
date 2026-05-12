@@ -30,6 +30,7 @@ test('refreshAgentStatusForChat clears local state when server reports no active
     setAgentPlan: () => events.push('setAgentPlan'),
     setAgentThought: () => events.push('setAgentThought'),
     setPendingRequest: () => events.push('setPendingRequest'),
+    setExtensionWorkingState: (next) => events.push(`setExtensionWorkingState:${next.message ?? 'null'}`),
     setActiveTurn: () => events.push('setActiveTurn'),
     noteAgentActivity: () => events.push('noteAgentActivity'),
     clearLastActivityFlag: () => events.push('clearLastActivityFlag'),
@@ -41,6 +42,7 @@ test('refreshAgentStatusForChat clears local state when server reports no active
   expect(events).toContain('setAgentDraft');
   expect(events).toContain('setAgentThought');
   expect(events).toContain('setPendingRequest');
+  expect(events).toContain('setExtensionWorkingState:null');
 });
 
 test('refreshAgentStatusForChat restores draft/thought previews for active payloads', async () => {
@@ -49,6 +51,7 @@ test('refreshAgentStatusForChat restores draft/thought previews for active paylo
   const thoughtBufferRef = { current: '' };
   const draftBufferRef = { current: '' };
   const activeTurns: Array<string | null | undefined> = [];
+  let extensionWorkingState: any = null;
 
   const response = await refreshAgentStatusForChat({
     currentChatJid: 'web:chat',
@@ -57,6 +60,7 @@ test('refreshAgentStatusForChat restores draft/thought previews for active paylo
       data: { turn_id: 'turn-42', type: 'thinking' },
       thought: { text: 'thought text', total_lines: 1 },
       draft: { text: 'draft text', total_lines: 1 },
+      extension_working: { message: 'Compacting context…', indicator: { mode: 'default' }, visible: true },
     }),
     activeChatJidRef: { current: 'web:chat' },
     wasAgentActiveRef: { current: false },
@@ -76,6 +80,9 @@ test('refreshAgentStatusForChat restores draft/thought previews for active paylo
       thoughtState = typeof next === 'function' ? next(thoughtState) : next;
     },
     setPendingRequest: () => undefined,
+    setExtensionWorkingState: (next) => {
+      extensionWorkingState = next;
+    },
     setActiveTurn: (turnId) => activeTurns.push(turnId),
     noteAgentActivity: () => undefined,
     clearLastActivityFlag: () => undefined,
@@ -87,6 +94,11 @@ test('refreshAgentStatusForChat restores draft/thought previews for active paylo
   expect(draftBufferRef.current).toBe('draft text');
   expect(thoughtState.text).toBe('thought text');
   expect(draftState.text).toBe('draft text');
+  expect(extensionWorkingState).toEqual({
+    message: 'Compacting context…',
+    indicator: { mode: 'default' },
+    visible: true,
+  });
 });
 
 test('reconcileSilentTurn refreshes timeline and throttles duplicate probes', async () => {

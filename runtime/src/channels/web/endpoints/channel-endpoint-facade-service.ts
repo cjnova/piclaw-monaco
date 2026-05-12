@@ -23,7 +23,7 @@ import {
 import { deletePostResponse } from "../timeline-service.js";
 import { handleAgentsRequest, handleAvatarRequest } from "./identity-endpoints.js";
 import { handleManifestRequest, type ManifestIconMeta } from "../manifest.js";
-import { handleInternalPostRequest, handleUpdatePostRequest } from "../post-mutations.js";
+import { handleInternalPostRequest, handleUpdatePostAnnotationsRequest, handleUpdatePostRequest } from "../post-mutations.js";
 import {
   handleAgentRespondRequest,
   handleThoughtVisibilityRequest,
@@ -139,6 +139,10 @@ export class WebChannelEndpointFacadeService {
 
   async handleUpdatePost(req: Request, id: number | null): Promise<Response> {
     return await handleUpdatePostRequest(req, id, this.options.endpointContexts.postMutations());
+  }
+
+  async handleUpdatePostAnnotations(req: Request, id: number): Promise<Response> {
+    return await handleUpdatePostAnnotationsRequest(req, id, this.options.endpointContexts.postMutations());
   }
 
   async handleInternalPost(req: Request): Promise<Response> {

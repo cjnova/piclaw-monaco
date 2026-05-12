@@ -46,6 +46,7 @@ export function composeMainAppShellOptions(input: ComposeMainAppShellOptionsInpu
     handleTabToggleDiff: shellState.handleTabToggleDiff,
     editorContainerRef: paneRuntime.editorContainerRef,
     getPaneContent: () => paneRuntime.editorInstanceRef?.current?.getContent?.(),
+    subscribePaneContentChange: (cb: (content: string) => void) => paneRuntime.editorInstanceRef?.current?.onContentChange?.(cb),
     panePopoutPath: shellState.panePopoutPath,
     canReattachPane: paneRuntime.canReattachPanePopout,
     handleReattachPane: paneRuntime.requestPanePopoutReattach,

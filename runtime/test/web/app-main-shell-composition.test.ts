@@ -14,7 +14,7 @@ test('composeMainAppShellOptions composes pane-popout and main-shell payloads fr
       panePopoutHasMenuActions: true,
       panePopoutTitle: 'Terminal',
       editorContainerRef: { current: null },
-      editorInstanceRef: { current: { getContent: () => 'abc' } },
+      editorInstanceRef: { current: { getContent: () => 'abc', onContentChange: (cb: (content: string) => void) => { cb('abc'); return () => {}; } } },
       hasDockPanes: true,
       dockVisible: true,
       toggleDock: () => {},
@@ -133,6 +133,10 @@ test('composeMainAppShellOptions composes pane-popout and main-shell payloads fr
   expect(result.branchLoaderMode).toBe(false);
   expect(result.panePopoutMode).toBe(true);
   expect(result.panePopoutOptions.panePopoutTitle).toBe('Terminal');
+  let previewContent = '';
+  const unsubscribe = result.panePopoutOptions.subscribePaneContentChange((content: string) => { previewContent = content; });
+  expect(previewContent).toBe('abc');
+  expect(typeof unsubscribe).toBe('function');
   expect(result.mainShellOptions.workspaceOpen).toBe(true);
   expect(result.mainShellOptions.connectionStatus).toBe('connected');
   expect(result.mainShellOptions.currentHashtag).toBe('tag');

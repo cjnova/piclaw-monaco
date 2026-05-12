@@ -232,6 +232,14 @@ export function installWebChannelPrototype(
       value: withRuntimePublicSurface((service, chatJid: string): Record<string, unknown> | null =>
         service.getAgentStatus(chatJid)),
     },
+    getExtensionWorkingState: {
+      configurable: true,
+      writable: true,
+      value: withRuntimePublicSurface((service, chatJid: string): Record<string, unknown> | null => {
+        const state = service.getExtensionWorkingState(chatJid);
+        return state as unknown as Record<string, unknown> | null;
+      }),
+    },
     setContextUsage: {
       configurable: true,
       writable: true,
@@ -445,6 +453,11 @@ export function installWebChannelPrototype(
       configurable: true,
       writable: true,
       value: withHttpSurface(async (service, req: Request, id: number | null) => await service.handleUpdatePost(req, id)),
+    },
+    handleUpdatePostAnnotations: {
+      configurable: true,
+      writable: true,
+      value: withHttpSurface(async (service, req: Request, id: number) => await service.handleUpdatePostAnnotations(req, id)),
     },
     handleInternalPost: {
       configurable: true,

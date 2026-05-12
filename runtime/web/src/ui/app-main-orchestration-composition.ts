@@ -115,6 +115,7 @@ export function composeMainAppLifecycleCompositionOptions(options: UseMainAppOrc
     setAgentPlan: setters.setAgentPlan,
     setAgentThought: setters.setAgentThought,
     setPendingRequest: setters.setPendingRequest,
+    setExtensionWorkingState: setters.setExtensionWorkingState,
     setActiveTurn: interaction.setActiveTurn,
     noteAgentActivity: interaction.noteAgentActivity,
     showLastActivity: interaction.showLastActivity,

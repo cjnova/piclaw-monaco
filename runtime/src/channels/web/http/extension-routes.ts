@@ -202,26 +202,3 @@ export function getWidgetKindRenderer(kind: string): WidgetKindRenderer | null {
   if (typeof renderer !== "function") return;
   _widgetKindRegistry.set(kind.trim(), renderer);
 };
-
-// Back-compat: keep the old tree-specific global pointing at the generic registry.
-// Addons should migrate to __piclaw_registerWidgetKind('session_tree', fn).
-(globalThis as any).__piclaw_registerTreeWidgetHtml = (
-  fn: (leafId: string, chatJid: string) => string,
-): void => {
-  (globalThis as any).__piclaw_registerWidgetKind(
-    "session_tree",
-    (artifact: Record<string, unknown>) => {
-      const tree = artifact.tree && typeof artifact.tree === "object"
-        ? artifact.tree as Record<string, unknown>
-        : {};
-      return fn(String(tree.leafId ?? ""), String(artifact.chatJid ?? ""));
-    },
-  );
-};
-
-/** @deprecated Use __piclaw_registerWidgetKind('session_tree', fn) instead. */
-export function getTreeWidgetHtmlProvider(): ((leafId: string, chatJid: string) => string) | null {
-  const renderer = _widgetKindRegistry.get("session_tree");
-  if (!renderer) return null;
-  return (leafId, chatJid) => renderer({ leafId, chatJid });
-}

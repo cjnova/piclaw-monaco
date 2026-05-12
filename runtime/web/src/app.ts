@@ -63,9 +63,11 @@ import {
     OOBE_PROVIDER_MISSING_DISMISSED_KEY,
     resolveOobePanelState,
 } from './ui/oobe-state.js';
+import { installPwaDisplayScaleSync } from './ui/pwa-display-scale.js';
 
 const CURRENT_APP_ASSET_VERSION = getCurrentAppAssetVersion();
 
+installPwaDisplayScaleSync();
 await initializeAppShellRuntime();
 
 const {

@@ -53,6 +53,7 @@ import { exitProcess } from "./exit-process.js";
 import { imageProcessing } from "./image-processing.js";
 import { sessionStatus } from "./session-status.js";
 import { providerResponseDiagnostics } from "./provider-response-diagnostics.js";
+import { postCompactionPrune } from "./post-compaction-prune.js";
 
 /** Build the built-in extension factory list used for session creation. */
 export function createBuiltinExtensionFactories(options?: {
@@ -82,6 +83,7 @@ export function createBuiltinExtensionFactories(options?: {
     // remotePair moved to extensions/integrations/remote-pair/ (lazy, env-gated)
     sessionStatus,
     providerResponseDiagnostics,
+    postCompactionPrune,
   ];
 }
 

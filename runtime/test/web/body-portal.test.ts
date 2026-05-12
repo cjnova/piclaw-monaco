@@ -50,6 +50,14 @@ class FakeElement extends FakeNode {
     this.localName = tagName.toLowerCase();
   }
 
+  get className(): string {
+    return this.getAttribute('class') || '';
+  }
+
+  set className(value: string) {
+    this.setAttribute('class', value || '');
+  }
+
   get firstChild(): FakeNode | null {
     return this.childNodes[0] || null;
   }
@@ -169,7 +177,9 @@ test('BodyPortal mounts portal children into a body host after the host is creat
   await waitFor(() => Boolean(findByClass(fakeDocument.body, 'portal-child')), 1000, 10);
 
   const portalChild = findByClass(fakeDocument.body, 'portal-child');
+  const portalHost = findByClass(fakeDocument.body, 'portal-host');
   expect(fakeDocument.body.childNodes.length).toBeGreaterThan(1);
+  expect(portalHost).toBeTruthy();
   expect(portalChild).toBeTruthy();
   expect(flattenText(portalChild)).toBe('hello portal');
 });

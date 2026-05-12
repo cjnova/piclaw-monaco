@@ -16,3 +16,12 @@ export {
   saveToolOutput,
   startToolOutputCleanup,
 } from "../tool-output.js";
+
+export {
+  getToolResultCompactionEnabled,
+  getToolResultCompactionThresholdsByTool,
+  getToolResultCompactionTools,
+  getToolResultSemanticSummaryConfig,
+} from "../core/config.js";
+
+export { resolveModelRequestAuth } from "../utils/model-auth.js";

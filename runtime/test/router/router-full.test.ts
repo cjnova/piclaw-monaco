@@ -50,6 +50,37 @@ describe("router", () => {
     expect(result).not.toContain("<messages");
   });
 
+  test("formatMessages sends file and folder references as absolute workspace paths", () => {
+    const msgs = [
+      {
+        id: "1",
+        chat_jid: "web:default",
+        sender: "user",
+        sender_name: "Alice",
+        content: [
+          "please inspect these",
+          "",
+          "Files:",
+          "- notes/todo.md",
+          "- /tmp/already-absolute.txt",
+          "",
+          "Folders:",
+          "- projects/demo",
+        ].join("\n"),
+        timestamp: "2025-01-01T00:00:00Z",
+        is_from_me: false,
+        is_bot_message: false,
+      },
+    ];
+
+    const result = formatMessages(msgs, "web");
+    expect(result).toContain("  - /tmp/already-absolute.txt");
+    expect(result).toMatch(/ {2}- .*\/notes\/todo\.md/);
+    expect(result).toMatch(/ {2}- .*\/projects\/demo/);
+    expect(result).not.toContain("  - notes/todo.md");
+    expect(result).not.toContain("  - projects/demo");
+  });
+
   test("formatMessages includes channel metadata but no repeated formatting hint", () => {
     const msgs = [
       { id: "1", chat_jid: "x", sender: "u", sender_name: "U", content: "hi", timestamp: "t", is_from_me: false, is_bot_message: false },

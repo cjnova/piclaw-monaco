@@ -50,9 +50,12 @@ describe("web endpoint context builders", () => {
       defaultChatJid: "web:default",
       json: (payload, status = 200) => new Response(JSON.stringify(payload), { status }),
       getAgentStatus: () => ({ status: "active" }),
+      getExtensionWorkingState: () => ({ message: "Working", indicator: null }),
+      recoverStaleInflightRun: () => false,
       getBuffer: () => expectedBuffer,
       getContextUsageForChat: async () => ({ tokens: 10, contextWindow: 100, percent: 10 }),
       getAvailableModels: async () => ({ models: [] }),
+      getProviderReadyCompletedForInstance: () => true,
     });
 
     const contentCtx = createContentEndpointsContext({
@@ -61,6 +64,7 @@ describe("web endpoint context builders", () => {
       getBuffer: () => expectedBuffer,
     });
 
+    expect(agentStatusCtx.getExtensionWorkingState("web:default")).toEqual({ message: "Working", indicator: null });
     expect(agentStatusCtx.getBuffer("turn", "draft")).toEqual(expectedBuffer);
     expect(contentCtx.getBuffer("turn", "thought")).toEqual(expectedBuffer);
     await expect(agentStatusCtx.getContextUsageForChat("web:default")).resolves.toEqual({

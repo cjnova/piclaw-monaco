@@ -1176,3 +1176,19 @@ export class SSEClient {
         }
     }
 }
+
+/**
+ * Save annotations (highlights) for a post to the server.
+ */
+export async function savePostAnnotations(postId: number, annotations: unknown[], chatJid?: string): Promise<void> {
+    const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
+    const response = await fetch(`${API_BASE}/post/${postId}/annotations${query}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ annotations }),
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Failed to save annotations: ${response.status} ${text}`);
+    }
+}

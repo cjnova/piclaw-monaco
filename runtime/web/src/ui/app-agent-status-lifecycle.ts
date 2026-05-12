@@ -53,6 +53,7 @@ interface UseAgentStatusLifecycleOptions {
   setAgentPlan: (next: any) => void;
   setAgentThought: (next: any) => void;
   setPendingRequest: (next: any) => void;
+  setExtensionWorkingState: (next: any) => void;
   setActiveTurn: (turnId: string | null | undefined) => void;
   noteAgentActivity: (options?: Record<string, unknown>) => void;
   clearLastActivityFlag: () => void;
@@ -112,6 +113,7 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
     setAgentPlan,
     setAgentThought,
     setPendingRequest,
+    setExtensionWorkingState,
     setActiveTurn,
     noteAgentActivity,
     clearLastActivityFlag,
@@ -205,6 +207,7 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
           setAgentPlan,
           setAgentThought,
           setPendingRequest,
+          setExtensionWorkingState,
           setActiveTurn,
           noteAgentActivity,
           clearLastActivityFlag,
@@ -212,7 +215,7 @@ export function useAgentStatusLifecycle(options: UseAgentStatusLifecycleOptions)
         });
       },
     });
-  }, [activeChatJidRef, agentStatusRef, clearAgentRunState, clearLastActivityFlag, currentChatJid, draftBufferRef, getAgentStatus, noteAgentActivity, pendingRequestRef, refreshTimeline, setActiveTurn, setAgentDraft, setAgentPlan, setAgentStatus, setAgentThought, setPendingRequest, setStateAccessFailed, thoughtBufferRef, viewStateRef, wasAgentActiveRef]);
+  }, [activeChatJidRef, agentStatusRef, clearAgentRunState, clearLastActivityFlag, currentChatJid, draftBufferRef, getAgentStatus, noteAgentActivity, pendingRequestRef, refreshTimeline, setActiveTurn, setAgentDraft, setAgentPlan, setAgentStatus, setAgentThought, setPendingRequest, setExtensionWorkingState, setStateAccessFailed, thoughtBufferRef, viewStateRef, wasAgentActiveRef]);
 
   const reconcileSilentTurn = useCallback(async () => {
     return await reconcileSilentTurnState({

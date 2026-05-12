@@ -81,6 +81,8 @@ describe("scheduled-tasks extension", () => {
 
   beforeEach(() => {
     initDatabase();
+    getDb().query("DELETE FROM task_run_logs").run();
+    getDb().query("DELETE FROM scheduled_tasks").run();
     fake = createFakeApi();
     scheduledTasks(fake.api);
   });

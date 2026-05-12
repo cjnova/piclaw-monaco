@@ -3,6 +3,7 @@
  */
 
 import type { InteractionRow } from "../../db.js";
+import { updateMessageAnnotations } from "../../db/messages.js";
 
 function resolveChatJid(req: Request, defaultChatJid: string, bodyChatJid?: unknown): string {
   const urlChatJid = new URL(req.url).searchParams.get("chat_jid");
@@ -97,4 +98,35 @@ export async function handleInternalPostRequest(req: Request, ctx: PostMutations
 
   ctx.broadcastAgentResponse(interaction);
   return ctx.json({ status: "ok", ok: true, id: interaction.id }, 201);
+}
+
+/** PATCH /post/:id/annotations orchestration. */
+export async function handleUpdatePostAnnotationsRequest(
+  req: Request,
+  id: number,
+  ctx: PostMutationsContext,
+): Promise<Response> {
+  if (!id || id < 1) return ctx.json({ error: "Missing or invalid post id" }, 400);
+
+  let body: { annotations?: unknown[]; chat_jid?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return ctx.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (!Array.isArray(body.annotations)) {
+    return ctx.json({ error: "Missing or invalid annotations array" }, 400);
+  }
+
+  // Cap annotation count to prevent abuse
+  if (body.annotations.length > 200) {
+    return ctx.json({ error: "Too many annotations (max 200)" }, 400);
+  }
+
+  const chatJid = resolveChatJid(req, ctx.defaultChatJid, body.chat_jid);
+  const ok = updateMessageAnnotations(chatJid, id, body.annotations.length > 0 ? body.annotations : null);
+  if (!ok) return ctx.json({ error: "Post not found" }, 404);
+
+  return ctx.json({ status: "ok", ok: true, id, annotations: body.annotations });
 }

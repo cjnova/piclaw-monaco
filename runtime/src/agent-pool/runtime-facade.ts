@@ -7,7 +7,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentSession, AgentSessionRuntime, ModelRegistry, AuthStorage } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, AgentSessionRuntime, ModelRegistry, AuthStorage, SettingsManager } from "@earendil-works/pi-coding-agent";
 
 import { applyControlCommand, type AgentControlCommand, type AgentControlResult } from "../agent-control/index.js";
 import { getLatestTokenUsageModel } from "../db.js";
@@ -17,6 +17,7 @@ import { detectChannel } from "../router.js";
 import { executeSlashCommand } from "./slash-command.js";
 import { peekProviderUsage, warmProviderUsage } from "./provider-usage.js";
 import { resolveModelLabel } from "../utils/model-utils.js";
+import { resolveModelScope } from "../utils/scoped-models.js";
 import { createLogger } from "../utils/logger.js";
 import { withChatContext } from "../core/chat-context.js";
 import { sanitiseJid } from "./session.js";
@@ -479,6 +480,8 @@ export interface AvailableModelsResult {
   provider_usage: Awaited<ReturnType<typeof warmProviderUsage>>;
   latest_requested_model: string | null;
   latest_response_model: string | null;
+  scoped_models_only: boolean;
+  enabled_model_patterns: string[];
 }
 
 /** Dependencies required by AgentRuntimeFacade. */
@@ -486,6 +489,7 @@ export interface AgentRuntimeFacadeOptions {
   pool: Map<string, PoolEntry>;
   getOrCreateRuntime: (chatJid: string) => Promise<AgentSessionRuntime>;
   modelRegistry: ModelRegistry;
+  settingsManager?: SettingsManager;
   authStorage: AuthStorage;
   clearAttachments: (chatJid: string) => void;
   refreshRuntime: (chatJid: string, runtime: AgentSessionRuntime) => Promise<void>;
@@ -526,7 +530,11 @@ export class AgentRuntimeFacade {
     const persistedState = session ? { current: null, thinkingLevel: null } : getPersistedSessionState(chatJid);
     const registry = (session as (AgentSession & { modelRegistry?: ModelRegistry }) | null)?.modelRegistry ?? this.options.modelRegistry;
     registry.refresh();
-    const available = registry.getAvailable();
+    const scopedModels = resolveModelScope(
+      registry.getAvailable(),
+      (session as (AgentSession & { settingsManager?: SettingsManager }) | null)?.settingsManager ?? this.options.settingsManager,
+    );
+    const available = scopedModels.models;
     const modelOptions = available.map((model) => ({
       label: `${model.provider}/${model.id}`,
       provider: model.provider,
@@ -576,6 +584,8 @@ export class AgentRuntimeFacade {
       provider_usage: providerUsage,
       latest_requested_model: latestRequestedModel,
       latest_response_model: latestResponseModel,
+      scoped_models_only: scopedModels.scoped,
+      enabled_model_patterns: scopedModels.patterns,
     };
   }
 

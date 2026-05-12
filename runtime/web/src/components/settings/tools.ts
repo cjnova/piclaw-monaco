@@ -1,5 +1,4 @@
-import { html, useState, useCallback, useMemo, useEffect, useRef } from '../../vendor/preact-htm.js';
-import { NumberStepper } from './number-stepper.js';
+import { html, useState, useCallback, useMemo } from '../../vendor/preact-htm.js';
 
 // Toolset icons derived from the tool-status-hints SVG vocabulary
 const TOOLSET_ICONS = {
@@ -46,6 +45,10 @@ export function ToolsSection({ toolsets, filter = '', settingsData, mergeSetting
     const [enabledGroups, setEnabledGroups] = useState(() => { const m = {}; for (const g of groups) m[g.name] = true; return m; });
     const toggleGroup = useCallback((name) => { setEnabledGroups(prev => ({ ...prev, [name]: !prev[name] })); }, []);
     const searchMatchMode = settingsData?.searchMatchMode || 'or';
+    const compactableTools = useMemo(() => {
+        const raw = Array.isArray(settingsData?.toolResultCompactionTools) ? settingsData.toolResultCompactionTools : [];
+        return new Set(raw.filter(name => typeof name === 'string').map(name => name.trim().toLowerCase()).filter(Boolean));
+    }, [settingsData?.toolResultCompactionTools]);
 
     const toggleSearchMode = useCallback(async () => {
         const next = searchMatchMode === 'or' ? 'and' : 'or';
@@ -63,6 +66,30 @@ export function ToolsSection({ toolsets, filter = '', settingsData, mergeSetting
             console.warn('[settings/tools] Failed to save search match mode.', e);
         }
     }, [searchMatchMode, mergeSettingsData]);
+
+    const toggleToolCompaction = useCallback(async (toolName) => {
+        const normalizedToolName = String(toolName || '').trim().toLowerCase();
+        if (!normalizedToolName) return;
+        const nextTools = new Set(compactableTools);
+        if (nextTools.has(normalizedToolName)) {
+            nextTools.delete(normalizedToolName);
+        } else {
+            nextTools.add(normalizedToolName);
+        }
+        try {
+            const response = await fetch('/agent/settings/compaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolResultCompactionTools: Array.from(nextTools).sort() }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (payload?.ok && payload?.settings) {
+                mergeSettingsData?.(payload.settings);
+            }
+        } catch (e) {
+            console.warn('[settings/tools] Failed to save tool compaction settings.', e);
+        }
+    }, [compactableTools, mergeSettingsData]);
 
     const lf = filter.toLowerCase();
     const filteredGroups = useMemo(() => {
@@ -105,19 +132,42 @@ export function ToolsSection({ toolsets, filter = '', settingsData, mergeSetting
                         </label>
                         <span class="settings-hint" style="margin:0">${g.description}</span>
                     </div>
-                    ${enabled && html`<div class="settings-tool-list">${g.tools.map(t => html`
-                        <div class="settings-tool-row">
-                            <input type="checkbox" checked disabled />
-                            <span class="settings-tool-name">${t.name}</span>
-                            <span class="settings-tool-kind" title=${t.kind}>${KIND_BADGE[t.kind] || '?'}</span>
-                            ${t.summary && html`<span class="settings-tool-summary">${t.summary}</span>`}
-                            <span class="settings-tool-source">${TOOL_EXTENSION[t.name] || g.name}</span>
+                    ${enabled && html`<div class="settings-tool-list">
+                        <div class="settings-tool-row settings-tool-row-header" aria-hidden="true">
+                            <span class="settings-tool-status-header">Enabled</span>
+                            <span class="settings-tool-name">Tool</span>
+                            <span class="settings-tool-compact-header">Compact</span>
+                            <span class="settings-tool-kind">Kind</span>
+                            <span class="settings-tool-summary">Summary</span>
+                            <span class="settings-tool-source">Source</span>
                         </div>
-                    `)}</div>`}
+                        ${g.tools.map(t => {
+                            const normalizedToolName = String(t.name || '').trim().toLowerCase();
+                            const compactChecked = compactableTools.has(normalizedToolName);
+                            return html`
+                                <div class="settings-tool-row">
+                                    <input type="checkbox" checked disabled />
+                                    <span class="settings-tool-name">${t.name}</span>
+                                    <span class="settings-tool-compact">
+                                        <input
+                                            type="checkbox"
+                                            checked=${compactChecked}
+                                            onChange=${() => toggleToolCompaction(t.name)}
+                                            title=${compactChecked ? 'Disable tool-result compaction for this tool' : 'Enable tool-result compaction for this tool'}
+                                        />
+                                    </span>
+                                    <span class="settings-tool-kind" title=${t.kind}>${KIND_BADGE[t.kind] || '?'}</span>
+                                    ${t.summary && html`<span class="settings-tool-summary">${t.summary}</span>`}
+                                    ${!t.summary && html`<span class="settings-tool-summary"></span>`}
+                                    <span class="settings-tool-source">${TOOL_EXTENSION[t.name] || g.name}</span>
+                                </div>
+                            `;
+                        })}
+                    </div>`}
                 </div>
             `; })}
             ${filteredGroups.length === 0 && html`<p class="settings-hint">No tools match "${filter}"</p>`}
-            <p class="settings-hint">Tool activation is managed by the agent runtime. Group checkboxes collapse/expand; individual tools use <code>activate_tools</code>.</p>
+            <p class="settings-hint">Tool activation is managed by the agent runtime. Group checkboxes collapse/expand; the “Compact” column controls tool-result compaction eligibility.</p>
         </div>
     `;
 }

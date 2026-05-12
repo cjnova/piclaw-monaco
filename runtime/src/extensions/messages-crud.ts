@@ -110,11 +110,12 @@ type MessageRow = {
   content_blocks: string | null;
 };
 
-type MessageResultRow = Omit<MessageRow, "content_blocks"> & {
+type MessageResultRow = Omit<MessageRow, "content_blocks" | "annotations"> & {
   created_at: string;
   content_truncated?: boolean;
   content_full_length?: number;
   content_blocks?: unknown[];
+  annotations?: unknown[];
   content_excerpt?: string;
   content_excerpt_truncated?: boolean;
 };
@@ -822,6 +823,20 @@ function executeGet(params: MessagesParams, defaultChat: string): AgentToolResul
         .map((r) => `  [${r.rowid}] ${r.sender_name || r.sender}: ${r.content}`)
         .join("\n");
       const parts = [header];
+      // Show attachments if present
+      const msgMediaIds = getMediaIdsForMessage(item.message.rowid);
+      if (msgMediaIds.length > 0) {
+        parts.push(`\nAttachments:\n${msgMediaIds.map((mid) => `- attachment:${mid}`).join("\n")}`);
+      }
+      // Show annotations if present
+      const msgAnnotations = item.message.annotations;
+      if (Array.isArray(msgAnnotations) && msgAnnotations.length > 0) {
+        const annSummary = msgAnnotations.map((a: any) => {
+          if (a?.type === 'highlight') return `- highlight: "${clipText(a.text ?? '', 60)}" (${a.color})`;
+          return `- ${a?.type ?? 'unknown'}`;
+        }).join("\n");
+        parts.push(`\nAnnotations:\n${annSummary}`);
+      }
       if (item.line_view) {
         const lineHeader = `  lines ${item.line_view.selected_start}-${item.line_view.selected_end}${item.line_view.grep ? ` grep=${JSON.stringify(item.line_view.grep)}` : ""}:`;
         const lineBody = item.line_view.lines.length > 0
