@@ -66,18 +66,35 @@ export function cursorInRange(view: EditorView, from: number, to: number): boole
 
 // ── ViewPlugin ──────────────────────────────────────────────────
 
+export function getSelectionLineSignature(view: Pick<EditorView, 'state'>): string {
+    const doc = view.state.doc;
+    return view.state.selection.ranges
+        .map((range) => {
+            const anchor = Math.max(0, Math.min(range.anchor, doc.length));
+            const head = Math.max(0, Math.min(range.head, doc.length));
+            return `${doc.lineAt(anchor).from}:${doc.lineAt(head).from}`;
+        })
+        .join('|');
+}
+
 class LivePreviewPlugin {
     decorations: DecorationSet;
+    private selectionLineSignature: string;
 
     constructor(view: EditorView) {
+        this.selectionLineSignature = getSelectionLineSignature(view);
         this.decorations = this.buildDecorations(view);
     }
 
     update(update: ViewUpdate) {
+        const nextSelectionLineSignature = getSelectionLineSignature(update.view);
+        const selectionLineChanged = nextSelectionLineSignature !== this.selectionLineSignature;
+        this.selectionLineSignature = nextSelectionLineSignature;
+
         if (
             update.docChanged ||
-            update.selectionSet ||
-            update.viewportChanged
+            update.viewportChanged ||
+            (update.selectionSet && selectionLineChanged)
         ) {
             this.decorations = this.buildDecorations(update.view);
         }

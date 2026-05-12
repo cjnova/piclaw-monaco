@@ -51,6 +51,43 @@ type WebChannelRuntimePublicSurfaceBroadcast = Pick<
   "sse" | "uiBridge" | "broadcastEvent"
 >;
 
+export interface ExtensionWorkingStateSnapshot {
+  message: string | null;
+  indicator: Record<string, unknown> | null;
+  visible: boolean;
+}
+
+const DEFAULT_EXTENSION_WORKING_STATE: ExtensionWorkingStateSnapshot = {
+  message: null,
+  indicator: null,
+  visible: true,
+};
+
+function readEventChatJid(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const value = (data as Record<string, unknown>).chat_jid;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function isClearedWorkingState(state: ExtensionWorkingStateSnapshot): boolean {
+  const indicatorMode = typeof state.indicator?.mode === "string" ? state.indicator.mode : null;
+  return !state.message && state.visible === true && (!state.indicator || indicatorMode === "hidden");
+}
+
+function resolveWorkingIndicatorSnapshot(payload: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(payload.frames)) {
+    return { mode: "default", frames: [], intervalMs: null };
+  }
+  const frames = payload.frames.filter((frame): frame is string => typeof frame === "string");
+  const intervalRaw = payload.interval_ms ?? payload.intervalMs;
+  const intervalMs = typeof intervalRaw === "number" && Number.isFinite(intervalRaw) && intervalRaw > 0
+    ? intervalRaw
+    : null;
+  return frames.length > 0
+    ? { mode: "custom", frames, intervalMs }
+    : { mode: "hidden", frames: [], intervalMs };
+}
+
 export interface WebChannelRuntimePublicSurfaceChannel {
   runtimeFollowupFacade: WebChannelRuntimePublicSurfaceFollowupFacade;
   messageProcessingStorageService: WebChannelRuntimePublicSurfaceStorage;
@@ -62,7 +99,63 @@ export interface WebChannelRuntimePublicSurfaceServiceCarrier {
 }
 
 export class WebChannelRuntimePublicSurfaceService {
+  private readonly extensionWorkingStates = new Map<string, ExtensionWorkingStateSnapshot>();
+
   constructor(private readonly channel: WebChannelRuntimePublicSurfaceChannel) {}
+
+  private updateExtensionWorkingStateFromEvent(eventType: string, data: unknown): void {
+    const chatJid = readEventChatJid(data);
+    if (!chatJid || !data || typeof data !== "object") return;
+    const payload = data as Record<string, unknown>;
+
+    if (eventType === "agent_response") {
+      this.extensionWorkingStates.delete(chatJid);
+      return;
+    }
+    if (eventType === "agent_status" && (payload.type === "done" || payload.type === "error")) {
+      this.extensionWorkingStates.delete(chatJid);
+      return;
+    }
+
+    if (
+      eventType !== "extension_ui_working" &&
+      eventType !== "extension_ui_status" &&
+      eventType !== "extension_ui_working_indicator" &&
+      eventType !== "extension_ui_working_visible"
+    ) {
+      return;
+    }
+
+    const previous = this.extensionWorkingStates.get(chatJid) ?? DEFAULT_EXTENSION_WORKING_STATE;
+
+    const next: ExtensionWorkingStateSnapshot = eventType === "extension_ui_working"
+      ? {
+        ...previous,
+        message: typeof payload.message === "string" && payload.message.trim() ? payload.message.trim() : null,
+      }
+      : eventType === "extension_ui_status"
+        ? (() => {
+          if (payload.key === "context_usage") return previous;
+          return {
+            ...previous,
+            message: typeof payload.text === "string" && payload.text.trim() ? payload.text.trim() : null,
+          };
+        })()
+        : eventType === "extension_ui_working_visible"
+          ? { ...previous, visible: payload.visible !== false }
+          : { ...previous, indicator: resolveWorkingIndicatorSnapshot(payload) };
+
+    if (isClearedWorkingState(next)) {
+      this.extensionWorkingStates.delete(chatJid);
+      return;
+    }
+    this.extensionWorkingStates.set(chatJid, next);
+  }
+
+  getExtensionWorkingState(chatJid: string): ExtensionWorkingStateSnapshot | null {
+    const state = this.extensionWorkingStates.get(chatJid);
+    return state ? { ...state, indicator: state.indicator ? { ...state.indicator } : null } : null;
+  }
 
   get sse(): WebSessionBroadcastService["sse"] {
     return this.channel.sessionBroadcast.sse;
@@ -138,6 +231,9 @@ export class WebChannelRuntimePublicSurfaceService {
   }
 
   updateAgentStatus(chatJid: string, status: Record<string, unknown>): void {
+    if (status?.type === "done" || status?.type === "error") {
+      this.extensionWorkingStates.delete(chatJid);
+    }
     this.channel.runtimeFollowupFacade.updateAgentStatus(chatJid, status);
   }
 
@@ -230,6 +326,7 @@ export class WebChannelRuntimePublicSurfaceService {
   }
 
   broadcastEvent(eventType: string, data: unknown): void {
+    this.updateExtensionWorkingStateFromEvent(eventType, data);
     this.channel.sessionBroadcast.broadcastEvent(eventType, data);
   }
 

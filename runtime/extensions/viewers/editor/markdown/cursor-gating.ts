@@ -19,6 +19,7 @@ export const ALWAYS_DECORATED_NODES = new Set([
   'ATXHeading4',
   'ATXHeading5',
   'ATXHeading6',
+  'InlineCode',
   'ListItem',
 ]);
 

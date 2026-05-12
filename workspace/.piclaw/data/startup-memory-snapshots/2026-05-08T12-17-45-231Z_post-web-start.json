@@ -1,0 +1,73 @@
+{
+  "captured_at": "2026-05-08T12:17:45.231Z",
+  "pid": 2600,
+  "label": "post-web-start",
+  "snapshot": {
+    "cpu_percent": 0,
+    "ram_percent": 18.2,
+    "swap_percent": 0,
+    "cpu_series": [
+      0
+    ],
+    "ram_series": [
+      18.2
+    ],
+    "swap_series": [
+      0
+    ],
+    "vram_percent": null,
+    "vram_series": [],
+    "vram_total_bytes": 0,
+    "vram_used_bytes": 0,
+    "gpu_provider": null,
+    "buffer_cache_bytes": 1099710464,
+    "buffer_cache_series_bytes": [
+      1099710464
+    ],
+    "process_rss_series_bytes": [
+      204926976
+    ],
+    "process_heap_used_series_bytes": [
+      28178592
+    ],
+    "swap_total_bytes": 2147483648,
+    "swap_used_bytes": 0,
+    "sample_interval_ms": 2000,
+    "platform": "linux",
+    "process_memory": {
+      "rss_bytes": 204926976,
+      "heap_total_bytes": 29665280,
+      "heap_used_bytes": 28178592,
+      "external_bytes": 9440336,
+      "array_buffers_bytes": 464,
+      "vm_rss_bytes": 204926976,
+      "vm_hwm_bytes": 204926976,
+      "rss_anon_bytes": 156561408,
+      "rss_file_bytes": 48365568,
+      "rss_shmem_bytes": 0,
+      "pss_bytes": 173771776,
+      "private_clean_bytes": 106496,
+      "private_dirty_bytes": 157351936,
+      "shared_clean_bytes": 48787456,
+      "shared_dirty_bytes": 0,
+      "cgroup_memory_current_bytes": 1440645120,
+      "threads": 21
+    },
+    "runtime_memory": {
+      "cached_main_sessions": 0,
+      "cached_side_sessions": 0,
+      "active_fork_base_leaves": 0,
+      "active_chats": 0,
+      "create_in_flight": 0,
+      "branch_seed_realizations_in_flight": 0,
+      "invalid_deferred_seed_errors": 0,
+      "prewarm_in_flight": 0,
+      "queued_prewarms": 0,
+      "prewarm_queue_length": 0,
+      "prewarm_cooldowns": 0,
+      "recovery_attempts_total": 0,
+      "recovery_recovered_runs": 0,
+      "recovery_exhausted_runs": 0
+    }
+  }
+}

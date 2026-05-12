@@ -15,6 +15,7 @@ import type { TabViewState } from './tab-store.js';
 
 interface ExtendedEditorPaneInstance extends PaneInstance {
     onViewStateChange?(cb: (state: TabViewState) => void): void;
+    onContentChange?(cb: (content: string) => void): (() => void) | void;
     restoreViewState?(viewState: TabViewState): void;
     getPath?(): string;
     setPath?(newPath: string): void;
@@ -75,6 +76,8 @@ class LazyEditorInstance implements PaneInstance {
     private queuedSaveCb: ((content: string) => void) | null = null;
     private queuedCloseCb: (() => void) | null = null;
     private queuedViewStateCb: ((state: TabViewState) => void) | null = null;
+    private queuedContentChangeCb: ((content: string) => void) | null = null;
+    private queuedContentChangeUnsubscribe: (() => void) | null = null;
     private queuedViewState: TabViewState | null = null;
     private queuedDiffMode: 'saved' | null | undefined = undefined;
 
@@ -128,6 +131,9 @@ class LazyEditorInstance implements PaneInstance {
             if (this.queuedViewStateCb && typeof this.real.onViewStateChange === 'function') {
                 this.real.onViewStateChange(this.queuedViewStateCb);
             }
+            if (this.queuedContentChangeCb && typeof this.real.onContentChange === 'function') {
+                this.queuedContentChangeUnsubscribe = this.real.onContentChange(this.queuedContentChangeCb) || null;
+            }
             if (this.queuedViewState && typeof this.real.restoreViewState === 'function') {
                 requestAnimationFrame(() => this.real?.restoreViewState?.(this.queuedViewState));
             }
@@ -178,6 +184,9 @@ class LazyEditorInstance implements PaneInstance {
         this.queuedSaveCb = null;
         this.queuedCloseCb = null;
         this.queuedViewStateCb = null;
+        this.queuedContentChangeCb = null;
+        this.queuedContentChangeUnsubscribe?.();
+        this.queuedContentChangeUnsubscribe = null;
     }
 
     onDirtyChange(cb: (dirty: boolean) => void): void {
@@ -216,6 +225,17 @@ class LazyEditorInstance implements PaneInstance {
     onViewStateChange(cb: (state: TabViewState) => void): void {
         this.queuedViewStateCb = cb;
         this.real?.onViewStateChange?.(cb);
+    }
+
+    onContentChange(cb: (content: string) => void): (() => void) | void {
+        this.queuedContentChangeUnsubscribe?.();
+        this.queuedContentChangeCb = cb;
+        this.queuedContentChangeUnsubscribe = this.real?.onContentChange?.(cb) || null;
+        return () => {
+            if (this.queuedContentChangeCb === cb) this.queuedContentChangeCb = null;
+            this.queuedContentChangeUnsubscribe?.();
+            this.queuedContentChangeUnsubscribe = null;
+        };
     }
 
     restoreViewState(viewState: TabViewState): void {

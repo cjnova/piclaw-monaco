@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Type } from "typebox";
@@ -116,7 +116,11 @@ describe("same-turn tool activation live update", () => {
     const modelRegistry = ModelRegistry.inMemory(authStorage);
     const settingsManager = SettingsManager.create("/workspace", getAgentDir());
     const tempRoot = mkdtempSync(join(tmpdir(), "piclaw-issue13-"));
+    const workspaceDir = join(tempRoot, "workspace");
+    mkdirSync(workspaceDir, { recursive: true });
     const sessionDir = join(tempRoot, "session");
+    const previousWorkspace = process.env.PICLAW_WORKSPACE;
+    process.env.PICLAW_WORKSPACE = workspaceDir;
     const faux = registerFauxProvider();
 
     try {
@@ -155,6 +159,8 @@ describe("same-turn tool activation live update", () => {
       expect(toolResults.some((message) => message.toolName === "demo_extension_tool" && message.isError)).toBe(false);
     } finally {
       faux.unregister();
+      if (previousWorkspace === undefined) delete process.env.PICLAW_WORKSPACE;
+      else process.env.PICLAW_WORKSPACE = previousWorkspace;
       rmSync(tempRoot, { recursive: true, force: true });
     }
   });

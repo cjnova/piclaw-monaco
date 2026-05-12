@@ -12,6 +12,7 @@ export function preloadSettingsDialog() {
 
 export function SettingsDialogLoader() {
     const [open, setOpen] = useState(false);
+    const [Content, setContent] = useState(null);
 
     useEffect(() => {
         const handler = (event) => {
@@ -32,15 +33,22 @@ export function SettingsDialogLoader() {
         return () => window.removeEventListener('piclaw:open-settings', handler);
     }, []);
 
-    if (!open) return null;
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (event) => {
+            if (event.key === 'Escape') setOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [open]);
 
-    // Lazy-import the content on first open
-    const [Content, setContent] = useState(null);
     useEffect(() => {
         import('./settings-dialog.js').then(mod => {
             setContent(() => mod.SettingsDialogContent);
         });
     }, []);
+
+    if (!open) return null;
 
     if (!Content) {
         return html`
@@ -55,9 +63,5 @@ export function SettingsDialogLoader() {
         `;
     }
 
-    return html`
-        <div class="settings-dialog-backdrop" onClick=${(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-            <${Content} onClose=${() => setOpen(false)} />
-        </div>
-    `;
+    return html`<${Content} onClose=${() => setOpen(false)} />`;
 }

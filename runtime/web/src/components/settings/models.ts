@@ -30,6 +30,8 @@ export function ModelsSection({ filter = '' }) {
     const [thinkingLevel, setThinkingLevel] = useState('off');
     const [supportsThinking, setSupportsThinking] = useState(false);
     const [availableLevels, setAvailableLevels] = useState(['off']);
+    const [scopedModelsOnly, setScopedModelsOnly] = useState(false);
+    const [scopedBusy, setScopedBusy] = useState(false);
     const [thinkingBusy, setThinkingBusy] = useState(false);
 
     const loadModels = useCallback(async () => {
@@ -37,12 +39,18 @@ export function ModelsSection({ filter = '' }) {
         setModels(data);
         if (data.thinking_level) setThinkingLevel(data.thinking_level);
         setSupportsThinking(Boolean(data.supports_thinking));
+        setScopedModelsOnly(Boolean(data.scoped_models_only));
         if (Array.isArray(data.available_thinking_levels) && data.available_thinking_levels.length > 0) {
             setAvailableLevels(data.available_thinking_levels);
         }
         return data;
     }, []);
-    useEffect(() => { loadModels().catch(() => setModels({ models: [], model_options: [] })); }, []);
+    useEffect(() => {
+        loadModels().catch((error) => {
+            console.warn('[settings/models] Failed to load models.', error);
+            setModels({ models: [], model_options: [] });
+        });
+    }, []);
 
     const switchModel = useCallback(async (label) => {
         if (switching) return; setSwitching(true);
@@ -50,6 +58,29 @@ export function ModelsSection({ filter = '' }) {
         catch (e) { console.error('Failed to switch model:', e); }
         finally { setSwitching(false); }
     }, [switching, loadModels]);
+
+    const setScopedModels = useCallback(async (enabled) => {
+        if (scopedBusy) return;
+        setScopedBusy(true);
+        setScopedModelsOnly(Boolean(enabled));
+        try {
+            const response = await fetch('/agent/settings/general', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scopedModelsOnly: Boolean(enabled) }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) throw new Error(payload?.error || 'Failed to save scoped model setting.');
+            await loadModels();
+        } catch (e) {
+            console.error('Failed to set scoped model filtering:', e);
+            await loadModels().catch((reloadError) => {
+                console.warn('[settings/models] Reload after scoped model filtering failure failed.', reloadError);
+            });
+        } finally {
+            setScopedBusy(false);
+        }
+    }, [scopedBusy, loadModels]);
 
     const setLevel = useCallback(async (level) => {
         if (thinkingBusy) return; setThinkingBusy(true); setThinkingLevel(level);
@@ -59,7 +90,12 @@ export function ModelsSection({ filter = '' }) {
             setSupportsThinking(resp?.command?.supports_thinking !== false);
             // Reload to get updated available levels after model/thinking change
             await loadModels();
-        } catch (e) { console.error('Failed to set thinking:', e); await loadModels().catch((e2) => { void e2; }); }
+        } catch (e) {
+            console.error('Failed to set thinking:', e);
+            await loadModels().catch((reloadError) => {
+                console.warn('[settings/models] Reload after thinking change failure failed.', reloadError);
+            });
+        }
         finally { setThinkingBusy(false); }
     }, [thinkingBusy, loadModels]);
 
@@ -74,6 +110,18 @@ export function ModelsSection({ filter = '' }) {
     return html`
         <div class="settings-models-split">
             <div class="settings-models-summary settings-hint">Model and provider names may wrap in narrow panes to avoid clipping.</div>
+            <div class="settings-row" style="padding:0 0 10px 0; align-items:flex-start">
+                <label>Scoped models only</label>
+                <div style="display:flex; flex-direction:column; gap:4px; min-width:0">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:500">
+                        <input type="checkbox" checked=${scopedModelsOnly} disabled=${scopedBusy} onChange=${(e) => setScopedModels(e.target.checked)} />
+                        Use Pi <code>enabledModels</code> for Piclaw model lists
+                    </label>
+                    <span class="settings-hint" style="margin:0">
+                        Filters this picker and the <code>list_models</code> tool. TUI model selection remains unchanged.
+                    </span>
+                </div>
+            </div>
             <div class="settings-models-list">
                 <table class="settings-table settings-borderless settings-models-table">
                     <thead><tr><th style="width:32px"></th><th>Model</th><th>Provider</th><th>Context</th><th style="text-align:center">Reasoning</th></tr></thead>

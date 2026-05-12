@@ -26,6 +26,34 @@ import { recompressExistingMedia } from "./media-recompress.js";
 
 const log = createLogger("db.connection");
 
+/**
+ * Detect whether `dbPath` resides on a ZFS filesystem by parsing
+ * /proc/self/mountinfo. Returns false on any error or non-Linux platform.
+ */
+function isZfsFilesystem(dbPath: string): boolean {
+  try {
+    const mountInfo = fs.readFileSync("/proc/self/mountinfo", "utf-8");
+    const resolved = path.resolve(dbPath);
+    let bestLen = 0;
+    let bestFs = "";
+    for (const line of mountInfo.split("\n")) {
+      const dashIdx = line.indexOf(" - ");
+      if (dashIdx === -1) continue;
+      const fields = line.slice(0, dashIdx).split(" ");
+      const mountpoint = fields[4];
+      const afterDash = line.slice(dashIdx + 3).trim().split(" ");
+      const fstype = afterDash[0];
+      if (mountpoint && resolved.startsWith(mountpoint) && mountpoint.length > bestLen) {
+        bestLen = mountpoint.length;
+        bestFs = fstype;
+      }
+    }
+    return bestFs === "zfs";
+  } catch {
+    return false;
+  }
+}
+
 /** Singleton database handle; set by initDatabase(), accessed via getDb(). */
 let db: Database | null = null;
 let dbMode: "memory" | "file" | null = null;
@@ -586,6 +614,7 @@ function ensureMessageColumns(database: Database): void {
   ensureColumn("thread_id", "INTEGER");
   ensureColumn("is_terminal_agent_reply", "INTEGER DEFAULT 0");
   ensureColumn("is_steering_message", "INTEGER DEFAULT 0");
+  ensureColumn("annotations");
 }
 
 /**
@@ -871,6 +900,19 @@ export function initDatabase(): void {
   db.exec(useMemory ? "PRAGMA journal_mode = MEMORY;" : "PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA busy_timeout = 5000;");
   db.exec("PRAGMA secure_delete = ON;");
+  if (!useMemory) {
+    if (isZfsFilesystem(nextPath)) {
+      // ZFS has its own ARC — mmap causes double-caching and D-state stalls
+      // under I/O pressure. Use SQLite's conventional page cache instead.
+      db.exec("PRAGMA mmap_size = 0;");
+      db.exec("PRAGMA cache_size = -8000;"); // 8 MB page cache
+    } else {
+      // A1: Use mmap for DB reads — moves page I/O from anonymous heap to file-backed memory.
+      db.exec("PRAGMA mmap_size = 268435456;"); // 256 MB
+      // A2: Reduce malloc'd page cache since mmap handles hot pages.
+      db.exec("PRAGMA cache_size = -1000;"); // 1 MB (was default 2 MB)
+    }
+  }
   migrateLegacyConfigTables(db);
   createSchema(db);
   ensureChatBranchConstraints(db);
@@ -886,6 +928,47 @@ export function initDatabase(): void {
   ensureRemotePeerBaseUrl(db);
   ensureOutboundPairRequestsTable(db);
   ensureMediaCompression(db);
+  if (!useMemory) {
+    ensureIncrementalAutoVacuum(db);
+  }
+}
+
+/**
+ * Switch to incremental auto_vacuum (one-time) and reclaim freelist pages
+ * on every startup. Reduces database bloat from deleted rows so scans
+ * and page-cache operations cover only live data.
+ */
+function ensureIncrementalAutoVacuum(database: Database): void {
+  try {
+    const avRow = database.prepare("PRAGMA auto_vacuum").get() as { auto_vacuum: number } | undefined;
+    if (avRow?.auto_vacuum === 0) {
+      database.exec("PRAGMA auto_vacuum = INCREMENTAL;");
+      database.exec("VACUUM;");
+      log.info("Switched database to incremental auto_vacuum", {
+        operation: "init_database.auto_vacuum_migration",
+      });
+    }
+  } catch (err) {
+    debugSuppressedError(log, "auto_vacuum migration failed (non-fatal).", err, {
+      operation: "init_database.auto_vacuum_migration",
+    });
+  }
+
+  try {
+    const row = database.prepare("PRAGMA freelist_count").get() as { freelist_count: number } | undefined;
+    const freePages = row?.freelist_count ?? 0;
+    if (freePages > 5000) {
+      database.exec("PRAGMA incremental_vacuum(10000);");
+      log.info("Reclaimed freelist pages", {
+        operation: "init_database.incremental_vacuum",
+        freePagesBefore: freePages,
+      });
+    }
+  } catch (err) {
+    debugSuppressedError(log, "Incremental vacuum failed (non-fatal).", err, {
+      operation: "init_database.incremental_vacuum",
+    });
+  }
 }
 
 /**
@@ -1010,4 +1093,15 @@ export function closeDatabase(options?: { shrinkMemory?: boolean }): void {
       err: error,
     });
   }
+}
+
+/**
+ * A3: Release SQLite's internal page-cache allocations back to the OS.
+ * Safe to call periodically (e.g. after session eviction) without closing the DB.
+ */
+export function shrinkDatabaseMemory(): void {
+  if (!db) return;
+  try {
+    db.exec("PRAGMA shrink_memory;");
+  } catch (e) { void e; /* best-effort */ }
 }

@@ -10,7 +10,16 @@ import { extractCardBlocks, renderAdaptiveCard } from '../ui/adaptive-card-rende
 import { buildAdaptiveCardSubmissionFallbackText, describeAdaptiveCardSubmission, extractAdaptiveCardSubmissionBlocks } from '../ui/adaptive-card-submission.js';
 import { buildGeneratedWidgetPayload, canRenderGeneratedWidget } from '../ui/generated-widget.js';
 import { ImageModal } from './image-modal.js';
+import { ImageAnnotator, canAnnotate } from './image-annotator.js';
 import { FilePill } from './file-pill.js';
+import {
+    applyHighlightsToElement,
+    extractHighlightsFromAnnotations,
+    getSelectionInElement,
+    HIGHLIGHT_COLORS,
+    persistHighlight,
+    type PostHighlight,
+} from './post-highlights.js';
 import { buildSpeakablePostText, getSpeechPlaybackState, isSpeechSynthesisSupported, speakPostText, stopSpeechPlayback, subscribeSpeechPlayback } from './post-speech.ts';
 import { copyPlainTextSelectionFromElement, readSessionStorageFlagBestEffort, resolveLinkPreviewSiteName, writeClipboardDataViaExecCommand, writeClipboardTextBestEffort, writeSessionStorageFlagBestEffort } from './post-runtime-safety.js';
 
@@ -875,21 +884,29 @@ function highlightHtml(html, query) {
  */
 export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMessage, agentName, agentAvatarUrl, userName, userAvatarUrl, userAvatarBackground, onDelete, isThreadReply, isThreadPrev, isThreadNext, isRemoving, highlightQuery, onFileRef, onOpenWidget, onOpenAttachmentPreview }) {
     const [zoomedImage, setZoomedImage] = useState(null);
+    const [annotatingImage, setAnnotatingImage] = useState(null);
+    const [annotationResult, setAnnotationResult] = useState(null); // { id, url } after Done
     const [copyState, setCopyState] = useState('idle');
     const [speechPlaybackState, setSpeechPlaybackState] = useState(() => getSpeechPlaybackState());
+    const [highlightPopup, setHighlightPopup] = useState(null);
+    const [highlightVersion, setHighlightVersion] = useState(0);
     const contentRef = useRef(null);
     const copyResetTimerRef = useRef(null);
 
     const data = post.data;
     const isAgent = data.type === 'agent_response';
     const resolvedUserName = userName || 'You';
-    const displayName = isAgent ? (agentName || DEFAULT_AGENT_NAME) : resolvedUserName;
+    const isPeerAgentMessage = Boolean(!isAgent && peerMessageMeta?.sourceAgentName);
+    const displayName = isPeerAgentMessage
+        ? (agentName || DEFAULT_AGENT_NAME)
+        : isAgent ? (agentName || DEFAULT_AGENT_NAME) : resolvedUserName;
     const searchChatAgentName = typeof post.chat_agent_name === 'string' ? post.chat_agent_name.trim() : '';
     const showSearchChatAgentTag = Boolean(isAgent && highlightQuery && searchChatAgentName && searchChatAgentName !== displayName);
 
-    // Get avatar info based on the name
-    const avatarInfo = isAgent
-        ? getAvatarInfo(agentName, agentAvatarUrl, true)
+    // Get avatar info based on the name.
+    // Peer agent messages (cross-session relay) use the agent avatar.
+    const avatarInfo = (isAgent || isPeerAgentMessage)
+        ? getAvatarInfo(isPeerAgentMessage ? peerMessageMeta.sourceAgentName : agentName, agentAvatarUrl, true)
         : getAvatarInfo(resolvedUserName, userAvatarUrl);
     const normalizedUserBackground = typeof userAvatarBackground === 'string'
         ? userAvatarBackground.trim().toLowerCase()
@@ -898,7 +915,7 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
         && (normalizedUserBackground === 'clear' || normalizedUserBackground === 'transparent');
     // Keep agent avatars with transparent background when an image is set,
     // matching user avatar behavior when background is cleared.
-    const clearAgentBackground = isAgent && Boolean(avatarInfo.image);
+    const clearAgentBackground = (isAgent || isPeerAgentMessage) && Boolean(avatarInfo.image);
     const avatarStyle = `background-color: ${(clearUserBackground || clearAgentBackground) ? 'transparent' : avatarInfo.color}`;
 
     const contentMeta = data.content_meta;
@@ -917,7 +934,7 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
     const blocks = data.content_blocks || [];
     const mediaIds = data.media_ids || [];
     const peerMessageMeta = getPeerMessageMeta(blocks);
-    const showPeerAgentTag = Boolean(peerMessageMeta?.sourceAgentName);
+    const showPeerAgentTag = Boolean(peerMessageMeta?.sourceAgentName && isPeerAgentMessage);
 
     // Keep original message text even when link previews are available.
     let displayContent = getDisplayContent(data.content, data.link_previews);
@@ -971,12 +988,64 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
 
     const handleImageClick = (e, mediaId) => {
         e.stopPropagation();
-        setZoomedImage(getMediaUrl(mediaId));
+        if (canAnnotate()) {
+            setAnnotatingImage(getMediaUrl(mediaId));
+        } else {
+            setZoomedImage(getMediaUrl(mediaId));
+        }
     };
 
     const handleAttachmentPreview = (attachment) => {
         onOpenAttachmentPreview?.(attachment);
     };
+
+    const handleHighlightSelection = useCallback(async (color) => {
+        if (!highlightPopup) {
+            console.warn('[post-highlight] No highlightPopup state — handler called with stale closure');
+            return;
+        }
+        const highlight: PostHighlight = {
+            type: 'highlight',
+            text: highlightPopup.text,
+            textOffset: highlightPopup.textOffset,
+            color,
+        };
+        // Clear popup and selection immediately
+        setHighlightPopup(null);
+        window.getSelection()?.removeAllRanges();
+        // Apply highlight locally first for immediate visual feedback
+        if (contentRef.current) {
+            applyHighlightsToElement(contentRef.current, [highlight]);
+        }
+        // Persist to DB
+        try {
+            const updated = await persistHighlight(post.id, post.chat_jid, data.annotations, highlight);
+            data.annotations = updated;
+        } catch (err) {
+            console.warn('[post-highlight] Failed to persist highlight:', err);
+        }
+        setHighlightVersion((v) => v + 1);
+    }, [highlightPopup, post.id, post.chat_jid, data]);
+
+    const handleAnnotationSave = useCallback((result) => {
+        setAnnotatingImage(null);
+        if (result?.id) {
+            setAnnotationResult({ id: result.id, url: getMediaUrl(result.id) });
+        }
+    }, []);
+
+    const handleAnnotationSend = useCallback(async () => {
+        if (!annotationResult?.id) return;
+        // Attach the annotated image to the compose box so user can add commentary
+        window.dispatchEvent(new CustomEvent('piclaw:compose-media-attach', {
+            detail: { mediaId: annotationResult.id, mediaUrl: annotationResult.url },
+        }));
+        setAnnotationResult(null);
+    }, [annotationResult]);
+
+    const handleAnnotationDiscard = useCallback(() => {
+        setAnnotationResult(null);
+    }, []);
 
     const handleDeleteClick = (e) => {
         e.stopPropagation();
@@ -1122,6 +1191,48 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
         return enhanceCodeBlocks(contentRef.current);
     }, [renderedHtml]);
 
+    // Re-apply saved text highlights after content renders
+    useEffect(() => {
+        if (!contentRef.current) return;
+        const highlights = extractHighlightsFromAnnotations(data.annotations);
+        if (highlights.length > 0) applyHighlightsToElement(contentRef.current, highlights);
+    }, [renderedHtml, highlightVersion]);
+
+    // Listen for text selection to show highlight popup
+    useEffect(() => {
+        const el = contentRef.current;
+        if (!el) return;
+        let dismissTimer = null;
+        const onSelectionChange = () => {
+            const info = getSelectionInElement(el);
+            if (info && info.text.length > 0) {
+                if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+                setHighlightPopup(info);
+            } else {
+                // Delay clearing so the user can tap a color button
+                if (dismissTimer) clearTimeout(dismissTimer);
+                dismissTimer = setTimeout(() => {
+                    dismissTimer = null;
+                    setHighlightPopup(null);
+                }, 600);
+            }
+        };
+        // Also listen for pointerup/touchend on the post content to detect
+        // selection completion (selectionchange can fire too early on iPad)
+        const onPointerUp = () => {
+            setTimeout(onSelectionChange, 50);
+        };
+        document.addEventListener('selectionchange', onSelectionChange);
+        el.addEventListener('pointerup', onPointerUp);
+        el.addEventListener('touchend', onPointerUp);
+        return () => {
+            document.removeEventListener('selectionchange', onSelectionChange);
+            el.removeEventListener('pointerup', onPointerUp);
+            el.removeEventListener('touchend', onPointerUp);
+            if (dismissTimer) clearTimeout(dismissTimer);
+        };
+    }, [renderedHtml]);
+
     useEffect(() => {
         return subscribeSpeechPlayback((nextState) => {
             setSpeechPlaybackState(nextState);
@@ -1179,7 +1290,7 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
 
     return html`
         <div id=${`post-${post.id}`} class="post ${isAgent ? 'agent-post' : ''} ${isThreadReply ? 'thread-reply' : ''} ${isThreadPrev ? 'thread-prev' : ''} ${isThreadNext ? 'thread-next' : ''} ${isRemoving ? 'removing' : ''}" onClick=${onClick}>
-            <div class="post-avatar ${isAgent ? 'agent-avatar' : ''} ${avatarInfo.image ? 'has-image' : ''}" style=${avatarStyle}>
+            <div class="post-avatar ${(isAgent || isPeerAgentMessage) ? 'agent-avatar' : ''} ${avatarInfo.image ? 'has-image' : ''}" style=${avatarStyle}>
                 ${avatarInfo.image ? html`<img src=${avatarInfo.image} alt=${displayName} />` : avatarInfo.letter}
             </div>
             <div class="post-body">
@@ -1484,6 +1595,43 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
             </div>
         </div>
         ${zoomedImage && html`<${ImageModal} src=${zoomedImage} onClose=${() => setZoomedImage(null)} />`}
+        ${annotatingImage && html`
+            <div class="post-inline-annotator">
+                <${ImageAnnotator}
+                    src=${annotatingImage}
+                    onSave=${handleAnnotationSave}
+                    onCancel=${() => setAnnotatingImage(null)}
+                />
+            </div>
+        `}
+        ${annotationResult && html`
+            <div class="post-annotation-result">
+                <img src=${annotationResult.url} alt="Annotated" class="post-annotation-preview" />
+                <div class="post-annotation-actions">
+                    <button class="post-annotation-send-btn" onClick=${handleAnnotationSend}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        Send
+                    </button>
+                    <button class="post-annotation-discard-btn" onClick=${handleAnnotationDiscard}>Discard</button>
+                </div>
+            </div>
+        `}
+        ${highlightPopup && html`
+            <div
+                class="post-highlight-popup"
+                style="position:fixed; left:${Math.max(8, highlightPopup.rect.left)}px; top:${highlightPopup.rect.top - 42}px; z-index:100"
+            >
+                ${HIGHLIGHT_COLORS.map((c) => html`
+                    <button
+                        key=${c.name}
+                        class="post-highlight-color-btn"
+                        style="background:${c.value}; border:1px solid rgba(128,128,128,0.3)"
+                        onClick=${(e) => { e.preventDefault(); e.stopPropagation(); handleHighlightSelection(c.value); }}
+                        title=${`Highlight ${c.name}`}
+                    />
+                `)}
+            </div>
+        `}
 
     `;
 }

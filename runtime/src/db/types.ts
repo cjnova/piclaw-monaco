@@ -50,6 +50,8 @@ export interface InteractionData {
   content_blocks?: unknown[];
   /** OpenGraph / URL preview data attached to the message. */
   link_previews?: unknown[];
+  /** User-created annotations (highlights, markup) stored on the message. */
+  annotations?: unknown[];
 }
 
 /**

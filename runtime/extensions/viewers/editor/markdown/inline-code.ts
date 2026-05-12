@@ -7,7 +7,7 @@
  * Lezer structure:
  *   InlineCode → CodeMark + CodeText + CodeMark
  */
-import { registerDecorator, Decoration } from './live-preview.js';
+import { cursorInRange, registerDecorator, Decoration } from './live-preview.js';
 import type { DecorationEntry, SyntaxNode, EditorView } from './live-preview.js';
 
 function inlineCodeDecorator(node: SyntaxNode, _view: EditorView): DecorationEntry[] {
@@ -29,20 +29,23 @@ function inlineCodeDecorator(node: SyntaxNode, _view: EditorView): DecorationEnt
 
     const openMark = marks[0];
     const closeMark = marks[marks.length - 1];
+    const editingThisCodeSpan = cursorInRange(view, node.from, node.to);
 
-    // Hide opening backtick(s)
-    entries.push({
-        from: openMark.from,
-        to: openMark.to,
-        decoration: Decoration.replace({}),
-    });
+    if (!editingThisCodeSpan) {
+        // Hide opening backtick(s)
+        entries.push({
+            from: openMark.from,
+            to: openMark.to,
+            decoration: Decoration.replace({}),
+        });
 
-    // Hide closing backtick(s)
-    entries.push({
-        from: closeMark.from,
-        to: closeMark.to,
-        decoration: Decoration.replace({}),
-    });
+        // Hide closing backtick(s)
+        entries.push({
+            from: closeMark.from,
+            to: closeMark.to,
+            decoration: Decoration.replace({}),
+        });
+    }
 
     // Style the code content
     const contentFrom = openMark.to;

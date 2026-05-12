@@ -4,7 +4,7 @@ import { BodyPortal } from './body-portal.js';
 import { getMediaBlob, getMediaUrl } from '../api.js';
 import { renderMarkdown, renderMermaidDiagrams } from '../markdown.js';
 import { formatFileSize, formatTimestamp } from '../utils/format.js';
-import { highlightCodeToHtml, normalizeCodeLanguageLabel } from '../utils/code-highlighting.js';
+import { highlightCodeToHtml, normalizeCodeLanguageLabel, extensionToLanguage } from '../utils/code-highlighting.js';
 import {
     buildAddonAttachmentPreviewFrameUrl,
     getAddonAttachmentPreviewNote,
@@ -63,95 +63,22 @@ function buildMetadata(info, languageLabel = null, archivePreview = null) {
 }
 
 function previewLanguageFromAttachment(info, filename) {
-    const normalizedType = String(info?.content_type || '').trim().toLowerCase();
-    const normalizedName = String(filename || '').trim().toLowerCase();
-    const basename = normalizedName.split('/').pop() || normalizedName;
-
-    if (normalizedName.endsWith('.yaml') || normalizedName.endsWith('.yml') || normalizedType === 'text/yaml' || normalizedType === 'application/yaml') {
-        return 'yaml';
+    // Delegate to the shared extensionToLanguage utility from code-highlighting.ts
+    // which covers ~90 file extensions.
+    const name = String(filename || '').trim();
+    if (name) {
+        const lang = extensionToLanguage(name);
+        if (lang) return lang;
     }
-    if (normalizedName.endsWith('.json') || normalizedName.endsWith('.jsonl') || normalizedType === 'application/json') {
-        return 'json';
-    }
-    if (normalizedName.endsWith('.xml') || normalizedName.endsWith('.svg') || normalizedType === 'application/xml' || normalizedType === 'text/xml' || normalizedType === 'image/svg+xml') {
-        return 'xml';
-    }
-    if (normalizedName.endsWith('.html') || normalizedName.endsWith('.htm') || normalizedType === 'text/html') {
-        return 'html';
-    }
-    if (normalizedName.endsWith('.css') || normalizedType === 'text/css') {
-        return 'css';
-    }
-    if (normalizedName.endsWith('.ts') || normalizedName.endsWith('.tsx') || normalizedType === 'text/typescript') {
-        return normalizedName.endsWith('.tsx') ? 'tsx' : 'ts';
-    }
-    if (normalizedName.endsWith('.js') || normalizedName.endsWith('.jsx') || normalizedType === 'text/javascript' || normalizedType === 'application/javascript') {
-        return normalizedName.endsWith('.jsx') ? 'jsx' : 'js';
-    }
-    if (normalizedName.endsWith('.py') || normalizedType === 'text/x-python' || normalizedType === 'application/x-python-code') {
-        return 'python';
-    }
-    if (normalizedName.endsWith('.go') || normalizedType === 'text/x-go') {
-        return 'go';
-    }
-    if (
-        normalizedName.endsWith('.c++')
-        || normalizedName.endsWith('.cc')
-        || normalizedName.endsWith('.cp')
-        || normalizedName.endsWith('.cpp')
-        || normalizedName.endsWith('.cxx')
-        || normalizedName.endsWith('.hh')
-        || normalizedName.endsWith('.hpp')
-        || normalizedName.endsWith('.hxx')
-        || normalizedType === 'text/x-c++src'
-        || normalizedType === 'text/x-c++hdr'
-    ) {
-        return 'cpp';
-    }
-    if (normalizedName.endsWith('.rb') || normalizedType === 'text/x-ruby') {
-        return 'ruby';
-    }
-    if (normalizedName.endsWith('.rs') || normalizedType === 'text/x-rustsrc') {
-        return 'rust';
-    }
-    if (normalizedName.endsWith('.ps1') || normalizedName.endsWith('.psm1') || normalizedName.endsWith('.psd1') || normalizedType === 'text/x-powershell') {
-        return 'powershell';
-    }
-    if (basename === 'dockerfile' || normalizedName.endsWith('.dockerfile')) {
-        return 'dockerfile';
-    }
-    if (normalizedName.endsWith('.md') || normalizedName.endsWith('.markdown') || normalizedType === 'text/markdown') {
-        return 'markdown';
-    }
-    if (
-        normalizedName.endsWith('.sh')
-        || normalizedName.endsWith('.bash')
-        || normalizedName.endsWith('.zsh')
-        || basename === '.bashrc'
-        || basename === '.bash_profile'
-        || basename === '.profile'
-        || basename === '.zshrc'
-        || basename === '.zprofile'
-        || basename === '.zshenv'
-        || basename === '.env'
-        || basename.startsWith('.env.')
-        || normalizedType === 'text/x-shellscript'
-    ) {
-        return 'bash';
-    }
-    if (normalizedName.endsWith('.sql')) {
-        return 'sql';
-    }
-    if (
-        normalizedName.endsWith('.toml')
-        || normalizedName.endsWith('.ini')
-        || normalizedName.endsWith('.cfg')
-        || normalizedName.endsWith('.conf')
-        || normalizedName.endsWith('.properties')
-        || normalizedType === 'text/toml'
-    ) {
-        return 'toml';
-    }
+    // Fallback: check content_type for text types we know
+    const ct = String(info?.content_type || '').trim().toLowerCase();
+    if (ct === 'application/json') return 'json';
+    if (ct === 'text/yaml' || ct === 'application/yaml' || ct === 'text/x-yaml') return 'yaml';
+    if (ct === 'application/xml' || ct === 'text/xml') return 'xml';
+    if (ct === 'text/html') return 'html';
+    if (ct === 'text/css') return 'css';
+    if (ct === 'text/javascript' || ct === 'application/javascript') return 'javascript';
+    if (ct === 'text/x-python' || ct === 'application/x-python-code') return 'python';
     return null;
 }
 

@@ -391,6 +391,7 @@ export function renderMainShell(options: MainShellRenderOptions): any {
           ${editorOpen && !activeDetachedTab && tabStripActiveId && previewTabs.has(tabStripActiveId) && html`
             <${MarkdownPreview}
               getContent=${() => editorInstanceRef.current?.getContent?.()}
+              subscribeContentChange=${(cb) => editorInstanceRef.current?.onContentChange?.(cb)}
               path=${tabStripActiveId}
               onClose=${() => handleTabTogglePreview(tabStripActiveId)}
             />

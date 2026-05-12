@@ -301,6 +301,7 @@ export function SettingsDialogContent({ onClose }) {
         switch (activeSection) {
             case 'general': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'sessions': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
+            case 'recordings': return html`<${Comp} filter=${filter} setStatus=${setStatus} />`;
             case 'compaction': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;
             case 'keyboard': return html`<${Comp} filter=${filter} setStatus=${setStatus} />`;
             case 'workspace': return html`<${Comp} settingsData=${settingsData} setStatus=${setStatus} mergeSettingsData=${mergeSettingsData} />`;

@@ -10,6 +10,7 @@ import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
 import { findModel, parseModelInput } from "../utils/model-utils.js";
+import { resolveModelScope, type EnabledModelsSettingsProvider } from "../utils/scoped-models.js";
 import { getChatContext } from "../core/chat-context.js";
 import { updateSessionModel } from "./session-status.js";
 
@@ -124,8 +125,12 @@ export const modelControl: ExtensionFactory = (pi: ExtensionAPI) => {
     }),
     async execute(_id, params, _signal, _update, ctx) {
       ctx.modelRegistry.refresh();
+      const scopedModels = resolveModelScope(
+        ctx.modelRegistry.getAvailable(),
+        (ctx as { settingsManager?: EnabledModelsSettingsProvider }).settingsManager,
+      );
       const seen = new Map<string, Model<Api>>();
-      for (const m of ctx.modelRegistry.getAvailable()) {
+      for (const m of scopedModels.models) {
         if (!m?.provider || !m?.id) continue;
         const key = `${m.provider}/${m.id}`;
         if (!seen.has(key)) seen.set(key, m);
@@ -153,7 +158,7 @@ export const modelControl: ExtensionFactory = (pi: ExtensionAPI) => {
 
       if (page.length === 0) {
         const msg = query ? `No models found matching "${params.query}".` : "No available models found.";
-        return { content: [{ type: "text", text: msg }], details: { total: entries.length, count: 0, offset, limit, current_model: current, models: [] } };
+        return { content: [{ type: "text", text: msg }], details: { total: entries.length, count: 0, offset, limit, current_model: current, scoped_models_only: scopedModels.scoped, enabled_model_patterns: scopedModels.patterns, models: [] } };
       }
 
       const header = query
@@ -169,7 +174,7 @@ export const modelControl: ExtensionFactory = (pi: ExtensionAPI) => {
 
       return {
         content: [{ type: "text", text: `${header}\n${lines.join("\n")}` }],
-        details: { total: entries.length, count: page.length, offset, limit, current_model: current, models: page },
+        details: { total: entries.length, count: page.length, offset, limit, current_model: current, scoped_models_only: scopedModels.scoped, enabled_model_patterns: scopedModels.patterns, models: page },
       };
     },
   });

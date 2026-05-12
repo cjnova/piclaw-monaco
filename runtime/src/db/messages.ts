@@ -43,13 +43,14 @@ interface StoredMessageRow {
   screen_hint: string | null;
   content_blocks: string | null;
   link_previews: string | null;
+  annotations: string | null;
   thread_id: number | null;
   timestamp: string;
   is_bot_message: number;
 }
 
 /** Column list used in SELECT queries to ensure a consistent shape. */
-const MESSAGE_COLUMNS = "rowid, chat_jid, sender, sender_name, content, screen_hint, content_blocks, link_previews, thread_id, timestamp, is_bot_message";
+const MESSAGE_COLUMNS = "rowid, chat_jid, sender, sender_name, content, screen_hint, content_blocks, link_previews, annotations, thread_id, timestamp, is_bot_message";
 
 function ensureMonotonicMessageTimestamp(chatJid: string, requestedTimestamp: string): string {
   const requestedMs = Date.parse(requestedTimestamp);
@@ -97,6 +98,8 @@ function buildInteraction(row: StoredMessageRow, mediaIds: number[] = []): Inter
   if (row.screen_hint) data.screen_hint = row.screen_hint;
   if (contentBlocks?.length) data.content_blocks = contentBlocks;
   if (linkPreviews?.length) data.link_previews = linkPreviews;
+  const annotations = parseJsonArray(row.annotations);
+  if (annotations?.length) data.annotations = annotations;
   if (row.thread_id !== null && row.thread_id !== undefined) data.thread_id = row.thread_id;
   return {
     id: row.rowid,
@@ -280,6 +283,40 @@ export function updateMessageLinkPreviews(
   const payload = linkPreviews.length > 0 ? JSON.stringify(linkPreviews) : null;
   const res = db
     .prepare("UPDATE messages SET link_previews = ? WHERE chat_jid = ? AND rowid = ?")
+    .run(payload, chatJid, rowId);
+  return res.changes > 0;
+}
+
+/**
+ * Read the annotations JSON for a message. Returns parsed array or null.
+ */
+export function getMessageAnnotations(
+  chatJid: string,
+  rowId: number,
+): unknown[] | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT annotations FROM messages WHERE chat_jid = ? AND rowid = ?")
+    .get(chatJid, rowId) as { annotations: string | null } | undefined;
+  if (!row?.annotations) return null;
+  try { return JSON.parse(row.annotations); } catch { return null; }
+}
+
+/**
+ * Update the annotations JSON column for a message.
+ * Stores user-created highlights and markup that are not part of the message content.
+ */
+export function updateMessageAnnotations(
+  chatJid: string,
+  rowId: number,
+  annotations: unknown[] | null,
+): boolean {
+  const db = getDb();
+  const payload = Array.isArray(annotations) && annotations.length > 0
+    ? JSON.stringify(annotations)
+    : null;
+  const res = db
+    .prepare("UPDATE messages SET annotations = ? WHERE chat_jid = ? AND rowid = ?")
     .run(payload, chatJid, rowId);
   return res.changes > 0;
 }

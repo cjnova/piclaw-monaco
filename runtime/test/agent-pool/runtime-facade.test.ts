@@ -105,6 +105,37 @@ test("AgentRuntimeFacade reports available models and context usage", async () =
   });
 });
 
+test("AgentRuntimeFacade filters web model options with scopedModelsOnly enabledModels", async () => {
+  const previous = process.env.PICLAW_SCOPED_MODELS_ONLY;
+  process.env.PICLAW_SCOPED_MODELS_ONLY = "1";
+  try {
+    const fixture = createFacade({
+      modelRegistry: {
+        refresh: () => {},
+        getAvailable: () => [
+          { provider: "openai", id: "gpt-fast", name: "GPT Fast", contextWindow: 128000, reasoning: true },
+          { provider: "anthropic", id: "claude-test", name: "Claude Test", contextWindow: 200000, reasoning: true },
+          { provider: "google", id: "gemini-test", name: "Gemini Test", contextWindow: 1000000, reasoning: false },
+        ],
+        getAll: () => [],
+        registerProvider: () => {},
+      } as any,
+      settingsManager: {
+        getEnabledModels: () => ["anthropic/*", "gemini-test"],
+      } as any,
+    });
+
+    const available = await fixture.facade.getAvailableModels("web:cold-scoped");
+    expect(available.scoped_models_only).toBe(true);
+    expect(available.enabled_model_patterns).toEqual(["anthropic/*", "gemini-test"]);
+    expect(available.models).toEqual(["anthropic/claude-test", "google/gemini-test"]);
+    expect(available.model_options.map((m) => m.label)).toEqual(["anthropic/claude-test", "google/gemini-test"]);
+  } finally {
+    if (previous === undefined) delete process.env.PICLAW_SCOPED_MODELS_ONLY;
+    else process.env.PICLAW_SCOPED_MODELS_ONLY = previous;
+  }
+});
+
 test("AgentRuntimeFacade returns registry-backed model options without hydrating a cold chat runtime", async () => {
   let refreshCalls = 0;
   let _getOrCreateCalls = 0;

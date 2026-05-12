@@ -246,6 +246,28 @@ describe("model-control extension", () => {
     expect(result.details.models.every((m: any) => m.label.includes("other"))).toBe(true);
   });
 
+  test("list_models respects scopedModelsOnly enabledModels patterns", async () => {
+    const previous = process.env.PICLAW_SCOPED_MODELS_ONLY;
+    process.env.PICLAW_SCOPED_MODELS_ONLY = "1";
+    try {
+      const ctx = fake.makeCtx({
+        settingsManager: {
+          getEnabledModels: () => ["other/*", "reasoning-model:high"],
+        },
+      } as any);
+      const result = await callTool(fake.tools, "list_models", {}, ctx);
+      expect(result.details.scoped_models_only).toBe(true);
+      expect(result.details.enabled_model_patterns).toEqual(["other/*", "reasoning-model:high"]);
+      expect(result.details.models.map((m: any) => m.label)).toEqual([
+        "other/other-model",
+        "test-provider/reasoning-model",
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.PICLAW_SCOPED_MODELS_ONLY;
+      else process.env.PICLAW_SCOPED_MODELS_ONLY = previous;
+    }
+  });
+
   test("list_models returns empty for no-match query", async () => {
     const ctx = fake.makeCtx();
     const result = await callTool(fake.tools, "list_models", { query: "nonexistent-xyz" }, ctx);

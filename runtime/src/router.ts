@@ -17,6 +17,9 @@
  *   - agent-control uses detectChannel() to scope command execution.
  */
 
+import { isAbsolute, resolve } from "node:path";
+
+import { WORKSPACE_DIR } from "./core/config.js";
 import type { NewMessage } from "./types.js";
 
 /** Recognised channel types. */
@@ -67,12 +70,39 @@ function inferPromptChatJid(messages: NewMessage[]): string {
   return chatJids.length === 1 ? chatJids[0] : "";
 }
 
+function absolutizeWorkspaceReference(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/^(?:[a-z][a-z0-9+.-]*:|attachment:)/i.test(trimmed)) return trimmed;
+  if (isAbsolute(trimmed)) return trimmed;
+  return resolve(WORKSPACE_DIR, trimmed.replace(/^\.\//, ""));
+}
+
+function absolutizePromptFileReferenceBlocks(content: string): string {
+  const lines = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  let inReferenceBlock = false;
+  return lines.map((line) => {
+    const header = line.trim();
+    if (/^(?:files|folders):$/i.test(header)) {
+      inReferenceBlock = true;
+      return line;
+    }
+    if (inReferenceBlock) {
+      const match = line.match(/^(\s*-\s+)(.+?)\s*$/);
+      if (match) return `${match[1]}${absolutizeWorkspaceReference(match[2] ?? "")}`;
+      if (header === "") return line;
+      inReferenceBlock = false;
+    }
+    return line;
+  }).join("\n");
+}
+
 function formatPromptMessage(message: NewMessage): string {
   const sender = normalizePromptSenderName(message);
   const timestamp = normalizePromptHeaderValue(message.timestamp);
   const screenHint = normalizePromptScreenHint(message);
   const screenSuffix = screenHint ? ` (from ${screenHint})` : "";
-  const content = typeof message.content === "string" ? message.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n") : "";
+  const content = typeof message.content === "string" ? absolutizePromptFileReferenceBlocks(message.content) : "";
   const header = timestamp ? `${sender} @ ${timestamp}${screenSuffix}:` : `${sender}${screenSuffix}:`;
   if (!content) return header;
   const indented = content.split("\n").map((line) => `  ${line}`).join("\n");

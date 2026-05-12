@@ -71,8 +71,34 @@ function estimateMessageTokens(message: any): number {
   }
 }
 
+/** Short-lived per-session-manager cache for estimateContextTokensFromSession to avoid
+ *  rebuilding the full session context on every call. */
+type ContextEstimateCacheEntry = {
+  leafId: string;
+  entryCount: number;
+  tokens: number;
+  at: number;
+};
+const ctxEstimateCache = new WeakMap<object, ContextEstimateCacheEntry>();
+const CTX_ESTIMATE_CACHE_TTL_MS = 2_000;
+
 export function estimateContextTokensFromSession(session: AgentSession): number {
-  const context = session.sessionManager.buildSessionContext();
+  const mgr = session.sessionManager;
+  const leafId = typeof mgr.getLeafId === "function" ? (mgr.getLeafId() ?? "") : "";
+  const entryCount = typeof mgr.getEntries === "function" ? mgr.getEntries().length : -1;
+  const now = Date.now();
+  const cached = ctxEstimateCache.get(mgr as object);
+
+  if (
+    cached &&
+    cached.leafId === leafId &&
+    cached.entryCount === entryCount &&
+    now - cached.at < CTX_ESTIMATE_CACHE_TTL_MS
+  ) {
+    return cached.tokens;
+  }
+
+  const context = mgr.buildSessionContext();
   const hasCompactionSummary = context.messages.some((message: any) => message?.role === "compactionSummary");
 
   // Assistant usage metadata is scoped to the prompt that produced that
@@ -83,10 +109,15 @@ export function estimateContextTokensFromSession(session: AgentSession): number 
   // compacted context directly from the messages instead.
   if (!hasCompactionSummary) {
     const usage = session.getContextUsage?.();
-    if (typeof usage?.tokens === "number") return usage.tokens;
+    if (typeof usage?.tokens === "number") {
+      ctxEstimateCache.set(mgr as object, { leafId, entryCount, tokens: usage.tokens, at: now });
+      return usage.tokens;
+    }
   }
 
-  return context.messages.reduce((total: number, message: any) => total + estimateMessageTokens(message), 0);
+  const tokens = context.messages.reduce((total: number, message: any) => total + estimateMessageTokens(message), 0);
+  ctxEstimateCache.set(mgr as object, { leafId, entryCount, tokens, at: now });
+  return tokens;
 }
 
 /** Fallback context window when the model does not report one.

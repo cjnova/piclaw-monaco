@@ -97,6 +97,7 @@ export function createAgentPoolServices(options: AgentPoolServiceFactoryOptions)
     pool: options.pool,
     getOrCreateRuntime: (chatJid) => sessionManager.getOrCreate(chatJid),
     modelRegistry: options.modelRegistry,
+    settingsManager: options.settingsManager,
     authStorage: options.authStorage,
     clearAttachments: (chatJid) => attachments.clear(chatJid),
     refreshRuntime: (chatJid, runtime) => sessionManager.refreshRuntime(chatJid, runtime),

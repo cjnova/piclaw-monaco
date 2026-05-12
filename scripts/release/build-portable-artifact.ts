@@ -179,14 +179,14 @@ function buildUnixInstallScript(bundleName: string): string {
   return `#!/usr/bin/env sh\nset -eu\nPREFIX=\${1:-/opt/piclaw}\nBIN_DIR=\${PICLAW_BIN_DIR:-/usr/local/bin}\nSELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nmkdir -p "$PREFIX/releases"\nrm -rf "$PREFIX/releases/${bundleName}"\ncp -a "$SELF_DIR" "$PREFIX/releases/${bundleName}"\nln -sfn "releases/${bundleName}" "$PREFIX/current"\nif [ "\${PICLAW_SKIP_BIN_LINK:-0}" != "1" ]; then\n  mkdir -p "$BIN_DIR"\n  cat > "$BIN_DIR/piclaw" <<EOF\n#!/usr/bin/env sh\nexec "$PREFIX/current/bin/piclaw" "\\$@"\nEOF\n  chmod 755 "$BIN_DIR/piclaw"\nfi\necho "Installed Piclaw to $PREFIX/current"\n`;
 }
 
-function buildWindowsInstallScript(bundleName: string): string {
+export function buildWindowsInstallScript(bundleName: string): string {
   return [
-    "$ErrorActionPreference = 'Stop'",
     "param(",
     "  [string]$Prefix = (Join-Path $env:LOCALAPPDATA 'Piclaw'),",
     "  [string]$BinDir = (Join-Path $env:LOCALAPPDATA 'Microsoft\\WindowsApps'),",
     "  [switch]$SkipBinLink",
     ")",
+    "$ErrorActionPreference = 'Stop'",
     "$SelfDir = Split-Path -Parent $MyInvocation.MyCommand.Path",
     "$Releases = Join-Path $Prefix 'releases'",
     `$Dest = Join-Path $Releases '${bundleName}'`,
@@ -198,7 +198,9 @@ function buildWindowsInstallScript(bundleName: string): string {
     "New-Item -ItemType Junction -Path $Current -Target $Dest | Out-Null",
     "if (-not $SkipBinLink) {",
     "  New-Item -ItemType Directory -Force -Path $BinDir | Out-Null",
-    "  '@echo off`r`n\"' + (Join-Path $Current 'bin\\piclaw.cmd') + '\" %*`r`n' | Set-Content -Encoding ASCII (Join-Path $BinDir 'piclaw.cmd')",
+    "  $Launcher = Join-Path $Current 'bin\\piclaw.cmd'",
+    "  $Shim = \"@echo off`r`n`\"$Launcher`\" %*`r`n\"",
+    "  $Shim | Set-Content -Encoding ASCII (Join-Path $BinDir 'piclaw.cmd')",
     "}",
     "Write-Host \"Installed Piclaw to $Current\"",
     "",

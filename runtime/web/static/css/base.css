@@ -195,21 +195,27 @@
 /* Base styles */
 html, body {
     width: 100%;
-    height: 100%;
     overflow: hidden;
 }
 
 html {
     background-color: var(--bg-primary);
+    /* Browser default is 100dvh; iOS standalone must override to 100vh before CSS loads.
+       Do not remove the early index.html bootstrap or mobile-viewport.ts override without
+       reading docs/PWA.md — 100dvh cold-starts too short in iOS standalone PWAs. */
     --app-height: 100dvh;
     text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
 }
 
 body {
-    position: fixed;
-    inset: 0;
-    min-height: 100%;
+    /* Keep body in normal document flow. On current iOS standalone WebKit,
+       `position: fixed` on the root body turns the app into the viewport-sized
+       clipping box and truncates the bottom of compose/timeline. The mobile
+       viewport fix still drives height via --app-height; body just must not be
+       the fixed containing block. */
+    height: var(--app-height, 100dvh);
+    min-height: var(--app-height, 100dvh);
     font-family: var(--font-family);
     font-size: var(--font-size-md);
     line-height: var(--line-height);
@@ -222,8 +228,8 @@ body {
 #app {
     width: 100%;
     min-width: 0;
-    min-height: 100%;
-    height: 100%;
+    height: var(--app-height, 100dvh);
+    min-height: var(--app-height, 100dvh);
     display: flex;
     flex-direction: column;
     overflow: hidden;

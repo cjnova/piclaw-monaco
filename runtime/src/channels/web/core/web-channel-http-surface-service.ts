@@ -21,6 +21,7 @@ type WebChannelHttpSurfaceEndpointFacade = Pick<
   | "handleThoughtVisibility"
   | "handleDeletePost"
   | "handleUpdatePost"
+  | "handleUpdatePostAnnotations"
   | "handleInternalPost"
   | "handlePost"
   | "handleAgentStatus"
@@ -151,6 +152,10 @@ export class WebChannelHttpSurfaceService {
 
   async handleUpdatePost(req: Request, id: number | null): Promise<Response> {
     return await this.channel.endpointFacade.handleUpdatePost(req, id);
+  }
+
+  async handleUpdatePostAnnotations(req: Request, id: number): Promise<Response> {
+    return await this.channel.endpointFacade.handleUpdatePostAnnotations(req, id);
   }
 
   async handleInternalPost(req: Request): Promise<Response> {

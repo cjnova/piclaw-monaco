@@ -2680,6 +2680,11 @@ test("runAgentPrompt disarms the prompt timeout as soon as prompt() resolves", a
 
 test("runAgentPrompt ignores a queued late-timeout callback after prompt completion", async () => {
   let abortCalls = 0;
+  let timeoutState: {
+    timeoutId: ReturnType<typeof setTimeout> | null;
+    timedOutRef: { value: boolean };
+    completedRef: { value: boolean };
+  } | null = null;
 
   class StubSession {
     private listeners: Array<(event: any) => void> = [];
@@ -2697,6 +2702,11 @@ test("runAgentPrompt ignores a queued late-timeout callback after prompt complet
       for (const listener of this.listeners) {
         listener({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "done" } });
       }
+      setTimeout(() => {
+        if (!timeoutState || timeoutState.completedRef.value) return;
+        timeoutState.timedOutRef.value = true;
+        void this.abort();
+      }, 0);
     }
     async abort() {
       abortCalls += 1;
@@ -2710,50 +2720,31 @@ test("runAgentPrompt ignores a queued late-timeout callback after prompt complet
     recordMessageUsage: () => {},
   });
 
-  const originalStartPromptTimeout = turnCoordinator.startPromptTimeout.bind(turnCoordinator);
-  const originalClearTimeout = globalThis.clearTimeout;
-  turnCoordinator.startPromptTimeout = ((_session: any, _chatJid: string, _timeoutMs: number) => {
-    const state = originalStartPromptTimeout(_session, _chatJid, 0);
-    return { ...state, timeoutId: 1 as any };
+  turnCoordinator.startPromptTimeout = (() => {
+    timeoutState = {
+      timeoutId: null,
+      timedOutRef: { value: false },
+      completedRef: { value: false },
+    };
+    return timeoutState;
   }) as any;
 
-  globalThis.clearTimeout = ((_: any) => {
-    queueMicrotask(async () => {
-      const state = (turnCoordinator.startPromptTimeout as any).lastState;
-      if (!state || state.completedRef.value) return;
-      state.timedOutRef.value = true;
-      await session.abort();
-    });
-  }) as any;
+  const result = await runAgentPrompt("test", "web:default", { timeoutMs: 1000 }, {
+    getOrCreateRuntime: async () => createRuntime(session) as any,
+    turnCoordinator,
+    clearAttachments: () => {},
+    takeAttachments: () => [],
+    logsDir: createTestLogsDir(),
+    setActiveForkBaseLeaf: () => {},
+    clearActiveForkBaseLeaf: () => {},
+  });
 
-  const wrappedStartPromptTimeout = turnCoordinator.startPromptTimeout;
-  turnCoordinator.startPromptTimeout = ((...args: any[]) => {
-    const state = (wrappedStartPromptTimeout as any)(...args);
-    (turnCoordinator.startPromptTimeout as any).lastState = state;
-    return state;
-  }) as any;
+  await Bun.sleep(0);
 
-  try {
-    const result = await runAgentPrompt("test", "web:default", { timeoutMs: 1 }, {
-      getOrCreateRuntime: async () => createRuntime(session) as any,
-      turnCoordinator,
-      clearAttachments: () => {},
-      takeAttachments: () => [],
-      logsDir: createTestLogsDir(),
-      setActiveForkBaseLeaf: () => {},
-      clearActiveForkBaseLeaf: () => {},
-    });
-
-    await Bun.sleep(0);
-
-    expect(result.status).toBe("success");
-    expect(result.result).toBe("done");
-    expect(abortCalls).toBe(0);
-  } finally {
-    globalThis.clearTimeout = originalClearTimeout;
-  }
+  expect(result.status).toBe("success");
+  expect(result.result).toBe("done");
+  expect(abortCalls).toBe(0);
 });
-
 test("runAgentPrompt suppresses repeated automatic recovery loops for the same error signature", async () => {
   const restoreEnv = setEnv({
     PICLAW_TURN_AUTO_RECOVERY_ENABLED: "1",

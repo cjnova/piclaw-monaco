@@ -318,7 +318,8 @@ function ContextPie({ usage, onCompact, compactionLabel = '', compactionTitle = 
             class=${`compose-context-pie icon-btn${activeCompactionLabel ? ' is-compacting' : ''}`}
             type="button"
             title=${title}
-            aria-label=${activeCompactionLabel ? `Smart compaction ${activeCompactionLabel}` : 'Compact context'}
+            data-tooltip=${title}
+            aria-label=${title}
             onClick=${(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1107,7 +1108,9 @@ export function ComposeBox({
         if (!searchMode) return;
         fetch('/agent/settings-data').then(r => r.json()).then(data => {
             if (data?.searchMatchMode) setSearchMatchMode(data.searchMatchMode);
-        }).catch(() => {});
+        }).catch(() => {
+            setSearchMatchMode((prev) => prev || 'or');
+        });
     }, [searchMode]);
 
     // Fetch dynamic commands from the server for autocomplete
@@ -2362,6 +2365,25 @@ export function ComposeBox({
         setMediaFiles((current) => [...current, ...list]);
         setSubmitError(null);
     };
+
+    // Listen for annotated image attachments from the image annotator
+    useEffect(() => {
+        const onComposeMediaAttach = async (e) => {
+            const mediaId = e?.detail?.mediaId;
+            if (!mediaId) return;
+            try {
+                const { getMediaBlob } = await import('../api.js');
+                const blob = await getMediaBlob(mediaId);
+                const file = new File([blob], `annotated-${mediaId}.png`, { type: blob.type || 'image/png' });
+                setMediaFiles((current) => [...current, file]);
+                textareaRef.current?.focus();
+            } catch (err) {
+                console.warn('[compose-box] Failed to attach annotated image:', err);
+            }
+        };
+        window.addEventListener('piclaw:compose-media-attach', onComposeMediaAttach);
+        return () => window.removeEventListener('piclaw:compose-media-attach', onComposeMediaAttach);
+    }, []);
 
     const handleFileChange = (e) => {
         addMediaFiles(e.target.files);

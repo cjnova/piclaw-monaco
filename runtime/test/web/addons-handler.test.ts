@@ -10,6 +10,7 @@ import {
   handleAddonConfigApiRequest,
   handleGetAddons,
   handleInstallAddon,
+  handleUninstallAddon,
   handleRestartAddonRuntime,
   isAddonFsLockError,
   mergeCatalogs,
@@ -852,4 +853,75 @@ test('handleRestartAddonRuntime returns success and schedules graceful restart',
   } finally {
     delete (globalThis as any).__PICLAW_EXIT_SCHEDULER__;
   }
+});
+
+test('handleUninstallAddon returns concise warning when bun remove resolver output is huge', async () => {
+  await withTempWorkspaceEnv('piclaw-addon-uninstall-warning-', {}, async (workspace) => {
+    const originalFetch = globalThis.fetch;
+    const addonName = '@rcarmo/piclaw-addon-goal';
+    const addonsDir = join(workspace.workspace, '.pi', 'extensions');
+    const installedDir = join(addonsDir, 'node_modules', '@rcarmo', 'piclaw-addon-goal');
+    mkdirSync(installedDir, { recursive: true });
+    writeFileSync(join(addonsDir, 'package.json'), JSON.stringify({
+      name: 'piclaw-local-addons',
+      private: true,
+      dependencies: { [addonName]: 'https://example.invalid/piclaw-addon-goal-0.1.0.tgz' },
+    }, null, 2));
+    writeFileSync(join(installedDir, 'package.json'), JSON.stringify({ name: addonName, version: '0.1.0' }, null, 2));
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('rcarmo/piclaw-addons/main/catalog.json')) {
+        return new Response(JSON.stringify({ source: 'default', addons: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (href.includes('catalog-goal.json')) {
+        return new Response(JSON.stringify({
+          source: 'goal',
+          addons: [{
+            slug: 'goal',
+            name: addonName,
+            version: '0.1.0',
+            description: 'goal',
+            install: { kind: 'tarball', spec: 'https://example.invalid/piclaw-addon-goal-0.1.0.tgz' },
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('not found', { status: 404 });
+    }) as typeof fetch;
+
+    const longResolverOutput = Array.from({ length: 9 }, (_, index) => (
+      `error: GET https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-${index}-0.1.${index}.tgz - 404 error: @rcarmo/piclaw-addon-${index}@https://rcarmo.github.io/piclaw-addons/packages/piclaw-addon-${index}-0.1.${index}.tgz failed to resolve error`
+    )).join('\n');
+
+    setAddonInstallTestHooksForTests({
+      async runBunCommand(args, cwd) {
+        expect(args).toEqual(['bun', 'remove', addonName]);
+        expect(cwd).toBe(addonsDir);
+        return { ok: false, exitCode: 1, stdout: '', stderr: longResolverOutput };
+      },
+    });
+
+    try {
+      const response = await handleUninstallAddon(
+        new Request('https://example.test/agent/addons/uninstall', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: 'goal' }),
+        }),
+        (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+        new URL('https://example.test/agent/addons/uninstall?catalog_url=https://example.com/catalog-goal.json'),
+      );
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data).toEqual(expect.objectContaining({ ok: true, slug: 'goal' }));
+      expect(data.warning).toContain('bun remove failed first (9 dependency resolution errors)');
+      expect(data.warning).toContain('package files were removed manually');
+      expect(data.warning).not.toContain('https://rcarmo.github.io');
+      expect(data.warning.length).toBeLessThan(180);
+    } finally {
+      setAddonInstallTestHooksForTests(null);
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

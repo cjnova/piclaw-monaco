@@ -87,6 +87,59 @@ describe("export timeline endpoint", () => {
     expect(html).toContain('href="https://example.com/path"');
   });
 
+  test("preserves markdown data-image URLs in exported HTML", async () => {
+    const tinySvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"><rect width="12" height="8" fill="red"/></svg>').toString("base64");
+    db.storeMessage({
+      id: "msg-export-data-image",
+      chat_jid: "web:default",
+      sender: "agent",
+      sender_name: "Smith",
+      content: `![chart](data:image/svg+xml;base64,${tinySvg})`,
+      timestamp: "2026-04-21T10:00:00.000Z",
+      is_from_me: true,
+      is_bot_message: true,
+    });
+
+    const response = exportEndpoint.handleExportTimeline(
+      new Request("http://127.0.0.1/internal/export/timeline?chat_jid=web%3Adefault", {
+        headers: { authorization: "Bearer secret123" },
+      }),
+      { runtimeDir, internalSecret: "secret123" },
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(`src="data:image/svg+xml;base64,${tinySvg}"`);
+    expect(html).not.toContain('data-removed-src="unsafe-url"');
+  });
+
+  test("inlines attached images as data URIs for PDF rendering", async () => {
+    const rowId = db.storeMessage({
+      id: "msg-export-attached-image",
+      chat_jid: "web:default",
+      sender: "user",
+      sender_name: "User",
+      content: "attached image",
+      timestamp: "2026-04-21T10:00:00.000Z",
+      is_from_me: false,
+      is_bot_message: false,
+    });
+    const mediaId = db.createMedia("dot.svg", "image/svg+xml", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="5" fill="blue"/></svg>'));
+    db.attachMediaToMessage(rowId, [mediaId]);
+
+    const response = exportEndpoint.handleExportTimeline(
+      new Request("http://127.0.0.1/internal/export/timeline?chat_jid=web%3Adefault", {
+        headers: { authorization: "Bearer secret123" },
+      }),
+      { runtimeDir, internalSecret: "secret123" },
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('src="data:image/svg+xml;base64,');
+    expect(html).not.toContain(`/media/${mediaId}`);
+  });
+
   test("renders printable HTML for the requested chat and last-N range", async () => {
     db.storeMessage({
       id: "msg-export-1",

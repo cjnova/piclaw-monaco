@@ -4,7 +4,8 @@
  *
  * Renders below the CodeMirror editor when activated via tab context menu.
  * Uses the same renderMarkdown() pipeline as the timeline so output is
- * visually consistent. Updates on a debounced timer to avoid jank.
+ * visually consistent. Updates from editor content-change events with a
+ * debounce to avoid re-rendering Markdown on every keystroke.
  *
  * Includes a draggable splitter at the top for resizing.
  */
@@ -13,7 +14,9 @@ import { html, useEffect, useRef, useState } from '../vendor/preact-htm.js';
 import { renderMarkdown, renderMermaidDiagrams } from '../markdown.js';
 import { readStoredPanelHeight, writeStoredPanelHeight } from './markdown-preview-storage.js';
 
-const POLL_MS = 400;
+const RENDER_DEBOUNCE_MS = 120;
+const SUBSCRIBE_RETRY_MS = 100;
+const MAX_RENDER_CHARS = 96 * 1024;
 const MIN_H = 60;
 const DEFAULT_H = 220;
 const LS_KEY = 'mdPreviewHeight';
@@ -27,26 +30,51 @@ function getStoredHeight() {
  *
  * @param {Object} props
  * @param {() => string|undefined} props.getContent - Returns current editor content.
+ * @param {(cb: (content: string) => void) => (() => void)|void} props.subscribeContentChange - Subscribe to editor content changes.
  * @param {string} props.path - File path (for display).
  * @param {() => void} props.onClose - Close the preview.
  */
-export function MarkdownPreview({ getContent, path, onClose }) {
+export function MarkdownPreview({ getContent, subscribeContentChange, path, onClose }) {
     const [renderedHtml, setRenderedHtml] = useState('');
     const [height, setHeight] = useState(getStoredHeight);
     const previewRef = useRef(null);
     const panelRef = useRef(null);
-    const prevTextRef = useRef('');
+    const prevTextRef = useRef(null);
+    const renderTimerRef = useRef(null);
+    const subscribeRetryTimerRef = useRef(null);
     const getContentRef = useRef(getContent);
+    const subscribeContentChangeRef = useRef(subscribeContentChange);
 
-    // Keep ref in sync without restarting effects
+    // Keep refs in sync without restarting effects on parent re-renders.
     getContentRef.current = getContent;
+    subscribeContentChangeRef.current = subscribeContentChange;
 
-    // Single stable interval — reads getContent via ref
+    // Render on editor content-change events instead of polling getContent().
     useEffect(() => {
-        const tick = () => {
-            const text = getContentRef.current?.() || '';
+        let disposed = false;
+
+        const clearPendingRender = () => {
+            if (renderTimerRef.current !== null) {
+                clearTimeout(renderTimerRef.current);
+                renderTimerRef.current = null;
+            }
+        };
+
+        const clearSubscribeRetry = () => {
+            if (subscribeRetryTimerRef.current !== null) {
+                clearTimeout(subscribeRetryTimerRef.current);
+                subscribeRetryTimerRef.current = null;
+            }
+        };
+
+        const renderText = (text) => {
+            if (disposed) return;
             if (text === prevTextRef.current) return;
             prevTextRef.current = text;
+            if (String(text || '').length > MAX_RENDER_CHARS) {
+                setRenderedHtml('<p style="color:var(--text-secondary)">Preview disabled for large documents to keep the editor responsive.</p>');
+                return;
+            }
             try {
                 const h = renderMarkdown(text, null);
                 setRenderedHtml(h);
@@ -54,10 +82,40 @@ export function MarkdownPreview({ getContent, path, onClose }) {
                 setRenderedHtml('<p style="color:var(--text-secondary)">Preview unavailable</p>');
             }
         };
-        tick();
-        const id = setInterval(tick, POLL_MS);
-        return () => clearInterval(id);
-    }, []);
+
+        const scheduleRender = (text) => {
+            clearPendingRender();
+            renderTimerRef.current = setTimeout(() => {
+                renderTimerRef.current = null;
+                renderText(text || '');
+            }, RENDER_DEBOUNCE_MS);
+        };
+
+        let unsubscribe = null;
+        const subscribe = () => {
+            if (disposed || unsubscribe) return;
+            const maybeUnsubscribe = typeof subscribeContentChangeRef.current === 'function'
+                ? subscribeContentChangeRef.current((content) => scheduleRender(content || ''))
+                : null;
+            if (typeof maybeUnsubscribe === 'function') {
+                unsubscribe = maybeUnsubscribe;
+                return;
+            }
+            // The preview can mount before the lazy editor instance is bound.
+            // Retry subscription only; do not poll/serialize editor content.
+            subscribeRetryTimerRef.current = setTimeout(subscribe, SUBSCRIBE_RETRY_MS);
+        };
+
+        renderText(getContentRef.current?.() || '');
+        subscribe();
+
+        return () => {
+            disposed = true;
+            clearPendingRender();
+            clearSubscribeRetry();
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
+    }, [path]);
 
     // Render mermaid diagrams after HTML update
     useEffect(() => {
