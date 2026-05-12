@@ -1105,3 +1105,19 @@ export function shrinkDatabaseMemory(): void {
     db.exec("PRAGMA shrink_memory;");
   } catch (e) { void e; /* best-effort */ }
 }
+
+/**
+ * D3: Reclaim freelist pages without a full VACUUM.
+ * Only useful when auto_vacuum = INCREMENTAL (mode 2). Reclaims up to `maxPages`
+ * freelist pages, shrinking the DB file. Safe to call on startup after bulk deletes.
+ *
+ * @returns Number of freelist pages remaining (0 = fully reclaimed).
+ */
+export function reclaimFreelistPages(maxPages = 1000): number {
+  if (!db) return 0;
+  try {
+    db.exec(`PRAGMA incremental_vacuum(${maxPages});`);
+    const row = db.prepare("PRAGMA freelist_count").get() as { freelist_count: number } | undefined;
+    return row?.freelist_count ?? 0;
+  } catch (e) { void e; return 0; }
+}
