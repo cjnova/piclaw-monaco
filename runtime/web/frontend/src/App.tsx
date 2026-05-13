@@ -22,6 +22,8 @@ import { useTabs } from "./app/useTabs";
 import { TerminalPanel } from "./app/TerminalPanel";
 import { ExtensionFrame } from "./app/ExtensionFrame";
 import { useDialog } from "./hooks/useDialog";
+import { ProviderWizard } from "./components/ProviderWizard";
+import { providerConfigured } from "./app/providerState";
 
 const PANEL_NAMES: Record<string, string> = {
   explorer: "Workspace", search: "Search", extensions: "Addons",
@@ -41,6 +43,7 @@ function AppContent() {
   } = layout;
   const paletteVisible = useSignal(false);
   const statusFlash = useStatusFlash();
+  const wizardDismissed = useSignal<boolean>(!!localStorage.getItem("piclaw_wizard_dismissed"));
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
   const extensionPageHtml = useSignal<string | null>(null);
@@ -118,6 +121,32 @@ function AppContent() {
     return () => window.removeEventListener('piclaw:close-sidebar', onClose);
   }, [sidebarCollapsed]);
 
+  // Listen for piclaw:show-wizard to re-show the wizard (optionally for a specific provider)
+  const wizardProviderId = useSignal<string | undefined>(undefined);
+  useEffect(() => {
+    const onShowWizard = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      wizardProviderId.value = detail?.providerId ?? undefined;
+      wizardDismissed.value = false;
+      // If the settings panel is active, navigate away so the wizard can be seen
+      if (activePanel.value === "settings") {
+        activePanel.value = previousPanel.value || "agent";
+        sidebarCollapsed.value = true;
+      }
+    };
+    window.addEventListener('piclaw:show-wizard', onShowWizard);
+    return () => window.removeEventListener('piclaw:show-wizard', onShowWizard);
+  }, [wizardDismissed, wizardProviderId, activePanel, previousPanel, sidebarCollapsed]);
+
+  // Listen for piclaw:check-provider — trigger a status re-poll
+  useEffect(() => {
+    const onCheck = () => {
+      window.dispatchEvent(new CustomEvent('piclaw:sse-connected'));
+    };
+    window.addEventListener('piclaw:check-provider', onCheck);
+    return () => window.removeEventListener('piclaw:check-provider', onCheck);
+  }, []);
+
   // Clock: align to next full minute, then tick every 60s
   useEffect(() => {
     const tick = () => { clockText.value = formatClock(new Date()); };
@@ -151,6 +180,8 @@ function AppContent() {
   const isWidgetActive = hasWidgetTab && tabs.value.some((t) => t.id === activeTabId.value && t.type === "widget");
   const isTerminalActive = activeTabId.value === "terminal";
   const hasTerminalTab = tabs.value.some((t) => t.type === "terminal");
+  const showWizard = (providerConfigured.value === false || wizardProviderId.value) && !wizardDismissed.value;
+  const handleWizardDismiss = useCallback(() => { wizardDismissed.value = true; }, [wizardDismissed]);
 
   return (
     <div className="app-layout">
@@ -196,7 +227,11 @@ function AppContent() {
                   ) : (
                     <>
                       <div className={isWidgetActive || isTerminalActive ? "app-layout__tab-content--hidden" : "app-layout__tab-content"}>
-                        <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
+                        {showWizard ? (
+                          <ProviderWizard onDismiss={() => { handleWizardDismiss(); wizardProviderId.value = undefined; }} providerId={wizardProviderId.value} />
+                        ) : (
+                          <ChatPanel onOpenPalette={() => { paletteVisible.value = true; }} />
+                        )}
                       </div>
                       {hasTerminalTab && (
                         <div className={isTerminalActive ? "app-layout__tab-content" : "app-layout__tab-content--hidden"}>

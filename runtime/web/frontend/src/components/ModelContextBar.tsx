@@ -6,6 +6,7 @@ import { useModelPicker } from "./model-context-bar/useModelPicker";
 import { ModelPicker } from "./model-context-bar/ModelPicker";
 import { ThinkingPicker } from "./model-context-bar/ThinkingPicker";
 import { ContextRing } from "./model-context-bar/ContextRing";
+import { providerConfigured } from "../app/providerState";
 
 export function ModelContextBar() {
   const {
@@ -54,6 +55,18 @@ export function ModelContextBar() {
       data-model-picker
       className={`model-badge-wrapper${isStale.value ? " model-badge-wrapper--stale" : ""}`}
     >
+      {providerConfigured.value === false && (
+        <span
+          className="no-provider-badge"
+          role="button"
+          tabIndex={0}
+          title="No AI provider configured — click to set up"
+          onClick={() => window.dispatchEvent(new CustomEvent("piclaw:show-wizard"))}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.dispatchEvent(new CustomEvent("piclaw:show-wizard")); } }}
+        >
+          ⚠ No provider
+        </span>
+      )}
       {showPicker.value && (
         <ModelPicker
           models={models.value ?? []}

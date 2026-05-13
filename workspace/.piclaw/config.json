@@ -8,12 +8,16 @@
     "backoffBaseMs": 900000,
     "backoffMaxMs": 21600000,
     "progressWatchdogEnabled": false,
-    "progressWatchdogTimeoutMs": 120000
+    "progressWatchdogTimeoutMs": 120000,
+    "toolResultCompactionEnabled": true
   },
   "sessionMaxSizeMb": 32,
   "sessionAutoRotate": true,
   "web": {
     "terminalEnabled": true,
     "widgetToken": "2CRc7jlrA8xGzOn-G5YO6nzZflhnJoU-LQhfGwtiyzg"
+  },
+  "models": {
+    "scopedModelsOnly": false
   }
 }
