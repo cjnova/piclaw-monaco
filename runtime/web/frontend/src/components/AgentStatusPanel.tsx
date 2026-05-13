@@ -6,7 +6,7 @@ interface PanelState {
   expanded: boolean;
 }
 
-const COLLAPSED_MAX_CHARS = 800;
+const COLLAPSED_MAX_CHARS = 200;
 const STORAGE_KEY = "piclaw:agent-panel-prefs";
 
 function loadPanelPrefs(): { draftExpanded: boolean; thoughtExpanded: boolean } {
@@ -342,9 +342,6 @@ export function AgentStatusPanel() {
                     </span>
                   )}
                 </div>
-                <span className={`agent-status-card__tool-badge agent-status-card__tool-badge--${tool.status}`}>
-                  {tool.status === "running" ? "working" : "done"}
-                </span>
               </div>
             ))}
             {!toolsExpanded && tools.length > 3 && (
@@ -424,6 +421,7 @@ interface AgentPanelProps {
 
 function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle }: AgentPanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const canTruncate = text.length > COLLAPSED_MAX_CHARS;
   const { visible, truncated } = expanded
     ? { visible: text, truncated: false }
     : truncate(text, COLLAPSED_MAX_CHARS);
@@ -447,8 +445,8 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle }: Agen
         {elapsed > 0 && (
           <span className="agent-status-card__timer">{elapsed}s</span>
         )}
-        {(expanded || truncated) && (
-          <span className="agent-status-card__toggle" aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`}>
+        {canTruncate && (
+          <span className="agent-status-card__toggle" aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`} onClick={onToggle}>
             {expanded ? <span className="agent-status-card__toggle-label">▾ less</span> : <span className="agent-status-card__toggle-label">▸ more…</span>}
           </span>
         )}

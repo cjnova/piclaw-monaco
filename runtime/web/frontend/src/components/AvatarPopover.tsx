@@ -8,25 +8,6 @@ interface AvatarPopoverProps {
   onDismiss: () => void;
 }
 
-async function patchSettings(body: Record<string, unknown>) {
-  const res = await fetch("/agent/settings/general", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-async function fetchGithubAvatar(handle: string): Promise<{ name: string; avatar: string }> {
-  const res = await fetch(`https://api.github.com/users/${encodeURIComponent(handle)}`, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) throw new Error("GitHub user not found");
-  const data = await res.json() as { name?: string; avatar_url?: string };
-  return { name: data.name || handle, avatar: data.avatar_url || "" };
-}
 
 function bustAvatarCache(type: "user" | "agent", url: string) {
   const buster = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
