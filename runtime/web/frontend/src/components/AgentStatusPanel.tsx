@@ -65,6 +65,7 @@ export function AgentStatusPanel() {
   const [status, setStatus] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [tools, setTools] = useState<ToolCall[]>([]);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
   const [elapsed, setElapsed] = useState({ draft: 0, thought: 0, tools: 0 });
 
   // #320 Recovery substates
@@ -218,6 +219,7 @@ export function AgentStatusPanel() {
       setStatus(null);
       setStatusText("");
       setTools([]);
+      setToolsExpanded(false);
       // Reset recovery and watchdog state
       setRecoveryState(null);
       setRecoveryDetail("");
@@ -304,38 +306,49 @@ export function AgentStatusPanel() {
       )}
 
       {tools.length > 0 && (
-        <div className="agent-status-panel__tools">
-          <div className="agent-status-panel__tools-header">
-            <span>Tools</span>
+        <div className="agent-status-card agent-status-card--tools">
+          <div className="agent-status-card__header" onClick={() => setToolsExpanded(prev => !prev)}>
+            <span className="agent-status-card__dot agent-status-card__dot--tools" />
+            <span className="agent-status-card__title">Tools ({tools.length})</span>
             {elapsed.tools > 0 && (
-              <span className="agent-status-panel__elapsed">{elapsed.tools}s</span>
+              <span className="agent-status-card__timer">{elapsed.tools}s</span>
+            )}
+            <span className="agent-status-card__toggle">{!toolsExpanded && <span className="agent-status-card__toggle-label">more…</span>}{toolsExpanded ? "▾" : "▸"}</span>
+          </div>
+          <div className={`agent-status-card__content${toolsExpanded ? "" : " agent-status-card__content--collapsed"}`}>
+            {(toolsExpanded ? tools : tools.slice(-3)).map((tool) => (
+              <div key={tool.id} className={`agent-status-card__tool-item agent-status-card__tool-item--${tool.status}`}>
+                <div className="agent-status-card__tool-indicator">
+                  {tool.status === "running" ? (
+                    <span className="agent-status-card__tool-spinner" />
+                  ) : (
+                    <span className="agent-status-panel__tool-check">✓</span>
+                  )}
+                </div>
+                <div className="agent-status-panel__tool-info">
+                  <span className="agent-status-panel__tool-title">{tool.title}</span>
+                  {tool.hints.length > 0 && (
+                    <span className="agent-status-panel__tool-context">
+                      {tool.hints.map((hint) => (
+                        <span key={hint.key} className="agent-status-panel__tool-hint" title={hint.title || hint.label}>
+                          <span className="agent-status-panel__tool-hint-icon" dangerouslySetInnerHTML={{ __html: sanitizeSvg(hint.icon_svg) }} />
+                          <span>{hint.label}</span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+                <span className={`agent-status-card__tool-badge agent-status-card__tool-badge--${tool.status}`}>
+                  {tool.status === "running" ? "working" : "done"}
+                </span>
+              </div>
+            ))}
+            {!toolsExpanded && tools.length > 3 && (
+              <button type="button" className="agent-status-card__more-btn" onClick={() => setToolsExpanded(true)}>
+                +{tools.length - 3} more…
+              </button>
             )}
           </div>
-          {tools.map((tool) => (
-            <div key={tool.id} className={`agent-status-panel__tool agent-status-panel__tool--${tool.status}`}>
-              <div className="agent-status-panel__tool-indicator">
-                {tool.status === "running" ? (
-                  <div className="agent-status-panel__spinner" />
-                ) : (
-                  <span className="agent-status-panel__tool-check">✓</span>
-                )}
-              </div>
-              <div className="agent-status-panel__tool-info">
-                <span className="agent-status-panel__tool-title">{tool.title}</span>
-                {tool.hints.length > 0 && (
-                  <span className="agent-status-panel__tool-context">
-                    {tool.hints.map((hint) => (
-                      <span key={hint.key} className="agent-status-panel__tool-hint" title={hint.title || hint.label}>
-                        <span className="agent-status-panel__tool-hint-icon" dangerouslySetInnerHTML={{ __html: sanitizeSvg(hint.icon_svg) }} />
-                        <span>{hint.label}</span>
-                      </span>
-                    ))}
-                  </span>
-                )}
-
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
@@ -374,7 +387,7 @@ export function AgentStatusPanel() {
       {thought.text && (
         <AgentPanel
           title="Thoughts"
-          titleClass="agent-status-panel__title--thought"
+          type="thought"
           text={thought.text}
           expanded={thought.expanded}
           elapsed={elapsed.thought}
@@ -385,7 +398,7 @@ export function AgentStatusPanel() {
       {draft.text && (
         <AgentPanel
           title="Draft"
-          titleClass="agent-status-panel__title--draft"
+          type="draft"
           text={draft.text}
           expanded={draft.expanded}
           elapsed={elapsed.draft}
@@ -398,14 +411,14 @@ export function AgentStatusPanel() {
 
 interface AgentPanelProps {
   title: string;
-  titleClass?: string;
+  type: "draft" | "thought";
   text: string;
   expanded: boolean;
   elapsed?: number;
   onToggle: () => void;
 }
 
-function AgentPanel({ title, titleClass, text, expanded, elapsed = 0, onToggle }: AgentPanelProps) {
+function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle }: AgentPanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const { visible, truncated } = expanded
     ? { visible: text, truncated: false }
@@ -423,34 +436,24 @@ function AgentPanel({ title, titleClass, text, expanded, elapsed = 0, onToggle }
   }, [visible]);
 
   return (
-    <div className="agent-status-panel__section">
-      <div className={`agent-status-panel__title ${titleClass || ""}`} onClick={onToggle} style={{ cursor: "pointer" }}>
-        <button
-          type="button"
-          className="agent-status-panel__toggle"
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`}
-        >
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            {expanded
-              ? <polyline points="4 6 8 10 12 6" />
-              : <polyline points="6 4 10 8 6 12" />
-            }
-          </svg>
-        </button>
-        <span className="agent-status-panel__dot" aria-hidden="true" />
-        <span>{title}</span>
+    <div className={`agent-status-card agent-status-card--${type}`}>
+      <div className="agent-status-card__header" onClick={onToggle}>
+        <span className={`agent-status-card__dot agent-status-card__dot--${type}`} aria-hidden="true" />
+        <span className="agent-status-card__title">{title}</span>
         {elapsed > 0 && (
-          <span className="agent-status-panel__elapsed">{elapsed}s</span>
+          <span className="agent-status-card__timer">{elapsed}s</span>
         )}
+        <span className="agent-status-card__toggle" aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`}>
+          {!expanded && <span className="agent-status-card__toggle-label">more…</span>}{expanded ? "▾" : "▸"}
+        </span>
       </div>
       <div
-        className={`agent-status-panel__body ${expanded ? "agent-status-panel__body--expanded" : ""}`}
+        className={`agent-status-card__content${expanded ? "" : " agent-status-card__content--collapsed"}`}
         ref={contentRef}
       />
       {!expanded && truncated && (
         <button type="button" className="agent-status-panel__more" onClick={onToggle}>
-          ▸ more
+          <span className="agent-status-card__more">more…</span>
         </button>
       )}
       {expanded && text.length > COLLAPSED_MAX_CHARS && (
