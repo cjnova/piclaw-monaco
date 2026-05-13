@@ -1,6 +1,8 @@
 import { useState } from "preact/hooks";
 import { ImageLightbox } from "../ImageLightbox";
 import { AttachmentChip } from "../AttachmentChip";
+import { DelimitedTable } from "./DelimitedTable";
+import { isDelimitedFile } from "../../utils/delimited-preview";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
 import { relativeTime, getBlockKey } from "./helpers";
 import { MessageActionBar } from "./MessageActionBar";
@@ -141,11 +143,18 @@ export function MessageItem({
         {attachments.length > 0 && (
           <div className="message-list__attachments">
             {attachments.map((attachment, idx) => (
-              <AttachmentChip
-                key={`${attachment.mediaId}-${attachment.filename}-${idx}`}
-                mediaId={attachment.mediaId}
-                filename={attachment.filename}
-              />
+              <div key={`${attachment.mediaId}-${attachment.filename}-${idx}`}>
+                <AttachmentChip
+                  mediaId={attachment.mediaId}
+                  filename={attachment.filename}
+                />
+                {isDelimitedFile(attachment.filename) && (
+                  <DelimitedTable
+                    mediaId={attachment.mediaId}
+                    filename={attachment.filename}
+                  />
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -278,7 +287,7 @@ export function MessageItem({
             postId={interaction.id}
           />
         )}
-        {interaction.content_blocks?.some((b: Record<string, unknown>) => b.type === "file") && (
+        {!isUser && interaction.content_blocks?.some((b: Record<string, unknown>) => b.type === "file") && (
           <div className="message-list__attachments">
             {interaction.content_blocks
               .filter((b: Record<string, unknown>) => b.type === "file")
@@ -286,6 +295,7 @@ export function MessageItem({
                 const filename = String(b.filename ?? b.name ?? "file");
                 const mediaId = interaction.media_ids?.[i];
                 return (
+                  <>
                   <span key={i} className="attachment-chip">
                     <span className="attachment-chip__icon">📄</span>
                     <span className="attachment-chip__name">{filename}</span>
@@ -361,6 +371,10 @@ export function MessageItem({
                       </>
                     )}
                   </span>
+                  {mediaId && isDelimitedFile(filename) && (
+                    <DelimitedTable mediaId={mediaId} filename={filename} />
+                  )}
+                  </>
                 );
               })}
           </div>
