@@ -1,5 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { type SettingsData } from "./types";
+import { AvatarSection } from "./AvatarSection";
 
 export function AppearanceSection({
   data,
@@ -48,6 +49,8 @@ export function AppearanceSection({
           }
         />
       </div>
+
+      <AvatarSection />
     </section>
   );
 }

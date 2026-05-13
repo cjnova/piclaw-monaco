@@ -6516,3 +6516,14 @@ pre.frontmatter-block {
   opacity: 1;
   background: color-mix(in srgb, #f9e2af 12%, transparent);
 }
+
+/* Avatar popover */
+.message-list__avatar-clickable { cursor: pointer; }
+.avatar-popover { position: fixed; z-index: 1000; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); min-width: 180px; }
+.avatar-popover__title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.avatar-popover__btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); cursor: pointer; margin-bottom: 6px; }
+.avatar-popover__btn:hover { background: var(--bg-sidebar); }
+.avatar-popover__btn--small { width: auto; min-width: 48px; justify-content: center; margin-bottom: 0; }
+.avatar-popover__github { display: flex; gap: 6px; align-items: center; }
+.avatar-popover__input { flex: 1; padding: 4px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); }
+.avatar-popover__status { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
