@@ -8,6 +8,7 @@ export {
   parseSshFlag,
   parseSshPort,
   parseStrictHostKeyCheckingMode,
+  pullRemoteFileForChat,
   registerLiveChatSshSession,
   resolveRemoteTarget,
   resolveSshCoreConfigFromChatConfig,

@@ -291,7 +291,7 @@ describe("ssh-core extension registration", () => {
 
     sshCoreExtension(fake.api);
 
-    expect(Array.from(fake.state.tools.keys())).toEqual(["read", "write", "edit", "bash"]);
+    expect(Array.from(fake.state.tools.keys())).toEqual(["read", "write", "edit", "bash", "local_bash"]);
     expect(fake.state.flags.has("ssh")).toBe(true);
     expect(fake.state.flags.has("ssh-port")).toBe(true);
     expect(fake.state.flags.has("p")).toBe(true);

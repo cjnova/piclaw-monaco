@@ -8,6 +8,7 @@
  * Reads the current chat JID from AsyncLocalStorage/env at execution time.
  */
 import { basename, resolve, relative, isAbsolute } from "path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Type, type Static } from "typebox";
 import type {
   AgentToolResult,
@@ -21,6 +22,7 @@ import { WORKSPACE_DIR } from "../core/config.js";
 import { AttachmentRegistry, getAttachmentRegistry } from "../agent-pool/attachments.js";
 import { getChatJid } from "../core/chat-context.js";
 import { createLogger, debugSuppressedError } from "../utils/logger.js";
+import { pullRemoteFileForChat } from "./ssh-core.js";
 
 const log = createLogger("extensions.file-attachments");
 
@@ -139,16 +141,36 @@ async function execute(
   }
 
   const file = Bun.file(resolved);
-  if (!(await file.exists())) {
-    return { content: [{ type: "text", text: `File not found: ${params.path}` }], details: {} };
+  let fileData: Uint8Array | null = null;
+  let fileSize: number;
+  let pulledRemotely = false;
+
+  if (await file.exists()) {
+    fileData = new Uint8Array(await file.arrayBuffer());
+    fileSize = file.size;
+  } else {
+    // Attempt remote pull via active SSH session
+    const chatJid = getChatJid("web:default");
+    const remoteData = await pullRemoteFileForChat(chatJid, resolved);
+    if (!remoteData) {
+      return { content: [{ type: "text", text: `File not found: ${params.path}` }], details: {} };
+    }
+    // Write to local workspace/tmp for the attachment flow
+    const tmpDir = resolve(WORKSPACE_DIR, "tmp");
+    mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = resolve(tmpDir, basename(resolved));
+    writeFileSync(tmpPath, remoteData);
+    fileData = new Uint8Array(remoteData);
+    fileSize = remoteData.length;
+    pulledRemotely = true;
   }
 
   const filename = params.name || basename(resolved);
   startAttachmentProgress(ctx, `Attachment: uploading ${filename}…`);
   try {
-    const data = new Uint8Array(await file.arrayBuffer());
+    const data = fileData!;
     const contentType = detectContentType(resolved, params.content_type);
-    const size = file.size;
+    const size = fileSize!;
     const kind: AttachmentKind = params.kind || (contentType.startsWith("image/") ? "image" : "file");
 
     const mediaId = createMedia(filename, contentType, data, null, { size, source_path: resolved, kind });
@@ -162,9 +184,10 @@ async function execute(
       sourcePath: resolved,
     });
 
+    const remoteNote = pulledRemotely ? " (pulled from remote host via SSH)" : "";
     return {
-      content: [{ type: "text", text: `Attached "${filename}" (${Math.round(size / 1024)} KB). A download card will appear in the chat automatically.` }],
-      details: { filename, content_type: contentType, size, kind },
+      content: [{ type: "text", text: `Attached "${filename}" (${Math.round(size / 1024)} KB)${remoteNote}. A download card will appear in the chat automatically.` }],
+      details: { filename, content_type: contentType, size, kind, pulled_remotely: pulledRemotely },
     };
   } finally {
     finishAttachmentProgress(ctx);

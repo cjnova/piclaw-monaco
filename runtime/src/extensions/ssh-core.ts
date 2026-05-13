@@ -749,10 +749,32 @@ export function createSshAwareBashOperations(chatJid: string, fallback: BashOper
   return {
     exec: async (command, cwd, options) => {
       const state = getLiveChatSshState(chatJid);
-      if (!state?.transport) return fallback.exec(command, cwd, options);
-      return createRemoteBashOps(state.transport).exec(command, cwd, options);
+      if (!state?.transport) {
+        const result = await fallback.exec(command, cwd, options);
+        options.onData(Buffer.from("\n[Executed locally]\n", "utf-8"));
+        return result;
+      }
+      const result = await createRemoteBashOps(state.transport).exec(command, cwd, options);
+      const target = state.connection?.sshTarget ?? "remote";
+      options.onData(Buffer.from(`\n[Executed remotely via SSH: ${target}]\n`, "utf-8"));
+      return result;
     },
   };
+}
+
+/**
+ * Pull a file from the remote host via the live SSH transport for a chat.
+ * Returns the file content as a Buffer, or null if no SSH session is active.
+ */
+export async function pullRemoteFileForChat(chatJid: string, remotePath: string): Promise<Buffer | null> {
+  const state = getLiveChatSshState(chatJid);
+  if (!state?.transport || !state.connection) return null;
+  try {
+    const mapped = mapLocalPathToRemote(remotePath, state.connection);
+    return await state.transport.readFile(mapped);
+  } catch {
+    return null;
+  }
 }
 
 function writeSecretFile(path: string, content: string): void {
@@ -1120,6 +1142,14 @@ function registerSshCoreExtension(pi: ExtensionAPI, resolveConfig: (pi: Extensio
     },
   });
 
+  pi.registerTool({
+    ...localBash,
+    name: "local_bash",
+    label: "local_bash",
+    description: "Execute a bash command locally, bypassing active SSH redirection. Use when you need to run something on the host even while SSH is active.",
+    promptSnippet: "local_bash: run a command on the local host, ignoring SSH profile.",
+  });
+
   pi.on("session_start", async (_event, ctx) => {
     const resolvedConfig = resolveConfig(pi);
     if (!resolvedConfig) return;
@@ -1271,6 +1301,14 @@ export function createChatSshCoreExtension(
         const tool = createBashTool(localCwd, { operations: createRemoteBashOps(state.transport) });
         return tool.execute(id, params, signal, onUpdate);
       },
+    });
+
+    pi.registerTool({
+      ...localBash,
+      name: "local_bash",
+      label: "local_bash",
+      description: "Execute a bash command locally, bypassing active SSH redirection. Use when you need to run something on the host even while SSH is active.",
+      promptSnippet: "local_bash: run a command on the local host, ignoring SSH profile.",
     });
 
     pi.on("session_start", async (_event, ctx) => {
