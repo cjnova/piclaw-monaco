@@ -313,7 +313,11 @@ export function AgentStatusPanel() {
             {elapsed.tools > 0 && (
               <span className="agent-status-card__timer">{elapsed.tools}s</span>
             )}
-            <span className="agent-status-card__toggle">{!toolsExpanded && tools.length > 3 && <span className="agent-status-card__toggle-label">more…</span>}{toolsExpanded ? "▾" : (tools.length > 3 ? "▸" : "")}</span>
+            {(toolsExpanded || tools.length > 3) && (
+              <span className="agent-status-card__toggle">
+                {toolsExpanded ? <span className="agent-status-card__toggle-label">▾ less</span> : <span className="agent-status-card__toggle-label">▸ more…</span>}
+              </span>
+            )}
           </div>
           <div className={`agent-status-card__content${toolsExpanded ? "" : " agent-status-card__content--collapsed"}`}>
             {(toolsExpanded ? tools : tools.slice(-3)).map((tool) => (
@@ -443,9 +447,11 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle }: Agen
         {elapsed > 0 && (
           <span className="agent-status-card__timer">{elapsed}s</span>
         )}
-        <span className="agent-status-card__toggle" aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`}>
-          {!expanded && truncated && <span className="agent-status-card__toggle-label">more…</span>}{expanded ? "▾" : (!expanded && truncated ? "▸" : "")}
-        </span>
+        {(expanded || truncated) && (
+          <span className="agent-status-card__toggle" aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`}>
+            {expanded ? <span className="agent-status-card__toggle-label">▾ less</span> : <span className="agent-status-card__toggle-label">▸ more…</span>}
+          </span>
+        )}
       </div>
       <div
         className={`agent-status-card__content${expanded ? "" : " agent-status-card__content--collapsed"}`}
