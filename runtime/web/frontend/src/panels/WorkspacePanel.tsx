@@ -92,6 +92,16 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
 
 // ─── WorkspacePanel ──────────────────────────────────────────────────────────
 
+const SHOW_HIDDEN_KEY = "workspaceShowHidden";
+
+function loadShowHidden(): boolean {
+  try {
+    const raw = localStorage.getItem(SHOW_HIDDEN_KEY);
+    if (raw !== null) return raw !== "false";
+  } catch {}
+  return true;
+}
+
 export function WorkspacePanel() {
   const [topHeight, setTopHeight] = useState(() => Number(safeGetItem("piclaw-workspace-split")) || 260);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +109,9 @@ export function WorkspacePanel() {
   const heightRef = useRef(topHeight);
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [treeVersion, setTreeVersion] = useState(0);
+  const [showHidden, setShowHidden] = useState<boolean>(loadShowHidden);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [reindexing, setReindexing] = useState(false);
 
   useEffect(() => {
     if (topPaneRef.current) {
@@ -110,6 +123,34 @@ export function WorkspacePanel() {
     setTreeVersion((current) => current + 1);
     setSelectedNode(payload.nextNode);
   }, []);
+
+  const handleToggleHidden = useCallback(() => {
+    setShowHidden((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(SHOW_HIDDEN_KEY, String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const handleReindex = useCallback(async () => {
+    if (reindexing) return;
+    setReindexing(true);
+    try {
+      const res = await fetch("/workspace/reindex", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "all" }),
+      });
+      setRefreshKey((k) => k + 1);
+      const msg = res.ok ? "Workspace reindexed" : "Reindex failed";
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: msg } }));
+    } catch {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Reindex error" } }));
+    } finally {
+      setReindexing(false);
+    }
+  }, [reindexing]);
 
   const onDragStart = useCallback((e: MouseEvent) => {
     e.preventDefault();
@@ -140,8 +181,24 @@ export function WorkspacePanel() {
   return (
     <div ref={containerRef} className="workspace">
       <div className="workspace__pane-top" ref={topPaneRef}>
-        <div className="workspace__section-header workspace__section-header--padded">Files</div>
-        <FileTree key={treeVersion} onFileSelect={setSelectedNode} />
+        <div className="workspace__section-header workspace__section-header--padded" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>Files</span>
+          <div className="workspace__files-toolbar">
+            <button
+              className={`workspace__files-toolbar-icon codicon codicon-list-filter${!showHidden ? " workspace__files-toolbar-icon--active" : ""}`}
+              title={showHidden ? "Hide dotfiles" : "Show dotfiles"}
+              onClick={handleToggleHidden}
+              aria-pressed={!showHidden}
+            />
+            <button
+              className={`workspace__files-toolbar-icon codicon codicon-refresh${reindexing ? " workspace__files-toolbar-icon--spinning" : ""}`}
+              title="Refresh &amp; reindex"
+              onClick={handleReindex}
+              disabled={reindexing}
+            />
+          </div>
+        </div>
+        <FileTree key={`${treeVersion}-${refreshKey}`} onFileSelect={setSelectedNode} showHidden={showHidden} />
       </div>
       <div
         className="workspace__drag-handle"
