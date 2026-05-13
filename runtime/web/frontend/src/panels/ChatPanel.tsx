@@ -114,7 +114,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         credentials: "same-origin",
         body: JSON.stringify({ content: "/abort" }),
       });
+      // Clear stale tool/thought/draft panels immediately
+      window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
+      window.dispatchEvent(
+        new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
+      );
     } catch {
+      window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
+      window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
       window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to abort", type: "error" } }));
     }
   };
