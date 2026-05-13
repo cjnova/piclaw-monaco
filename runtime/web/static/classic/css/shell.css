@@ -5458,6 +5458,18 @@ pre.frontmatter-block {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── #320 Recovery substates ─────────────────────── */
+.agent-status__recovery-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; margin-top: 6px; }
+.agent-status__recovery-pill--compacting { background: rgba(249, 226, 175, 0.15); color: #f9e2af; }
+.agent-status__recovery-pill--retrying   { background: rgba(249, 226, 175, 0.15); color: #f9e2af; }
+.agent-status__recovery-pill--recovering { background: rgba(250, 179, 135, 0.15); color: #fab387; }
+.agent-status__recovery-pill--blocked    { background: rgba(243, 139, 168, 0.15); color: #f38ba8; }
+.agent-status__recovery-pill--error      { background: rgba(243, 139, 168, 0.15); color: #f38ba8; }
+
+/* ── #319 Operator controls ──────────────────────── */
+.agent-status__abort-btn { padding: 3px 10px; font-size: 11px; border-radius: 6px; border: 1px solid var(--error, #f38ba8); background: transparent; color: var(--error, #f38ba8); cursor: pointer; margin-left: 8px; }
+.agent-status__abort-btn:hover { background: rgba(243, 139, 168, 0.15); }
+
 /* ── Adaptive Cards ─────────────────────────────── */
 .message-list__adaptive-cards {
   margin: 8px 0;
