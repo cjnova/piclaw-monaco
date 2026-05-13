@@ -1879,3 +1879,13 @@
     border-color: var(--accent-color);
 }
 
+
+/* ── Delimited file preview table ─────────────────────────────────────────── */
+.delimited-table { margin: 8px 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); font-size: 12px; width: 100%; align-self: flex-start; }
+.delimited-table__header { padding: 6px 10px; background: var(--bg-elevated); color: var(--text-muted); font-size: 11px; }
+.delimited-table__scroll { max-height: 300px; overflow: auto; }
+.delimited-table__grid { width: 100%; border-collapse: collapse; }
+.delimited-table__grid th { position: sticky; top: 0; background: var(--bg-elevated); color: var(--text); padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
+.delimited-table__grid td { padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--text-soft); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.delimited-table__grid tr:hover td { background: var(--bg-elevated); }
+.delimited-table__footer { padding: 4px 10px; background: var(--bg-elevated); color: var(--text-muted); font-size: 11px; text-align: center; }
