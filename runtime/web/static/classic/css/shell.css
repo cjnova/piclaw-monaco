@@ -2220,6 +2220,7 @@ body {
   white-space: pre-wrap;
   overflow-x: auto;
   max-width: 100%;
+  min-width: 0;
 }
 
 .message--highlighted {
@@ -2257,8 +2258,8 @@ body {
   border-collapse: collapse;
   table-layout: auto;
   margin: 8px 0;
-  width: 100%;
-  max-width: 100%;
+  width: max-content;
+  min-width: 100%;
   font-size: var(--font-size-sm);
 }
 
@@ -5470,6 +5471,103 @@ pre.frontmatter-block {
 .agent-status__abort-btn { padding: 3px 10px; font-size: 11px; border-radius: 6px; border: 1px solid var(--error, #f38ba8); background: transparent; color: var(--error, #f38ba8); cursor: pointer; margin-left: 8px; }
 .agent-status__abort-btn:hover { background: rgba(243, 139, 168, 0.15); }
 
+/* ── #353 Card-style status panels ──────────────── */
+.agent-status-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated, var(--overlay-white-03));
+  margin: 4px 0;
+  overflow: hidden;
+  animation: agentFadeIn 0.2s ease-out;
+}
+.agent-status-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+.agent-status-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.agent-status-card__dot--draft   { background: #fab387; }
+.agent-status-card__dot--thought  { background: #cba6f7; }
+.agent-status-card__dot--tools    { background: #89b4fa; }
+.agent-status-card__title { flex: 1; }
+.agent-status-card__timer  { color: var(--text-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.agent-status-card__toggle { font-size: 28px; padding: 2px 10px; cursor: pointer; min-width: 36px; text-align: center; line-height: 1; display: inline-flex; align-items: center; gap: 2px; }
+.agent-status-card__toggle-label { font-size: 11px; font-weight: 400; line-height: 1; }
+.agent-status-card--tools .agent-status-card__toggle { color: #89b4fa; }
+.agent-status-card--thought .agent-status-card__toggle { color: #cba6f7; }
+.agent-status-card--draft .agent-status-card__toggle { color: #fab387; }
+.agent-status-card__more-btn { display: block; width: 100%; padding: 4px 10px; font-size: 11px; color: var(--accent); background: none; border: none; border-top: 1px solid var(--border); cursor: pointer; text-align: center; }
+.agent-status-card__more-btn:hover { background: rgba(137, 180, 250, 0.1); }
+.agent-status-card__content {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-soft, var(--text-muted));
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono, monospace);
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+  border-top: 1px solid var(--border);
+  line-height: 1.4;
+}
+.agent-status-card__content--collapsed {
+  max-height: 80px;
+  overflow: hidden;
+}
+.agent-status-card__more {
+  color: var(--accent);
+  cursor: pointer;
+  font-style: italic;
+}
+.agent-status-card__tool-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--text);
+  transition: opacity 0.3s;
+}
+.agent-status-card__tool-item--done {
+  opacity: 0.7;
+}
+.agent-status-card__tool-indicator {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.agent-status-card__tool-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: agentSpin 0.8s linear infinite;
+  display: inline-block;
+}
+.agent-status-card__tool-check {
+  color: #a6e3a1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ── Adaptive Cards ─────────────────────────────── */
 .message-list__adaptive-cards {
   margin: 8px 0;
@@ -6516,3 +6614,6 @@ pre.frontmatter-block {
   opacity: 1;
   background: color-mix(in srgb, #f9e2af 12%, transparent);
 }
+.agent-status-card__tool-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500; margin-left: auto; flex-shrink: 0; }
+.agent-status-card__tool-badge--running { background: rgba(137, 180, 250, 0.15); color: #89b4fa; }
+.agent-status-card__tool-badge--done { background: rgba(166, 227, 161, 0.15); color: #a6e3a1; }
