@@ -64,6 +64,7 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
   const errorMsg = useSignal<string | null>(null);
   const activeProvider = useSignal<string>(providerId ?? "");
   const oauthUrl = useSignal<string | null>(null);
+  const oauthInstructions = useSignal<string | null>(null);
   const apiKeyInput = useSignal<string>("");
   const providers = useSignal<Provider[]>([]);
   const selectedApiProvider = useSignal<string>("");
@@ -97,6 +98,7 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
     errorMsg.value = null;
     activeProvider.value = id;
     oauthUrl.value = null;
+    oauthInstructions.value = null;
 
     try {
       const result = await sendCommand(`/login __step1method ${JSON.stringify({ provider: id, action: "oauth" })}`);
@@ -125,6 +127,20 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
         errorMsg.value = result.message || "Failed to start OAuth flow.";
         step.value = "error";
         return;
+      }
+      // Extract instructions (device code) from adaptive card TextBlock with isSubtle
+      if (result.contentBlocks) {
+        for (const block of result.contentBlocks) {
+          const payload = block.payload as Record<string, unknown> | undefined;
+          const bodyItems = (payload?.body ?? []) as Array<Record<string, unknown>>;
+          for (const item of bodyItems) {
+            if (item.type === "TextBlock" && item.isSubtle && typeof item.text === "string" && item.text.length > 0) {
+              oauthInstructions.value = item.text;
+              break;
+            }
+          }
+          if (oauthInstructions.value) break;
+        }
       }
       step.value = "oauth-waiting";
     } catch (err) {
@@ -387,6 +403,11 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
                   Open sign-in page ↗
                 </a>
               </p>
+            )}
+            {oauthInstructions.value && (
+              <div className="provider-wizard__device-code">
+                <p>{oauthInstructions.value}</p>
+              </div>
             )}
             {errorMsg.value && (
               <div className="provider-wizard__card-error">{errorMsg.value}</div>
