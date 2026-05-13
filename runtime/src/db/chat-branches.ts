@@ -456,8 +456,7 @@ function moveChatCursorToLastPosition(chatJid: string): void {
     INSERT INTO chat_cursors (chat_jid, cursor_ts, queued_followups_json)
     VALUES (?, ?, NULL)
     ON CONFLICT(chat_jid) DO UPDATE SET
-      cursor_ts = excluded.cursor_ts,
-      queued_followups_json = NULL
+      cursor_ts = excluded.cursor_ts
   `).run(chatJid, ts);
 }
 
@@ -731,8 +730,9 @@ export interface RenameChatJidResult {
  *   - evicting the session from the in-memory agent pool *before* calling this
  *   - renaming the session directory on disk *after* this succeeds
  *
- * Child branches whose `chat_jid` starts with `oldJid + ":branch:"` are
- * rewritten to start with `newJid + ":branch:"` so the tree stays intact.
+ * Child branches whose `chat_jid` starts with `oldJid + ":"` are
+ * rewritten to start with `newJid + ":"` so the tree stays intact for both
+ * legacy `:branch:` and modern hierarchical JID forms.
  */
 export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResult {
   const old = String(oldJid || "").trim();
@@ -754,8 +754,9 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
   const db = getDb();
   const now = new Date().toISOString();
   const updated: string[] = [];
-  const childPrefix = old + ":branch:";
-  const childNextPrefix = next + ":branch:";
+  const childPrefix = `${old}:`;
+  const childNextPrefix = `${next}:`;
+  const childPrefixLength = childPrefix.length;
 
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -765,8 +766,10 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
     ).run(next, old);
     // Also update any children whose JID starts with the old prefix.
     db.prepare(
-      `UPDATE chats SET jid = ? || substr(jid, ?) WHERE jid GLOB ?`
-    ).run(childNextPrefix, childPrefix.length + 1, childPrefix + "*");
+      `UPDATE chats
+          SET jid = ? || substr(jid, ?)
+        WHERE substr(jid, 1, ?) = ?`
+    ).run(childNextPrefix, childPrefixLength + 1, childPrefixLength, childPrefix);
     if ((chatsRows as any)?.changes > 0) updated.push("chats");
 
     // --- messages -------------------------------------------------------
@@ -774,8 +777,10 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
       `UPDATE messages SET chat_jid = ? WHERE chat_jid = ?`
     ).run(next, old);
     db.prepare(
-      `UPDATE messages SET chat_jid = ? || substr(chat_jid, ?) WHERE chat_jid GLOB ?`
-    ).run(childNextPrefix, childPrefix.length + 1, childPrefix + "*");
+      `UPDATE messages
+          SET chat_jid = ? || substr(chat_jid, ?)
+        WHERE substr(chat_jid, 1, ?) = ?`
+    ).run(childNextPrefix, childPrefixLength + 1, childPrefixLength, childPrefix);
     if ((msgRows as any)?.changes > 0) updated.push("messages");
 
     // --- chat_cursors ---------------------------------------------------
@@ -783,8 +788,10 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
       `UPDATE chat_cursors SET chat_jid = ? WHERE chat_jid = ?`
     ).run(next, old);
     db.prepare(
-      `UPDATE chat_cursors SET chat_jid = ? || substr(chat_jid, ?) WHERE chat_jid GLOB ?`
-    ).run(childNextPrefix, childPrefix.length + 1, childPrefix + "*");
+      `UPDATE chat_cursors
+          SET chat_jid = ? || substr(chat_jid, ?)
+        WHERE substr(chat_jid, 1, ?) = ?`
+    ).run(childNextPrefix, childPrefixLength + 1, childPrefixLength, childPrefix);
     if ((cursorRows as any)?.changes > 0) updated.push("chat_cursors");
 
     // --- chat_branches (chat_jid + root_chat_jid) ----------------------
@@ -797,8 +804,8 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
          SET chat_jid = ? || substr(chat_jid, ?),
              root_chat_jid = CASE WHEN root_chat_jid = ? THEN ? ELSE root_chat_jid END,
              updated_at = ?
-       WHERE chat_jid GLOB ?`
-    ).run(childNextPrefix, childPrefix.length + 1, old, next, now, childPrefix + "*");
+       WHERE substr(chat_jid, 1, ?) = ?`
+    ).run(childNextPrefix, childPrefixLength + 1, old, next, now, childPrefixLength, childPrefix);
     updated.push("chat_branches");
 
     // --- token_usage ----------------------------------------------------
@@ -806,8 +813,10 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
       `UPDATE token_usage SET chat_jid = ? WHERE chat_jid = ?`
     ).run(next, old);
     db.prepare(
-      `UPDATE token_usage SET chat_jid = ? || substr(chat_jid, ?) WHERE chat_jid GLOB ?`
-    ).run(childNextPrefix, childPrefix.length + 1, childPrefix + "*");
+      `UPDATE token_usage
+          SET chat_jid = ? || substr(chat_jid, ?)
+        WHERE substr(chat_jid, 1, ?) = ?`
+    ).run(childNextPrefix, childPrefixLength + 1, childPrefixLength, childPrefix);
     updated.push("token_usage");
 
     // --- scheduled_tasks ------------------------------------------------
@@ -815,8 +824,10 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
       `UPDATE scheduled_tasks SET chat_jid = ? WHERE chat_jid = ?`
     ).run(next, old);
     db.prepare(
-      `UPDATE scheduled_tasks SET chat_jid = ? || substr(chat_jid, ?) WHERE chat_jid GLOB ?`
-    ).run(childNextPrefix, childPrefix.length + 1, childPrefix + "*");
+      `UPDATE scheduled_tasks
+          SET chat_jid = ? || substr(chat_jid, ?)
+        WHERE substr(chat_jid, 1, ?) = ?`
+    ).run(childNextPrefix, childPrefixLength + 1, childPrefixLength, childPrefix);
 
     // --- config tables (ssh, proxmox, portainer) -----------------------
     for (const tbl of ["ssh_configs", "proxmox_configs", "portainer_configs"]) {
@@ -824,8 +835,10 @@ export function renameChatJid(oldJid: string, newJid: string): RenameChatJidResu
         `UPDATE ${tbl} SET chat_jid = ? WHERE chat_jid = ?`
       ).run(next, old);
       db.prepare(
-        `UPDATE ${tbl} SET chat_jid = ? || substr(chat_jid, ?) WHERE chat_jid GLOB ?`
-      ).run(childNextPrefix, childPrefix.length + 1, childPrefix + "*");
+        `UPDATE ${tbl}
+            SET chat_jid = ? || substr(chat_jid, ?)
+          WHERE substr(chat_jid, 1, ?) = ?`
+      ).run(childNextPrefix, childPrefixLength + 1, childPrefixLength, childPrefix);
     }
 
     db.exec("COMMIT");

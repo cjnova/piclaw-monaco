@@ -39,6 +39,22 @@ export function readEnvFile(keys: string[]): Record<string, string> {
     const key = trimmed.slice(0, eqIdx).trim();
     if (!wanted.has(key)) continue;
     let value = trimmed.slice(eqIdx + 1).trim();
+
+    // Unquoted values: strip trailing inline comments (" # ...").
+    // Keep literal '#' when it is part of the token (e.g. URLs/fragments).
+    const isDoubleQuoted = value.startsWith('"') && value.endsWith('"');
+    const isSingleQuoted = value.startsWith("'") && value.endsWith("'");
+    if (!isDoubleQuoted && !isSingleQuoted) {
+      for (let i = 0; i < value.length; i += 1) {
+        if (value[i] !== "#") continue;
+        const prev = i > 0 ? value[i - 1] : "";
+        if (i === 0 || /\s/.test(prev)) {
+          value = value.slice(0, i).trimEnd();
+          break;
+        }
+      }
+    }
+
     // Strip surrounding single or double quotes from the value.
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);

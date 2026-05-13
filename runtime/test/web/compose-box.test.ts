@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   SLASH_COMMANDS,
@@ -165,6 +167,7 @@ test('resolveComposePrefillRequest applies new non-search prefill tokens exactly
 test('parseQueuedContent extracts file, folder, message, and attachment refs from transcript-wrapped queue items', () => {
   const parsed = parseQueuedContent([
     'Channel: web',
+    'Chat: web:default',
     '',
     'Rui Carmo @ 2026-04-13T08:40:35.008Z:',
     '  Please check this later.',
@@ -200,14 +203,25 @@ test('parseQueuedContent normalizes backtick-wrapped file refs from Files blocks
     '  ',
     '  Files:',
     '  - `piclaw/runtime/extensions/viewers/editor/markdown/code-block.ts`',
-    '  - `piclaw/runtime/web/static/dist/editor.bundle.js`',
+    '  - `piclaw/runtime/web/static/classic/dist/editor.bundle.js`',
   ].join('\n'));
 
   expect(parsed.text).toBe('Fixed it.');
   expect(parsed.fileRefs).toEqual([
     'piclaw/runtime/extensions/viewers/editor/markdown/code-block.ts',
-    'piclaw/runtime/web/static/dist/editor.bundle.js',
+    'piclaw/runtime/web/static/classic/dist/editor.bundle.js',
   ]);
+});
+
+test('QueuedFollowupStack renders move-up before move-down controls', () => {
+  const source = readFileSync(join(import.meta.dir, '../../web/src/components/compose-box.ts'), 'utf8');
+  const controlsStart = source.indexOf('aria-label="Queued follow-up controls"');
+  expect(controlsStart).toBeGreaterThan(-1);
+  const moveUpIndex = source.indexOf('data-action="move-up"', controlsStart);
+  const moveDownIndex = source.indexOf('data-action="move-down"', controlsStart);
+  expect(moveUpIndex).toBeGreaterThan(-1);
+  expect(moveDownIndex).toBeGreaterThan(-1);
+  expect(moveUpIndex).toBeLessThan(moveDownIndex);
 });
 
 test('buildReturnedQueuedDraft restores refs and preserves attachment markers in compose text', () => {
@@ -391,12 +405,17 @@ test('resolveComposeModelPickerState keeps the model picker visible for cold cha
   });
 });
 
-test('resolveComposeExtensionWorkingDisplay renders default, custom, and hidden indicator states', () => {
+test('resolveComposeExtensionWorkingDisplay renders default working state with a spinner and preserves custom/hidden indicators', () => {
+  const css = readFileSync(join(import.meta.dir, '../../web/static/classic/css/chat.css'), 'utf8');
+  expect(css).toContain('.compose-inline-status-spinner');
+  expect(css).toContain('animation: spin 1s linear infinite;');
+
   expect(resolveComposeExtensionWorkingDisplay(null)).toEqual({
     visible: false,
     title: '',
     indicatorText: null,
     animateDot: false,
+    animateSpinner: false,
   });
 
   expect(resolveComposeExtensionWorkingDisplay({
@@ -406,7 +425,8 @@ test('resolveComposeExtensionWorkingDisplay renders default, custom, and hidden 
     visible: true,
     title: 'Compacting context…',
     indicatorText: null,
-    animateDot: true,
+    animateDot: false,
+    animateSpinner: true,
   });
 
   expect(resolveComposeExtensionWorkingDisplay({
@@ -417,6 +437,7 @@ test('resolveComposeExtensionWorkingDisplay renders default, custom, and hidden 
     title: 'Working…',
     indicatorText: '⠙',
     animateDot: false,
+    animateSpinner: false,
   });
 
   expect(resolveComposeExtensionWorkingDisplay({
@@ -427,7 +448,14 @@ test('resolveComposeExtensionWorkingDisplay renders default, custom, and hidden 
     title: 'Background sync',
     indicatorText: null,
     animateDot: false,
+    animateSpinner: false,
   });
+});
+
+test('compose status notice rows use a spinner for active working state', () => {
+  const source = readFileSync(join(import.meta.dir, '../../web/src/components/compose-box.ts'), 'utf8');
+  expect(source).toContain('class="compose-inline-status-spinner"');
+  expect(source).not.toContain('buildComposeStatusDotClass({ pulsing: false })');
 });
 
 test('speech push-to-talk starts only on blank compose with native speech available', () => {

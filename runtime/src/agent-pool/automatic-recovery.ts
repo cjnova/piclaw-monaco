@@ -204,6 +204,14 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
   }
 
   if (input.snapshot.compactionErrorMessage) {
+    if (isTransientFailure(errorText)) {
+      return {
+        recover: true,
+        classifier: "compaction_failure",
+        strategy: "retry",
+        reason: "Transient compaction failure; retrying once without another compaction first.",
+      };
+    }
     return {
       recover: false,
       classifier: "compaction_failure",
@@ -328,23 +336,6 @@ export function decideAutomaticRecovery(input: RecoveryDecisionInput): RecoveryD
       classifier: "non_recoverable",
       strategy: null,
       reason: "Failure classified as non-recoverable.",
-    };
-  }
-
-  if (input.snapshot.compactionErrorMessage) {
-    if (isTransientFailure(errorText)) {
-      return {
-        recover: true,
-        classifier: "compaction_failure",
-        strategy: "retry",
-        reason: "Transient compaction failure; retrying without another compaction first.",
-      };
-    }
-    return {
-      recover: false,
-      classifier: "compaction_failure",
-      strategy: null,
-      reason: "Compaction failure classified as hard failure for this recovery cycle.",
     };
   }
 

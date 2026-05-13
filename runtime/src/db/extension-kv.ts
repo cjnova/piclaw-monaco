@@ -38,14 +38,21 @@ function resolveScope(scope?: KvScope, scopeKey?: string): { scope: KvScope; sco
 
 function serializeValue(value: unknown): string {
   const json = JSON.stringify(value);
+  if (json === undefined) {
+    throw new Error("Extension KV value must be JSON-serializable.");
+  }
   if (Buffer.byteLength(json, "utf8") > MAX_VALUE_BYTES) {
     throw new Error(`Extension KV value exceeds maximum size (${MAX_VALUE_BYTES} bytes).`);
   }
   return json;
 }
 
-function deserializeValue<T>(raw: string): T {
-  return JSON.parse(raw) as T;
+function deserializeValue<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
 export function extensionKvGet<T = unknown>(
@@ -155,11 +162,17 @@ export function extensionKvQuery<T = unknown>(
     `).all(extensionId, s, options.jsonPath, equalsJson, limit) as typeof rows;
   }
 
-  return rows.map((r) => ({
-    key: r.key,
-    scopeKey: r.scope_key,
-    value: deserializeValue<T>(r.value),
-  }));
+  const out: Array<{ key: string; scopeKey: string; value: T }> = [];
+  for (const r of rows) {
+    const parsed = deserializeValue<T>(r.value);
+    if (parsed === null) continue;
+    out.push({
+      key: r.key,
+      scopeKey: r.scope_key,
+      value: parsed,
+    });
+  }
+  return out;
 }
 
 export function extensionKvClear(

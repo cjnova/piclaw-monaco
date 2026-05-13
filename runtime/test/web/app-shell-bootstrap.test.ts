@@ -15,7 +15,7 @@ afterEach(() => {
   }
 });
 
-test('registerAppPaneExtensions does not register the built-in kanban pane by default', () => {
+test('registerAppPaneExtensions does not register addon-owned kanban/mindmap panes by default', () => {
   previousKanbanExtension = paneRegistry.get('kanban-editor') || null;
   if (previousKanbanExtension) paneRegistry.unregister('kanban-editor');
 
@@ -24,6 +24,6 @@ test('registerAppPaneExtensions does not register the built-in kanban pane by de
   for (const ext of paneRegistry.list()) registeredByTest.add(ext.id);
 
   expect(paneRegistry.get('editor')).toBeTruthy();
-  expect(paneRegistry.get('mindmap-editor')).toBeTruthy();
+  expect(paneRegistry.get('mindmap-editor')).toBeUndefined();
   expect(paneRegistry.get('kanban-editor')).toBeUndefined();
 });

@@ -7,7 +7,7 @@
  *
  * Reads the current chat JID from AsyncLocalStorage/env at execution time.
  */
-import { basename, resolve, relative } from "path";
+import { basename, resolve, relative, isAbsolute } from "path";
 import { Type, type Static } from "typebox";
 import type {
   AgentToolResult,
@@ -64,7 +64,7 @@ function resolveWorkspacePath(inputPath: string): string | null {
   if (!inputPath) return null;
   const resolved = resolve(WORKSPACE_DIR, inputPath);
   const rel = relative(WORKSPACE_DIR, resolved);
-  if (rel.startsWith("..") || rel.startsWith("/")) return null;
+  if (rel.startsWith("..") || rel.startsWith("/") || isAbsolute(rel)) return null;
   return resolved;
 }
 
@@ -310,7 +310,7 @@ const ATTACHMENT_HINT = [
   "to look for the download card below your message.",
   "Use attachment:<id> when you want to reference an uploaded attachment by id.",
   "Use read_attachment to load an attachment by id (auto/text/image/base64 modes).",
-  "Use export_attachment to save an attachment into /workspace/tmp for shell tools.",
+  `Use export_attachment to save an attachment into ${WORKSPACE_DIR}/tmp for shell tools.`,
 ].join("\n");
 
 // ── Factory ───────────────────────────────────────────────
@@ -449,8 +449,8 @@ export function createFileAttachmentsExtension(registry: AttachmentRegistry = ge
     pi.registerTool({
       name: "export_attachment",
       label: "export_attachment",
-      description: "Export an attachment by id to /workspace/tmp for shell tools.",
-      promptSnippet: "export_attachment: write attachment content to /workspace/tmp and return the file path.",
+      description: `Export an attachment by id to ${WORKSPACE_DIR}/tmp for shell tools.`,
+      promptSnippet: `export_attachment: write attachment content to ${WORKSPACE_DIR}/tmp and return the file path.`,
       parameters: ExportAttachmentSchema,
       execute: executeExportAttachment,
     });

@@ -23,9 +23,9 @@ test("ghostty-web export manifest vendors js + wasm with metadata", () => {
     throw new Error(`${proc.stdout.toString()}\n${proc.stderr.toString()}`.trim());
   }
 
-  const jsFile = "/workspace/piclaw/runtime/web/static/js/vendor/ghostty-web.js";
-  const wasmFile = "/workspace/piclaw/runtime/web/static/js/vendor/ghostty-vt.wasm";
-  const metaFile = "/workspace/piclaw/runtime/web/static/js/vendor/ghostty-web.meta.json";
+  const jsFile = "/workspace/piclaw/runtime/web/static/common/js/vendor/ghostty-web.js";
+  const wasmFile = "/workspace/piclaw/runtime/web/static/common/js/vendor/ghostty-vt.wasm";
+  const metaFile = "/workspace/piclaw/runtime/web/static/common/js/vendor/ghostty-web.meta.json";
 
   expect(existsSync(jsFile)).toBe(true);
   expect(existsSync(wasmFile)).toBe(true);

@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import { shouldShowComposeAgentAffordance } from "../../web/src/ui/compose-layout.js";
+
+const responsiveCss = readFileSync(path.join(import.meta.dir, "../../web/static/classic/css/responsive.css"), "utf8");
 
 test("shows compose agent affordance when the footer is wide enough", () => {
   expect(shouldShowComposeAgentAffordance({
@@ -24,4 +28,15 @@ test("hides compose agent affordance when there are no visible agents", () => {
     visibleAgentCount: 0,
     hasContextIndicator: true,
   })).toBe(false);
+});
+
+test("mobile compose layout keeps the session switcher floated above the textarea", () => {
+  const triggerRules = [...responsiveCss.matchAll(/\.compose-session-trigger-top\s*\{[^}]+\}/g)].map(([rule]) => rule);
+
+  expect(triggerRules.length).toBeGreaterThanOrEqual(2);
+  expect(responsiveCss).toContain(".compose-session-trigger-top + .compose-input-main textarea");
+  expect(responsiveCss).toContain("position: absolute;");
+  expect(responsiveCss).toContain("z-index: 7;");
+  expect(responsiveCss).toContain("padding-right: max(calc(var(--spacing-xs) + 28px), min(44vw, 156px));");
+  expect(triggerRules.every((rule) => !rule.includes("position: static;"))).toBe(true);
 });

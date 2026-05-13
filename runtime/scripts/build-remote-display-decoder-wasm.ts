@@ -6,8 +6,8 @@ import { dirname, relative, resolve } from "node:path";
 
 const PROJECT_DIR = process.cwd();
 const SOURCE_FILE = resolve(PROJECT_DIR, "assemblyscript/remote-display-decoder.ts");
-const OUTPUT_FILE = resolve(PROJECT_DIR, "web/static/js/vendor/remote-display-decoder.wasm");
-const METADATA_FILE = resolve(PROJECT_DIR, "web/static/js/vendor/remote-display-decoder.meta.json");
+const OUTPUT_FILE = resolve(PROJECT_DIR, "web/static/common/js/vendor/remote-display-decoder.wasm");
+const METADATA_FILE = resolve(PROJECT_DIR, "web/static/common/js/vendor/remote-display-decoder.meta.json");
 const ASC_BIN_CANDIDATES = [
   resolve(PROJECT_DIR, "../node_modules/.bin/asc"),
   resolve(PROJECT_DIR, "../node_modules/.bin/asc.cmd"),

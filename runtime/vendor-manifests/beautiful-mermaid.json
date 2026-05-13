@@ -2,8 +2,8 @@
   "id": "beautiful-mermaid",
   "packageName": "beautiful-mermaid",
   "sourceEntry": "web/src/vendor/mermaid-entry.ts",
-  "outputFile": "web/static/js/vendor/beautiful-mermaid.js",
-  "metadataFile": "web/static/js/vendor/beautiful-mermaid.meta.json",
+  "outputFile": "web/static/common/js/vendor/beautiful-mermaid.js",
+  "metadataFile": "web/static/common/js/vendor/beautiful-mermaid.meta.json",
   "buildCommand": [
     "bun",
     "build",

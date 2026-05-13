@@ -60,6 +60,7 @@ import {
   getSshConfig,
   listRecentChatJids,
   pruneOldTokenUsage,
+  reclaimFreelistPages,
   shrinkDatabaseMemory,
   upsertSshConfig,
 } from "./db.js";
@@ -287,9 +288,14 @@ export class AgentPool {
       this.config.cleanupIntervalMs,
     );
     // B4: Prune old token_usage rows once on startup (90-day retention).
+    // D3: Reclaim freelist pages left by the pruning (incremental vacuum).
     try {
       const pruned = pruneOldTokenUsage(90);
-      if (pruned > 0) log.info(`Pruned ${pruned} token_usage rows older than 90 days`);
+      if (pruned > 0) {
+        log.info(`Pruned ${pruned} token_usage rows older than 90 days`);
+        const remaining = reclaimFreelistPages();
+        if (remaining === 0) log.info("Reclaimed all freelist pages after token_usage pruning");
+      }
     } catch (e) { void e; }
   }
 

@@ -232,6 +232,61 @@ test("chat branch registry can list archived branches and restore with collision
   expect(db.getChatBranchByAgentName(restored.agent_name)?.chat_jid).toBe(archived.chat_jid);
 });
 
+test("renameChatJid rewrites modern hierarchical descendants across branch tables", () => {
+  const rootChatJid = `web:test-rename-root-${Date.now()}`;
+  const parentChatJid = `${rootChatJid}:research`;
+  const childChatJid = `${parentChatJid}:analysis`;
+  const unrelatedChatJid = `${rootChatJid}-sibling:keep`;
+  const now = new Date().toISOString();
+
+  db.storeChatMetadata(rootChatJid, now, "Root");
+  db.storeChatMetadata(parentChatJid, now, "Parent");
+  db.storeChatMetadata(childChatJid, now, "Child");
+  db.storeChatMetadata(unrelatedChatJid, now, "Sibling");
+
+  const root = db.getChatBranchByChatJid(rootChatJid);
+  const parent = db.ensureChatBranch({
+    chat_jid: parentChatJid,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: root?.branch_id ?? null,
+    agent_name: "research",
+  });
+  db.ensureChatBranch({
+    chat_jid: childChatJid,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: parent.branch_id,
+    agent_name: "analysis",
+  });
+  db.ensureChatBranch({
+    chat_jid: unrelatedChatJid,
+    root_chat_jid: unrelatedChatJid,
+    parent_branch_id: null,
+    agent_name: "keep",
+  });
+
+  db.storeMessage(makeMessage(parentChatJid, "parent message", now));
+  db.storeMessage(makeMessage(childChatJid, "child message", now));
+  db.storeMessage(makeMessage(unrelatedChatJid, "unrelated", now));
+  db.setChatCursor(parentChatJid, now);
+  db.setChatCursor(childChatJid, now);
+  db.setChatCursor(unrelatedChatJid, now);
+
+  const renamedParent = `${rootChatJid}:research-notes`;
+  const renamedChild = `${renamedParent}:analysis`;
+  const result = db.renameChatJid(parentChatJid, renamedParent);
+
+  expect(result.newJid).toBe(renamedParent);
+  expect(db.getChatBranchByChatJid(parentChatJid)).toBeNull();
+  expect(db.getChatBranchByChatJid(renamedParent)?.chat_jid).toBe(renamedParent);
+  expect(db.getChatBranchByChatJid(renamedChild)?.chat_jid).toBe(renamedChild);
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(renamedParent)).toEqual({ count: 1 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(renamedChild)).toEqual({ count: 1 });
+  expect(db.getDb().prepare("SELECT COUNT(*) AS count FROM messages WHERE chat_jid = ?").get(unrelatedChatJid)).toEqual({ count: 1 });
+  expect(db.getChatCursor(renamedParent)).toBe(now);
+  expect(db.getChatCursor(renamedChild)).toBe(now);
+  expect(db.getChatCursor(unrelatedChatJid)).toBe(now);
+});
+
 test("mergeChatBranchIntoParent moves child chat state into its parent", () => {
   const rootChatJid = `web:test-merge-root-${Date.now()}`;
   const branchChatJid = `${rootChatJid}:branch:merge`;

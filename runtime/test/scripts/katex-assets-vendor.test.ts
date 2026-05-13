@@ -20,8 +20,8 @@ test("katex asset workflow vendors rewritten CSS + woff2 fonts with provenance m
 
   const cssFile = "/workspace/piclaw/runtime/web/src/styles/katex.bundle.css";
   const metaFile = "/workspace/piclaw/runtime/web/src/styles/katex.bundle.meta.json";
-  const mainFontFile = "/workspace/piclaw/runtime/web/static/fonts/KaTeX_Main-Regular.woff2";
-  const sizeFontFile = "/workspace/piclaw/runtime/web/static/fonts/KaTeX_Size4-Regular.woff2";
+  const mainFontFile = "/workspace/piclaw/runtime/web/static/common/fonts/KaTeX_Main-Regular.woff2";
+  const sizeFontFile = "/workspace/piclaw/runtime/web/static/common/fonts/KaTeX_Size4-Regular.woff2";
 
   expect(existsSync(cssFile)).toBe(true);
   expect(existsSync(metaFile)).toBe(true);

@@ -685,6 +685,46 @@ describe("smart-compaction", () => {
       expect(ctx.ui.notify).not.toHaveBeenCalled();
       expect(ctx.ui.setWorkingMessage).toHaveBeenCalledWith(expect.stringContaining("Smart compaction:"));
     });
+
+    it("aborts progressive mode when merge passes make no reduction (loop guard)", async () => {
+      const longMessages: any[] = [];
+      for (let i = 0; i < 80; i++) {
+        longMessages.push(userMsg(`Loop-guard continuity fact ${i}: ${"x".repeat(700)}`));
+        longMessages.push(_assistantTextMsg(`Acknowledged loop-guard fact ${i}.`));
+      }
+
+      const hugeSummary = `${"Y".repeat(15_000)}\n\n${"Z".repeat(15_000)}`;
+      (completeSimple as any).mockImplementation(async (_model: any, context: any) => {
+        const prompt = context.messages[0].content[0].text as string;
+        if (prompt.includes("deterministic chunk")) {
+          return {
+            content: [{ type: "text", text: `## Chunk Range\n- 0-1\n\n## Goals / User Intent\n- ${hugeSummary}` }],
+            stopReason: "end",
+          };
+        }
+        return {
+          content: [{ type: "text", text: `## Goal\n${hugeSummary}` }],
+          stopReason: "end",
+        };
+      });
+
+      const ctx = makeCtx({ model: { provider: "test", id: "small-context", contextWindow: 16_000, reasoning: false } });
+      const result = await handler!(
+        {
+          preparation: makePreparation(longMessages.length, {
+            messagesToSummarize: longMessages,
+            tokensBefore: 95_000,
+          }),
+          branchEntries: [],
+          signal: new AbortController().signal,
+        },
+        ctx,
+      );
+
+      expect(result).toEqual({ cancel: true });
+      expect((completeSimple as any).mock.calls.length).toBeLessThan(25);
+      expect(ctx.ui.setWorkingMessage).toHaveBeenCalledWith(expect.stringContaining("progressive iterative mode"));
+    });
   });
 
   describe("overhead and safety guards", () => {

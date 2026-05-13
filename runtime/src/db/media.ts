@@ -18,6 +18,16 @@ import { getDb } from "./connection.js";
 import type { MediaRecord } from "./types.js";
 import { maybeCompress, maybeDecompress } from "./media-compression.js";
 
+function parseMediaMetadata(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Link a set of media records to a message row.
  * Called by db/messages.ts after inserting/updating a message with attachments.
@@ -116,7 +126,7 @@ export function getMediaById(id: number): MediaRecord | undefined {
       created_at: string;
     } | undefined;
   if (!row) return undefined;
-  const parsedMeta = row.metadata ? JSON.parse(row.metadata) : null;
+  const parsedMeta = parseMediaMetadata(row.metadata);
   return {
     id: row.id,
     filename: row.filename,
@@ -149,7 +159,7 @@ export function getMediaInfoById(id: number): Omit<MediaRecord, "data" | "thumbn
     id: row.id,
     filename: row.filename,
     content_type: row.content_type,
-    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    metadata: parseMediaMetadata(row.metadata),
     created_at: row.created_at,
   };
 }
@@ -199,8 +209,7 @@ function appendMediaTextToFts(
   for (const row of rows) {
     if (!isTextIndexable(row.content_type)) continue;
     // Decompress if stored compressed
-    let rawMeta: Record<string, unknown> | null = null;
-    try { if (row.metadata) rawMeta = JSON.parse(row.metadata); } catch (e) { void e; }
+    const rawMeta = parseMediaMetadata(row.metadata);
     const decompressed = maybeDecompress(row.data, rawMeta);
     const raw = new TextDecoder().decode(decompressed);
     const text =

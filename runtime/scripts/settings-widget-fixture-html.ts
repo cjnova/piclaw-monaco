@@ -21,6 +21,6 @@ console.log(`<!doctype html>
   </style>
 </head>
 <body>
-  <iframe src="/static/dev/settings-widget-fixture.html?section=${section}" title="Settings dialog fixture"></iframe>
+  <iframe src="/test/fixtures/settings-widget-fixture.html?section=${section}" title="Settings dialog fixture"></iframe>
 </body>
 </html>`);

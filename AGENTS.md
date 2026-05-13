@@ -78,4 +78,3 @@ git tag -d v2.3.0-ux && git push origin :refs/tags/v2.3.0-ux
 - Treat slash-command config dispatch as a legacy fallback only; new settings-pane work should register direct handlers in the add-on runtime entry and use browser fetches from the pane
 - For web visuals/SVG diagrams, prefer attached `.svg` files (via `attach_file`) over raw SVG markup in message text; use widget/artifact paths only when interactivity is needed
 - See `WORKITEMS.md` for the workitem lifecycle
-- See `workitems/` for the kanban-style issue tracker

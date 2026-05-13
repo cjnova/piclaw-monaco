@@ -2,12 +2,12 @@
 
 Dream-maintained memory index generated from the message database plus human-readable daily notes.
 
-Generated: 2026-05-12T15:08:40.009Z
+Generated: 2026-05-13T05:21:50.698Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 4
+- Complete days: 3
 - Partial days: 0
 - Unsummarised days: 0
 - Latest complete day: 2026-05-12
@@ -22,13 +22,11 @@ Generated: 2026-05-12T15:08:40.009Z
 ## Recent daily memories
 
 - [2026-05-12](../daily/2026-05-12.md)
-  - Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent co…
+  - Active day (15:05–20:14 UTC, 58 messages, 1 session). Started with a PiClaw version check (confirmed **v2.3.2…
 - [2026-05-08](../daily/2026-05-08.md)
   - Light housekeeping day (13:40–21:38 UTC, 60 messages across 2 sessions). Two `/compact` runs: first reduced c…
 - [2026-05-07](../daily/2026-05-07.md)
   - Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functiona…
-- [2026-05-05](../daily/2026-05-05.md)
-  - Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission chec…
 
 ## Sources
 

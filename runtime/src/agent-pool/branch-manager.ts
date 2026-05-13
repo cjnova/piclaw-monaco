@@ -156,6 +156,26 @@ function isSessionActive(session: AgentSession): boolean {
   return Boolean(session.isStreaming || session.isCompacting || session.isRetrying || session.isBashRunning);
 }
 
+function isDescendantChatJid(parentChatJid: string, candidateChatJid: string): boolean {
+  return candidateChatJid.startsWith(`${parentChatJid}:`);
+}
+
+function mapRenamedSessionArtifactEntry(entryName: string, oldChatJid: string, newChatJid: string): string | null {
+  const oldSanitized = sanitiseJid(oldChatJid);
+  const newSanitized = sanitiseJid(newChatJid);
+  if (entryName === oldSanitized) return newSanitized;
+  if (entryName.startsWith(`${oldSanitized}__`)) return `${newSanitized}${entryName.slice(oldSanitized.length)}`;
+
+  const oldDescendantPrefix = `${oldSanitized}_`;
+  if (!entryName.startsWith(oldDescendantPrefix)) return null;
+
+  const descendantSuffix = entryName.slice(oldDescendantPrefix.length).replace(/_/g, ":");
+  const descendantJid = `${oldChatJid}:${descendantSuffix}`;
+  if (!isDescendantChatJid(oldChatJid, descendantJid)) return null;
+
+  return `${newSanitized}_${entryName.slice(oldDescendantPrefix.length)}`;
+}
+
 /**
  * Coordinates chat-branch registration, branch lookup, and fork/prune behavior.
  */
@@ -269,16 +289,15 @@ export class AgentBranchManager {
     this.options.activeForkBaseLeafByChat.delete(old);
     this.options.cancelSessionWarmup?.(old);
 
-    // Also evict any child branches that live under old + ":branch:".
-    const childPrefix = old + ":branch:";
+    // Also evict any child branches that live under old + ":".
     for (const [jid, entry] of this.options.pool) {
-      if (jid.startsWith(childPrefix)) {
+      if (isDescendantChatJid(old, jid)) {
         try { await entry.runtime.dispose(); } catch (e) { debugSuppressedError(log, "best-effort dispose failed for child pool session", e, { jid }); }
         this.options.pool.delete(jid);
       }
     }
     for (const [jid, entry] of this.options.sidePool) {
-      if (jid.startsWith(childPrefix)) {
+      if (isDescendantChatJid(old, jid)) {
         try { await entry.runtime.dispose(); } catch (e) { debugSuppressedError(log, "best-effort dispose failed for child side-pool session", e, { jid }); }
         this.options.sidePool.delete(jid);
       }
@@ -299,18 +318,15 @@ export class AgentBranchManager {
     if (existsSync(oldSideDir) && !existsSync(newSideDir)) {
       renameSync(oldSideDir, newSideDir);
     }
-    // Rename child branch session directories.
-    const oldDirPrefix = sanitiseJid(old) + "_branch_";
-    const newDirPrefix = sanitiseJid(next) + "_branch_";
+    // Rename child/variant session directories that derive from this chat JID.
     try {
       const { readdirSync } = await import("fs");
       for (const entry of readdirSync(SESSIONS_DIR)) {
-        if (entry.startsWith(oldDirPrefix)) {
-          const suffix = entry.slice(oldDirPrefix.length);
-          const src = join(SESSIONS_DIR, entry);
-          const dst = join(SESSIONS_DIR, newDirPrefix + suffix);
-          if (!existsSync(dst)) renameSync(src, dst);
-        }
+        const mapped = mapRenamedSessionArtifactEntry(entry, old, next);
+        if (!mapped || mapped === entry) continue;
+        const src = join(SESSIONS_DIR, entry);
+        const dst = join(SESSIONS_DIR, mapped);
+        if (!existsSync(dst)) renameSync(src, dst);
       }
     } catch (e) { debugSuppressedError(log, "best-effort child branch directory rename failed", e, { old, next }); }
 

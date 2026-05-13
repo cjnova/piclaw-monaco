@@ -66,11 +66,12 @@ export type RouteFlags = {
  */
 export function isPublicStaticPath(pathname: string): boolean {
   if (pathname.startsWith("/static/fonts/")) return true;
+  if (pathname.startsWith("/static/common/fonts/")) return true;
 
-  if (pathname === "/static/dist/login.bundle.js") return true;
-  if (pathname === "/static/dist/login.bundle.js.map") return true;
-  if (pathname === "/static/dist/login.bundle.css") return true;
-  if (pathname === "/static/dist/login.bundle.css.map") return true;
+  if (pathname === "/static/common/dist/login.bundle.js") return true;
+  if (pathname === "/static/common/dist/login.bundle.js.map") return true;
+  if (pathname === "/static/common/dist/login.bundle.css") return true;
+  if (pathname === "/static/common/dist/login.bundle.css.map") return true;
 
   if (pathname.startsWith("/static/") && /\.(png|ico|svg|jpg|jpeg|webp|gif)$/i.test(pathname)) return true;
   return false;

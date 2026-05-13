@@ -8,7 +8,7 @@ import { VncRemoteDisplayProtocol, DEFAULT_CLIENT_PIXEL_FORMAT } from "../../web
 
 // ─── WASM loading ───────────────────────────────────────────────
 
-const WASM_PATH = resolve(import.meta.dir, "../../web/static/js/vendor/remote-display-decoder.wasm");
+const WASM_PATH = resolve(import.meta.dir, "../../web/static/common/js/vendor/remote-display-decoder.wasm");
 
 let wasm: any;
 

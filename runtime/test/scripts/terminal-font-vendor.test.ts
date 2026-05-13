@@ -18,9 +18,9 @@ test("terminal font workflow vendors FiraCode Nerd Font Mono with metadata", () 
     throw new Error(`${proc.stdout.toString()}\n${proc.stderr.toString()}`.trim());
   }
 
-  const metaFile = "/workspace/piclaw/runtime/web/static/fonts/vendor/firacode-nerd-font.meta.json";
-  const regularFile = "/workspace/piclaw/runtime/web/static/fonts/vendor/firacode-nerd-font-mono-regular.ttf";
-  const boldFile = "/workspace/piclaw/runtime/web/static/fonts/vendor/firacode-nerd-font-mono-bold.ttf";
+  const metaFile = "/workspace/piclaw/runtime/web/static/common/fonts/vendor/firacode-nerd-font.meta.json";
+  const regularFile = "/workspace/piclaw/runtime/web/static/common/fonts/vendor/firacode-nerd-font-mono-regular.ttf";
+  const boldFile = "/workspace/piclaw/runtime/web/static/common/fonts/vendor/firacode-nerd-font-mono-bold.ttf";
 
   expect(existsSync(metaFile)).toBe(true);
   expect(existsSync(regularFile)).toBe(true);

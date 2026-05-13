@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -310,6 +310,100 @@ test("AgentBranchManager appends new child paths to the stable source JID after 
   expect(child.chat_jid).toBe("web:default:research:child-work");
   expect(child.parent_branch_id).toBe(parent.branch_id);
   expect(child.agent_name).toBe("child-work");
+
+  ws.cleanup();
+});
+
+test("AgentBranchManager renameChatJid migrates hierarchical descendants and session artifacts", async () => {
+  const ws = createTempWorkspace("piclaw-rename-chat-jid-");
+  restoreEnv = setEnv({ PICLAW_WORKSPACE: ws.workspace, PICLAW_STORE: ws.store, PICLAW_DATA: ws.data });
+
+  const db = await importFresh<typeof import("../src/db.js")>("../src/db.js");
+  db.initDatabase();
+
+  const rootChatJid = "web:default";
+  const oldParent = "web:default:research";
+  const oldChild = "web:default:research:analysis";
+  const oldUnrelated = "web:defaulting:keep";
+  const now = new Date().toISOString();
+
+  db.storeChatMetadata(rootChatJid, now, "Default");
+  const root = db.getChatBranchByChatJid(rootChatJid);
+  db.storeChatMetadata(oldParent, now, "Research");
+  const parent = db.ensureChatBranch({
+    chat_jid: oldParent,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: root?.branch_id ?? null,
+    agent_name: "research",
+  });
+  db.storeChatMetadata(oldChild, now, "Analysis");
+  db.ensureChatBranch({
+    chat_jid: oldChild,
+    root_chat_jid: rootChatJid,
+    parent_branch_id: parent.branch_id,
+    agent_name: "analysis",
+  });
+  db.storeChatMetadata(oldUnrelated, now, "Keep");
+  db.ensureChatBranch({
+    chat_jid: oldUnrelated,
+    root_chat_jid: oldUnrelated,
+    parent_branch_id: null,
+    agent_name: "keep",
+  });
+
+  let disposed = 0;
+  const inactiveSession = {
+    isStreaming: false,
+    isCompacting: false,
+    isRetrying: false,
+    isBashRunning: false,
+    dispose() {
+      disposed += 1;
+    },
+  };
+
+  const fixture = createManager();
+  fixture.pool.set(oldParent, { runtime: createRuntime(inactiveSession), lastUsed: Date.now() });
+  fixture.pool.set(oldChild, { runtime: createRuntime(inactiveSession), lastUsed: Date.now() });
+  fixture.pool.set(oldUnrelated, { runtime: createRuntime(inactiveSession), lastUsed: Date.now() });
+  fixture.sidePool.set(oldChild, { runtime: createRuntime(inactiveSession), lastUsed: Date.now() });
+
+  const oldParentDir = ensureSessionDir(oldParent);
+  const oldParentSideDir = `${oldParentDir}__btw-side`;
+  mkdirSync(oldParentSideDir, { recursive: true });
+  const oldChildDir = ensureSessionDir(oldChild);
+  const oldChildVariant = `${oldChildDir}__variant`;
+  mkdirSync(oldChildVariant, { recursive: true });
+
+  const newParent = "web:default:research-notes";
+  const newChild = "web:default:research-notes:analysis";
+  await fixture.manager.renameChatJid(oldParent, newParent);
+
+  expect(fixture.pool.has(oldParent)).toBe(false);
+  expect(fixture.pool.has(oldChild)).toBe(false);
+  expect(fixture.sidePool.has(oldChild)).toBe(false);
+  expect(fixture.pool.has(oldUnrelated)).toBe(true);
+  expect(disposed).toBe(3);
+
+  expect(db.getChatBranchByChatJid(newParent)?.chat_jid).toBe(newParent);
+  expect(db.getChatBranchByChatJid(newChild)?.chat_jid).toBe(newChild);
+  expect(db.getChatBranchByChatJid(oldParent)).toBeNull();
+  expect(db.getChatBranchByChatJid(oldChild)).toBeNull();
+  expect(db.getChatBranchByChatJid(oldUnrelated)?.chat_jid).toBe(oldUnrelated);
+
+  const newParentDir = ensureSessionDir(newParent);
+  const newParentSideDir = `${newParentDir}__btw-side`;
+  const newChildDir = ensureSessionDir(newChild);
+  const newChildVariant = `${newChildDir}__variant`;
+
+  expect(existsSync(newParentDir)).toBe(true);
+  expect(existsSync(newParentSideDir)).toBe(true);
+  expect(existsSync(newChildDir)).toBe(true);
+  expect(existsSync(newChildVariant)).toBe(true);
+  expect(existsSync(oldParentDir)).toBe(false);
+  expect(existsSync(oldParentSideDir)).toBe(false);
+  expect(existsSync(oldChildDir)).toBe(false);
+  expect(existsSync(oldChildVariant)).toBe(false);
 
   ws.cleanup();
 });

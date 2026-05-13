@@ -1,30 +1,18 @@
 # Agent-ready recent context
 
-Generated: 2026-05-12T15:08:40.009Z
+Generated: 2026-05-13T05:21:50.698Z
 
 Source: `/workspace/piclaw-monaco/workspace/notes/daily`
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 4
+- Complete days: 3
 - Partial days: 0
 - Unsummarised days: 0
 - Latest complete day: 2026-05-12
 
 ## Recent complete days
-
-### 2026-05-05
-
-- State: complete
-- Summarised until: 2026-05-05T15:10:31.114Z
-- Messages: 68
-- Session trees: 1
-- Session chats: 1
-
-#### Summary
-
-- Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message testing (multiple probes confirming steer receipt). Long-form content generation stress tests: history of computing essay, detailed neural networks explanation (with CNN/transformer additions), and comprehensive quantum computing guide (qubits, gates, QEC, real-world applications). Markdown table rendering tests (server status table, quantum vs classical comparison). Simple greeting/countdown tests. No project decisions or feature development — purely functional QA covering steering, notifications, long-form streaming, and rich markdown rendering.
 
 ### 2026-05-07
 
@@ -53,11 +41,11 @@ Source: `/workspace/piclaw-monaco/workspace/notes/daily`
 ### 2026-05-12
 
 - State: complete
-- Summarised until: 2026-05-12T15:06:13.962Z
-- Messages: 2
+- Summarised until: 2026-05-12T20:14:45.075Z
+- Messages: 58
 - Session trees: 1
 - Session chats: 1
 
 #### Summary
 
-- Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent confirmed **PiClaw v2.3.2**. No project work, decisions, or feedback.
+- Active day (15:05–20:14 UTC, 58 messages, 1 session). Started with a PiClaw version check (confirmed **v2.3.2**), followed by a markdown rendering test. Mid-session: multiple UI login/provider configuration interactions (OAuth flows for Anthropic, OpenAI Codex, Azure OpenAI, Ollama) and a `/restart`. Evening session focused on **VS Code theme import** feature planning — reviewed the existing Catppuccin-based theme system (~70 CSS variables, dark/light modes) and CodeMirror syntax highlighting alignment (22 `--syn-*` variables mapped to `.tok-*` classes). Fleet of 20 agents spawned to refine the theme import workitem; scored ★★★★★ 10/10. User corrected that the issue should be on GitHub (not local workitems); agent created **GitHub issue [#360](https://github.com/cjnova/piclaw-monaco/issues/360)** on `cjnova/piclaw-monaco`.

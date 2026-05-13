@@ -224,9 +224,16 @@ The web UI now keeps a bounded cache of recent timeline snapshots and uses nearb
 - `app-timeline-cache.ts` stores recent chat timeline payloads with an age limit and a small LRU-style cache cap
 - the active chat is excluded from prewarm selection, and recent nearby chats are deduped before background fetches begin
 - background prewarm is best-effort: failed fetches are logged at debug level and dropped rather than surfacing as user-facing errors
+- prewarm is shutdown-aware: once session-manager shutdown starts, queued prewarms are cleared and new prewarm/create requests are rejected so teardown cannot race with fresh runtime creation
 - the cache is used together with the newer refresh-coalescing/warm-session work so thread switches can often render from something fresher than a cold network round-trip
 
 This is not backend truth — it is browser-local performance state intended purely to reduce visible latency around timeline revisits and nearby-thread navigation.
+
+## Branch JID rename behavior
+
+Chat JID rename/migration now treats descendants as any JID under `oldJid + ":"`, not only legacy `:branch:` forms.
+
+That means renaming a branch like `web:default:research` to `web:default:research-notes` also rewrites descendants such as `web:default:research:analysis` across DB tables and associated session artifacts.
 
 ## Model restore across reloads
 
