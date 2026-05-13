@@ -48,7 +48,7 @@ export function AttachmentChip({ mediaId, filename }: AttachmentChipProps) {
         onClick={handlePreview}
         aria-label={`Preview ${filename}`}
       >
-        👁️
+        <i className="codicon codicon-open-preview" />
       </button>
       {showPreview && isImage && (
         <ImageLightbox

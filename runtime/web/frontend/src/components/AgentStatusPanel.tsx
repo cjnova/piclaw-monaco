@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
+import { getMessageUrl } from "../api/chat-jid";
 
 interface PanelState {
   text: string;
@@ -66,6 +67,18 @@ export function AgentStatusPanel() {
   const [tools, setTools] = useState<ToolCall[]>([]);
   const [elapsed, setElapsed] = useState({ draft: 0, thought: 0, tools: 0 });
 
+  // #320 Recovery substates
+  type RecoveryState = null | "recovering" | "compacting" | "retrying" | "blocked" | "error";
+  const [recoveryState, setRecoveryState] = useState<RecoveryState>(null);
+  const [recoveryDetail, setRecoveryDetail] = useState("");
+
+  // #323 Watchdog
+  type WatchdogState = null | "warning" | "hung";
+  const [watchdogState, setWatchdogState] = useState<WatchdogState>(null);
+  const [watchdogElapsed, setWatchdogElapsed] = useState(0);
+  const lastProgressTimeRef = useRef<number | null>(null);
+  const agentRunningRef = useRef(false);
+
   const draftBufferRef = useRef("");
   const thoughtBufferRef = useRef("");
   const draftRafRef = useRef<number | null>(null);
@@ -126,6 +139,8 @@ export function AgentStatusPanel() {
       const detail = (e as CustomEvent).detail;
       if (detail.type === "tool_call") {
         if (!toolsStartRef.current) toolsStartRef.current = Date.now();
+        lastProgressTimeRef.current = Date.now();
+        agentRunningRef.current = true;
         const id = detail.title || detail.tool_name || "unknown";
         setTools((prev) => {
           if (prev.some((t) => t.id === id && t.status === "running")) return prev;
@@ -138,13 +153,52 @@ export function AgentStatusPanel() {
           }];
         });
       } else if (detail.type === "tool_status") {
+        lastProgressTimeRef.current = Date.now();
         const id = detail.title || detail.tool_name || "unknown";
         setTools((prev) => prev.map((t) =>
           t.id === id ? { ...t, status: "done" as const, title: detail.title || t.title } : t
         ));
       }
-      if (detail.type && detail.type !== "context_usage" && detail.type !== "done") setStatus(detail.type);
+      if (detail.type && detail.type !== "context_usage" && detail.type !== "done") {
+        setStatus(detail.type);
+        if (detail.type !== "done") {
+          lastProgressTimeRef.current = Date.now();
+          agentRunningRef.current = true;
+        }
+      }
       if (detail.text || detail.message) setStatusText(detail.text || detail.message || "");
+
+      // #320 Recovery substates
+      if (detail.type === "intent") {
+        const key = detail.intent_key;
+        if (key === "recovery") {
+          const strategy = detail.recovery_strategy || "";
+          setRecoveryState("recovering");
+          setRecoveryDetail(strategy ? `Recovering — ${strategy.replace(/_/g, " ")}` : "Recovering…");
+        } else if (key === "compaction") {
+          setRecoveryState("compacting");
+          setRecoveryDetail("Auto-compacting…");
+        } else if (key === "retry") {
+          const attempt = detail.attempt;
+          const total = detail.total;
+          const delay = detail.delay_seconds;
+          setRecoveryState("retrying");
+          let txt = "Retrying";
+          if (attempt != null && total != null) txt += ` (attempt ${attempt}/${total}`;
+          if (delay != null) txt += `, ${delay}s delay`;
+          if (attempt != null && total != null) txt += ")";
+          setRecoveryDetail(txt);
+        }
+      } else if (detail.type === "error") {
+        const classifier = detail.classifier;
+        if (classifier === "auth_config" || classifier === "provider_auth") {
+          setRecoveryState("blocked");
+          setRecoveryDetail("Authentication required — reconfigure provider");
+        } else {
+          setRecoveryState("error");
+          setRecoveryDetail(detail.message || detail.text || "Recovery exhausted");
+        }
+      }
     };
 
     const handleTurnEnd = () => {
@@ -164,6 +218,13 @@ export function AgentStatusPanel() {
       setStatus(null);
       setStatusText("");
       setTools([]);
+      // Reset recovery and watchdog state
+      setRecoveryState(null);
+      setRecoveryDetail("");
+      setWatchdogState(null);
+      setWatchdogElapsed(0);
+      lastProgressTimeRef.current = null;
+      agentRunningRef.current = false;
     };
 
     let mounted = true;
@@ -184,7 +245,36 @@ export function AgentStatusPanel() {
     };
   }, [flushDraft, flushThought]);
 
-  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done");
+  // #323 Watchdog interval
+  useEffect(() => {
+    const watchdogInterval = setInterval(() => {
+      if (!agentRunningRef.current || lastProgressTimeRef.current === null) return;
+      const secs = Math.floor((Date.now() - lastProgressTimeRef.current) / 1000);
+      setWatchdogElapsed(secs);
+      if (secs > 60) {
+        setWatchdogState("hung");
+      } else if (secs > 30) {
+        setWatchdogState("warning");
+      }
+    }, 10000);
+    return () => clearInterval(watchdogInterval);
+  }, []);
+
+  // #319 Abort handler
+  const handleAbort = async () => {
+    try {
+      await fetch(getMessageUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ content: "/abort" }),
+      });
+    } catch {}
+    window.dispatchEvent(new CustomEvent("piclaw:agent-turn-end"));
+    window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
+  };
+
+  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState;
   if (!hasContent) return null;
 
   const toggleDraftExpand = () => {
@@ -246,6 +336,38 @@ export function AgentStatusPanel() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* #320 Recovery substates pill */}
+      {recoveryState && (
+        <div className={`agent-status__recovery-pill agent-status__recovery-pill--${recoveryState}`}>
+          <span aria-hidden="true">
+            {recoveryState === "compacting" ? "🟡" :
+             recoveryState === "retrying" ? "🟡" :
+             recoveryState === "recovering" ? "🟠" :
+             recoveryState === "blocked" ? "🔴" :
+             recoveryState === "error" ? "🔴" : ""}
+          </span>
+          <span>{recoveryDetail}</span>
+          {(watchdogState === "hung" || recoveryState === "blocked" || recoveryState === "error") && (
+            <button className="agent-status__abort-btn" onClick={handleAbort}>Abort</button>
+          )}
+        </div>
+      )}
+
+      {/* #323 Watchdog notification */}
+      {watchdogState && (
+        <div className={`agent-status__recovery-pill agent-status__recovery-pill--${watchdogState === "hung" ? "error" : "retrying"}`}>
+          <span aria-hidden="true">{watchdogState === "hung" ? "🔴" : "⚠️"}</span>
+          <span>
+            {watchdogState === "hung"
+              ? `Possible hung run (${Math.floor(watchdogElapsed / 60)}m ${watchdogElapsed % 60}s)`
+              : `No progress for ${watchdogElapsed}s`}
+          </span>
+          {watchdogState === "hung" && !recoveryState && (
+            <button className="agent-status__abort-btn" onClick={handleAbort}>Abort</button>
+          )}
         </div>
       )}
 
