@@ -1,6 +1,5 @@
 import { useSignal } from "@preact/signals";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { buildChatUrl } from "../api/chat-jid";
 import { useScrollManager } from "./message-list/useScrollManager";
 import { useTimelineFetch } from "./message-list/useTimelineFetch";
 import { useTimelineStream } from "./message-list/useTimelineStream";

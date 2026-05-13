@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 import { getChatJid } from "../../api/chat-jid";
-import type { AgentStatus, AgentContext, ModelInfo, ProviderUsage, ModelEntry } from "./types";
+import type { AgentStatus, AgentContext, ModelInfo, ProviderUsage } from "./types";
 import { fmtTokens } from "./types";
 import { addonHealthSignal } from "./addonHealthSignal";
 import { providerConfigured } from "../../app/providerState";
