@@ -7,6 +7,7 @@ import { renderMarkdown } from "../../utils/markdown-pipeline";
 import { relativeTime, getBlockKey } from "./helpers";
 import { MessageActionBar } from "./MessageActionBar";
 import { userAvatarUrl, assistantAvatarUrl } from "../../api/identity";
+import { AvatarPopover } from "../AvatarPopover";
 import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer";
 import type { ContentBlock, Interaction } from "./types";
 
@@ -185,6 +186,12 @@ export function MessageItem({
   const displayName = isUser ? "You" : "PiClaw";
 
   const [userImgError, setUserImgError] = useState(false);
+  const [avatarPopover, setAvatarPopover] = useState<{ type: "user" | "agent"; x: number; y: number } | null>(null);
+
+  const handleAvatarClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    setAvatarPopover({ type: isUser ? "user" : "agent", x: e.clientX, y: e.clientY });
+  };
 
   const AvatarCircle = () => {
     if (isUser) {
@@ -206,7 +213,7 @@ export function MessageItem({
         }`}
         data-message-id={interaction.id}
       >
-        <AvatarCircle />
+        <span className="message-list__avatar-clickable" onClick={handleAvatarClick}><AvatarCircle /></span>
         <div className="message-list__body message-list__body--collapsed">
           <MessageActionBar
             messageId={interaction.id}
@@ -246,7 +253,7 @@ export function MessageItem({
       }`}
       data-message-id={interaction.id}
     >
-      <AvatarCircle />
+      <span className="message-list__avatar-clickable" onClick={handleAvatarClick}><AvatarCircle /></span>
       <div className="message-list__body">
         <MessageActionBar
           messageId={interaction.id}
@@ -424,6 +431,14 @@ export function MessageItem({
         )}
         {lightboxSrc && (
           <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+        )}
+        {avatarPopover && (
+          <AvatarPopover
+            type={avatarPopover.type}
+            x={avatarPopover.x}
+            y={avatarPopover.y}
+            onDismiss={() => setAvatarPopover(null)}
+          />
         )}
       </div>
     </div>

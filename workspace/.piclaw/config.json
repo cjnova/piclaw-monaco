@@ -19,5 +19,8 @@
   },
   "models": {
     "scopedModelsOnly": false
+  },
+  "user": {
+    "userName": "cjnova"
   }
 }
