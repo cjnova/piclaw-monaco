@@ -40,7 +40,7 @@ describe("pack-hygiene", () => {
   });
 
   test("findBlockedPackEntries allows runtime files", () => {
-    const files = ["src/index.ts", "web/static/index.html", "docs/architecture.md"];
+    const files = ["src/index.ts", "web/static/classic/index.html", "docs/architecture.md"];
     expect(findBlockedPackEntries(files)).toEqual([]);
   });
 

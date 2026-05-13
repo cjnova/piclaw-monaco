@@ -1354,7 +1354,7 @@ export function WorkspaceExplorer({
         debouncedVisibilityRef.current = setTimeout(() => {
             debouncedVisibilityRef.current = 0;
             updateVisibility();
-        }, 250);
+        }, 2000);
     }).current;
 
     useEffect(() => {

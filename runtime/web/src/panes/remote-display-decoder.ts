@@ -2,7 +2,7 @@
 import * as loader from '@assemblyscript/loader';
 import { collectAssemblyScriptGarbageBestEffort } from './remote-display-gc.js';
 
-const REMOTE_DISPLAY_DECODER_WASM_URL = '/static/js/vendor/remote-display-decoder.wasm';
+const REMOTE_DISPLAY_DECODER_WASM_URL = '/static/common/js/vendor/remote-display-decoder.wasm';
 
 /**
  * Full-pipeline WASM decoder.

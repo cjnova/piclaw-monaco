@@ -1,11 +1,11 @@
 # Current Dream state
 
-Generated: 2026-05-12T15:08:40.009Z
+Generated: 2026-05-13T05:21:50.698Z
 
 ## Status
 
 - Window: last 7 days
-- Complete days: 4
+- Complete days: 3
 - Partial days: 0
 - Unsummarised days: 0
 - Latest complete day: 2026-05-12
@@ -13,9 +13,9 @@ Generated: 2026-05-12T15:08:40.009Z
 ## Complete days
 
 - 2026-05-12
-  - Summary: Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent confirmed **PiClaw v2.3.2**. No project work, decisi…
-  - Summarised until: 2026-05-12T15:06:13.962Z
-  - Messages: 2
+  - Summary: Active day (15:05–20:14 UTC, 58 messages, 1 session). Started with a PiClaw version check (confirmed **v2.3.2**), followed by a markdown rendering test. Mid-se…
+  - Summarised until: 2026-05-12T20:14:45.075Z
+  - Messages: 58
   - Session trees: 1
   - Session chats: 1
 - 2026-05-08
@@ -28,12 +28,6 @@ Generated: 2026-05-12T15:08:40.009Z
   - Summary: Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functionality: initial `/widget test` slash command failed …
   - Summarised until: 2026-05-07T15:24:21.657Z
   - Messages: 24
-  - Session trees: 1
-  - Session chats: 1
-- 2026-05-05
-  - Summary: Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message test…
-  - Summarised until: 2026-05-05T15:10:31.114Z
-  - Messages: 68
   - Session trees: 1
   - Session chats: 1
 

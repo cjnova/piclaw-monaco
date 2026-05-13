@@ -83,17 +83,17 @@ test("sse helper streams connection and broadcasts", async () => {
 
 test("static helpers serve files and not-found", async () => {
   const root = join(import.meta.dir, "..", "..", "..");
-  const indexPath = join(root, "web", "static", "index.html");
+  const indexPath = join(root, "web", "static", "classic", "index.html");
   expect(existsSync(indexPath)).toBe(true);
 
-  const okRes = await serveStatic("index.html", () => new Response("nope", { status: 404 }));
+  const okRes = await serveStatic("classic/index.html", () => new Response("nope", { status: 404 }));
   expect(okRes.status).toBe(200);
   expect(okRes.headers.get("Content-Type")).toContain("text/html");
   expect(okRes.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
   const indexHtml = await okRes.text();
   expect(indexHtml).not.toContain("__APP_ASSET_VERSION__");
   expect(indexHtml).not.toContain("__PICLAW_NOTIFICATION_SOURCE_LABELS_FLAG__");
-  expect(indexHtml).toMatch(/\/static\/dist\/app\.bundle\.js\?v=[a-z0-9]+/i);
+  expect(indexHtml).toMatch(/\/static\/classic\/dist\/app\.bundle\.js\?v=[a-z0-9]+/i);
   expect(indexHtml).toMatch(/\/manifest\.json\?v=[a-z0-9]+/i);
   expect(indexHtml).toContain('window.__PICLAW_NOTIFICATION_SOURCE_LABELS_ENABLED__ = "0" === "1";');
 
@@ -101,9 +101,9 @@ test("static helpers serve files and not-found", async () => {
   expect(loginRes.status).toBe(200);
   const loginHtml = await loginRes.text();
   expect(loginHtml).not.toContain("__LOGIN_ASSET_VERSION__");
-  expect(loginHtml).toMatch(/\/static\/dist\/login\.bundle\.js\?v=[a-z0-9]+/i);
+  expect(loginHtml).toMatch(/\/static\/(common\/)?dist\/login\.bundle\.js\?v=[a-z0-9]+/i);
 
-  const appBundleRes = await serveStatic("dist/app.bundle.js", () => new Response("nope", { status: 404 }));
+  const appBundleRes = await serveStatic("classic/dist/app.bundle.js", () => new Response("nope", { status: 404 }));
   expect(appBundleRes.status).toBe(200);
   expect(appBundleRes.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
 
@@ -114,7 +114,7 @@ test("static helpers serve files and not-found", async () => {
   expect(swText).not.toContain("__PICLAW_NOTIFICATION_SOURCE_LABELS_FLAG__");
   expect(swText).toContain('const NOTIFICATION_SOURCE_LABELS_ENABLED = "0" === "1";');
 
-  const wasmRes = await serveStatic("js/vendor/remote-display-decoder.wasm", () => new Response("nope", { status: 404 }));
+  const wasmRes = await serveStatic("common/js/vendor/remote-display-decoder.wasm", () => new Response("nope", { status: 404 }));
   expect(wasmRes.status).toBe(200);
   expect(wasmRes.headers.get("Content-Type")).toBe("application/wasm");
 
@@ -126,7 +126,7 @@ test("static text helpers serve repeated html and service worker reads", async (
   const responses = await Promise.all(
     Array.from({ length: 20 }, async () => {
       const [indexRes, swRes] = await Promise.all([
-        serveStatic("index.html", () => new Response("nope", { status: 404 })),
+        serveStatic("classic/index.html", () => new Response("nope", { status: 404 })),
         serveStatic("sw.js", () => new Response("nope", { status: 404 })),
       ]);
       return {

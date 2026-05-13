@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * API client for Vibes backend
  */
@@ -8,10 +7,13 @@ import { resolveScreenSizeHint } from './ui/screen-size-hint.js';
 
 const API_BASE = '';
 
+type ApiOptions = Record<string, any>;
+type ApiError = Error & { status?: number; code?: string; payload?: unknown };
+
 /**
  * Fetch wrapper with error handling
  */
-async function request(url, options = {}) {
+async function request(url, options: RequestInit & ApiOptions = {}) {
     const startedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
         ? performance.now()
         : Date.now();
@@ -145,7 +147,7 @@ export async function getSystemMetrics() {
     return request('/agent/system-metrics');
 }
 
-export async function getScheduledTasks(options = {}) {
+export async function getScheduledTasks(options: ApiOptions = {}) {
     const params = new URLSearchParams();
     if (options?.id) params.set('id', String(options.id));
     if (options?.chatJid) params.set('chat_jid', String(options.chatJid));
@@ -157,7 +159,7 @@ export async function getScheduledTasks(options = {}) {
     return request(`/agent/scheduled-tasks${query}`);
 }
 
-export async function updateScheduledTask(action, id, options = {}) {
+export async function updateScheduledTask(action, id, options: ApiOptions = {}) {
     return request('/agent/scheduled-tasks/action', {
         method: 'POST',
         body: JSON.stringify({
@@ -165,6 +167,47 @@ export async function updateScheduledTask(action, id, options = {}) {
             id,
             allow_internal: options?.allowInternal === true,
         }),
+    });
+}
+
+export async function getSessionRecordings() {
+    return request('/agent/recordings');
+}
+
+export async function getSessionRecording(id) {
+    return request(`/agent/recordings/${encodeURIComponent(id)}`);
+}
+
+export async function startSessionRecording(options: ApiOptions = {}) {
+    return request('/agent/recordings/start', {
+        method: 'POST',
+        body: JSON.stringify(options || {}),
+    });
+}
+
+export async function stopSessionRecording(options: ApiOptions = {}) {
+    return request('/agent/recordings/stop', {
+        method: 'POST',
+        body: JSON.stringify(options || {}),
+    });
+}
+
+export async function deleteSessionRecording(id) {
+    return request(`/agent/recordings/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function sessionRecordingExportUrl(id, format = 'json') {
+    return `/agent/recordings/${encodeURIComponent(id)}/export?format=${encodeURIComponent(format)}`;
+}
+
+export function sessionRecordingPlaybackUrl(id) {
+    return `/recordings/playback?id=${encodeURIComponent(id)}`;
+}
+
+export async function previewSessionRecordingRedaction(payload, options: ApiOptions = {}) {
+    return request('/agent/recordings/redact-preview', {
+        method: 'POST',
+        body: JSON.stringify({ payload, ...options }),
     });
 }
 
@@ -211,7 +254,7 @@ export async function deletePost(postId, cascade = false, chatJid = null) {
  */
 export async function sendAgentMessage(agentId, content, threadId = null, mediaIds = [], mode = null, chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    const payload = {
+    const payload: ApiOptions = {
         content,
         thread_id: threadId,
         media_ids: mediaIds,
@@ -270,7 +313,7 @@ export async function getActiveChatAgents() {
 /**
  * List known branch/session records from the branch registry.
  */
-export async function getChatBranches(rootChatJid = null, options = {}) {
+export async function getChatBranches(rootChatJid = null, options: ApiOptions = {}) {
     const params = new URLSearchParams();
     if (rootChatJid) params.set('root_chat_jid', String(rootChatJid));
     if (options?.includeArchived) params.set('include_archived', '1');
@@ -281,7 +324,7 @@ export async function getChatBranches(rootChatJid = null, options = {}) {
 /**
  * Create a first-class forked branch from an existing chat branch.
  */
-export async function forkChatBranch(sourceChatJid, options = {}) {
+export async function forkChatBranch(sourceChatJid, options: ApiOptions = {}) {
     return request('/agent/branch-fork', {
         method: 'POST',
         body: JSON.stringify({
@@ -304,7 +347,7 @@ export async function createRootChatSession(agentName) {
 /**
  * Rename a registry-backed chat branch / agent identity.
  */
-export async function renameChatBranch(chatJid, options = {}) {
+export async function renameChatBranch(chatJid, options: ApiOptions = {}) {
     return request('/agent/branch-rename', {
         method: 'POST',
         body: JSON.stringify({
@@ -357,7 +400,7 @@ export async function renameChatJid(oldJid, newJid) {
 /**
  * Restore/reopen an archived branch into active discovery.
  */
-export async function restoreChatBranch(chatJid, options = {}) {
+export async function restoreChatBranch(chatJid, options: ApiOptions = {}) {
     return request('/agent/branch-restore', {
         method: 'POST',
         body: JSON.stringify({
@@ -370,7 +413,7 @@ export async function restoreChatBranch(chatJid, options = {}) {
 /**
  * Relay a peer message from one chat agent/window to another.
  */
-export async function sendPeerAgentMessage(sourceChatJid, targetChatOrName, content, mode = 'auto', options = {}) {
+export async function sendPeerAgentMessage(sourceChatJid, targetChatOrName, content, mode = 'auto', options: ApiOptions = {}) {
     const payload = {
         source_chat_jid: sourceChatJid,
         content,
@@ -390,7 +433,7 @@ export async function getWebPushPublicKey() {
     return request('/agent/push/vapid-public-key');
 }
 
-export async function saveWebPushSubscription(subscription, options = {}) {
+export async function saveWebPushSubscription(subscription, options: ApiOptions = {}) {
     const payload = {
         subscription,
         ...(options?.deviceId ? { device_id: options.deviceId } : {}),
@@ -401,7 +444,7 @@ export async function saveWebPushSubscription(subscription, options = {}) {
     });
 }
 
-export async function deleteWebPushSubscription(subscription, options = {}) {
+export async function deleteWebPushSubscription(subscription, options: ApiOptions = {}) {
     const payload = {
         subscription,
         ...(options?.deviceId ? { device_id: options.deviceId } : {}),
@@ -447,7 +490,7 @@ export async function getAutoresearchStatus(chatJid = null) {
 /**
  * Stop the currently running autoresearch experiment for the current chat.
  */
-export async function stopAutoresearch(chatJid = null, options = {}) {
+export async function stopAutoresearch(chatJid = null, options: ApiOptions = {}) {
     return request('/agent/autoresearch/stop', {
         method: 'POST',
         body: JSON.stringify({
@@ -597,7 +640,7 @@ export async function submitAdaptiveCardAction(payload) {
     return response.json();
 }
 
-export async function streamSidePrompt(prompt, options = {}) {
+export async function streamSidePrompt(prompt, options: ApiOptions = {}) {
     const response = await fetch(API_BASE + '/agent/side-prompt/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -630,7 +673,7 @@ export async function streamSidePrompt(prompt, options = {}) {
     });
 
     if (errorPayload) {
-        const error = new Error(errorPayload?.error || 'Side prompt failed');
+        const error = new Error(errorPayload?.error || 'Side prompt failed') as ApiError;
         error.payload = errorPayload;
         throw error;
     }
@@ -775,7 +818,7 @@ export async function attachWorkspaceFile(path) {
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024;
 const WORKSPACE_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
 
-function buildWorkspaceUploadUrl(pathname, targetPath = '', options = {}) {
+function buildWorkspaceUploadUrl(pathname, targetPath = '', options: ApiOptions = {}) {
     const params = new URLSearchParams();
     if (targetPath) params.set('path', targetPath);
     if (options.overwrite) params.set('overwrite', '1');
@@ -810,13 +853,13 @@ function uploadWorkspaceChunk(blob, url, headers, progressCallback) {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     resolve(body);
                 } else {
-                    const err = new Error(body.error || `HTTP ${xhr.status}`);
+                    const err = new Error(body.error || `HTTP ${xhr.status}`) as ApiError;
                     err.status = xhr.status;
                     err.code = body.code;
                     reject(err);
                 }
             } catch {
-                const err = new Error(`HTTP ${xhr.status}`);
+                const err = new Error(`HTTP ${xhr.status}`) as ApiError;
                 err.status = xhr.status;
                 reject(err);
             }
@@ -827,7 +870,7 @@ function uploadWorkspaceChunk(blob, url, headers, progressCallback) {
     });
 }
 
-async function uploadWorkspaceFileChunked(file, targetPath = '', options = {}) {
+async function uploadWorkspaceFileChunked(file, targetPath = '', options: ApiOptions = {}) {
     const uploadId = createWorkspaceUploadId();
     const url = buildWorkspaceUploadUrl('/workspace/upload-chunk', targetPath, options);
     const chunkSize = Math.max(1, Math.min(MAX_UPLOAD_SIZE, Number(options.chunkSize) || WORKSPACE_UPLOAD_CHUNK_SIZE));
@@ -876,11 +919,11 @@ async function uploadWorkspaceFileChunked(file, targetPath = '', options = {}) {
     return lastResult;
 }
 
-export async function uploadWorkspaceFile(file, targetPath = '', options = {}) {
+export async function uploadWorkspaceFile(file, targetPath = '', options: ApiOptions = {}) {
     if (file?.size > MAX_UPLOAD_SIZE) {
         const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
         const limitMB = (MAX_UPLOAD_SIZE / (1024 * 1024)).toFixed(0);
-        const err = new Error(`File too large (${sizeMB} MB). Maximum upload size is ${limitMB} MB.`);
+        const err = new Error(`File too large (${sizeMB} MB). Maximum upload size is ${limitMB} MB.`) as ApiError;
         err.code = 'file_too_large';
         throw err;
     }
@@ -898,7 +941,7 @@ export async function createWorkspaceFile(path, name, content = '') {
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Create failed' }));
-        const err = new Error(error.error || `HTTP ${response.status}`);
+        const err = new Error(error.error || `HTTP ${response.status}`) as ApiError;
         err.status = response.status;
         err.code = error.code;
         throw err;
@@ -917,7 +960,7 @@ export async function renameWorkspaceFile(path, name) {
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Rename failed' }));
-        const err = new Error(error.error || `HTTP ${response.status}`);
+        const err = new Error(error.error || `HTTP ${response.status}`) as ApiError;
         err.status = response.status;
         err.code = error.code;
         throw err;
@@ -936,7 +979,7 @@ export async function moveWorkspaceEntry(path, target) {
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Move failed' }));
-        const err = new Error(error.error || `HTTP ${response.status}`);
+        const err = new Error(error.error || `HTTP ${response.status}`) as ApiError;
         err.status = response.status;
         err.code = error.code;
         throw err;
@@ -962,7 +1005,7 @@ export async function setWorkspaceVisibility(visible, showHidden = false) {
 /**
  * Get raw workspace file URL (images/SVG)
  */
-export function getWorkspaceRawUrl(path, options = {}) {
+export function getWorkspaceRawUrl(path, options: ApiOptions = {}) {
     const query = new URLSearchParams({ path: String(path || '') });
     if (options.download) query.set('download', '1');
     return `${API_BASE}/workspace/raw?${query.toString()}`;
@@ -987,7 +1030,21 @@ export function getWorkspaceDownloadUrl(path, showHidden = false) {
  * SSE client for live updates
  */
 export class SSEClient {
-    constructor(onEvent, onStatusChange, options = {}) {
+    onEvent: (eventType: string, data: unknown) => void;
+    onStatusChange: (status: string) => void;
+    chatJid: string | null;
+    eventSource: EventSource | null;
+    reconnectTimeout: ReturnType<typeof setTimeout> | null;
+    reconnectDelay: number;
+    status: string;
+    reconnectAttempts: number;
+    cooldownUntil: number;
+    connecting: boolean;
+    lastActivityAt: number;
+    staleCheckTimer: ReturnType<typeof setInterval> | null;
+    staleThresholdMs: number;
+
+    constructor(onEvent, onStatusChange, options: ApiOptions = {}) {
         this.onEvent = onEvent;
         this.onStatusChange = onStatusChange;
         this.chatJid = typeof options?.chatJid === 'string' && options.chatJid.trim() ? options.chatJid.trim() : null;
@@ -1180,15 +1237,10 @@ export class SSEClient {
 /**
  * Save annotations (highlights) for a post to the server.
  */
-export async function savePostAnnotations(postId: number, annotations: unknown[], chatJid?: string): Promise<void> {
+export async function savePostAnnotations(postId: number, annotations: unknown[], chatJid?: string) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    const response = await fetch(`${API_BASE}/post/${postId}/annotations${query}`, {
+    return request(`/post/${postId}/annotations${query}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ annotations }),
     });
-    if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`Failed to save annotations: ${response.status} ${text}`);
-    }
 }

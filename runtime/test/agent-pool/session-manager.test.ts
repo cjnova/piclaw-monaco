@@ -6,7 +6,7 @@ import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import { readDeferredBranchSeed, restoreClaimedDeferredBranchSeed, writeDeferredBranchSeed } from "../../src/agent-pool/branch-seeding.js";
 import { ensureSessionDir } from "../../src/agent-pool/session.js";
 import { AgentSessionManager } from "../../src/agent-pool/session-manager.js";
-import { createTempWorkspace, setEnv } from "../helpers.js";
+import { createTempWorkspace, setEnv, waitFor } from "../helpers.js";
 
 let restoreEnv: (() => void) | null = null;
 let cleanupWorkspace: (() => void) | null = null;
@@ -559,6 +559,43 @@ test("AgentSessionManager priority prewarms bypass the recent-chat cooldown and 
     Date.now = originalDateNow;
     await fixture.manager.shutdown();
   }
+});
+
+test("AgentSessionManager rejects new prewarms once shutdown starts", async () => {
+  const fixture = createManager({
+    createSession: async () => createRuntime({ dispose() {} }),
+  });
+
+  await fixture.manager.shutdown();
+  expect(fixture.manager.prewarm("web:after-shutdown")).toBe(false);
+});
+
+test("AgentSessionManager does not retain a prewarm-created runtime when shutdown starts mid-create", async () => {
+  let disposed = 0;
+  let releaseCreate!: () => void;
+  const createGate = new Promise<void>((resolve) => {
+    releaseCreate = resolve;
+  });
+
+  const fixture = createManager({
+    createSession: async () => {
+      await createGate;
+      return createRuntime({
+        dispose() {
+          disposed += 1;
+        },
+      }) as any;
+    },
+  });
+
+  expect(fixture.manager.prewarm("web:shutdown-race")).toBe(true);
+  await Bun.sleep(10);
+  await fixture.manager.shutdown();
+  releaseCreate();
+  await waitFor(() => disposed === 1, 1_000, 10);
+
+  expect(fixture.pool.has("web:shutdown-race")).toBe(false);
+  expect(disposed).toBe(1);
 });
 
 test("restoreClaimedDeferredBranchSeed preserves a newer primary seed written after claim", () => {

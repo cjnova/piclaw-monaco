@@ -90,6 +90,7 @@ const MID_TURN_CONTEXT_CHECK_MIN_INTERVAL_MS = 1_000;
 const CONTEXT_USAGE_UPDATE_MIN_INTERVAL_MS = 250;
 const DEFAULT_RECOVERY_LOOP_GUARD_MAX_FAILURES = 3;
 const DEFAULT_RECOVERY_LOOP_GUARD_WINDOW_MS = 10 * 60 * 1000;
+const MAX_RECOVERY_LOOP_GUARD_CHATS = 512;
 
 type RecoveryFailureSignatureRecord = {
   atMs: number;
@@ -97,6 +98,35 @@ type RecoveryFailureSignatureRecord = {
 };
 
 const recentRecoveryFailuresByChat = new Map<string, RecoveryFailureSignatureRecord[]>();
+
+function pruneRecoveryFailureMap(now: number, windowMs: number): void {
+  for (const [chatJid, records] of recentRecoveryFailuresByChat.entries()) {
+    const filtered = records.filter((entry) => (now - entry.atMs) <= windowMs);
+    if (filtered.length === 0) {
+      recentRecoveryFailuresByChat.delete(chatJid);
+      continue;
+    }
+    if (filtered.length !== records.length) {
+      recentRecoveryFailuresByChat.set(chatJid, filtered.slice(-200));
+    }
+  }
+
+  if (recentRecoveryFailuresByChat.size <= MAX_RECOVERY_LOOP_GUARD_CHATS) return;
+
+  const oldestChats = Array.from(recentRecoveryFailuresByChat.entries())
+    .map(([chatJid, records]) => ({
+      chatJid,
+      lastAtMs: records.length > 0 ? records[records.length - 1]!.atMs : 0,
+    }))
+    .sort((a, b) => a.lastAtMs - b.lastAtMs);
+
+  const overflow = recentRecoveryFailuresByChat.size - MAX_RECOVERY_LOOP_GUARD_CHATS;
+  for (let i = 0; i < overflow; i += 1) {
+    const candidate = oldestChats[i];
+    if (!candidate) break;
+    recentRecoveryFailuresByChat.delete(candidate.chatJid);
+  }
+}
 
 function normalizeRecoverySignatureText(value: string | null | undefined): string {
   return String(value || "")
@@ -144,6 +174,8 @@ function shouldSuppressRecoveryLoop(options: {
   }
 
   const now = Date.now();
+  pruneRecoveryFailureMap(now, windowMs);
+
   const signature = [
     normalizeRecoverySignatureText(options.modelLabel),
     normalizeRecoverySignatureText(options.classifier),

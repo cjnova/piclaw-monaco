@@ -40,10 +40,10 @@ window.addEventListener('piclaw:widget-message', (e) => {
 
 The \`submit({ text })\` call is the main way to get output from the widget back into the conversation.
 
-Vendored libraries (served from \`/static/js/vendor/\`):
+Vendored libraries (served from \`/static/common/js/vendor/\`):
 - **Babylon.js 7.x** — UMD global build (exposes \`BABYLON\` global), use via script tag:
   \`\`\`html
-  <script src="/static/js/vendor/babylon/babylon.js"></script>
+  <script src="/static/common/js/vendor/babylon/babylon.js"></script>
   <script>
   var canvas = document.getElementById('renderCanvas');
   var engine = new BABYLON.Engine(canvas, true);
@@ -57,7 +57,7 @@ Vendored libraries (served from \`/static/js/vendor/\`):
   \`\`\`
 - **ECharts 5.6** — rich charting (bar, line, pie, heatmap, treemap, radar, geo, etc.):
   \`\`\`html
-  <script src="/static/js/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/common/js/vendor/echarts/echarts.min.js"></script>
   <div id="chart" style="width:100%;height:400px"></div>
   <script>
   var chart = echarts.init(document.getElementById('chart'), 'dark');

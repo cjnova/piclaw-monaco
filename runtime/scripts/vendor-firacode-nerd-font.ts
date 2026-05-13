@@ -12,16 +12,16 @@ const ARCHIVE_PATH = resolve(CACHE_DIR, ZIP_NAME);
 const OUTPUTS = [
   {
     archivePath: "FiraCodeNerdFontMono-Regular.ttf",
-    outputFile: "web/static/fonts/vendor/firacode-nerd-font-mono-regular.ttf",
+    outputFile: "web/static/common/fonts/vendor/firacode-nerd-font-mono-regular.ttf",
     weight: 400,
   },
   {
     archivePath: "FiraCodeNerdFontMono-Bold.ttf",
-    outputFile: "web/static/fonts/vendor/firacode-nerd-font-mono-bold.ttf",
+    outputFile: "web/static/common/fonts/vendor/firacode-nerd-font-mono-bold.ttf",
     weight: 700,
   },
 ] as const;
-const METADATA_FILE = resolve(process.cwd(), "web/static/fonts/vendor/firacode-nerd-font.meta.json");
+const METADATA_FILE = resolve(process.cwd(), "web/static/common/fonts/vendor/firacode-nerd-font.meta.json");
 
 function sha256ForFile(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");

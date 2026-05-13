@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useMemo, useRef, useState } from '../vendor/preact-htm.js';
 import { getMediaInfo, getMediaUrl, getThumbnailUrl, submitAdaptiveCardAction } from '../api.js';
 import { renderMarkdown, renderMermaidDiagrams, sanitizeUrl } from '../markdown.js';
@@ -9,6 +8,7 @@ import { getAttachmentPreviewKind, getAttachmentPreviewLabel } from '../ui/attac
 import { extractCardBlocks, renderAdaptiveCard } from '../ui/adaptive-card-renderer.js';
 import { buildAdaptiveCardSubmissionFallbackText, describeAdaptiveCardSubmission, extractAdaptiveCardSubmissionBlocks } from '../ui/adaptive-card-submission.js';
 import { buildGeneratedWidgetPayload, canRenderGeneratedWidget } from '../ui/generated-widget.js';
+import { disclosureTriangleSvgString, renderDisclosureTriangle } from '../ui/disclosure-triangle.js';
 import { ImageModal } from './image-modal.js';
 import { ImageAnnotator, canAnnotate } from './image-annotator.js';
 import { FilePill } from './file-pill.js';
@@ -200,7 +200,7 @@ function OutcomePill({ marker }) {
         <div class=${`post-outcome-pill post-outcome-pill-${severity}`}>
             <div class="post-outcome-pill-header" onClick=${hasDetail ? toggle : undefined}>
                 ${hasDetail && html`
-                    <span class=${`post-outcome-pill-toggle${expanded ? ' expanded' : ''}`} aria-hidden="true">▶</span>
+                    <span class="post-outcome-pill-toggle" aria-hidden="true">${renderDisclosureTriangle(expanded ? 'down' : 'right')}</span>
                 `}
                 <span class="post-outcome-pill-label">${label}</span>
                 ${draftRecovered && html`<span class="post-outcome-pill-badge">draft recovered</span>`}
@@ -340,7 +340,7 @@ function ResourceBlock({ block }) {
     return html`
         <div class="resource-embed">
             <button class="resource-embed-toggle" onClick=${(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}>
-                ${open ? '▼' : '▶'} ${title}
+                ${renderDisclosureTriangle(open ? 'down' : 'right')} ${title}
             </button>
             ${open && html`
                 ${contentText && html`<pre class="resource-embed-content">${contentText}</pre>`}
@@ -409,13 +409,13 @@ function GeneratedWidgetLaunch({ block, post, onOpenWidget }) {
                     type="button"
                     disabled=${!supportsRender}
                     onClick=${launchWidget}
-                    title=${supportsRender ? 'Open widget in a floating pane' : 'Unsupported widget artifact'}
+                    title=${supportsRender ? 'Open widget in a floating pane with a zen-mode toggle' : 'Unsupported widget artifact'}
                 >
                     ${openLabel}
                 </button>
                 <span class="generated-widget-launch-note">
                     ${supportsRender
-                        ? 'Opens in a dismissible floating pane.'
+                        ? 'Opens in a dismissible floating pane with a zen-mode toggle.'
                         : 'This widget artifact is missing or unsupported.'}
                 </span>
             </div>
@@ -479,6 +479,9 @@ export function getDisplayContent(content, _linkPreviews) {
 }
 
 const CODE_COPY_RESET_MS = 1800;
+const LARGE_CODE_BLOCK_COLLAPSE_LINES = 40;
+const LARGE_CODE_BLOCK_COLLAPSE_BYTES = 24 * 1024;
+const LARGE_CODE_BLOCK_PREVIEW_LINES = 16;
 const COPY_ICON_SVG = `
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <rect x="9" y="9" width="10" height="10" rx="2"></rect>
@@ -530,6 +533,23 @@ const CLIPBOARD_STYLE = `
   hr { border: none; border-top: 1px solid #d0d7de; margin: 1em 0; }
   img { max-width: 100%; }
 </style>`;
+
+export function getLargeCodeBlockMetadata(text, options = {}) {
+    const value = typeof text === 'string' ? text : '';
+    const lines = value ? value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n') : [];
+    const byteLength = new TextEncoder().encode(value).byteLength;
+    const lineThreshold = Number.isFinite(options.lineThreshold) ? options.lineThreshold : LARGE_CODE_BLOCK_COLLAPSE_LINES;
+    const byteThreshold = Number.isFinite(options.byteThreshold) ? options.byteThreshold : LARGE_CODE_BLOCK_COLLAPSE_BYTES;
+    const shouldCollapse = lines.length > lineThreshold || byteLength > byteThreshold;
+    const visibleLines = Math.min(lines.length, Number.isFinite(options.previewLines) ? options.previewLines : LARGE_CODE_BLOCK_PREVIEW_LINES);
+    return {
+        shouldCollapse,
+        lineCount: lines.length,
+        byteLength,
+        visibleLines,
+        omittedLines: Math.max(0, lines.length - visibleLines),
+    };
+}
 
 async function copyTextToClipboard(text) {
     const value = typeof text === 'string' ? text : '';
@@ -636,6 +656,32 @@ function enhanceCodeBlocks(container) {
     blocks.forEach((pre) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'post-code-block';
+        const code = pre.querySelector('code');
+        const blockMeta = getLargeCodeBlockMetadata(code?.textContent || '');
+        if (blockMeta.shouldCollapse) {
+            wrapper.classList.add('post-code-block-collapsed');
+            wrapper.style.setProperty('--post-code-preview-lines', String(blockMeta.visibleLines));
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'post-code-expand-btn';
+            const updateToggle = () => {
+                const expanded = wrapper.classList.contains('post-code-block-expanded');
+                toggle.innerHTML = expanded
+                    ? `${disclosureTriangleSvgString('up')} <span>Collapse output</span>`
+                    : `${disclosureTriangleSvgString('right')} <span>Expand output · ${blockMeta.lineCount.toLocaleString()} lines · ${formatFileSize(blockMeta.byteLength)}${blockMeta.omittedLines ? ` · ${blockMeta.omittedLines.toLocaleString()} hidden` : ''}</span>`;
+                toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            };
+            const handleToggleClick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                wrapper.classList.toggle('post-code-block-expanded');
+                updateToggle();
+            };
+            toggle.addEventListener('click', handleToggleClick);
+            updateToggle();
+            wrapper.appendChild(toggle);
+            cleanups.push(() => toggle.removeEventListener('click', handleToggleClick));
+        }
         pre.parentNode?.insertBefore(wrapper, pre);
         wrapper.appendChild(pre);
 
@@ -894,11 +940,14 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
     const copyResetTimerRef = useRef(null);
 
     const data = post.data;
+    const blocks = data.content_blocks || [];
+    const mediaIds = data.media_ids || [];
+    const peerMessageMeta = getPeerMessageMeta(blocks);
     const isAgent = data.type === 'agent_response';
     const resolvedUserName = userName || 'You';
     const isPeerAgentMessage = Boolean(!isAgent && peerMessageMeta?.sourceAgentName);
     const displayName = isPeerAgentMessage
-        ? (agentName || DEFAULT_AGENT_NAME)
+        ? peerMessageMeta.sourceAgentName
         : isAgent ? (agentName || DEFAULT_AGENT_NAME) : resolvedUserName;
     const searchChatAgentName = typeof post.chat_agent_name === 'string' ? post.chat_agent_name.trim() : '';
     const showSearchChatAgentTag = Boolean(isAgent && highlightQuery && searchChatAgentName && searchChatAgentName !== displayName);
@@ -931,9 +980,6 @@ export function Post({ post, onClick, onHashtagClick, onMessageRef, onScrollToMe
         }
         : null;
 
-    const blocks = data.content_blocks || [];
-    const mediaIds = data.media_ids || [];
-    const peerMessageMeta = getPeerMessageMeta(blocks);
     const showPeerAgentTag = Boolean(peerMessageMeta?.sourceAgentName && isPeerAgentMessage);
 
     // Keep original message text even when link previews are available.

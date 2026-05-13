@@ -95,7 +95,7 @@ async function ensureSdk(): Promise<void> {
 
   sdkLoadPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "/static/js/vendor/adaptivecards.min.js";
+    script.src = "/static/common/js/vendor/adaptivecards.min.js";
     script.onload = () => {
       sdkLoaded = true;
       resolve();

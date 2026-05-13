@@ -1,1 +1,1 @@
-../../static/js/vendor/preact-htm.js
+../../static/common/js/vendor/preact-htm.js

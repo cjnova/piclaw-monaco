@@ -11,11 +11,15 @@ describe("portable artifact Windows installer", () => {
     expect(script.indexOf("$ErrorActionPreference = 'Stop'")).toBeGreaterThan(script.indexOf(")\r\n"));
   });
 
-  test("writes the cmd shim with interpreted CRLF escapes instead of literal backtick text", () => {
+  test("writes cmd shims for piclaw and pi with interpreted CRLF escapes instead of literal backtick text", () => {
     const script = buildWindowsInstallScript("piclaw-2.3.4-windows-x64");
 
-    expect(script).toContain("$Launcher = Join-Path $Current 'bin\\piclaw.cmd'");
-    expect(script).toContain('$Shim = "@echo off`r`n`"$Launcher`" %*`r`n"');
+    expect(script).toContain("$PiclawLauncher = Join-Path $Current 'bin\\piclaw.cmd'");
+    expect(script).toContain("$PiLauncher = Join-Path $Current 'bin\\pi.cmd'");
+    expect(script).toContain('$PiclawShim = "@echo off`r`n`"$PiclawLauncher`" %*`r`n"');
+    expect(script).toContain('$PiShim = "@echo off`r`n`"$PiLauncher`" %*`r`n"');
+    expect(script).toContain("$PiclawShim | Set-Content -Encoding ASCII (Join-Path $BinDir 'piclaw.cmd')");
+    expect(script).toContain("$PiShim | Set-Content -Encoding ASCII (Join-Path $BinDir 'pi.cmd')");
     expect(script).not.toContain("'@echo off`r`n");
   });
 });

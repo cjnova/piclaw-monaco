@@ -93,4 +93,17 @@ describe("readEnvFile", () => {
       cleanup();
     }
   });
+
+  test("strips inline comments on unquoted values but keeps literal hashes", () => {
+    setup("A=value # comment\nB=https://example.com/#frag\nC='value # kept'\nD=abc#def");
+    try {
+      const result = readEnvFile(["A", "B", "C", "D"]);
+      expect(result.A).toBe("value");
+      expect(result.B).toBe("https://example.com/#frag");
+      expect(result.C).toBe("value # kept");
+      expect(result.D).toBe("abc#def");
+    } finally {
+      cleanup();
+    }
+  });
 });

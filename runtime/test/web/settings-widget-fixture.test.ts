@@ -5,9 +5,9 @@ import { join } from "node:path";
 const repoRoot = join(import.meta.dir, "../..");
 
 test("settings widget fixture static shell references the fixture bundle and app CSS", () => {
-  const html = readFileSync(join(repoRoot, "web/static/dev/settings-widget-fixture.html"), "utf8");
-  expect(html).toContain('/static/dist/app.bundle.css');
-  expect(html).toContain('/static/dist/settings-widget-fixture.bundle.js');
+  const html = readFileSync(join(repoRoot, "test/fixtures/settings-widget-fixture.html"), "utf8");
+  expect(html).toContain('/static/classic/dist/app.bundle.css');
+  expect(html).toContain('/static/classic/dist/settings-widget-fixture.bundle.js');
 });
 
 test("build:web includes the settings widget fixture entrypoint", () => {
@@ -30,6 +30,6 @@ test("settings widget fixture HTML helper emits a dashboard-widget iframe shell"
   });
   const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
   expect(exitCode).toBe(0);
-  expect(stdout).toContain('/static/dev/settings-widget-fixture.html?section=addons');
+  expect(stdout).toContain('/test/fixtures/settings-widget-fixture.html?section=addons');
   expect(stdout).toContain('<iframe');
 });

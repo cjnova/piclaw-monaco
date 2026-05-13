@@ -175,9 +175,9 @@ function queryExportMessages(
 
 function loadAllCss(runtimeDir: string): string {
   const parts: string[] = [];
-  const bundlePath = join(runtimeDir, "web/static/dist/app.bundle.css");
+  const bundlePath = join(runtimeDir, "web/static/classic/dist/app.bundle.css");
   if (existsSync(bundlePath)) parts.push(readFileSync(bundlePath, "utf8"));
-  const cssDir = join(runtimeDir, "web/static/css");
+  const cssDir = join(runtimeDir, "web/static/classic/css");
   if (existsSync(cssDir)) {
     for (const entry of readdirSync(cssDir).sort()) {
       if (entry.endsWith(".css")) parts.push(readFileSync(join(cssDir, entry), "utf8"));

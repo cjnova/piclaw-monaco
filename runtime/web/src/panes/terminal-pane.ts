@@ -15,8 +15,8 @@ import {
 } from './terminal-lifecycle-runtime.js';
 import { applyTerminalThemeBestEffort } from './terminal-theme-runtime.js';
 
-const GHOSTTY_WEB_MODULE = '/static/js/vendor/ghostty-web.js';
-const GHOSTTY_WASM_MODULE = '/static/js/vendor/ghostty-vt.wasm';
+const GHOSTTY_WEB_MODULE = '/static/common/js/vendor/ghostty-web.js';
+const GHOSTTY_WASM_MODULE = '/static/common/js/vendor/ghostty-vt.wasm';
 export const TERMINAL_TAB_PATH = 'piclaw://terminal';
 const TERMINAL_FONT_FAMILY = 'FiraCode Nerd Font Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
 const TERMINAL_FONT_LOAD_SPEC = '400 13px "FiraCode Nerd Font Mono"';

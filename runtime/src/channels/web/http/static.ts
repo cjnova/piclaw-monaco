@@ -40,8 +40,8 @@ const MIME_TYPES: Record<string, string> = {
 const APP_ASSET_VERSION_PLACEHOLDER = "__APP_ASSET_VERSION__";
 const LOGIN_ASSET_VERSION_PLACEHOLDER = "__LOGIN_ASSET_VERSION__";
 const NOTIFICATION_SOURCE_LABELS_PLACEHOLDER = "__PICLAW_NOTIFICATION_SOURCE_LABELS_FLAG__";
-const APP_VERSION_FILES = ["dist/app.bundle.js", "dist/app.bundle.css"];
-const LOGIN_VERSION_FILES = ["dist/login.bundle.js", "dist/login.bundle.css"];
+const APP_VERSION_FILES = ["classic/dist/app.bundle.js", "classic/dist/app.bundle.css"];
+const LOGIN_VERSION_FILES = ["common/dist/login.bundle.js", "common/dist/login.bundle.css"];
 const TEXT_ASSET_CACHE = new Map<string, { mtimeMs: number; text: string }>();
 const GZIP_ASSET_CACHE = new Map<string, { mtimeMs: number; data: Uint8Array }>();
 
@@ -96,8 +96,11 @@ function renderHtmlTemplate(relPath: string, html: string): string {
     NOTIFICATION_SOURCE_LABELS_PLACEHOLDER,
     WEB_RUNTIME_CONFIG.notificationDebugLabels ? "1" : "0"
   );
-  if (relPath === "index.html") {
+  if (relPath === "classic/index.html") {
     return renderedWithSharedFlags.replaceAll(APP_ASSET_VERSION_PLACEHOLDER, getAppAssetVersion());
+  }
+  if (relPath === "visual/index.html") {
+    return renderedWithSharedFlags;
   }
   if (relPath === "login.html") {
     return renderedWithSharedFlags.replaceAll(LOGIN_ASSET_VERSION_PLACEHOLDER, getLoginAssetVersion());

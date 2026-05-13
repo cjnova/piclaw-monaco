@@ -4,7 +4,7 @@
 
 ### 2026-05-12
 
-- Minimal session (15:05–15:06 UTC, 2 messages, 1 session). User asked what PiClaw version is running; agent confirmed **PiClaw v2.3.2**. No project work, decisions, or feedback.
+- Active day (15:05–20:14 UTC, 58 messages, 1 session). Started with a PiClaw version check (confirmed **v2.3.2**), followed by a markdown rendering test. Mid-session: multiple UI login/provider configuration interactions (OAuth flows for Anthropic, OpenAI Code…
 
 ### 2026-05-08
 
@@ -13,7 +13,3 @@
 ### 2026-05-07
 
 - Brief afternoon widget testing session (15:04–15:24 UTC, 24 messages). User tested dashboard widget functionality: initial `/widget test` slash command failed (not a valid command), then requested widget tests via natural language — agent delivered test widge…
-
-### 2026-05-05
-
-- Full-day QA and testing session (08:20–15:10 UTC, 68 messages). Browser notification testing (permission checks, unfocused-tab behavior). Steering message testing (multiple probes confirming steer receipt). Long-form content generation stress tests: history o…

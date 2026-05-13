@@ -163,20 +163,32 @@ function findPackedTarball(packDir: string): string {
   return latest;
 }
 
-function buildUnixLauncherScript(): string {
-  return `#!/usr/bin/env sh\nset -eu\nSELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nROOT=$(CDPATH= cd -- "$SELF_DIR/.." && pwd)\nexport BUN_INSTALL="$ROOT/bun"\nexport PATH="$ROOT/bun/bin:$PATH"\nexec "$ROOT/bun/bin/bun" "$ROOT/app/runtime/src/index.ts" "$@"\n`;
+function buildUnixPiclawLauncherScript(): string {
+  return `#!/usr/bin/env sh\nset -eu\nSELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nROOT=$(CDPATH= cd -- "$SELF_DIR/.." && pwd)\nexport BUN_INSTALL="$ROOT/bun"\nexport PATH="$ROOT/bun/bin:$ROOT/app/node_modules/.bin:$PATH"\nexec "$ROOT/bun/bin/bun" "$ROOT/app/runtime/src/index.ts" "$@"\n`;
 }
 
-function buildWindowsCmdLauncher(): string {
-  return `@echo off\r\nsetlocal\r\nset "SELF_DIR=%~dp0"\r\nfor %%I in ("%SELF_DIR%..") do set "ROOT=%%~fI"\r\nset "BUN_INSTALL=%ROOT%\\bun"\r\nset "PATH=%ROOT%\\bun;%PATH%"\r\n"%ROOT%\\bun\\bun.exe" "%ROOT%\\app\\runtime\\src\\index.ts" %*\r\n`;
+function buildUnixPiLauncherScript(): string {
+  return `#!/usr/bin/env sh\nset -eu\nSELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nROOT=$(CDPATH= cd -- "$SELF_DIR/.." && pwd)\nexport BUN_INSTALL="$ROOT/bun"\nexport PATH="$ROOT/bun/bin:$ROOT/app/node_modules/.bin:$PATH"\nexec "$ROOT/bun/bin/bun" "$ROOT/app/node_modules/@earendil-works/pi-coding-agent/dist/cli.js" "$@"\n`;
 }
 
-function buildWindowsPowerShellLauncher(): string {
-  return `$ErrorActionPreference = 'Stop'\r\n$Root = Resolve-Path (Join-Path $PSScriptRoot '..')\r\n$env:BUN_INSTALL = Join-Path $Root 'bun'\r\n$env:PATH = (Join-Path $Root 'bun') + [IO.Path]::PathSeparator + $env:PATH\r\n& (Join-Path $Root 'bun/bun.exe') (Join-Path $Root 'app/runtime/src/index.ts') @args\r\nexit $LASTEXITCODE\r\n`;
+function buildWindowsPiclawCmdLauncher(): string {
+  return `@echo off\r\nsetlocal\r\nset "SELF_DIR=%~dp0"\r\nfor %%I in ("%SELF_DIR%..") do set "ROOT=%%~fI"\r\nset "BUN_INSTALL=%ROOT%\\bun"\r\nset "PATH=%ROOT%\\bun;%ROOT%\\app\\node_modules\\.bin;%PATH%"\r\n"%ROOT%\\bun\\bun.exe" "%ROOT%\\app\\runtime\\src\\index.ts" %*\r\n`;
+}
+
+function buildWindowsPiCmdLauncher(): string {
+  return `@echo off\r\nsetlocal\r\nset "SELF_DIR=%~dp0"\r\nfor %%I in ("%SELF_DIR%..") do set "ROOT=%%~fI"\r\nset "BUN_INSTALL=%ROOT%\\bun"\r\nset "PATH=%ROOT%\\bun;%ROOT%\\app\\node_modules\\.bin;%PATH%"\r\n"%ROOT%\\bun\\bun.exe" "%ROOT%\\app\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js" %*\r\n`;
+}
+
+function buildWindowsPiclawPowerShellLauncher(): string {
+  return `$ErrorActionPreference = 'Stop'\r\n$Root = Resolve-Path (Join-Path $PSScriptRoot '..')\r\n$env:BUN_INSTALL = Join-Path $Root 'bun'\r\n$env:PATH = (Join-Path $Root 'bun') + [IO.Path]::PathSeparator + (Join-Path $Root 'app/node_modules/.bin') + [IO.Path]::PathSeparator + $env:PATH\r\n& (Join-Path $Root 'bun/bun.exe') (Join-Path $Root 'app/runtime/src/index.ts') @args\r\nexit $LASTEXITCODE\r\n`;
+}
+
+function buildWindowsPiPowerShellLauncher(): string {
+  return `$ErrorActionPreference = 'Stop'\r\n$Root = Resolve-Path (Join-Path $PSScriptRoot '..')\r\n$env:BUN_INSTALL = Join-Path $Root 'bun'\r\n$env:PATH = (Join-Path $Root 'bun') + [IO.Path]::PathSeparator + (Join-Path $Root 'app/node_modules/.bin') + [IO.Path]::PathSeparator + $env:PATH\r\n& (Join-Path $Root 'bun/bun.exe') (Join-Path $Root 'app/node_modules/@earendil-works/pi-coding-agent/dist/cli.js') @args\r\nexit $LASTEXITCODE\r\n`;
 }
 
 function buildUnixInstallScript(bundleName: string): string {
-  return `#!/usr/bin/env sh\nset -eu\nPREFIX=\${1:-/opt/piclaw}\nBIN_DIR=\${PICLAW_BIN_DIR:-/usr/local/bin}\nSELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nmkdir -p "$PREFIX/releases"\nrm -rf "$PREFIX/releases/${bundleName}"\ncp -a "$SELF_DIR" "$PREFIX/releases/${bundleName}"\nln -sfn "releases/${bundleName}" "$PREFIX/current"\nif [ "\${PICLAW_SKIP_BIN_LINK:-0}" != "1" ]; then\n  mkdir -p "$BIN_DIR"\n  cat > "$BIN_DIR/piclaw" <<EOF\n#!/usr/bin/env sh\nexec "$PREFIX/current/bin/piclaw" "\\$@"\nEOF\n  chmod 755 "$BIN_DIR/piclaw"\nfi\necho "Installed Piclaw to $PREFIX/current"\n`;
+  return `#!/usr/bin/env sh\nset -eu\nPREFIX=\${1:-/opt/piclaw}\nBIN_DIR=\${PICLAW_BIN_DIR:-/usr/local/bin}\nSELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nmkdir -p "$PREFIX/releases"\nrm -rf "$PREFIX/releases/${bundleName}"\ncp -a "$SELF_DIR" "$PREFIX/releases/${bundleName}"\nln -sfn "releases/${bundleName}" "$PREFIX/current"\nif [ "\${PICLAW_SKIP_BIN_LINK:-0}" != "1" ]; then\n  mkdir -p "$BIN_DIR"\n  cat > "$BIN_DIR/piclaw" <<EOF\n#!/usr/bin/env sh\nexec "$PREFIX/current/bin/piclaw" "\\$@"\nEOF\n  cat > "$BIN_DIR/pi" <<EOF\n#!/usr/bin/env sh\nexec "$PREFIX/current/bin/pi" "\\$@"\nEOF\n  chmod 755 "$BIN_DIR/piclaw" "$BIN_DIR/pi"\nfi\necho "Installed Piclaw to $PREFIX/current"\n`;
 }
 
 export function buildWindowsInstallScript(bundleName: string): string {
@@ -198,9 +210,12 @@ export function buildWindowsInstallScript(bundleName: string): string {
     "New-Item -ItemType Junction -Path $Current -Target $Dest | Out-Null",
     "if (-not $SkipBinLink) {",
     "  New-Item -ItemType Directory -Force -Path $BinDir | Out-Null",
-    "  $Launcher = Join-Path $Current 'bin\\piclaw.cmd'",
-    "  $Shim = \"@echo off`r`n`\"$Launcher`\" %*`r`n\"",
-    "  $Shim | Set-Content -Encoding ASCII (Join-Path $BinDir 'piclaw.cmd')",
+    "  $PiclawLauncher = Join-Path $Current 'bin\\piclaw.cmd'",
+    "  $PiLauncher = Join-Path $Current 'bin\\pi.cmd'",
+    "  $PiclawShim = \"@echo off`r`n`\"$PiclawLauncher`\" %*`r`n\"",
+    "  $PiShim = \"@echo off`r`n`\"$PiLauncher`\" %*`r`n\"",
+    "  $PiclawShim | Set-Content -Encoding ASCII (Join-Path $BinDir 'piclaw.cmd')",
+    "  $PiShim | Set-Content -Encoding ASCII (Join-Path $BinDir 'pi.cmd')",
     "}",
     "Write-Host \"Installed Piclaw to $Current\"",
     "",
@@ -209,7 +224,7 @@ export function buildWindowsInstallScript(bundleName: string): string {
 
 function buildLinuxRunReadme(bundleName: string, version: string, arch: string): string {
   const artifactName = `${bundleName}.run`;
-  return `# Piclaw ${version} Linux .run bundle (${arch})\n\nThis directory was extracted from \`${artifactName}\`, a self-extracting Piclaw Linux bundle. It contains the bundled Bun runtime, Piclaw application files, production dependencies, and launch/install scripts.\n\n## Running without installing\n\n\`\`\`sh\n./bin/piclaw --version\n./bin/piclaw --help\n./bin/piclaw\n\`\`\`\n\nThe launcher sets \`BUN_INSTALL\` and \`PATH\` to use the bundled runtime under \`./bun\`.\n\n## Installing or upgrading from the .run file\n\nFrom the directory that contains the downloaded \`.run\` file:\n\n\`\`\`sh\nchmod +x ${artifactName}\nsudo ./${artifactName} --install /opt/piclaw\n\`\`\`\n\nBy default this installs the release under \`/opt/piclaw/releases/${bundleName}\`, updates \`/opt/piclaw/current\`, and writes \`/usr/local/bin/piclaw\`.\n\n## Extracting without installing\n\n\`\`\`sh\n./${artifactName} --extract /tmp/piclaw-run-test\n/tmp/piclaw-run-test/${bundleName}/bin/piclaw --version\n\`\`\`\n\n## Installer options\n\n\`\`\`text\n${artifactName} --install [PREFIX]       Install to PREFIX (default: /opt/piclaw)\n${artifactName} --extract DIR            Extract payload under DIR without installing\n${artifactName} --version                Print bundled Piclaw version\n${artifactName} --help                   Show installer help\n\`\`\`\n\nEnvironment variables for \`--install\`:\n\n- \`PICLAW_BIN_DIR=DIR\` — write the launcher to \`DIR/piclaw\` instead of \`/usr/local/bin/piclaw\`.\n- \`PICLAW_SKIP_BIN_LINK=1\` — install files but do not write a launcher.\n\n## Bundle layout\n\n- \`bin/piclaw\` — launcher script for the bundled app.\n- \`bun/bin/bun\` — bundled Bun runtime.\n- \`app/\` — packaged Piclaw application tree.\n- \`install.sh\` — install script used by the \`.run\` wrapper.\n- \`MANIFEST.json\` — build metadata.\n- \`VERSION\` — bundled Piclaw version.\n\n## Notes\n\nThe \`linux-x64-baseline\` build uses Bun's non-AVX baseline runtime for older x64 CPUs. If your host is modern, the regular \`linux-x64\` artifact is fine; if it grumbles about CPU instructions, use the baseline one and pretend this was wisdom rather than hardware archaeology.\n`;
+  return `# Piclaw ${version} Linux .run bundle (${arch})\n\nThis directory was extracted from \`${artifactName}\`, a self-extracting Piclaw Linux bundle. It contains the bundled Bun runtime, Piclaw application files, production dependencies, the Pi CLI, and launch/install scripts.\n\n## Running without installing\n\n\`\`\`sh\n./bin/piclaw --version\n./bin/pi --version\n./bin/piclaw --help\n./bin/pi --help\n./bin/piclaw\n\`\`\`\n\nThe launchers set \`BUN_INSTALL\` and \`PATH\` to use the bundled runtime under \`./bun\` and bundled dependency CLIs under \`./app/node_modules/.bin\`.\n\n## Installing or upgrading from the .run file\n\nFrom the directory that contains the downloaded \`.run\` file:\n\n\`\`\`sh\nchmod +x ${artifactName}\nsudo ./${artifactName} --install /opt/piclaw\n\`\`\`\n\nBy default this installs the release under \`/opt/piclaw/releases/${bundleName}\`, updates \`/opt/piclaw/current\`, and writes \`/usr/local/bin/piclaw\` and \`/usr/local/bin/pi\`.\n\n## Extracting without installing\n\n\`\`\`sh\n./${artifactName} --extract /tmp/piclaw-run-test\n/tmp/piclaw-run-test/${bundleName}/bin/piclaw --version\n/tmp/piclaw-run-test/${bundleName}/bin/pi --version\n\`\`\`\n\n## Installer options\n\n\`\`\`text\n${artifactName} --install [PREFIX]       Install to PREFIX (default: /opt/piclaw)\n${artifactName} --extract DIR            Extract payload under DIR without installing\n${artifactName} --version                Print bundled Piclaw version\n${artifactName} --help                   Show installer help\n\`\`\`\n\nEnvironment variables for \`--install\`:\n\n- \`PICLAW_BIN_DIR=DIR\` — write launchers to \`DIR/piclaw\` and \`DIR/pi\` instead of \`/usr/local/bin\`.\n- \`PICLAW_SKIP_BIN_LINK=1\` — install files but do not write launchers.\n\n## Bundle layout\n\n- \`bin/piclaw\` — launcher script for the bundled Piclaw app.\n- \`bin/pi\` — launcher script for the bundled Pi CLI from \`@earendil-works/pi-coding-agent\`.\n- \`bun/bin/bun\` — bundled Bun runtime.\n- \`app/\` — packaged Piclaw application tree.\n- \`install.sh\` — install script used by the \`.run\` wrapper.\n- \`MANIFEST.json\` — build metadata.\n- \`VERSION\` — bundled Piclaw version.\n\n## Notes\n\nThe \`linux-x64-baseline\` build uses Bun's non-AVX baseline runtime for older x64 CPUs. If your host is modern, the regular \`linux-x64\` artifact is fine; if it grumbles about CPU instructions, use the baseline one and pretend this was wisdom rather than hardware archaeology.\n`;
 }
 
 function buildSelfExtractingStub(bundleName: string, version: string, arch: string): string {
@@ -234,7 +249,7 @@ Usage:
 
 Install environment variables:
   PICLAW_BIN_DIR=DIR          Launcher directory for --install (default: $DEFAULT_BIN_DIR)
-  PICLAW_SKIP_BIN_LINK=1      Do not write DIR/piclaw launcher
+  PICLAW_SKIP_BIN_LINK=1      Do not write DIR/piclaw or DIR/pi launchers
 EOF
 }
 
@@ -266,6 +281,10 @@ install_bundle() {
     echo "Extracted payload is missing bin/piclaw" >&2
     exit 1
   fi
+  if [ ! -x "$src/bin/pi" ]; then
+    echo "Extracted payload is missing bin/pi" >&2
+    exit 1
+  fi
 
   mkdir -p "$prefix/releases"
   rm -rf "$prefix/releases/$BUNDLE_NAME"
@@ -278,13 +297,17 @@ install_bundle() {
 #!/usr/bin/env sh
 exec "$prefix/current/bin/piclaw" "\$@"
 EOF
-    chmod 755 "$bin_dir/piclaw"
+    cat > "$bin_dir/pi" <<EOF
+#!/usr/bin/env sh
+exec "$prefix/current/bin/pi" "\$@"
+EOF
+    chmod 755 "$bin_dir/piclaw" "$bin_dir/pi"
   fi
 
   echo "Installed Piclaw $PICLAW_VERSION to $prefix/current"
   echo "Usage notes: $prefix/current/README.md"
   if [ "\${PICLAW_SKIP_BIN_LINK:-0}" != "1" ]; then
-    echo "Launcher: $bin_dir/piclaw"
+    echo "Launchers: $bin_dir/piclaw, $bin_dir/pi"
   fi
 }
 
@@ -380,6 +403,14 @@ function downloadBunReleaseBinary(bunTarget: string, workdir: string): string {
   return binary;
 }
 
+function assertBundledPiCli(appDir: string): void {
+  const piPackageJson = join(appDir, "node_modules", "@earendil-works", "pi-coding-agent", "package.json");
+  const piCli = join(appDir, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
+
+  if (!existsSync(piPackageJson)) throw new Error("Portable bundle is missing @earendil-works/pi-coding-agent");
+  if (!existsSync(piCli)) throw new Error("Portable bundle is missing the Pi CLI entrypoint: node_modules/@earendil-works/pi-coding-agent/dist/cli.js");
+}
+
 function copyBundledBun(bundleDir: string, info: PlatformInfo, workdir: string): void {
   const bunSource = info.bunTarget ? downloadBunReleaseBinary(info.bunTarget, workdir) : process.execPath;
   if (info.platform === "windows") {
@@ -398,14 +429,18 @@ function copyBundledBun(bundleDir: string, info: PlatformInfo, workdir: string):
 function writeLaunchers(bundleDir: string, platform: PlatformInfo["platform"], bundleName: string): void {
   mkdirSync(join(bundleDir, "bin"), { recursive: true });
   if (platform === "windows") {
-    writeFileSync(join(bundleDir, "bin", "piclaw.cmd"), buildWindowsCmdLauncher());
-    writeFileSync(join(bundleDir, "bin", "piclaw.ps1"), buildWindowsPowerShellLauncher());
+    writeFileSync(join(bundleDir, "bin", "piclaw.cmd"), buildWindowsPiclawCmdLauncher());
+    writeFileSync(join(bundleDir, "bin", "piclaw.ps1"), buildWindowsPiclawPowerShellLauncher());
+    writeFileSync(join(bundleDir, "bin", "pi.cmd"), buildWindowsPiCmdLauncher());
+    writeFileSync(join(bundleDir, "bin", "pi.ps1"), buildWindowsPiPowerShellLauncher());
     writeFileSync(join(bundleDir, "install.ps1"), buildWindowsInstallScript(bundleName));
     return;
   }
 
-  writeFileSync(join(bundleDir, "bin", "piclaw"), buildUnixLauncherScript(), { mode: 0o755 });
+  writeFileSync(join(bundleDir, "bin", "piclaw"), buildUnixPiclawLauncherScript(), { mode: 0o755 });
+  writeFileSync(join(bundleDir, "bin", "pi"), buildUnixPiLauncherScript(), { mode: 0o755 });
   chmodSync(join(bundleDir, "bin", "piclaw"), 0o755);
+  chmodSync(join(bundleDir, "bin", "pi"), 0o755);
   writeFileSync(join(bundleDir, "install.sh"), buildUnixInstallScript(bundleName), { mode: 0o755 });
   chmodSync(join(bundleDir, "install.sh"), 0o755);
 }
@@ -464,6 +499,7 @@ async function buildPortableArtifact(options: Options): Promise<void> {
       },
     });
 
+    assertBundledPiCli(appDir);
     copyBundledBun(bundleDir, info, workdir);
     renameSync(appDir, join(bundleDir, "app"));
     writeLaunchers(bundleDir, info.platform, info.bundleName);
@@ -479,6 +515,8 @@ async function buildPortableArtifact(options: Options): Promise<void> {
       arch: info.arch,
       bun: info.bunTarget ?? basename(process.execPath),
       bunTarget: info.bunTarget,
+      launchers: info.platform === "windows" ? ["bin/piclaw.cmd", "bin/piclaw.ps1", "bin/pi.cmd", "bin/pi.ps1"] : ["bin/piclaw", "bin/pi"],
+      piCli: "app/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
       builtAt: new Date().toISOString(),
     }, null, 2) + "\n");
 

@@ -4,7 +4,7 @@
   login.html – TOTP/WebAuthn authentication page for PiClaw.
 
   Shown when WEB_TOTP_SECRET is configured. The page shell is static HTML,
-  with minimal CSS/JS bundles loaded from /static/dist/.
+  with minimal CSS/JS bundles loaded from /static/common/dist/.
 
   Served by: channels/web/auth.ts when the user is not authenticated.
 -->
@@ -12,7 +12,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Piclaw Login</title>
-    <link rel="stylesheet" href="/static/dist/login.bundle.css?v=__LOGIN_ASSET_VERSION__" />
+    <link rel="stylesheet" href="/static/common/dist/login.bundle.css?v=__LOGIN_ASSET_VERSION__" />
   </head>
   <body>
     <div class="card">
@@ -34,6 +34,6 @@
         <div class="error" id="error"></div>
       </form>
     </div>
-    <script type="module" src="/static/dist/login.bundle.js?v=__LOGIN_ASSET_VERSION__"></script>
+    <script type="module" src="/static/common/dist/login.bundle.js?v=__LOGIN_ASSET_VERSION__"></script>
   </body>
 </html>

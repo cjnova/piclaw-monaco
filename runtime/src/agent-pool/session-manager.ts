@@ -81,6 +81,7 @@ export class AgentSessionManager {
   private readonly prewarmQueue: Array<{ chatJid: string; mode: "full" | "lightweight" }> = [];
   private readonly prewarmCooldownByChat = new Map<string, number>();
   private prewarmLoopActive = false;
+  private isShuttingDown = false;
 
   constructor(private readonly options: AgentSessionManagerOptions) {}
 
@@ -112,6 +113,9 @@ export class AgentSessionManager {
   }
 
   async getOrCreate(chatJid: string): Promise<AgentSessionRuntime> {
+    if (this.isShuttingDown) {
+      throw new Error("Session manager is shutting down.");
+    }
     const pendingIdleDispose = this.idleMainDisposalsInFlight.get(chatJid);
     if (pendingIdleDispose) {
       await pendingIdleDispose;
@@ -159,6 +163,14 @@ export class AgentSessionManager {
             extensionFactories,
           });
 
+      if (this.isShuttingDown) {
+        await this.disposeRuntimeOnce(runtime, "Failed to dispose newly created session during shutdown", {
+          operation: "get_or_create.dispose_during_shutdown",
+          chatJid,
+        });
+        throw new Error("Session manager is shutting down.");
+      }
+
       this.options.pool.set(chatJid, { runtime, lastUsed: Date.now() });
       this.enforceMainSessionPoolLimit({ protectedChatJids: [chatJid] });
       try {
@@ -186,6 +198,9 @@ export class AgentSessionManager {
   }
 
   async getOrCreateSide(chatJid: string): Promise<AgentSessionRuntime> {
+    if (this.isShuttingDown) {
+      throw new Error("Session manager is shutting down.");
+    }
     const pendingIdleDispose = this.idleSideDisposalsInFlight.get(chatJid);
     if (pendingIdleDispose) {
       await pendingIdleDispose;
@@ -220,6 +235,14 @@ export class AgentSessionManager {
             customTools: this.options.createCustomToolOverrides?.() ?? [],
             extensionFactories,
           });
+
+      if (this.isShuttingDown) {
+        await this.disposeRuntimeOnce(runtime, "Failed to dispose newly created side session during shutdown", {
+          operation: "get_or_create_side.dispose_during_shutdown",
+          chatJid,
+        });
+        throw new Error("Session manager is shutting down.");
+      }
 
       this.options.sidePool.set(chatJid, { runtime, lastUsed: Date.now() });
       return runtime;
@@ -307,6 +330,7 @@ export class AgentSessionManager {
   }
 
   prewarm(chatJid: string, options: { priority?: boolean; mode?: "full" | "lightweight" } = {}): boolean {
+    if (this.isShuttingDown) return false;
     const normalizedChatJid = String(chatJid || "").trim();
     if (!normalizedChatJid) return false;
     if (this.getBlockingInvalidSeedError(normalizedChatJid)) return false;
@@ -342,6 +366,11 @@ export class AgentSessionManager {
   }
 
   async shutdown(): Promise<void> {
+    this.isShuttingDown = true;
+    this.queuedPrewarms.clear();
+    this.prewarmQueue.length = 0;
+    this.prewarmCooldownByChat.clear();
+
     for (const jid of [...this.options.pool.keys()]) {
       await this.disposeEntry(this.options.pool, jid, "shutdown.dispose_main_session");
     }
@@ -667,11 +696,12 @@ export class AgentSessionManager {
 
     void (async () => {
       try {
-        while (this.prewarmQueue.length > 0) {
+        while (!this.isShuttingDown && this.prewarmQueue.length > 0) {
           const next = this.prewarmQueue.shift();
           if (!next) continue;
           const { chatJid, mode } = next;
           this.queuedPrewarms.delete(chatJid);
+          if (this.isShuttingDown) continue;
           if (this.prewarmInFlight.has(chatJid)) continue;
           if (this.options.pool.has(chatJid) && !hasDeferredBranchSeed(chatJid)) continue;
 
