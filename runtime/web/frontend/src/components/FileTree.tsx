@@ -82,9 +82,10 @@ interface TreeItemProps {
   expandedPaths: Set<string>;
   onSelect: (node: TreeNode) => void;
   onToggleExpand: (path: string) => void;
+  showHidden?: boolean;
 }
 
-function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand }: TreeItemProps) {
+function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand, showHidden = true }: TreeItemProps) {
   const isDir = node.type === "dir";
   const expanded = expandedPaths.has(node.path);
   const [children, setChildren] = useState<TreeNode[] | null>(
@@ -207,7 +208,7 @@ function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand 
 
       {expanded && !loading && children && children.length > 0 && (
         <div className="file-tree__children">
-          {children.map((child) => (
+          {(showHidden ? children : children.filter((c) => !c.name.startsWith("."))).map((child) => (
             <TreeItem
               key={child.path}
               node={child}
@@ -215,6 +216,7 @@ function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand 
               expandedPaths={expandedPaths}
               onSelect={onSelect}
               onToggleExpand={onToggleExpand}
+              showHidden={showHidden}
             />
           ))}
         </div>
@@ -263,9 +265,10 @@ function getFileIcon(name: string): string {
 
 interface FileTreeProps {
   onFileSelect?: (node: TreeNode) => void;
+  showHidden?: boolean;
 }
 
-export function FileTree({ onFileSelect }: FileTreeProps) {
+export function FileTree({ onFileSelect, showHidden = true }: FileTreeProps) {
   const [rootChildren, setRootChildren] = useState<TreeNode[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -361,9 +364,13 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     );
   }
 
+  const visibleRootChildren = showHidden
+    ? rootChildren
+    : rootChildren.filter((n) => !n.name.startsWith("."));
+
   return (
     <div className="file-tree" role="tree">
-      {rootChildren.map((node) => (
+      {visibleRootChildren.map((node) => (
         <TreeItem
           key={node.path}
           node={node}
@@ -371,6 +378,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
           expandedPaths={expandedPaths}
           onSelect={handleSelect}
           onToggleExpand={toggleExpanded}
+          showHidden={showHidden}
         />
       ))}
     </div>
