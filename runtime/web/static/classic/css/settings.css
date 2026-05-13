@@ -2207,3 +2207,25 @@
     color: var(--error-color, #e55);
     width: 100%;
 }
+
+
+/* ── Recordings section ── */
+.recordings-section__controls { margin-bottom: 12px; }
+.recordings-section__status { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.recordings-section__error { margin-bottom: 8px; }
+.recordings-section__empty { font-size: 13px; color: var(--text-muted); padding: 12px 0; }
+.recordings-section__list { list-style: none; padding: 0; margin: 0; }
+.recordings-section__item { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.recordings-section__item:hover { background: var(--bg-elevated); }
+.recordings-section__item--active { background: var(--bg-elevated); }
+.recordings-section__item--recording { border-left: 3px solid var(--error); }
+.recordings-section__item-title { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.recordings-section__badge { font-size: 10px; color: var(--error); font-weight: bold; }
+.recordings-section__meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.recordings-section__actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.recordings-section__btn { padding: 4px 10px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.recordings-section__btn:hover { background: var(--bg-elevated); }
+.recordings-section__btn--record { border-color: var(--error); color: var(--error); }
+.recordings-section__btn--record.active { background: var(--error); color: var(--bg); }
+.recordings-section__btn--danger { border-color: var(--error); color: var(--error); }
+.recordings-section__btn--danger:hover { background: var(--error); color: var(--bg); }

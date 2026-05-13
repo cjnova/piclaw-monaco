@@ -11,12 +11,14 @@ import { ModelsSection } from "./settings/ModelsSection";
 import { KeychainSection } from "./settings/KeychainSection";
 import { ToolsSection } from "./settings/ToolsSection";
 import { ProvidersSection } from "./settings/ProvidersSection";
+import { RecordingsSection } from "./settings/RecordingsSection";
 import { EnvironmentSection } from "./settings/EnvironmentSection";
 import { safeGetItem, safeSetItem } from "../utils/storage";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
   { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
+  { id: "recordings", label: "Recordings", icon: "codicon-record" },
   { id: "compaction", label: "Compaction", icon: "codicon-archive" },
   { id: "workspace", label: "Workspace", icon: "codicon-folder" },
   { id: "environment", label: "Environment", icon: "codicon-symbol-variable" },
@@ -152,6 +154,9 @@ export function SettingsPanel() {
         )}
         {activeCategory.value === "tools" && (
           <ToolsSection data={s} />
+        )}
+        {activeCategory.value === "recordings" && (
+          <RecordingsSection />
         )}
       </div>
     </div>

@@ -1,0 +1,10 @@
+{
+  "id": "rec-2d6e0b0a-a976-4b40-9d1c-0ca1aea83965",
+  "chatJid": "web:default",
+  "title": "Recording 2026-05-13T17:44",
+  "mode": "redacted",
+  "status": "recording",
+  "startedAt": "2026-05-13T17:44:06.413Z",
+  "eventCount": 27,
+  "tracePath": "/workspace/piclaw-monaco/workspace/.piclaw/data/session-recordings/rec-2d6e0b0a-a976-4b40-9d1c-0ca1aea83965/trace.jsonl"
+}
