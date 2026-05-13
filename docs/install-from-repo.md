@@ -90,7 +90,7 @@ After install, the goal is that:
 - `pi-mcp-adapter` does not require `mcp-cli`, and it brings its own `mcp` / `/mcp` / `/mcp-auth` surfaces once loaded.
 - This path is Bun-first. npm parity is not part of the initial scope.
 - The published GHCR image remains the main documented production runtime.
-- The Bun repo-install path now ships the bundled `cdp-browser` and `win-ui` extensions in the package tree alongside the existing optional extensions.
+- The Bun repo-install path ships the bundled `cdp-browser` extension in the package tree; Windows UI automation now ships separately as `@rcarmo/piclaw-addon-win-ui`.
 - Build, pack, and install commands should be run from the repo root; `runtime/` is not a separate package.
 - If repo-install behavior differs slightly from the published package layout, those differences should stay small and documented.
 - Dream/AutoDream details, file sequence, and outputs are documented in [`runtime/docs/dream-memory.md`](../runtime/docs/dream-memory.md).

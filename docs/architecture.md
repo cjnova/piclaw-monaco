@@ -186,7 +186,7 @@ In addition to the inline factories, piclaw ships **packaged runtime extensions*
 | `node_modules/pi-mcp-adapter/index.ts` | Always loaded | Bundled Pi package extension that exposes the token-efficient `mcp` proxy tool plus `/mcp`, `/mcp setup`, and `/mcp-auth` commands for external MCP servers configured through shared `.mcp.json` / `~/.config/mcp/mcp.json` with optional Pi-specific override layers |
 | per-session `ssh-core` session extension | Created per session by `AgentPool` | Wraps `read`/`write`/`edit`/`bash` with session-scoped local-or-remote SSH execution |
 | `browser/cdp-browser/` | Always loaded | Cross-platform Chromium CDP browser control tool (`cdp_browser`) |
-| `platform/windows/win-ui/` | Always loaded (runtime no-op off Windows) | Windows desktop automation via bun:ffi + IAccessible (`win_*` tools) |
+| `@rcarmo/piclaw-addon-win-ui` | Installable add-on | Windows desktop automation via bun:ffi + IAccessible (`win_*` tools) |
 | `viewers/office-viewer/` | Always loaded | Lightweight JS Office document viewer with extension route |
 
 WhatsApp is now an opt-in runtime channel rather than an assumed core subsystem. The default web-first runtime uses a no-op WhatsApp boundary; the Baileys-backed channel module is lazy-loaded only when `PICLAW_WHATSAPP_ENABLED=1`/`WHATSAPP_ENABLED=1` (or `whatsapp.enabled: true` in config) and a phone number are configured.
