@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
+import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 
 interface PanelState {
   text: string;
   expanded: boolean;
+  dismissed: boolean;
 }
 
-const COLLAPSED_MAX_CHARS = 200;
+const COLLAPSED_MAX_LINES = 8;
 const STORAGE_KEY = "piclaw:agent-panel-prefs";
 
 function loadPanelPrefs(): { draftExpanded: boolean; thoughtExpanded: boolean } {
@@ -23,10 +25,22 @@ function savePanelPrefs(prefs: { draftExpanded: boolean; thoughtExpanded: boolea
   } catch {}
 }
 
-/** Truncate text for collapsed view. */
-function truncate(text: string, maxChars: number): { visible: string; truncated: boolean } {
-  if (text.length <= maxChars) return { visible: text, truncated: false };
-  return { visible: text.slice(0, maxChars), truncated: true };
+/** Strip <internal>...</internal> blocks from text before rendering. */
+function stripInternalTags(text: string): string {
+  return text.replace(/<internal>[\s\S]*?<\/internal>/g, "");
+}
+
+/** Truncate text for collapsed view by line count. Returns visible text, omitted line count, total line count. */
+function truncateByLines(
+  text: string,
+  maxLines: number
+): { visible: string; omitted: number; totalLines: number } {
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  const totalLines = lines.length;
+  if (totalLines <= maxLines) return { visible: normalized, omitted: 0, totalLines };
+  const visible = lines.slice(0, maxLines).join("\n");
+  return { visible, omitted: totalLines - maxLines, totalLines };
 }
 
 /** Sanitize SVG string — allow only safe SVG elements and attributes. */
@@ -60,8 +74,8 @@ interface ToolCall {
 
 export function AgentStatusPanel() {
   const prefs = loadPanelPrefs();
-  const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded });
-  const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded });
+  const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded, dismissed: false });
+  const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded, dismissed: false });
   const [status, setStatus] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [tools, setTools] = useState<ToolCall[]>([]);
@@ -213,8 +227,8 @@ export function AgentStatusPanel() {
       thoughtStartRef.current = null;
       toolsStartRef.current = null;
       const savedPrefs = loadPanelPrefs();
-      setDraftState({ text: "", expanded: savedPrefs.draftExpanded });
-      setThoughtState({ text: "", expanded: savedPrefs.thoughtExpanded });
+      setDraftState({ text: "", expanded: savedPrefs.draftExpanded, dismissed: false });
+      setThoughtState({ text: "", expanded: savedPrefs.thoughtExpanded, dismissed: false });
       setElapsed({ draft: 0, thought: 0, tools: 0 });
       setStatus(null);
       setStatusText("");
@@ -293,6 +307,41 @@ export function AgentStatusPanel() {
       return next;
     });
   };
+  const dismissDraft = (e: MouseEvent) => {
+    e.stopPropagation();
+    setDraftState((prev) => ({ ...prev, dismissed: true }));
+  };
+  const dismissThought = (e: MouseEvent) => {
+    e.stopPropagation();
+    setThoughtState((prev) => ({ ...prev, dismissed: true }));
+  };
+
+  // Escape key: collapse any expanded panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const target = e.target as Element | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if ((target as HTMLElement | null)?.isContentEditable) return;
+      let collapsed = false;
+      if (thought.expanded) {
+        setThoughtState((prev) => ({ ...prev, expanded: false }));
+        savePanelPrefs({ draftExpanded: draft.expanded, thoughtExpanded: false });
+        collapsed = true;
+      }
+      if (draft.expanded) {
+        setDraftState((prev) => ({ ...prev, expanded: false }));
+        savePanelPrefs({ draftExpanded: false, thoughtExpanded: thought.expanded });
+        collapsed = true;
+      }
+      if (collapsed) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [thought.expanded, draft.expanded]);
 
   return (
     <div className="agent-status-panel">
@@ -385,7 +434,7 @@ export function AgentStatusPanel() {
         </div>
       )}
 
-      {thought.text && (
+      {thought.text && !thought.dismissed && (
         <AgentPanel
           title="Thoughts"
           type="thought"
@@ -393,10 +442,11 @@ export function AgentStatusPanel() {
           expanded={thought.expanded}
           elapsed={elapsed.thought}
           onToggle={toggleThoughtExpand}
+          onDismiss={dismissThought}
         />
       )}
 
-      {draft.text && (
+      {draft.text && !draft.dismissed && (
         <AgentPanel
           title="Draft"
           type="draft"
@@ -404,6 +454,7 @@ export function AgentStatusPanel() {
           expanded={draft.expanded}
           elapsed={elapsed.draft}
           onToggle={toggleDraftExpand}
+          onDismiss={dismissDraft}
         />
       )}
     </div>
@@ -417,23 +468,27 @@ interface AgentPanelProps {
   expanded: boolean;
   elapsed?: number;
   onToggle: () => void;
+  onDismiss: (e: MouseEvent) => void;
 }
 
-function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle }: AgentPanelProps) {
+function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDismiss }: AgentPanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const canTruncate = text.length > COLLAPSED_MAX_CHARS;
-  const { visible, truncated } = expanded
-    ? { visible: text, truncated: false }
-    : truncate(text, COLLAPSED_MAX_CHARS);
 
-  // Write content via ref to avoid Preact dangerouslySetInnerHTML reconciliation issues
+  // Strip <internal> blocks, then truncate by lines
+  const stripped = stripInternalTags(text);
+  const { visible, omitted } = expanded
+    ? { visible: stripped, omitted: 0 }
+    : truncateByLines(stripped, COLLAPSED_MAX_LINES);
+  const canTruncate = stripped.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").length > COLLAPSED_MAX_LINES;
+
+  // Render markdown into DOM via ref to avoid reconciliation issues
   useEffect(() => {
     if (contentRef.current) {
-      contentRef.current.textContent = "";
-      const pre = document.createElement("div");
-      pre.className = "agent-status-panel__body-text";
-      pre.textContent = visible;
-      contentRef.current.appendChild(pre);
+      contentRef.current.innerHTML = "";
+      const div = document.createElement("div");
+      div.className = "agent-status-panel__body-text";
+      div.innerHTML = renderThinkingMarkdown(visible);
+      contentRef.current.appendChild(div);
     }
   }, [visible]);
 
@@ -450,17 +505,26 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle }: Agen
             {expanded ? <span className="agent-status-card__toggle-label">▾ less</span> : <span className="agent-status-card__toggle-label">▸ more…</span>}
           </span>
         )}
+        <button
+          type="button"
+          className="agent-status-card__close"
+          aria-label={`Close ${title} panel`}
+          onClick={onDismiss}
+          title="Dismiss"
+        >
+          ×
+        </button>
       </div>
       <div
         className={`agent-status-card__content${expanded ? "" : " agent-status-card__content--collapsed"}`}
         ref={contentRef}
       />
-      {!expanded && truncated && (
+      {!expanded && omitted > 0 && (
         <button type="button" className="agent-status-panel__more" onClick={onToggle}>
-          <span className="agent-status-card__more">more…</span>
+          <span className="agent-status-card__more">▸ {omitted} more lines</span>
         </button>
       )}
-      {expanded && text.length > COLLAPSED_MAX_CHARS && (
+      {expanded && canTruncate && (
         <button type="button" className="agent-status-panel__more" onClick={onToggle}>
           ▴ show less
         </button>

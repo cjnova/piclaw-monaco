@@ -5509,6 +5509,8 @@ pre.frontmatter-block {
 .agent-status-card--draft .agent-status-card__toggle { color: #fab387; }
 .agent-status-card__more-btn { display: block; width: 100%; padding: 4px 10px; font-size: 11px; color: var(--accent); background: none; border: none; border-top: 1px solid var(--border); cursor: pointer; text-align: center; }
 .agent-status-card__more-btn:hover { background: rgba(137, 180, 250, 0.1); }
+.agent-status-card__close { margin-left: auto; border: none; background: transparent; color: var(--text-muted); font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px; cursor: pointer; flex-shrink: 0; transition: color 0.15s ease, background-color 0.15s ease; }
+.agent-status-card__close:hover { color: var(--text, var(--fg)); background-color: var(--bg-elevated, rgba(255,255,255,0.08)); }
 .agent-status-card__content {
   padding: 6px 10px;
   font-size: 12px;
