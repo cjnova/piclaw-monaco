@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
 import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
+import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
 
 /**
  * Decide whether to show a dot, spinner, or nothing for a given status.
@@ -253,6 +254,10 @@ export function AgentStatusPanel() {
   const [elapsed, setElapsed] = useState({ draft: 0, thought: 0, tools: 0 });
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  // #377 Pending approval request
+  const [pendingRequest, setPendingRequest] = useState<AgentRequest | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
   // #320 Recovery substates
   type RecoveryState = null | "recovering" | "compacting" | "retrying" | "blocked" | "error";
   const [recoveryState, setRecoveryState] = useState<RecoveryState>(null);
@@ -386,6 +391,12 @@ export function AgentStatusPanel() {
       if (detail.turn_color) setTurnColor(detail.turn_color);
       if (detail.text || detail.message) setStatusText(detail.text || detail.message || "");
 
+      // #377 pending_request status: also open approval modal if request_id is present
+      if (detail.type === "pending_request" && detail.request_id) {
+        setPendingRequest(detail as AgentRequest);
+        setModalOpen(true);
+      }
+
       // #320 Recovery substates
       if (detail.type === "intent") {
         const key = detail.intent_key;
@@ -446,6 +457,9 @@ export function AgentStatusPanel() {
       setWatchdogElapsed(0);
       lastProgressTimeRef.current = null;
       agentRunningRef.current = false;
+      // #377 Clear pending request on turn end
+      setPendingRequest(null);
+      setModalOpen(false);
     };
 
     let mounted = true;
@@ -455,12 +469,26 @@ export function AgentStatusPanel() {
     window.addEventListener("piclaw:agent-status", handleStatus);
     window.addEventListener("piclaw:agent-turn-end", handleTurnEnd);
 
+    // #377 Pending approval requests from extension_ui_request SSE events
+    const handleAgentRequest = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      // Accept extension_ui_request payloads (kind: "custom" or any kind with request_id)
+      // Also accept agent_status payloads with type: "pending_request"
+      if (detail.request_id || detail.type === "pending_request") {
+        setPendingRequest(detail as AgentRequest);
+        setModalOpen(true);
+      }
+    };
+    window.addEventListener("piclaw:agent-request", handleAgentRequest);
+
     return () => {
       mounted = false;
       window.removeEventListener("piclaw:agent-draft", handleDraft);
       window.removeEventListener("piclaw:agent-thought", handleThought);
       window.removeEventListener("piclaw:agent-status", handleStatus);
       window.removeEventListener("piclaw:agent-turn-end", handleTurnEnd);
+      window.removeEventListener("piclaw:agent-request", handleAgentRequest);
       if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
     };
@@ -495,7 +523,7 @@ export function AgentStatusPanel() {
     window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
   };
 
-  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState;
+  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest;
   if (!hasContent) return null;
 
   const toggleDraftExpand = () => {
@@ -550,6 +578,51 @@ export function AgentStatusPanel() {
 
   return (
     <div className="agent-status-panel">
+      {/* #377 Pending approval request — shield row (clickable, auto-shows modal) */}
+      {pendingRequest && (
+        <div
+          className="agent-status agent-status-request"
+          aria-live="assertive"
+          role="button"
+          tabIndex={0}
+          style={turnColor ? { "--turn-color": turnColor } as preact.JSX.CSSProperties : undefined}
+          onClick={() => setModalOpen(true)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setModalOpen(true); }}
+          title="Click to review approval request"
+        >
+          <span className="agent-status-panel__status-dot" aria-hidden="true" />
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ flexShrink: 0 }}
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span className="agent-status-text">
+            {pendingRequest.tool_call?.title
+              ? `Awaiting approval: ${pendingRequest.tool_call.title}`
+              : "Awaiting approval…"}
+          </span>
+        </div>
+      )}
+
+      {/* #377 Approval modal — auto-open; dismissable only via Allow/Deny/Always Allow */}
+      {pendingRequest && modalOpen && (
+        <AgentRequestModal
+          request={pendingRequest}
+          onClose={() => {
+            setModalOpen(false);
+            setPendingRequest(null);
+          }}
+        />
+      )}
       {status && status !== "idle" && status !== "done" && (() => {
         const indicator = resolveStatusIndicator(status);
         // For error: show status row with ⚠ icon (indicator is 'none' but we still render)

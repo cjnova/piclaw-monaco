@@ -17,12 +17,13 @@ interface UseTimelineStreamParams {
  * Manages the SSE connection lifecycle:
  * - EventSource creation and cleanup
  * - Handles: new_post, agent_draft_delta, agent_draft, agent_response, agent_status,
- *   agent_thought_delta, agent_thought
+ *   agent_thought_delta, agent_thought, extension_ui_request
  * - Reconnection logic (triggers refetchTimelineOnReconnect on re-open)
  * - Draft state updates
  * - Connection status dispatch
  * - Relays agent events to AgentStatusPanel via window.dispatchEvent:
- *   piclaw:agent-draft, piclaw:agent-thought, piclaw:agent-turn-end
+ *   piclaw:agent-draft, piclaw:agent-thought, piclaw:agent-turn-end,
+ *   piclaw:agent-request (for pending approval requests)
  */
 export function useTimelineStream({
   setMessages,
@@ -127,6 +128,16 @@ export function useTimelineStream({
         window.dispatchEvent(
           new CustomEvent("piclaw:agent-status", { detail: { type: "done" } })
         );
+      }
+    });
+
+    es.addEventListener("extension_ui_request", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        // Relay approval/custom UI requests so AgentStatusPanel can show the modal
+        window.dispatchEvent(new CustomEvent("piclaw:agent-request", { detail: data }));
+      } catch (err) {
+        console.warn("[MessageList] SSE extension_ui_request parse error:", err);
       }
     });
 
