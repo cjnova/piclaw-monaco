@@ -68,6 +68,144 @@ function truncateByLines(
   return { visible, omitted: totalLines - maxLines, totalLines };
 }
 
+// ---------------------------------------------------------------------------
+// Tool argument parsing helpers
+// ---------------------------------------------------------------------------
+
+/** Parse tool_args JSON safely; returns null on failure. */
+function parseToolArgs(raw: unknown): Record<string, unknown> | null {
+  if (!raw) return null;
+  if (typeof raw === "object" && raw !== null) return raw as Record<string, unknown>;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch {}
+  }
+  return null;
+}
+
+/** Determine tool kind from tool_name prefix. */
+export function resolveToolKind(toolName: string): "bash" | "read" | "write" | "search" | "other" {
+  const n = (toolName || "").toLowerCase();
+  if (n === "bash" || n.startsWith("bash") || n.includes("shell") || n.includes("run")) return "bash";
+  if (n === "read" || n.startsWith("read") || n.includes("cat") || n.includes("view")) return "read";
+  if (
+    n === "write" || n.startsWith("write") ||
+    n.includes("edit") || n.includes("patch") ||
+    n.includes("create") || n.includes("delete") ||
+    n.includes("insert") || n.includes("replace")
+  ) return "write";
+  if (n.includes("search") || n.includes("grep") || n.includes("find") || n.includes("glob")) return "search";
+  return "other";
+}
+
+/** Labels and badge colours for each kind. */
+const TOOL_KIND_LABELS: Record<string, { label: string; cls: string }> = {
+  bash:   { label: "bash",   cls: "agent-tool-kind-pill--bash" },
+  read:   { label: "read",   cls: "agent-tool-kind-pill--read" },
+  write:  { label: "write",  cls: "agent-tool-kind-pill--write" },
+  search: { label: "search", cls: "agent-tool-kind-pill--search" },
+  other:  { label: "tool",   cls: "agent-tool-kind-pill--other" },
+};
+
+interface ParsedTitle {
+  prefix: string;
+  argument: string | null;
+  suffix: string;
+  gitBranch: string | null;
+}
+
+/**
+ * Resolve a human-readable title from a tool call's name, raw title, and args.
+ * - For bash tools: extracts the first meaningful command token.
+ * - For read/write tools: extracts the file path.
+ * - Returns prefix/argument/suffix parts for styled rendering.
+ */
+export function resolveTitleFromArgs(
+  toolName: string,
+  rawTitle: string,
+  toolArgs: unknown,
+): ParsedTitle {
+  const args = parseToolArgs(toolArgs);
+  const kind = resolveToolKind(toolName);
+  let prefix = rawTitle || toolName || "Running tool…";
+  let argument: string | null = null;
+  let suffix = "";
+  let gitBranch: string | null = null;
+
+  // Extract git branch from args (mirrors upstream status.ts:287-333)
+  if (args) {
+    const branchRaw = args.branch ?? args.git_branch ?? args.ref;
+    if (typeof branchRaw === "string" && branchRaw) gitBranch = branchRaw;
+    // Also try to extract from cwd/path by checking common fields
+    const cwdRaw = args.cwd ?? args.working_dir ?? args.workdir;
+    if (!gitBranch && typeof cwdRaw === "string" && cwdRaw) {
+      // Branch may be stored alongside cwd in some tool schemas
+      const repoRaw = args.repo ?? args.repo_path;
+      if (typeof repoRaw === "string" && repoRaw) gitBranch = null; // will rely on path hint
+    }
+  }
+
+  if (kind === "bash" && args) {
+    const cmd = args.command ?? args.cmd ?? args.shell_command;
+    if (typeof cmd === "string" && cmd) {
+      // Shorten: take first line, strip leading shell boilerplate, cap at 80 chars
+      const firstLine = cmd.split("\n")[0].trim();
+      const short = firstLine.length > 80 ? firstLine.slice(0, 78) + "…" : firstLine;
+      prefix = "$ ";
+      argument = short;
+      suffix = "";
+      return { prefix, argument, suffix, gitBranch };
+    }
+  }
+
+  if ((kind === "read" || kind === "write") && args) {
+    const filePath =
+      args.path ?? args.file_path ?? args.filename ?? args.file ?? args.target_file;
+    if (typeof filePath === "string" && filePath) {
+      const opLabel = kind === "write" ? "write " : "read ";
+      prefix = opLabel;
+      argument = filePath.length > 60 ? "…" + filePath.slice(-58) : filePath;
+      return { prefix, argument, suffix, gitBranch };
+    }
+  }
+
+  if (kind === "search" && args) {
+    const query = args.query ?? args.pattern ?? args.regex ?? args.search;
+    if (typeof query === "string" && query) {
+      prefix = "search ";
+      argument = query.length > 60 ? query.slice(0, 58) + "…" : query;
+      return { prefix, argument, suffix, gitBranch };
+    }
+  }
+
+  // Fallback: return raw title as-is
+  return { prefix, argument: null, suffix: "", gitBranch };
+}
+
+// ---------------------------------------------------------------------------
+// Retry countdown helpers
+// ---------------------------------------------------------------------------
+
+/** Parse a retry_at / retryAt ISO timestamp from a tool_status event detail. */
+function parseRetryAt(detail: Record<string, unknown>): number | null {
+  const raw = detail.retry_at ?? detail.retryAt;
+  if (typeof raw !== "string" || !raw) return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Format milliseconds remaining as a short countdown string. */
+function formatRetryCountdown(remainingMs: number): string {
+  if (remainingMs <= 0) return "retrying now";
+  const secs = Math.ceil(remainingMs / 1000);
+  if (secs < 60) return `retry in ${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return `retry in ${mins}m ${rem}s`;
+}
+
 /** Sanitize SVG string — allow only safe SVG elements and attributes. */
 function sanitizeSvg(raw: string): string {
   if (!raw || typeof raw !== "string") return "";
@@ -93,8 +231,13 @@ interface ToolCall {
   id: string;
   name: string;
   title: string;
+  rawTitle: string;
+  toolArgs: unknown;
+  kind: "bash" | "read" | "write" | "search" | "other";
   status: "running" | "done" | "error";
   hints: StatusHint[];    // "repo • branch"
+  retryAt: number | null; // epoch ms for retry countdown
+  gitBranch: string | null;
 }
 
 export function AgentStatusPanel() {
@@ -108,6 +251,7 @@ export function AgentStatusPanel() {
   const [tools, setTools] = useState<ToolCall[]>([]);
   const [toolsExpanded, setToolsExpanded] = useState(false);
   const [elapsed, setElapsed] = useState({ draft: 0, thought: 0, tools: 0 });
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   // #320 Recovery substates
   type RecoveryState = null | "recovering" | "compacting" | "retrying" | "blocked" | "error";
@@ -150,6 +294,14 @@ export function AgentStatusPanel() {
     return () => clearInterval(interval);
   }, []);
 
+  // Tick nowMs every second when any tool has an active retry countdown
+  useEffect(() => {
+    const hasRetry = tools.some((t) => t.retryAt != null);
+    if (!hasRetry) return;
+    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [tools]);
+
   useEffect(() => {
     const handleDraft = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -186,20 +338,36 @@ export function AgentStatusPanel() {
         const id = detail.title || detail.tool_name || "unknown";
         setTools((prev) => {
           if (prev.some((t) => t.id === id && t.status === "running")) return prev;
+          const toolName = detail.tool_name || "tool";
+          const rawTitle = detail.title || toolName || "Running tool...";
+          const toolArgs = detail.tool_args ?? null;
+          const kind = resolveToolKind(toolName);
+          const parsed = resolveTitleFromArgs(toolName, rawTitle, toolArgs);
+          const displayTitle = parsed.argument != null
+            ? parsed.prefix + parsed.argument + parsed.suffix
+            : parsed.prefix;
           return [...prev, {
             id,
-            name: detail.tool_name || "tool",
-            title: detail.title || detail.tool_name || "Running tool...",
+            name: toolName,
+            title: displayTitle,
+            rawTitle,
+            toolArgs,
+            kind,
             status: "running" as const,
             hints: Array.isArray(detail.status_hints) ? detail.status_hints : [],
+            retryAt: null,
+            gitBranch: parsed.gitBranch,
           }];
         });
       } else if (detail.type === "tool_status") {
         lastProgressTimeRef.current = Date.now();
         const id = detail.title || detail.tool_name || "unknown";
-        setTools((prev) => prev.map((t) =>
-          t.id === id ? { ...t, status: "done" as const, title: detail.title || t.title } : t
-        ));
+        const retryAt = parseRetryAt(detail as Record<string, unknown>);
+        setTools((prev) => prev.map((t) => {
+          if (t.id !== id) return t;
+          const newStatus = retryAt ? "running" as const : "done" as const;
+          return { ...t, status: newStatus, retryAt: retryAt ?? null };
+        }));
       }
       if (detail.type && detail.type !== "context_usage" && detail.type !== "done") {
         setStatus(detail.type);
@@ -424,7 +592,11 @@ export function AgentStatusPanel() {
             )}
           </div>
           <div className={`agent-status-card__content${toolsExpanded ? "" : " agent-status-card__content--collapsed"}`}>
-            {(toolsExpanded ? tools : tools.slice(-3)).map((tool) => (
+            {(toolsExpanded ? tools : tools.slice(-3)).map((tool) => {
+              const parsed = resolveTitleFromArgs(tool.name, tool.rawTitle, tool.toolArgs);
+              const kindMeta = TOOL_KIND_LABELS[tool.kind] || TOOL_KIND_LABELS.other;
+              const retryLabel = tool.retryAt != null ? formatRetryCountdown(tool.retryAt - nowMs) : null;
+              return (
               <div key={tool.id} className={`agent-status-card__tool-item agent-status-card__tool-item--${tool.status}`}>
                 <div className="agent-status-card__tool-indicator">
                   {tool.status === "running" ? (
@@ -434,7 +606,31 @@ export function AgentStatusPanel() {
                   )}
                 </div>
                 <div className="agent-status-panel__tool-info">
-                  <span className="agent-status-panel__tool-title">{tool.title}</span>
+                  {/* Tool kind pill */}
+                  <span className={`agent-tool-kind-pill ${kindMeta.cls}`}>{kindMeta.label}</span>
+                  {/* Parsed title with highlighted argument */}
+                  <span className="agent-status-panel__tool-title">
+                    {parsed.argument != null ? (
+                      <>
+                        <span className="agent-tool-title-prefix">{parsed.prefix}</span>
+                        <span className="agent-tool-title-arg">{parsed.argument}</span>
+                        {parsed.suffix && <span className="agent-tool-title-suffix">{parsed.suffix}</span>}
+                      </>
+                    ) : (
+                      parsed.prefix
+                    )}
+                  </span>
+                  {/* Git branch hint */}
+                  {parsed.gitBranch && (
+                    <span className="agent-tool-git-branch" title="Git branch">
+                      <span aria-hidden="true">⎇</span> {parsed.gitBranch}
+                    </span>
+                  )}
+                  {/* Retry countdown */}
+                  {retryLabel && (
+                    <span className="agent-tool-retry-countdown">{retryLabel}</span>
+                  )}
+                  {/* Status hints (SVG icons) */}
                   {tool.hints.length > 0 && (
                     <span className="agent-status-panel__tool-context">
                       {tool.hints.map((hint) => (
@@ -447,7 +643,8 @@ export function AgentStatusPanel() {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
             {!toolsExpanded && tools.length > 3 && (
               <button type="button" className="agent-status-card__more-btn" onClick={() => setToolsExpanded(true)}>
                 +{tools.length - 3} more…

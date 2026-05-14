@@ -5576,6 +5576,26 @@ pre.frontmatter-block {
 .agent-status__abort-btn { padding: 3px 10px; font-size: 11px; border-radius: 6px; border: 1px solid var(--error, #f38ba8); background: transparent; color: var(--error, #f38ba8); cursor: pointer; margin-left: 8px; }
 .agent-status__abort-btn:hover { background: rgba(243, 139, 168, 0.15); }
 
+/* #371 Tool kind pills */
+.agent-tool-kind-pill { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; padding: 1px 6px; border-radius: 8px; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
+.agent-tool-kind-pill--bash   { background: rgba(249, 226, 175, 0.18); color: #f9e2af; }
+.agent-tool-kind-pill--read   { background: rgba(137, 180, 250, 0.18); color: #89b4fa; }
+.agent-tool-kind-pill--write  { background: rgba(250, 179, 135, 0.18); color: #fab387; }
+.agent-tool-kind-pill--search { background: rgba(166, 227, 161, 0.18); color: #a6e3a1; }
+.agent-tool-kind-pill--other  { background: rgba(180, 190, 254, 0.18); color: #b4befe; }
+
+/* #371 Parsed tool title parts */
+.agent-tool-title-prefix { color: var(--text-muted); }
+.agent-tool-title-arg    { font-family: var(--font-mono, monospace); color: var(--text); font-weight: 500; }
+.agent-tool-title-suffix { color: var(--text-muted); }
+
+/* #371 Git branch hint */
+.agent-tool-git-branch { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-muted); background: rgba(137, 180, 250, 0.10); padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
+
+/* #371 Retry countdown */
+.agent-tool-retry-countdown { display: inline-flex; align-items: center; font-size: 10px; color: #f9e2af; background: rgba(249, 226, 175, 0.15); padding: 1px 7px; border-radius: 8px; margin-left: 6px; font-variant-numeric: tabular-nums; vertical-align: middle; animation: agent-countdown-pulse 1s ease-in-out infinite; }
+@keyframes agent-countdown-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
+
 /* ── #353 Card-style status panels ──────────────── */
 .agent-status-card {
   border: 1px solid var(--border);
