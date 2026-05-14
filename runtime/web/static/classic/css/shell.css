@@ -7022,3 +7022,138 @@ pre.frontmatter-block {
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── #388 Addon settings pane styles ──────────────────────────────── */
+.settings-panel__nav-item--addon {
+  border-left: 2px solid transparent;
+}
+.settings-panel__addon-error {
+  padding: 16px;
+  color: var(--error, #f38ba8);
+  font-size: 13px;
+}
+.settings-panel__addon-loading {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+/* Force addon pane content to inherit our typography */
+.settings-panel__content h1,
+.settings-panel__content h2,
+.settings-panel__content h3,
+.settings-panel__content h4 {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-panel__content h1:first-child,
+.settings-panel__content h2:first-child,
+.settings-panel__content h3:first-child,
+.settings-panel__content h4:first-child {
+  margin-top: 0;
+}
+.settings-panel__content p {
+  font-size: 12px;
+  color: var(--text-soft, var(--text-muted));
+  margin: 4px 0 8px;
+}
+.settings-panel__content table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+.settings-panel__content table,
+.settings-panel__content div {
+  max-height: none !important;
+}
+.settings-panel__content td,
+.settings-panel__content th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft, var(--text-muted));
+  font-weight: normal;
+}
+.settings-panel__content td strong,
+.settings-panel__content td b {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 12px;
+}
+.settings-panel__content input[type="text"],
+.settings-panel__content input[type="search"] {
+  background: var(--bg-input, rgba(0,0,0,0.2));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 12px;
+  max-width: 300px;
+}
+.settings-panel__content button {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated, rgba(255,255,255,0.04));
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-panel__content button:hover {
+  background: var(--bg-elevated, rgba(255,255,255,0.08));
+  color: var(--text);
+}
+
+/* ── #388 Aggressive addon pane typography overrides ──────────────── */
+.settings-panel__content label {
+  font-size: 12px !important;
+  color: var(--text) !important;
+  font-weight: normal !important;
+}
+.settings-panel__content span {
+  font-size: 12px !important;
+}
+.settings-panel__content strong,
+.settings-panel__content b {
+  font-weight: 500 !important;
+  font-size: 12px !important;
+}
+.settings-panel__content code {
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 11px !important;
+  background: var(--overlay-black-35, rgba(0,0,0,0.15)) !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+}
+.settings-panel__content ul,
+.settings-panel__content ol {
+  font-size: 12px !important;
+  padding-left: 1.5em !important;
+  color: var(--text-soft, var(--text-muted)) !important;
+}
+.settings-panel__content li {
+  margin: 2px 0 !important;
+}
+.settings-panel__content input[type="checkbox"] {
+  width: 14px !important;
+  height: 14px !important;
+  accent-color: var(--accent) !important;
+}
+.settings-panel__content select {
+  background: var(--bg-input, rgba(0,0,0,0.2)) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+  color: var(--text) !important;
+  font-size: 12px !important;
+}
+.settings-panel__content hr {
+  border: none !important;
+  border-top: 1px solid var(--border) !important;
+  margin: 12px 0 !important;
+}
