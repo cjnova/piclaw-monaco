@@ -4598,14 +4598,60 @@ body {
 }
 
 .settings-panel__tool-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px 160px 36px 28px 1fr 90px;
   align-items: center;
-  gap: 8px;
-  padding: 5px 12px 5px 38px;
+  gap: 6px;
+  padding: 4px 12px 4px 38px;
   font-size: 12px;
 }
 .settings-panel__tool-row:hover {
   background: var(--overlay-white-03);
+}
+
+/* Column header row */
+.settings-panel__tool-row--header {
+  padding-top: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.settings-panel__tool-row--header span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Per-column helpers */
+.settings-panel__tool-col-enabled,
+.settings-panel__tool-col-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-panel__tool-col-enabled input[type="checkbox"],
+.settings-panel__tool-col-compact input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+.settings-panel__tool-col-enabled input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* Source label */
+.settings-panel__tool-source {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .settings-panel__tool-checkbox {
