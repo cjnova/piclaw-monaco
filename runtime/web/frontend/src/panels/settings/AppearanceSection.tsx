@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
-import { type SettingsData } from "./types";
+import { type SettingsData, type SettingsSectionProps } from "./types";
 import { AvatarSection } from "./AvatarSection";
+import { registerSettingsPane } from "./pane-registry";
 
 export function AppearanceSection({
   data,
@@ -54,3 +55,13 @@ export function AppearanceSection({
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "appearance",
+  label: "Appearance",
+  icon: <i className="codicon codicon-paintcan" />,
+  order: 45,
+  component: ({ data, saveSetting }: SettingsSectionProps) => (
+    <AppearanceSection data={data} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
+  ),
+});

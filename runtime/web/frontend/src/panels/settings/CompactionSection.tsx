@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
-import { type SettingsData, type WatchdogPhase, type CompactionBackoff } from "./types";
+import { type SettingsData, type WatchdogPhase, type CompactionBackoff, type SettingsSectionProps } from "./types";
 import { NumberStepper } from "./NumberStepper";
+import { registerSettingsPane } from "./pane-registry";
 
 export function CompactionSection({
   data,
@@ -222,3 +223,13 @@ export function CompactionSection({
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "compaction",
+  label: "Compaction",
+  icon: <i className="codicon codicon-archive" />,
+  order: 20,
+  component: ({ data, saveSetting }: SettingsSectionProps) => (
+    <CompactionSection data={data} onSaveCompaction={(field, value) => saveSetting("compaction", field, value)} />
+  ),
+});

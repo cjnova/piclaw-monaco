@@ -95,3 +95,13 @@ export interface SettingsData {
 }
 
 export type Category = "general" | "sessions" | "recordings" | "workspace" | "environment" | "models" | "keychain" | "tools" | "appearance" | "compaction" | "providers";
+
+/**
+ * Props passed to every built-in settings section component when rendered
+ * through the unified pane registry.
+ */
+export interface SettingsSectionProps {
+  data: SettingsData;
+  saveSetting: (endpoint: string, field: string, value: unknown) => Promise<void>;
+  filter?: string;
+}
