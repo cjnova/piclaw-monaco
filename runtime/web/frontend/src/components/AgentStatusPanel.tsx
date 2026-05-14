@@ -2,6 +2,31 @@ import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
 import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 
+/**
+ * Decide whether to show a dot, spinner, or nothing for a given status.
+ * Mirrors resolveRunningStatusIndicator from upstream status-dot.js.
+ */
+export function resolveStatusIndicator(
+  status: string | null,
+  opts: { pendingRequest?: boolean; isLastActivity?: boolean } = {},
+): "dot" | "spinner" | "none" {
+  if (opts.pendingRequest) return "dot";
+  if (opts.isLastActivity) return "none";
+  if (status === "error") return "none";
+  if (status === "last_activity") return "none";
+  if (status === "intent" || status === "pending_request") return "dot";
+  if (
+    status === "tool_metadata" ||
+    status === "tool_call" ||
+    status === "tool_status" ||
+    status === "thinking" ||
+    status === "waiting"
+  ) {
+    return "spinner";
+  }
+  return "dot";
+}
+
 interface PanelState {
   text: string;
   expanded: boolean;
@@ -77,6 +102,8 @@ export function AgentStatusPanel() {
   const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded, dismissed: false });
   const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded, dismissed: false });
   const [status, setStatus] = useState<string | null>(null);
+  const [steerQueued, setSteerQueued] = useState(false);
+  const [turnColor, setTurnColor] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [tools, setTools] = useState<ToolCall[]>([]);
   const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -181,6 +208,14 @@ export function AgentStatusPanel() {
           agentRunningRef.current = true;
         }
       }
+      // steer_queued: show queued dot
+      if (detail.type === "steer_queued") {
+        setSteerQueued(true);
+      } else if (detail.type && detail.type !== "context_usage") {
+        setSteerQueued(false);
+      }
+      // turn color
+      if (detail.turn_color) setTurnColor(detail.turn_color);
       if (detail.text || detail.message) setStatusText(detail.text || detail.message || "");
 
       // #320 Recovery substates
@@ -232,6 +267,8 @@ export function AgentStatusPanel() {
       setElapsed({ draft: 0, thought: 0, tools: 0 });
       setStatus(null);
       setStatusText("");
+      setSteerQueued(false);
+      setTurnColor(null);
       setTools([]);
       setToolsExpanded(false);
       // Reset recovery and watchdog state
@@ -345,14 +382,32 @@ export function AgentStatusPanel() {
 
   return (
     <div className="agent-status-panel">
-      {status && status !== "idle" && status !== "done" && (
-        <div className="agent-status-panel__status">
-          <div className="agent-status-panel__spinner" />
-          <span className="agent-status-panel__status-text">
-            {statusText || status}
-          </span>
-        </div>
-      )}
+      {status && status !== "idle" && status !== "done" && (() => {
+        const indicator = resolveStatusIndicator(status);
+        // For error: show status row with ⚠ icon (indicator is 'none' but we still render)
+        const showRow = indicator !== "none" || status === "error";
+        if (!showRow) return null;
+        const colorStyle = turnColor ? { "--turn-color": turnColor } as preact.JSX.CSSProperties : undefined;
+        return (
+          <div className="agent-status-panel__status" style={colorStyle}>
+            {status === "error" ? (
+              <span className="agent-status-panel__error-icon" aria-label="Error" role="img">⚠</span>
+            ) : indicator === "spinner" ? (
+              <div className="agent-status-panel__spinner" />
+            ) : (
+              <div
+                className={[
+                  "agent-status-panel__status-dot",
+                  steerQueued ? "agent-status-panel__status-dot--queued" : "",
+                ].filter(Boolean).join(" ")}
+              />
+            )}
+            <span className="agent-status-panel__status-text">
+              {statusText || status}
+            </span>
+          </div>
+        );
+      })()}
 
       {tools.length > 0 && (
         <div className="agent-status-card agent-status-card--tools">
