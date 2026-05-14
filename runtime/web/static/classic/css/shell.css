@@ -5296,15 +5296,42 @@ pre.frontmatter-block {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--turn-color, var(--accent));
   animation: agentPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* Queued dot: distinct pulsing satellite dot to indicate steer_queued state */
+.agent-status-panel__status-dot--queued {
+  position: relative;
+  z-index: 0;
+}
+.agent-status-panel__status-dot--queued::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--turn-color, var(--accent));
+  opacity: 0.35;
+  left: 6px;
+  top: -2px;
+  animation: agentPulse 1.5s ease-in-out infinite 0.5s;
+}
+
+/* Error icon in status row */
+.agent-status-panel__error-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: var(--error, #f38ba8);
 }
 
 .agent-status-panel__spinner {
   width: 16px;
   height: 16px;
   border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  border-top-color: var(--turn-color, var(--accent));
   border-radius: 50%;
   animation: agentSpin 0.8s linear infinite;
   flex-shrink: 0;
