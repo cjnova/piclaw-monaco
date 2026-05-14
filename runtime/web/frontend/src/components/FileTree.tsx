@@ -1,5 +1,5 @@
 /**
- * FileTree.tsx – Lazy-loading workspace file tree component.
+ * FileTree.tsx - Lazy-loading workspace file tree component.
  *
  * Fetches directory listings from GET /workspace/tree and renders
  * an expandable tree with codicon icons. Clicking a folder toggles
@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { formatBytes } from "../utils/formatBytes";
 import { getChatJid } from "../api/chat-jid";
+import { FileIcon } from "./FileIcon";
 
 /** Tree node shape returned by GET /workspace/tree */
 interface TreeNode {
@@ -139,11 +140,6 @@ function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand,
     onToggleExpand(node.path);
   }, [isDir, expanded, children, node, onSelect, onToggleExpand]);
 
-  const iconName = isDir
-    ? expanded
-      ? "folder-opened"
-      : "folder"
-    : getFileIcon(node.name);
 
   const meta = isDir
     ? node.child_count !== undefined
@@ -178,14 +174,14 @@ function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand,
         <span
           className={`codicon codicon-${expanded && isDir ? "chevron-down" : isDir ? "chevron-right" : "blank"} file-tree__chevron`}
         />
-        <span className={`codicon codicon-${iconName} file-tree__icon`} />
+        <FileIcon filename={node.name} isFolder={isDir} open={expanded} className="file-tree__icon" />
         <span className="file-tree__name">{node.name}</span>
         {meta && <span className="file-tree__meta">{meta}</span>}
       </div>
 
       {loading && (
         <div className="file-tree__loading file-tree__children-indent">
-          Loading…
+          Loading...
         </div>
       )}
 
@@ -231,35 +227,6 @@ function TreeItem({ node, selectedPath, expandedPaths, onSelect, onToggleExpand,
   );
 }
 
-function getFileIcon(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  const iconMap: Record<string, string> = {
-    ts: "symbol-misc",
-    tsx: "symbol-misc",
-    js: "symbol-misc",
-    jsx: "symbol-misc",
-    json: "json",
-    md: "markdown",
-    txt: "file-text",
-    html: "code",
-    css: "symbol-color",
-    scss: "symbol-color",
-    svg: "file-media",
-    png: "file-media",
-    jpg: "file-media",
-    jpeg: "file-media",
-    gif: "file-media",
-    webp: "file-media",
-    sh: "terminal",
-    yaml: "list-tree",
-    yml: "list-tree",
-    toml: "list-tree",
-    lock: "lock",
-    gitignore: "git-commit",
-    env: "key",
-  };
-  return iconMap[ext] ?? "file";
-}
 
 // ─── FileTree ─────────────────────────────────────────────────────────────────
 
@@ -327,7 +294,7 @@ export function FileTree({ onFileSelect, showHidden = true }: FileTreeProps) {
         return next;
       });
     }
-  }, [rootChildren]); // intentionally omit selectedPath — only run when root loads
+  }, [rootChildren]); // intentionally omit selectedPath - only run when root loads
 
   const handleSelect = useCallback(
     (node: TreeNode) => {
@@ -338,7 +305,7 @@ export function FileTree({ onFileSelect, showHidden = true }: FileTreeProps) {
   );
 
   if (loading) {
-    return <div className="file-tree file-tree__loading" role="tree">Loading workspace…</div>;
+    return <div className="file-tree file-tree__loading" role="tree">Loading workspace...</div>;
   }
 
   if (error) {
