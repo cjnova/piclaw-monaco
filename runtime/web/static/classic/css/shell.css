@@ -7157,3 +7157,10 @@ pre.frontmatter-block {
   border-top: 1px solid var(--border) !important;
   margin: 12px 0 !important;
 }
+
+/* Separator between core and addon nav items */
+.settings-panel__nav-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 6px 12px;
+}

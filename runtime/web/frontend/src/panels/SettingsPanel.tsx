@@ -157,7 +157,8 @@ export function SettingsPanel() {
             <span>{cat.label}</span>
           </button>
         ))}
-        {/* Addon panes rendered after built-in sections */}
+        {/* Separator + addon panes rendered after built-in sections */}
+        {addonPanes.length > 0 && <hr className="settings-panel__nav-separator" />}
         {addonPanes.map((pane) => (
           <button
             key={pane.id}
