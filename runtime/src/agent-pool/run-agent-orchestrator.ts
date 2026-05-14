@@ -359,7 +359,10 @@ async function maybeAutoRotateSession(
     }
   }
 
-  const result = await rotateSession(session, runtime, { reason: "automatic" });
+  const result = await rotateSession(session, runtime, {
+    reason: "automatic",
+    fallbackOnCompactionFailure: true,
+  });
   if (result.status === "success") {
     resetCompactionSuccessCount(chatJid);
     options.onInfo?.("Auto-rotated oversized session", {
@@ -1085,14 +1088,53 @@ export async function runAgentPrompt(
       source: "run_agent",
     });
     if (!runOptions.skipPrePromptCompaction) {
+      let prePromptCompactionFailure: string | null = null;
       await maybeAutoCompactSessionBeforePrompt(session, chatJid, options, (event) => {
-        if (event.type === "compaction_start") {
-          heartbeatTrackedPhase(chatJid, "preprompt_compaction", { eventType: event.type });
-        } else if (event.type === "compaction_end") {
-          heartbeatTrackedPhase(chatJid, "prompt", { eventType: event.type });
+        const eventAny = event as { type?: string; errorMessage?: unknown };
+        if (eventAny.type === "compaction_start") {
+          heartbeatTrackedPhase(chatJid, "preprompt_compaction", { eventType: eventAny.type });
+        } else if (eventAny.type === "compaction_end") {
+          heartbeatTrackedPhase(chatJid, "prompt", { eventType: eventAny.type });
+          const errorMessage = typeof eventAny.errorMessage === "string"
+            ? String(eventAny.errorMessage).trim()
+            : "";
+          if (errorMessage) prePromptCompactionFailure = errorMessage;
+        } else if (eventAny.type === "compaction_suppressed") {
+          const errorMessage = typeof eventAny.errorMessage === "string"
+            ? String(eventAny.errorMessage).trim()
+            : "";
+          if (errorMessage) prePromptCompactionFailure = errorMessage;
         }
         runOptions.onEvent?.(event);
       });
+      if (prePromptCompactionFailure && !isCompactionCancellationError(prePromptCompactionFailure)) {
+        const rotation = await rotateSession(session, runtime, {
+          reason: "automatic",
+          skipCompaction: true,
+          emergencyReason: prePromptCompactionFailure,
+        });
+        if (rotation.status === "success") {
+          clearCompactionFailureBackoff(chatJid);
+          resetCompactionSuccessCount(chatJid);
+          session = runtime.session;
+          modelLabel = session.model ? `${session.model.provider}/${session.model.id}` : null;
+          updateSessionModel(chatJid, modelLabel, session.thinkingLevel ?? null);
+          options.onWarn?.("Emergency-rotated session after pre-prompt compaction failure", {
+            operation: "run_agent.preprompt_compaction_emergency_rotate",
+            chatJid,
+            errorMessage: prePromptCompactionFailure,
+            archivePath: rotation.archivePath ?? null,
+            newSessionFile: rotation.newSessionFile ?? null,
+          });
+        } else {
+          options.onWarn?.("Emergency rotation after pre-prompt compaction failure failed", {
+            operation: "run_agent.preprompt_compaction_emergency_rotate_failed",
+            chatJid,
+            errorMessage: prePromptCompactionFailure,
+            reason: rotation.message,
+          });
+        }
+      }
     } else {
       heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preprompt_compaction_skipped" });
     }

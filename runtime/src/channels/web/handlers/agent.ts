@@ -54,7 +54,7 @@ import "../../../extensions/generic-tool-status-hints.js";
 import { createUuid } from "../../../utils/ids.js";
 import { createLogger } from "../../../utils/logger.js";
 import type { AttachmentInfo } from "../../../agent-pool/attachments.js";
-import { cancelScheduledIdleAutoCompaction, maybeAutoCompactSessionBeforePrompt } from "../../../agent-pool/compaction.js";
+import { cancelScheduledIdleAutoCompaction, isCompactionCancellationError, maybeAutoCompactSessionBeforePrompt } from "../../../agent-pool/compaction.js";
 import { checkPendingShutdown } from "../../../runtime/shutdown-registry.js";
 import { DEFAULT_BASE_RETRY_MS, getRetryAtIso } from "../../../queue/retry-policy.js";
 import { formatProviderError } from "./provider-error-format.js";
@@ -1447,6 +1447,7 @@ export async function processChat(
   let sawCompactionEvent = false;
   let sawRecoveryEvent = false;
   let lastCompactionErrorMessage: string | null = null;
+  let lastCompactionSuppressed = false;
   let lastRecoveryOutcome: string | null = null;
 
   const resolvedThreadRootId = resolveThreadRootId(
@@ -1492,6 +1493,11 @@ export async function processChat(
       const errorMessage = typeof event.errorMessage === "string" ? event.errorMessage.trim() : "";
       if (errorMessage) lastCompactionErrorMessage = errorMessage;
     }
+    if (type === "compaction_suppressed") {
+      const errorMessage = typeof event.errorMessage === "string" ? event.errorMessage.trim() : "";
+      if (errorMessage) lastCompactionErrorMessage = errorMessage;
+      lastCompactionSuppressed = true;
+    }
     if (type === "recovery_start" || type === "recovery_end") {
       sawRecoveryEvent = true;
     }
@@ -1508,6 +1514,38 @@ export async function processChat(
     title: "Thinking...",
     turn_id: turnId,
   });
+
+  const maybeEmergencyRotateAfterPrePromptCompaction = async (source: "foreground" | "background"): Promise<boolean> => {
+    const detail = lastCompactionErrorMessage?.trim();
+    if (!detail || isCompactionCancellationError(detail)) return false;
+    log.warn("Pre-prompt compaction failed or was suppressed; emergency-rotating session before prompt", withObservabilityMetadata({
+      operation: "process_chat.preprompt_compaction_emergency_rotate",
+      chatJid,
+      source,
+      suppressed: lastCompactionSuppressed,
+      errorMessage: detail,
+    }, turnId, browserObservability));
+    const result = await channel.agentPool.emergencyRotateSession(chatJid, detail);
+    if (result.status !== "success") {
+      log.warn("Emergency rotation after pre-prompt compaction failure failed", withObservabilityMetadata({
+        operation: "process_chat.preprompt_compaction_emergency_rotate_failed",
+        chatJid,
+        source,
+        reason: result.message,
+      }, turnId, browserObservability));
+      return false;
+    }
+    log.info("Emergency-rotated session after pre-prompt compaction failure", withObservabilityMetadata({
+      operation: "process_chat.preprompt_compaction_emergency_rotate_success",
+      chatJid,
+      source,
+      archivePath: result.archivePath ?? null,
+      newSessionFile: result.newSessionFile ?? null,
+      previousSize: result.previousSize ?? null,
+      nextSize: result.nextSize ?? null,
+    }, turnId, browserObservability));
+    return true;
+  };
 
   if (typeof channel.agentPool.getSessionForIntrospection === "function") {
     const session = await channel.agentPool.getSessionForIntrospection(chatJid);
@@ -1545,6 +1583,12 @@ export async function processChat(
           foregroundMs,
         }, turnId, browserObservability));
         compactionPromise
+          .then(async () => {
+            if (await maybeEmergencyRotateAfterPrePromptCompaction("background")) {
+              clearChatPreflight(chatJid);
+              endTrackedPhase(chatJid);
+            }
+          })
           .catch((error) => {
             log.warn("Background pre-prompt compaction failed before chat resume", withObservabilityMetadata({
               operation: "process_chat.preprompt_compaction_deferred_failed",
@@ -1566,6 +1610,13 @@ export async function processChat(
       if (!deferredForCompaction) {
         await compactionPromise;
       }
+    }
+
+    if (await maybeEmergencyRotateAfterPrePromptCompaction("foreground")) {
+      clearChatPreflight(chatJid);
+      endTrackedPhase(chatJid);
+      enqueueProcessChatAfterCompaction(channel, chatJid, agentId, lastMessage.id, effectiveThreadRootId, browserObservability);
+      return;
     }
 
     heartbeatTrackedPhase(chatJid, "prompt", { eventType: "preflight_promoted" });

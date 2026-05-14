@@ -65,6 +65,7 @@ export async function handleSessionRotate(session: AgentSession, runtime: AgentS
   const result = await rotateSession(session, runtime, {
     instructions: command.instructions,
     reason: "manual",
+    fallbackOnCompactionFailure: true,
   });
   return {
     status: result.status,

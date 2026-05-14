@@ -88,6 +88,7 @@ const SSH_TOOL_HINT = [
   "## SSH",
   "Use ssh to inspect or change the SSH profile for the current session.",
   "When a live session exists, SSH-backed core tools switch immediately for the current turn.",
+  "An active SSH profile redirects read, grep, find, ls, bash, edit, and write through the configured keychain-backed SSH connection.",
   "Live SSH tool redirection and stored SSH profiles are cleared at the end of each agent turn.",
 ].join("\n");
 
@@ -117,8 +118,8 @@ export const sshTool: ExtensionFactory = (pi: ExtensionAPI) => {
   pi.registerTool({
     name: "ssh",
     label: "ssh",
-    description: "Get, set, or clear the session-scoped SSH config used for remote core tools.",
-    promptSnippet: "ssh: inspect or update the current session SSH remote-tools profile.",
+    description: "Get, set, or clear the session-scoped SSH config used for remote core tools (read/grep/find/ls/bash/edit/write).",
+    promptSnippet: "ssh: inspect or update the current session SSH remote-tools profile; active profiles redirect read/grep/find/ls/bash/edit/write.",
     parameters: SshToolSchema,
     async execute(_toolCallId, params): Promise<SshToolResult> {
       const handlers = registeredHandlers;
@@ -135,13 +136,13 @@ export const sshTool: ExtensionFactory = (pi: ExtensionAPI) => {
         const liveRedirectionActive = Boolean(handlers.isActive?.(chatJid));
         if (!config) {
           return {
-            content: [{ type: "text", text: `No SSH config stored for ${chatJid}. Live SSH tool redirection is ${liveRedirectionActive ? "active" : "inactive"}.` }],
-            details: { action: "get", chat_jid: chatJid, configured: false, live_redirection_active: liveRedirectionActive, config: null },
+            content: [{ type: "text", text: `No SSH config stored for ${chatJid}. Live SSH tool redirection is ${liveRedirectionActive ? "active" : "inactive"}. Redirected tools when active: read, grep, find, ls, bash, edit, write.` }],
+            details: { action: "get", chat_jid: chatJid, configured: false, live_redirection_active: liveRedirectionActive, redirected_tools: ["read", "grep", "find", "ls", "bash", "edit", "write"], config: null },
           };
         }
         return {
-          content: [{ type: "text", text: `SSH config for ${chatJid}: ${config.ssh_target} (port ${config.ssh_port}, key ${config.private_key_keychain}). Live SSH tool redirection is ${liveRedirectionActive ? "active" : "inactive"}.` }],
-          details: { action: "get", chat_jid: chatJid, configured: true, live_redirection_active: liveRedirectionActive, config },
+          content: [{ type: "text", text: `SSH config for ${chatJid}: ${config.ssh_target} (port ${config.ssh_port}, key ${config.private_key_keychain}). Live SSH tool redirection is ${liveRedirectionActive ? "active" : "inactive"}. Redirected tools when active: read, grep, find, ls, bash, edit, write.` }],
+          details: { action: "get", chat_jid: chatJid, configured: true, live_redirection_active: liveRedirectionActive, redirected_tools: ["read", "grep", "find", "ls", "bash", "edit", "write"], config },
         };
       }
 

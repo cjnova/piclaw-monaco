@@ -118,7 +118,7 @@ const OPTIONAL_EXTENSIONS: OptionalBundledExtension[] = [
   { path: resolve(EXTENSIONS_DIR, "integrations", "mcp-status-hints", "index.ts") },
   { path: resolve(EXTENSIONS_DIR, "browser", "cdp-browser-tool", "index.ts") },
   { path: resolve(EXTENSIONS_DIR, "platform", "windows", "powershell", "index.ts"), platforms: ["win32"] },
-  { path: resolve(EXTENSIONS_DIR, "platform", "windows", "win-ui", "index.ts"), platforms: ["win32"] },
+  // win-ui removed: now shipped as @rcarmo/piclaw-addon-win-ui
   // office-viewer-tool removed: now shipped as @rcarmo/piclaw-addon-office-viewer
   { path: resolve(EXTENSIONS_DIR, "integrations", "office-tools-tool", "index.ts") },
   { path: resolve(EXTENSIONS_DIR, "integrations", "remote-pair", "index.ts"), envGate: "PICLAW_REMOTE_INTEROP_ENABLED" },

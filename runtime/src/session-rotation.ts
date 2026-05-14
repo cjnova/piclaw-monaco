@@ -27,6 +27,18 @@ export interface SessionRotationResult {
   previousSize?: number | null;
   nextSize?: number | null;
   compacted: boolean;
+  emergencyFallback?: boolean;
+}
+
+export interface SessionRotationOptions {
+  instructions?: string;
+  reason?: SessionRotationReason;
+  /** Continue with a lossy summary-only successor if the pre-rotation compaction fails. */
+  fallbackOnCompactionFailure?: boolean;
+  /** Skip model compaction entirely and create a lossy summary-only successor. */
+  skipCompaction?: boolean;
+  /** Human-readable reason included in summary-only emergency successors. */
+  emergencyReason?: string;
 }
 
 /** Default compaction prompt used before a rotation handoff. */
@@ -163,6 +175,95 @@ export function seedRotatedSession(
   }
 }
 
+const EMERGENCY_RECENT_MESSAGE_LIMIT = 32;
+const EMERGENCY_MESSAGE_CHAR_LIMIT = 800;
+const EMERGENCY_SUMMARY_CHAR_LIMIT = 16_000;
+
+function truncateForEmergencySummary(value: string, limit: number): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+}
+
+function extractVisibleText(message: AgentMessage): string {
+  const content = (message as AgentMessage & { content?: unknown }).content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const type = (block as { type?: unknown }).type;
+    if (type !== "text") continue;
+    const text = (block as { text?: unknown }).text;
+    if (typeof text === "string" && text.trim()) parts.push(text);
+  }
+  return parts.join("\n");
+}
+
+export function buildEmergencyRotationSummary(
+  context: SessionContext,
+  options: {
+    reason?: string | null;
+    previousSessionFile?: string | null;
+    archivePath?: string | null;
+  } = {},
+): { summary: string; tokensBefore: number; recentMessageCount: number } {
+  const carried = collectCarriedSummary(context.messages);
+  const parts: string[] = [
+    "# Emergency session rotation handoff",
+    "Compaction failed or was skipped, so Piclaw archived the bloated session and started a lean successor instead of carrying the oversized context forward.",
+  ];
+  if (options.reason?.trim()) parts.push(`Reason: ${truncateForEmergencySummary(options.reason, 500)}`);
+  if (options.archivePath?.trim()) parts.push(`Archived full session: ${options.archivePath.trim()}`);
+  else if (options.previousSessionFile?.trim()) parts.push(`Previous session file: ${options.previousSessionFile.trim()}`);
+
+  if (carried.summary) {
+    parts.push("\n## Existing compacted context", truncateForEmergencySummary(carried.summary, EMERGENCY_SUMMARY_CHAR_LIMIT));
+  }
+
+  const visibleMessages = context.messages
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .map((message) => ({ role: message.role, text: truncateForEmergencySummary(extractVisibleText(message), EMERGENCY_MESSAGE_CHAR_LIMIT) }))
+    .filter((message) => message.text.length > 0)
+    .slice(-EMERGENCY_RECENT_MESSAGE_LIMIT);
+
+  if (visibleMessages.length > 0) {
+    parts.push("\n## Recent visible conversation");
+    for (const message of visibleMessages) {
+      parts.push(`- ${message.role.toUpperCase()}: ${message.text}`);
+    }
+  }
+
+  parts.push("\n## Notes", "- Assistant thinking, encrypted reasoning signatures, tool calls, and full tool results were intentionally dropped from the successor session.", "- Use the archived session file only if deep forensic context is required.");
+
+  const summary = parts.join("\n").trim();
+  const tokensBefore = carried.tokensBefore || Math.ceil(JSON.stringify(context.messages).length / 4);
+  return { summary, tokensBefore, recentMessageCount: visibleMessages.length };
+}
+
+export function seedEmergencyRotatedSession(
+  sessionManager: SessionManager,
+  context: SessionContext,
+  options: {
+    sessionName?: string;
+    model?: { provider: string; modelId: string } | null;
+    reason?: string | null;
+    previousSessionFile?: string | null;
+    archivePath?: string | null;
+  },
+): void {
+  if (options.sessionName?.trim()) {
+    sessionManager.appendSessionInfo(options.sessionName.trim());
+  }
+
+  if (options.model) {
+    sessionManager.appendModelChange(options.model.provider, options.model.modelId);
+  }
+
+  const emergency = buildEmergencyRotationSummary(context, options);
+  sessionManager.appendCompaction(emergency.summary, "emergency-rotation", emergency.tokensBefore);
+}
+
 async function restoreCancelledRotationSession(
   runtime: AgentSessionRuntime,
   previousSessionFile: string,
@@ -189,7 +290,7 @@ async function restoreCancelledRotationSession(
 export async function rotateSession(
   session: AgentSession,
   runtime: AgentSessionRuntime,
-  options: { instructions?: string; reason?: SessionRotationReason } = {}
+  options: SessionRotationOptions = {}
 ): Promise<SessionRotationResult> {
   const reason = options.reason ?? "manual";
 
@@ -233,13 +334,21 @@ export async function rotateSession(
 
   const compactionInstructions = options.instructions?.trim() || ROTATION_COMPACTION_INSTRUCTIONS;
   let compacted = false;
-  try {
-    await session.compact(compactionInstructions);
-    compacted = true;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!isRotationFallbackCompactionError(message)) {
-      return { status: "error", reason, compacted, message };
+  let emergencyFallback = Boolean(options.skipCompaction);
+  let emergencyReason = options.emergencyReason?.trim() || null;
+  if (!options.skipCompaction) {
+    try {
+      await session.compact(compactionInstructions);
+      compacted = true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!isRotationFallbackCompactionError(message)) {
+        if (!options.fallbackOnCompactionFailure) {
+          return { status: "error", reason, compacted, message };
+        }
+        emergencyFallback = true;
+        emergencyReason = message;
+      }
     }
   }
 
@@ -259,6 +368,16 @@ export async function rotateSession(
     const result = await runtime.newSession({
       parentSession: archivePath,
       setup: async (sessionManager) => {
+        if (emergencyFallback) {
+          seedEmergencyRotatedSession(sessionManager, context, {
+            sessionName: currentSessionName,
+            model: currentModel,
+            reason: emergencyReason,
+            previousSessionFile,
+            archivePath,
+          });
+          return;
+        }
         seedRotatedSession(sessionManager, context, {
           sessionName: currentSessionName,
           model: currentModel,
@@ -285,27 +404,32 @@ export async function rotateSession(
 
     const nextSessionFile = activeSession.sessionFile || "(unavailable)";
     const nextSize = getSessionFileSize(activeSession.sessionFile);
-    const summaryCount = collectCarriedSummary(context.messages).summary ? 1 : 0;
-    const carriedMessageCount = context.messages.filter(
-      (message) => message.role !== "compactionSummary" && message.role !== "branchSummary"
-    ).length;
+    const summaryCount = emergencyFallback ? 1 : collectCarriedSummary(context.messages).summary ? 1 : 0;
+    const carriedMessageCount = emergencyFallback
+      ? 0
+      : context.messages.filter(
+        (message) => message.role !== "compactionSummary" && message.role !== "branchSummary"
+      ).length;
 
     return {
       status: "success",
       reason,
       compacted,
+      emergencyFallback,
       archivePath,
       newSessionFile: nextSessionFile,
       previousSize,
       nextSize,
       message: [
-        reason === "automatic" ? "Session auto-rotated." : "Session rotated.",
+        emergencyFallback
+          ? (reason === "automatic" ? "Session emergency-rotated." : "Session emergency-rotated.")
+          : (reason === "automatic" ? "Session auto-rotated." : "Session rotated."),
         `Archived previous session: ${archivePath}`,
         `New session: ${nextSessionFile}`,
         `Previous file size: ${previousSize === null ? "unknown" : formatBytes(previousSize)}`,
         `New file size: ${nextSize === null ? "unknown" : formatBytes(nextSize)}`,
-        `Continuity seed: ${summaryCount > 0 ? "summary + " : ""}${carriedMessageCount} carried message${carriedMessageCount === 1 ? "" : "s"}`,
-        `Compaction before rotate: ${compacted ? "yes" : "no (used current effective context)"}`,
+        `Continuity seed: ${emergencyFallback ? "lossy emergency summary" : `${summaryCount > 0 ? "summary + " : ""}${carriedMessageCount} carried message${carriedMessageCount === 1 ? "" : "s"}`}`,
+        `Compaction before rotate: ${compacted ? "yes" : emergencyFallback ? "no (emergency summary-only fallback)" : "no (used current effective context)"}`,
       ].join("\n"),
     };
   } catch (err) {

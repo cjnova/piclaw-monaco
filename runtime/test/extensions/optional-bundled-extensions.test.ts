@@ -86,24 +86,4 @@ describe("bundled optional extensions", () => {
     expect(fake.state.commands.has("cdp-tabs")).toBe(true);
     expect(fake.state.tools.get("cdp_browser")?.description).toContain("Chrome DevTools Protocol");
   });
-
-  test("win-ui stays a safe no-op off Windows", async () => {
-    const { default: registerWinUi } = await import("../../extensions/platform/windows/win-ui/index.ts");
-    const fake = createFakeApi();
-
-    registerWinUi(fake.api);
-
-    if (process.platform === "win32") {
-      expect(fake.state.tools.has("win_list_windows")).toBe(true);
-      expect(fake.state.tools.has("win_screenshot")).toBe(true);
-      expect(fake.state.tools.has("win_desktop_screenshot")).toBe(true);
-      expect(fake.state.tools.has("win_list_monitors")).toBe(true);
-      expect(fake.state.tools.has("win_monitor_screenshot")).toBe(true);
-      expect(fake.state.tools.has("win_region_screenshot")).toBe(true);
-      expect(fake.state.tools.has("win_kill")).toBe(true);
-    } else {
-      expect(fake.state.tools.size).toBe(0);
-      expect(fake.state.commands.size).toBe(0);
-    }
-  });
 });

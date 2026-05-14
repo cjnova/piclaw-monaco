@@ -176,6 +176,12 @@ export function isCompactionCancellationError(message: string | null | undefined
   return /compaction cancelled|aborterror/i.test(String(message || ""));
 }
 
+function isRecentCompactionFailure(state: ChatCompactionBackoffState, nowMs = Date.now()): boolean {
+  const failedAtMs = Date.parse(state.lastFailedAt);
+  if (!Number.isFinite(failedAtMs)) return false;
+  return failedAtMs <= nowMs && (nowMs - failedAtMs) <= 24 * 60 * 60 * 1000;
+}
+
 function formatCompactionBackoffDetail(state: Pick<ChatCompactionBackoffState, "failureCount" | "backoffUntil" | "lastErrorMessage">): string {
   const parts = [
     `Skipping auto-compaction until ${state.backoffUntil}`,
@@ -321,6 +327,17 @@ async function runCompactionWithTimeoutExclusive<T>(
   }
 
   await abortCompactionBestEffort(session, chatJid, options);
+
+  // Wait for the compaction promise to fully settle so extension handlers
+  // finish their cleanup (finally blocks, UI teardown) before the caller
+  // can dispose the session.  Without this, emergency rotation can call
+  // session.dispose() while the extension's ctx is still in use.
+  const SETTLEMENT_GRACE_MS = 5_000;
+  await Promise.race([
+    compactionOutcome,
+    new Promise<void>((r) => setTimeout(r, SETTLEMENT_GRACE_MS)),
+  ]);
+
   updateSessionCompacting(chatJid, false);
   clearChatCompactionActive(chatJid);
   return {
@@ -383,6 +400,12 @@ async function maybeAutoCompactSession(
 
   try {
     const activeBackoff = getActiveCompactionBackoff(chatJid);
+    const previousBackoff = getChatCompactionBackoff(chatJid);
+    const previousNonCancellationFailure = previousBackoff
+      && !isCompactionCancellationError(previousBackoff.lastErrorMessage)
+      && isRecentCompactionFailure(previousBackoff)
+      ? previousBackoff
+      : null;
     if (activeBackoff && isCompactionCancellationError(activeBackoff.lastErrorMessage)) {
       clearCompactionFailureBackoff(chatJid);
       options.onWarn?.(
@@ -402,8 +425,11 @@ async function maybeAutoCompactSession(
           lastErrorMessage: activeBackoff.lastErrorMessage,
         },
       );
-    } else if (activeBackoff) {
-      const detail = formatCompactionBackoffDetail(activeBackoff);
+    } else if (activeBackoff || previousNonCancellationFailure) {
+      const suppressionState = activeBackoff ?? previousNonCancellationFailure!;
+      const detail = activeBackoff
+        ? formatCompactionBackoffDetail(suppressionState)
+        : `Previous auto-compaction failed at ${suppressionState.lastFailedAt}; emergency rotation should run before retrying. Last error: ${(suppressionState.lastErrorMessage ?? "unknown").slice(0, 160)}`;
       options.onWarn?.(
         reason === "idle"
           ? "Idle auto-compaction suppressed for chat after recent failures"
@@ -416,18 +442,18 @@ async function maybeAutoCompactSession(
           contextTokens: context.contextTokens,
           contextWindow: context.contextWindow,
           reserveTokens: context.reserveTokens,
-          failureCount: activeBackoff.failureCount,
-          backoffUntil: activeBackoff.backoffUntil,
-          lastErrorMessage: activeBackoff.lastErrorMessage,
+          failureCount: suppressionState.failureCount,
+          backoffUntil: suppressionState.backoffUntil,
+          lastErrorMessage: suppressionState.lastErrorMessage,
         },
       );
       onEvent?.({
         type: "compaction_suppressed",
-        reason: "backoff",
-        until: activeBackoff.backoffUntil,
-        failureCount: activeBackoff.failureCount,
+        reason: activeBackoff ? "backoff" : "previous_failure",
+        until: suppressionState.backoffUntil,
+        failureCount: suppressionState.failureCount,
         detail,
-        errorMessage: activeBackoff.lastErrorMessage ?? undefined,
+        errorMessage: suppressionState.lastErrorMessage ?? undefined,
       } as unknown as AgentSessionEvent);
       return;
     }
