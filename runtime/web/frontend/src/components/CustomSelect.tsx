@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "preact/hooks";
+import { useState, useRef, useEffect, useMemo } from "preact/hooks";
 
 interface Option {
   value: string;
@@ -20,6 +20,8 @@ interface CustomSelectProps {
 export function CustomSelect({ options, value, onChange, className, placeholder }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<Record<string, string>>({});
 
   const selected = options.find((o) => o.value === value);
   const displayLabel = selected?.label ?? placeholder ?? "Select...";
@@ -51,7 +53,19 @@ export function CustomSelect({ options, value, onChange, className, placeholder 
       <button
         type="button"
         className="custom-select__trigger"
-        onClick={() => setOpen(!open)}
+        ref={triggerRef}
+        onClick={() => {
+          if (!open && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setDropdownStyle({
+              position: 'fixed',
+              top: `${rect.bottom + 4}px`,
+              left: `${rect.left}px`,
+              width: `${rect.width}px`,
+            });
+          }
+          setOpen(!open);
+        }}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
@@ -59,7 +73,7 @@ export function CustomSelect({ options, value, onChange, className, placeholder 
         <span className="custom-select__arrow">{open ? "▴" : "▾"}</span>
       </button>
       {open && (
-        <div className="custom-select__dropdown" role="listbox">
+        <div className="custom-select__dropdown" role="listbox" style={dropdownStyle}>
           {options.map((opt) => (
             <button
               key={opt.value}
