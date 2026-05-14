@@ -1,43 +1,39 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 
-import { type SettingsData, type Category } from "./settings/types";
-import { GeneralSection } from "./settings/GeneralSection";
-import { SessionsSection } from "./settings/SessionsSection";
-import { AppearanceSection } from "./settings/AppearanceSection";
-import { CompactionSection } from "./settings/CompactionSection";
-import { WorkspaceSection } from "./settings/WorkspaceSection";
-import { ModelsSection } from "./settings/ModelsSection";
-import { KeychainSection } from "./settings/KeychainSection";
-import { ToolsSection } from "./settings/ToolsSection";
-import { ProvidersSection } from "./settings/ProvidersSection";
-import { RecordingsSection } from "./settings/RecordingsSection";
-import { EnvironmentSection } from "./settings/EnvironmentSection";
+import { type SettingsData } from "./settings/types";
 import { safeGetItem, safeSetItem } from "../utils/storage";
 import { getRegisteredPanes, type SettingsPaneDefinition } from "./settings/pane-registry";
 
-const BUILTIN_CATEGORIES: { id: Category; label: string; icon: string }[] = [
-  { id: "general", label: "General", icon: "codicon-gear" },
-  { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
-  { id: "recordings", label: "Recordings", icon: "codicon-record" },
-  { id: "compaction", label: "Compaction", icon: "codicon-archive" },
-  { id: "workspace", label: "Workspace", icon: "codicon-folder" },
-  { id: "environment", label: "Environment", icon: "codicon-symbol-variable" },
-  { id: "providers", label: "Providers", icon: "codicon-cloud" },
-  { id: "models", label: "Models", icon: "codicon-hubot" },
-  { id: "appearance", label: "Appearance", icon: "codicon-paintcan" },
-  { id: "keychain", label: "Keychain", icon: "codicon-key" },
-  { id: "tools", label: "Tools", icon: "codicon-tools" },
-];
+// Import all built-in sections so their registerSettingsPane() calls execute
+import "./settings/GeneralSection";
+import "./settings/SessionsSection";
+import "./settings/RecordingsSection";
+import "./settings/CompactionSection";
+import "./settings/WorkspaceSection";
+import "./settings/EnvironmentSection";
+import "./settings/ProvidersSection";
+import "./settings/ModelsSection";
+import "./settings/AppearanceSection";
+import "./settings/KeychainSection";
+import "./settings/ToolsSection";
 
-/** Safely render an addon pane component; shows an error state if it throws. */
-function AddonPaneRenderer({ pane, filter }: { pane: SettingsPaneDefinition; filter?: string }) {
+/** Safely render any pane component (built-in or addon); shows an error state if it throws. */
+function PaneRenderer({
+  pane,
+  data,
+  saveSetting,
+}: {
+  pane: SettingsPaneDefinition;
+  data: SettingsData;
+  saveSetting: (endpoint: string, field: string, value: unknown) => Promise<void>;
+}) {
   const [renderError, setRenderError] = useState<string | null>(null);
 
   if (renderError) {
     return (
       <div className="settings-panel__addon-error">
-        <p>Failed to render addon pane "{pane.label}": {renderError}</p>
+        <p>Failed to render pane "{pane.label}": {renderError}</p>
       </div>
     );
   }
@@ -45,36 +41,39 @@ function AddonPaneRenderer({ pane, filter }: { pane: SettingsPaneDefinition; fil
   if (typeof pane.component !== "function") {
     return (
       <div className="settings-panel__addon-error">
-        <p>Addon pane "{pane.label}" did not provide a valid component.</p>
+        <p>Pane "{pane.label}" did not provide a valid component.</p>
       </div>
     );
   }
 
   try {
-    const Comp = pane.component as (props: { filter?: string }) => unknown;
+    const Comp = pane.component as (props: {
+      data: SettingsData;
+      saveSetting: (endpoint: string, field: string, value: unknown) => Promise<void>;
+      filter?: string;
+    }) => unknown;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return <>{Comp({ filter }) as any}</>;
+    return <>{Comp({ data, saveSetting }) as any}</>;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    // Set error on next tick to avoid setState-in-render
     Promise.resolve().then(() => setRenderError(msg));
     return <div className="settings-panel__addon-loading">Loading…</div>;
   }
 }
 
 export function SettingsPanel() {
-  const activeCategory = useSignal<string>((safeGetItem("piclaw-settings-category") as Category) || "general");
+  const activeCategory = useSignal<string>(safeGetItem("piclaw-settings-category") || "general");
   const settings = useSignal<SettingsData>({});
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
   const saveStatus = useSignal<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Re-render when addon panes register/unregister
-  const [addonPanes, setAddonPanes] = useState<SettingsPaneDefinition[]>(() => getRegisteredPanes());
+  // Re-render when panes register/unregister
+  const [allPanes, setAllPanes] = useState<SettingsPaneDefinition[]>(() => getRegisteredPanes());
 
   useEffect(() => {
-    const handler = () => setAddonPanes(getRegisteredPanes());
+    const handler = () => setAllPanes(getRegisteredPanes());
     window.addEventListener("piclaw:settings-panes-changed", handler);
     return () => window.removeEventListener("piclaw:settings-panes-changed", handler);
   }, []);
@@ -140,24 +139,30 @@ export function SettingsPanel() {
     );
   }
 
+  // Split panes: built-in (order < 100) vs addon (order >= 100)
+  const builtinPanes = allPanes.filter(p => (p.order ?? 500) < 100);
+  const addonPanes = allPanes.filter(p => (p.order ?? 500) >= 100);
+
+  const activePane = allPanes.find(p => p.id === activeCategory.value)
+    ?? allPanes[0];
+
   const s = settings.value;
-  const activeAddonPane = addonPanes.find(p => p.id === activeCategory.value);
 
   return (
     <div className="settings-panel">
       {/* Left nav */}
       <nav className="settings-panel__nav">
-        {BUILTIN_CATEGORIES.map((cat) => (
+        {builtinPanes.map((pane) => (
           <button
-            key={cat.id}
-            className={`settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`}
-            onClick={() => { activeCategory.value = cat.id; safeSetItem("piclaw-settings-category", cat.id); }}
+            key={pane.id}
+            className={`settings-panel__nav-item${activeCategory.value === pane.id ? " settings-panel__nav-item--active" : ""}`}
+            onClick={() => { activeCategory.value = pane.id; safeSetItem("piclaw-settings-category", pane.id); }}
           >
-            <i className={`codicon ${cat.icon}`} />
-            <span>{cat.label}</span>
+            <span className="settings-panel__nav-icon">{pane.icon as never}</span>
+            <span>{pane.label}</span>
           </button>
         ))}
-        {/* Separator + addon panes rendered after built-in sections */}
+        {/* Separator between built-in and addon panes */}
         {addonPanes.length > 0 && <hr className="settings-panel__nav-separator" />}
         {addonPanes.map((pane) => (
           <button
@@ -180,47 +185,8 @@ export function SettingsPanel() {
           <div className="settings-panel__save-status">{saveStatus.value}</div>
         )}
 
-        {/* Built-in sections */}
-        {activeCategory.value === "general" && (
-          <GeneralSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
-        )}
-        {activeCategory.value === "sessions" && (
-          <SessionsSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
-        )}
-        {activeCategory.value === "appearance" && (
-          <AppearanceSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
-        )}
-        {activeCategory.value === "compaction" && (
-          <CompactionSection data={s} onSaveCompaction={(field, value) => saveSetting("compaction", field, value)} />
-        )}
-        {activeCategory.value === "workspace" && (
-          <WorkspaceSection data={s} onSaveWorkspace={(field, value) => saveSetting("workspace", field, value)} />
-        )}
-        {activeCategory.value === "environment" && (
-          <EnvironmentSection />
-        )}
-        {activeCategory.value === "providers" && (
-          <ProvidersSection providers={s.providers ?? []} />
-        )}
-        {activeCategory.value === "models" && (
-          <ModelsSection data={s} />
-        )}
-        {activeCategory.value === "keychain" && (
-          <KeychainSection />
-        )}
-        {activeCategory.value === "tools" && (
-          <ToolsSection data={s} />
-        )}
-        {activeCategory.value === "recordings" && (
-          <RecordingsSection />
-        )}
-
-        {/* Addon panes rendered after built-in sections */}
-        {activeAddonPane && (
-          <AddonPaneRenderer
-            pane={activeAddonPane}
-            filter={activeAddonPane.searchable ? "" : undefined}
-          />
+        {activePane && (
+          <PaneRenderer pane={activePane} data={s} saveSetting={saveSetting} />
         )}
       </div>
     </div>

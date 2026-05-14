@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
-import { type SettingsData } from "./types";
+import { type SettingsData, type SettingsSectionProps } from "./types";
 import { NumberStepper } from "./NumberStepper";
+import { registerSettingsPane } from "./pane-registry";
 
 export function WorkspaceSection({
   data,
@@ -67,3 +68,13 @@ export function WorkspaceSection({
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "workspace",
+  label: "Workspace",
+  icon: <i className="codicon codicon-folder" />,
+  order: 25,
+  component: ({ data, saveSetting }: SettingsSectionProps) => (
+    <WorkspaceSection data={data} onSaveWorkspace={(field, value) => saveSetting("workspace", field, value)} />
+  ),
+});

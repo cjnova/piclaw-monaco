@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
-import { type SettingsData } from "./types";
+import { type SettingsData, type SettingsSectionProps } from "./types";
 import { NumberStepper } from "./NumberStepper";
+import { registerSettingsPane } from "./pane-registry";
 
 export function SessionsSection({
   data,
@@ -71,3 +72,13 @@ export function SessionsSection({
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "sessions",
+  label: "Sessions",
+  icon: <i className="codicon codicon-terminal-bash" />,
+  order: 12,
+  component: ({ data, saveSetting }: SettingsSectionProps) => (
+    <SessionsSection data={data} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
+  ),
+});

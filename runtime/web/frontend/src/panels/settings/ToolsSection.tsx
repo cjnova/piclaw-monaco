@@ -1,5 +1,6 @@
 import { useSignal } from "@preact/signals";
-import { type SettingsData, type Toolset, type Tool } from "./types";
+import { type SettingsData, type Toolset, type Tool, type SettingsSectionProps } from "./types";
+import { registerSettingsPane } from "./pane-registry";
 
 function kindIcon(kind?: string): string {
   if (kind === "read-only") return "🔍";
@@ -85,3 +86,11 @@ export function ToolsSection({ data }: { data: SettingsData }) {
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "tools",
+  label: "Tools",
+  icon: <i className="codicon codicon-tools" />,
+  order: 80,
+  component: ({ data }: SettingsSectionProps) => <ToolsSection data={data} />,
+});

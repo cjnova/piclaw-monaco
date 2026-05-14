@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { registerSettingsPane } from "./pane-registry";
 
 interface EnvVariable {
   name: string;
@@ -166,3 +167,11 @@ export function EnvironmentSection() {
     </div>
   );
 }
+
+registerSettingsPane({
+  id: "environment",
+  label: "Environment",
+  icon: <i className="codicon codicon-symbol-variable" />,
+  order: 30,
+  component: () => <EnvironmentSection />,
+});

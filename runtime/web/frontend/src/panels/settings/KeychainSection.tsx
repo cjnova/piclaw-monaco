@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { useDialog } from "../../hooks/useDialog";
+import { registerSettingsPane } from "./pane-registry";
 
 interface KeychainEntry {
   name: string;
@@ -207,3 +208,11 @@ export function KeychainSection() {
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "keychain",
+  label: "Keychain",
+  icon: <i className="codicon codicon-key" />,
+  order: 50,
+  component: () => <KeychainSection />,
+});

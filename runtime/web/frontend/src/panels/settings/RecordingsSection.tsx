@@ -2,6 +2,7 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { getChatJid } from "../../api/chat-jid";
 import { ModalDialog } from "../../components/ModalDialog";
+import { registerSettingsPane } from "./pane-registry";
 
 interface Recording {
   id: string;
@@ -210,3 +211,11 @@ export function RecordingsSection() {
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "recordings",
+  label: "Recordings",
+  icon: <i className="codicon codicon-record" />,
+  order: 15,
+  component: () => <RecordingsSection />,
+});

@@ -1,5 +1,6 @@
 import { getMessageUrl } from "../../api/chat-jid";
-import { type Provider } from "./types";
+import { type Provider, type SettingsSectionProps } from "./types";
+import { registerSettingsPane } from "./pane-registry";
 
 export function ProvidersSection({ providers }: { providers: Provider[] }) {
   const sendCommand = async (command: string) => {
@@ -57,3 +58,13 @@ export function ProvidersSection({ providers }: { providers: Provider[] }) {
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "providers",
+  label: "Providers",
+  icon: <i className="codicon codicon-cloud" />,
+  order: 35,
+  component: ({ data }: SettingsSectionProps) => (
+    <ProvidersSection providers={data.providers ?? []} />
+  ),
+});

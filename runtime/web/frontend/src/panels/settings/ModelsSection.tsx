@@ -1,7 +1,8 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { getMessageUrl } from "../../api/chat-jid";
-import { type SettingsData } from "./types";
+import { type SettingsData, type SettingsSectionProps } from "./types";
+import { registerSettingsPane } from "./pane-registry";
 
 interface ModelOption {
   label: string;
@@ -187,3 +188,11 @@ export function ModelsSection({ data: _data }: { data: SettingsData }) {
     </section>
   );
 }
+
+registerSettingsPane({
+  id: "models",
+  label: "Models",
+  icon: <i className="codicon codicon-hubot" />,
+  order: 40,
+  component: ({ data }: SettingsSectionProps) => <ModelsSection data={data} />,
+});

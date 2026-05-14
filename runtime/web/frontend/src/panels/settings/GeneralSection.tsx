@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
-import { type SettingsData } from "./types";
+import { type SettingsData, type SettingsSectionProps } from "./types";
 import { NumberStepper } from "./NumberStepper";
+import { registerSettingsPane } from "./pane-registry";
 
 export function GeneralSection({
   data,
@@ -109,3 +110,14 @@ export function GeneralSection({
     </section>
   );
 }
+
+
+registerSettingsPane({
+  id: "general",
+  label: "General",
+  icon: <i className="codicon codicon-gear" />,
+  order: 10,
+  component: ({ data, saveSetting }: SettingsSectionProps) => (
+    <GeneralSection data={data} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
+  ),
+});
