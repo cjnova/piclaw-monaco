@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 
 import { type SettingsData, type Category } from "./settings/types";
@@ -14,8 +14,9 @@ import { ProvidersSection } from "./settings/ProvidersSection";
 import { RecordingsSection } from "./settings/RecordingsSection";
 import { EnvironmentSection } from "./settings/EnvironmentSection";
 import { safeGetItem, safeSetItem } from "../utils/storage";
+import { getRegisteredPanes, type SettingsPaneDefinition } from "./settings/pane-registry";
 
-const CATEGORIES: { id: Category; label: string; icon: string }[] = [
+const BUILTIN_CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "general", label: "General", icon: "codicon-gear" },
   { id: "sessions", label: "Sessions", icon: "codicon-terminal-bash" },
   { id: "recordings", label: "Recordings", icon: "codicon-record" },
@@ -29,13 +30,54 @@ const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "tools", label: "Tools", icon: "codicon-tools" },
 ];
 
+/** Safely render an addon pane component; shows an error state if it throws. */
+function AddonPaneRenderer({ pane, filter }: { pane: SettingsPaneDefinition; filter?: string }) {
+  const [renderError, setRenderError] = useState<string | null>(null);
+
+  if (renderError) {
+    return (
+      <div className="settings-panel__addon-error">
+        <p>Failed to render addon pane "{pane.label}": {renderError}</p>
+      </div>
+    );
+  }
+
+  if (typeof pane.component !== "function") {
+    return (
+      <div className="settings-panel__addon-error">
+        <p>Addon pane "{pane.label}" did not provide a valid component.</p>
+      </div>
+    );
+  }
+
+  try {
+    const Comp = pane.component as (props: { filter?: string }) => unknown;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return <>{Comp({ filter }) as any}</>;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Set error on next tick to avoid setState-in-render
+    Promise.resolve().then(() => setRenderError(msg));
+    return <div className="settings-panel__addon-loading">Loading…</div>;
+  }
+}
+
 export function SettingsPanel() {
-  const activeCategory = useSignal<Category>((safeGetItem("piclaw-settings-category") as Category) || "general");
+  const activeCategory = useSignal<string>((safeGetItem("piclaw-settings-category") as Category) || "general");
   const settings = useSignal<SettingsData>({});
   const loading = useSignal(true);
   const error = useSignal<string | null>(null);
   const saveStatus = useSignal<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Re-render when addon panes register/unregister
+  const [addonPanes, setAddonPanes] = useState<SettingsPaneDefinition[]>(() => getRegisteredPanes());
+
+  useEffect(() => {
+    const handler = () => setAddonPanes(getRegisteredPanes());
+    window.addEventListener("piclaw:settings-panes-changed", handler);
+    return () => window.removeEventListener("piclaw:settings-panes-changed", handler);
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -99,12 +141,13 @@ export function SettingsPanel() {
   }
 
   const s = settings.value;
+  const activeAddonPane = addonPanes.find(p => p.id === activeCategory.value);
 
   return (
     <div className="settings-panel">
       {/* Left nav */}
       <nav className="settings-panel__nav">
-        {CATEGORIES.map((cat) => (
+        {BUILTIN_CATEGORIES.map((cat) => (
           <button
             key={cat.id}
             className={`settings-panel__nav-item${activeCategory.value === cat.id ? " settings-panel__nav-item--active" : ""}`}
@@ -112,6 +155,17 @@ export function SettingsPanel() {
           >
             <i className={`codicon ${cat.icon}`} />
             <span>{cat.label}</span>
+          </button>
+        ))}
+        {/* Addon panes rendered after built-in sections */}
+        {addonPanes.map((pane) => (
+          <button
+            key={pane.id}
+            className={`settings-panel__nav-item settings-panel__nav-item--addon${activeCategory.value === pane.id ? " settings-panel__nav-item--active" : ""}`}
+            onClick={() => { activeCategory.value = pane.id; safeSetItem("piclaw-settings-category", pane.id); }}
+          >
+            <span className="settings-panel__nav-icon">{pane.icon as never}</span>
+            <span>{pane.label}</span>
           </button>
         ))}
       </nav>
@@ -125,6 +179,7 @@ export function SettingsPanel() {
           <div className="settings-panel__save-status">{saveStatus.value}</div>
         )}
 
+        {/* Built-in sections */}
         {activeCategory.value === "general" && (
           <GeneralSection data={s} onSaveGeneral={(field, value) => saveSetting("general", field, value)} />
         )}
@@ -157,6 +212,14 @@ export function SettingsPanel() {
         )}
         {activeCategory.value === "recordings" && (
           <RecordingsSection />
+        )}
+
+        {/* Addon panes rendered after built-in sections */}
+        {activeAddonPane && (
+          <AddonPaneRenderer
+            pane={activeAddonPane}
+            filter={activeAddonPane.searchable ? "" : undefined}
+          />
         )}
       </div>
     </div>
