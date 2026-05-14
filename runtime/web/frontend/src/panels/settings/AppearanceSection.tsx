@@ -174,6 +174,9 @@ export function AppearanceSection({
           <button className="settings-panel__btn settings-panel__btn--secondary" type="button" onClick={handleReset}>
             Reset
           </button>
+          {importStatus.value && (
+            <span style={{ fontSize: '11px', color: 'var(--success, #a6e3a1)', marginLeft: '4px' }}>{importStatus.value}</span>
+          )}
         </div>
       </div>
 
@@ -215,9 +218,6 @@ export function AppearanceSection({
         </div>
       )}
 
-      {importStatus.value && (
-        <div className="vscode-theme-status" style={{ position: 'absolute', top: '-20px', right: '20px', fontSize: '11px' }}>{importStatus.value}</div>
-      )}
 
       <input
         ref={fileInputRef}
