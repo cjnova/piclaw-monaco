@@ -46,6 +46,8 @@ import {
 } from "./agent-pool/contracts.js";
 import { runSidePrompt as runSidePromptInternal } from "./agent-pool/side-prompt-runner.js";
 import { runAgentPrompt } from "./agent-pool/run-agent-orchestrator.js";
+import { clearCompactionFailureBackoff, resetCompactionSuccessCount } from "./agent-pool/compaction.js";
+import { rotateSession, type SessionRotationResult } from "./session-rotation.js";
 import { type AvailableModelsResult } from "./agent-pool/runtime-facade.js";
 import { createAgentPoolServices, type AgentPoolServices } from "./agent-pool/service-factory.js";
 import { type AgentSessionManagerInstrumentationSnapshot, type PoolEntry } from "./agent-pool/session-manager.js";
@@ -493,6 +495,21 @@ export class AgentPool {
 
   async disposeChatSession(chatJid: string): Promise<void> {
     await this.sessionManager.recreate(chatJid);
+  }
+
+  async emergencyRotateSession(chatJid: string, emergencyReason: string): Promise<SessionRotationResult> {
+    const runtime = await this.getOrCreateRuntime(chatJid);
+    const result = await rotateSession(runtime.session, runtime, {
+      reason: "automatic",
+      skipCompaction: true,
+      emergencyReason,
+    });
+    if (result.status === "success") {
+      clearCompactionFailureBackoff(chatJid);
+      resetCompactionSuccessCount(chatJid);
+      await this.sessionManager.refreshRuntime(chatJid, runtime);
+    }
+    return result;
   }
 
   hasProviderModels(provider: string): boolean {

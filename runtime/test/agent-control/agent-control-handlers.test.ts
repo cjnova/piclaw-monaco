@@ -284,11 +284,18 @@ test("agent control queue, compact, and abort commands", async () => {
   const originalCompact = session.compact.bind(session);
   const restoreTimeoutEnv = setEnv({ PICLAW_COMPACTION_TIMEOUT_MS: "20" });
   try {
+    let _compactReject: ((err: Error) => void) | null = null;
     session.compact = async () => {
       session.compactCalls += 1;
       session.isCompacting = true;
-      await new Promise(() => {});
+      await new Promise<void>((_resolve, reject) => { _compactReject = reject; });
       return { tokensBefore: 0, firstKeptEntryId: null, summary: "" } as any;
+    };
+    const origAbort = session.abortCompaction?.bind(session);
+    (session as any).abortCompaction = () => {
+      origAbort?.();
+      _compactReject?.(new Error("Compaction cancelled"));
+      _compactReject = null;
     };
     const compactTimeout = await applyControlCommand(runtime as any, registry, { type: "compact", raw: "/compact" });
     expect(compactTimeout.status).toBe("error");

@@ -8,6 +8,7 @@
 import { createBashTool, createBashToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
+import { createSshAwareBashOperations } from "../extensions/ssh-core.js";
 import { getDefaultActiveToolNames } from "../extensions/tool-activation.js";
 
 /** The tracked bash operations injected into the built-in bash tool. */
@@ -41,9 +42,10 @@ export class AgentToolFactory {
    * Returns custom ToolDefinitions that override the built-in tools.
    * The bash tool definition uses tracked operations for keychain env injection.
    */
-  createCustomToolOverrides(): ToolDefinition[] {
+  createCustomToolOverrides(chatJid?: string): ToolDefinition[] {
     const { workspaceDir, bashOperations, platform = process.platform } = this.options;
     if (platform === "win32" || !bashOperations) return [];
-    return [createBashToolDefinition(workspaceDir, { operations: bashOperations }) as unknown as ToolDefinition];
+    const operations = chatJid ? createSshAwareBashOperations(chatJid, bashOperations) : bashOperations;
+    return [createBashToolDefinition(workspaceDir, { operations }) as unknown as ToolDefinition];
   }
 }

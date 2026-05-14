@@ -3,9 +3,10 @@ import { beforeEach, expect, test } from "bun:test";
 import "../helpers.js";
 import {
   estimateContextTokensFromSession,
+  maybeAutoCompactSessionBeforePrompt,
   runCompactionWithTimeout,
 } from "../../src/agent-pool/compaction.js";
-import { initDatabase } from "../../src/db.js";
+import { initDatabase, setChatCompactionBackoff } from "../../src/db.js";
 
 beforeEach(() => {
   initDatabase();
@@ -85,37 +86,85 @@ test("runCompactionWithTimeout keeps the single-flight lock until timed-out comp
       isCompacting: true,
       abortCompaction: () => {
         aborts += 1;
+        // Simulate abort causing the compaction to settle shortly after
+        setTimeout(() => release.resolve(), 10);
       },
     };
     const options = { onWarn: () => undefined };
 
-    const first = await runCompactionWithTimeout(session, "web:timeout", options, async () => {
+    const first = await runCompactionWithTimeout(session, "web:timeout-settle", options, async () => {
       calls += 1;
       await release.promise;
       return "late";
     });
-    const second = await runCompactionWithTimeout(session, "web:timeout", options, async () => {
-      calls += 1;
-      return "second";
-    });
 
+    // First call timed out, but settlement grace waited for the compaction
+    // promise to settle — so the lock is already released by the time the
+    // caller gets the result.
     expect(first.ok).toBe(false);
-    expect(second).toEqual(first);
     expect(calls).toBe(1);
     expect(aborts).toBe(1);
 
-    release.resolve();
-    await sleep(0);
-
-    const third = await runCompactionWithTimeout(session, "web:timeout", options, async () => {
+    // Second call should now succeed independently (lock was released
+    // after settlement).
+    const second = await runCompactionWithTimeout(session, "web:timeout-settle", options, async () => {
       calls += 1;
-      return "third";
+      return "second";
     });
-    expect(third).toEqual({ ok: true, result: "third" });
+    expect(second).toEqual({ ok: true, result: "second" });
     expect(calls).toBe(2);
   } finally {
     if (previousTimeout === undefined) delete process.env.PICLAW_COMPACTION_TIMEOUT_MS;
     else process.env.PICLAW_COMPACTION_TIMEOUT_MS = previousTimeout;
+  }
+});
+
+test("maybeAutoCompactSessionBeforePrompt suppresses retry after an expired non-cancellation failure", async () => {
+  const previousThreshold = process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT;
+  process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT = "75";
+  try {
+    const events: any[] = [];
+    const warnings: string[] = [];
+    let compactCalls = 0;
+    const chatJid = "web:previous-failure";
+    setChatCompactionBackoff(chatJid, {
+      chatJid,
+      failureCount: 1,
+      lastFailedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+      backoffUntil: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      lastErrorMessage: "Compaction timed out after 180s",
+    });
+    const session = {
+      ...makeSession([
+        { role: "user", content: [{ type: "text", text: "x".repeat(4000) }] },
+      ], 80_000),
+      model: { provider: "test", id: "large", contextWindow: 100_000 },
+      settingsManager: { getCompactionSettings: () => ({ enabled: true, reserveTokens: 25_000 }) },
+      isStreaming: false,
+      isCompacting: false,
+      isRetrying: false,
+      async compact() {
+        compactCalls += 1;
+      },
+    };
+
+    await maybeAutoCompactSessionBeforePrompt(
+      session as any,
+      chatJid,
+      { onWarn: (message) => warnings.push(message), onInfo: () => undefined },
+      (event) => events.push(event),
+    );
+
+    expect(compactCalls).toBe(0);
+    expect(warnings).toContain("Pre-prompt auto-compaction suppressed for chat after recent failures");
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "compaction_suppressed",
+      reason: "previous_failure",
+      errorMessage: "Compaction timed out after 180s",
+    }));
+  } finally {
+    if (previousThreshold === undefined) delete process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT;
+    else process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT = previousThreshold;
   }
 });
 

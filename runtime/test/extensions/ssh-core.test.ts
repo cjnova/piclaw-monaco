@@ -7,6 +7,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import sshCoreExtension, {
   applyLiveSshConfig,
   createChatSshCoreExtension,
+  createSshAwareBashOperations,
   createSshCoreExtension,
   hasLiveChatSshSession,
   parseSshFlag,
@@ -78,9 +79,12 @@ class FakeSshChild extends EventEmitter {
   stderr = new PassThrough();
   killed = false;
   killCalls = 0;
+  onStdin?: (chunk: string) => void;
   stdin = new Writable({
     write: (chunk, _encoding, callback) => {
-      this.stdinWrites.push(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk));
+      const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+      this.stdinWrites.push(text);
+      this.onStdin?.(text);
       callback();
     },
   });
@@ -220,6 +224,65 @@ describe("ssh-core live state", () => {
     setSshConnectionResolverForTests(null);
     expect(hasLiveChatSshSession("web:default")).toBe(false);
   });
+
+  test("ssh-aware bash operations use the live remote transport before falling back locally", async () => {
+    const chatJid = "web:ssh-aware-bash";
+    const child = new FakeSshChild();
+    child.onStdin = (chunk) => {
+      const startMarker = chunk.match(/(__PICLAW_SSH_BEGIN_[^']+__)/)?.[1];
+      const endMarker = chunk.match(/(__PICLAW_SSH_DONE_[^:']+__)/)?.[1];
+      if (!startMarker || !endMarker) return;
+      queueMicrotask(() => {
+        child.stdout.write(`${startMarker}\nremote-ok\n${endMarker}:0\n`);
+      });
+    };
+    setPersistentSshSpawnForTests(() => child as unknown as any);
+    setSshConnectionResolverForTests(async (_rawTarget, localCwd, localHome, port) => ({
+      sshTarget: "agent@example.com",
+      port,
+      remoteCwd: "/srv/project",
+      remoteHome: "/home/agent",
+      localCwd,
+      localHome,
+      privateKeyPath: "/tmp/test-key",
+      controlPath: "/tmp/test-control",
+      strictHostKeyChecking: "yes",
+      tempDir: "/tmp/piclaw-ssh-test",
+    }) as any);
+
+    let fallbackCalled = false;
+    const fallback = {
+      exec: async (_command: string, _cwd: string, { onData }: any) => {
+        fallbackCalled = true;
+        onData(Buffer.from("local-fallback", "utf-8"));
+        return { exitCode: 0 };
+      },
+    };
+
+    await registerLiveChatSshSession(chatJid, { localCwd: "/workspace", localHome: "/home/agent" });
+    await applyLiveSshConfig(chatJid, {
+      target: "agent@example.com:/srv/project",
+      port: 22,
+      privateKeyKeychain: "ssh-prod",
+      strictHostKeyChecking: "yes",
+    });
+
+    try {
+      const output: Buffer[] = [];
+      const operations = createSshAwareBashOperations(chatJid, fallback as any);
+      const result = await operations.exec("printf remote-ok", "/workspace", {
+        onData: (data) => output.push(data),
+        timeout: 1,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(Buffer.concat(output).toString("utf-8")).toContain("remote-ok");
+      expect(fallbackCalled).toBe(false);
+      expect(child.stdinWrites.some((value) => value.includes("printf remote-ok"))).toBe(true);
+    } finally {
+      await unregisterLiveChatSshSession(chatJid);
+    }
+  });
 });
 
 describe("ssh-core extension registration", () => {
@@ -228,7 +291,7 @@ describe("ssh-core extension registration", () => {
 
     sshCoreExtension(fake.api);
 
-    expect(Array.from(fake.state.tools.keys())).toEqual(["read", "write", "edit", "bash"]);
+    expect(Array.from(fake.state.tools.keys())).toEqual(["read", "write", "edit", "bash", "local_bash"]);
     expect(fake.state.flags.has("ssh")).toBe(true);
     expect(fake.state.flags.has("ssh-port")).toBe(true);
     expect(fake.state.flags.has("p")).toBe(true);

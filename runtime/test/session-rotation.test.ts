@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
@@ -47,6 +47,94 @@ function createPersistedSession(workspace: string, sessionDir: string, sessionNa
     },
   };
 }
+
+test("rotateSession emergency fallback archives bloated context when compaction fails", async () => {
+  const workspace = createTempWorkspace("piclaw-rotate-session-emergency-");
+  cleanupWorkspace = workspace.cleanup;
+  restoreEnv = setEnv({
+    PICLAW_WORKSPACE: workspace.workspace,
+    PICLAW_STORE: workspace.store,
+    PICLAW_DATA: workspace.data,
+  });
+
+  const { rotateSession, getArchivePath } = await importFresh<typeof import("../src/session-rotation.js")>("../src/session-rotation.js");
+  const sessionDir = join(workspace.workspace, "session-rotation-emergency");
+  const sessionManager = SessionManager.create(workspace.workspace, sessionDir);
+  sessionManager.appendSessionInfo("Bloated session");
+  sessionManager.appendCompaction("Existing stable context", "root", 4096);
+  sessionManager.appendMessage({ role: "user", content: "Recent user instruction to preserve", timestamp: Date.now() } as const);
+  sessionManager.appendMessage({
+    role: "assistant",
+    content: [
+      { type: "thinking", thinking: "PRIVATE_REASONING".repeat(100), thinkingSignature: "ENCRYPTED_SIGNATURE".repeat(100) },
+      { type: "text", text: "Recent visible assistant answer" },
+      { type: "toolCall", name: "bash", arguments: { command: "echo secret bulk" } },
+    ],
+    provider: "openai",
+    model: "gpt-test",
+    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: "toolUse",
+    timestamp: Date.now(),
+  } as any);
+  sessionManager.appendMessage({ role: "toolResult", toolCallId: "call-1", toolName: "bash", content: [{ type: "text", text: "FULL_TOOL_RESULT".repeat(200) }] } as any);
+  const sessionFile = sessionManager.getSessionFile();
+  const header = sessionManager.getHeader();
+  expect(sessionFile).toBeTruthy();
+  writeFileSync(sessionFile!, `${[header, ...sessionManager.getEntries()].map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+  const archivePath = getArchivePath(sessionFile!);
+
+  const session = {
+    sessionManager,
+    sessionFile,
+    sessionName: "Bloated session",
+    model: { provider: "openai", id: "gpt-test" },
+    isStreaming: false,
+    isCompacting: false,
+    isRetrying: false,
+    pendingMessageCount: 0,
+    async compact() {
+      throw new Error("Compaction timed out after 180s");
+    },
+  };
+  const runtime = {
+    session,
+    cwd: workspace.workspace,
+    diagnostics: [],
+    services: {} as any,
+    modelFallbackMessage: undefined,
+    newSession: async (options?: { parentSession?: string; setup?: (sessionManager: SessionManager) => Promise<void> | void }) => {
+      const nextManager = SessionManager.create(workspace.workspace, sessionDir);
+      nextManager.newSession({ parentSession: options?.parentSession });
+      await options?.setup?.(nextManager);
+      runtime.session = {
+        ...session,
+        sessionManager: nextManager,
+        sessionFile: nextManager.getSessionFile(),
+        async compact() {},
+      } as any;
+      return { cancelled: false };
+    },
+    switchSession: async () => ({ cancelled: false }),
+    fork: async () => ({ cancelled: false }),
+    importFromJsonl: async () => ({ cancelled: false }),
+    dispose: async () => {},
+  } as AgentSessionRuntime;
+
+  const result = await rotateSession(session as any, runtime, { reason: "automatic", fallbackOnCompactionFailure: true });
+
+  expect(result.status).toBe("success");
+  expect(result.emergencyFallback).toBe(true);
+  expect(existsSync(archivePath)).toBe(true);
+  expect(existsSync(sessionFile!)).toBe(false);
+  expect(runtime.session.sessionFile).toBeTruthy();
+  const nextContent = readFileSync(runtime.session.sessionFile!, "utf8");
+  expect(nextContent).toContain("Emergency session rotation handoff");
+  expect(nextContent).toContain("Existing stable context");
+  expect(nextContent).toContain("Recent user instruction to preserve");
+  expect(nextContent).toContain("Recent visible assistant answer");
+  expect(nextContent).not.toContain("ENCRYPTED_SIGNATURE");
+  expect(nextContent).not.toContain("FULL_TOOL_RESULT");
+});
 
 test("rotateSession restores the previous session when a cancelled newSession already replaced runtime.session", async () => {
   const workspace = createTempWorkspace("piclaw-rotate-session-cancelled-");

@@ -792,6 +792,7 @@ test("runAgentPrompt suppresses auto-compaction for chats under backoff after re
 
   class FailingSession {
     private listeners: Array<(event: any) => void> = [];
+    private _compactReject: ((err: Error) => void) | null = null;
     sessionManager = {
       getLeafId: () => "leaf-1",
       buildSessionContext: () => ({ messages: [{ role: "user", content: "x".repeat(200) }] }),
@@ -811,10 +812,12 @@ test("runAgentPrompt suppresses auto-compaction for chats under backoff after re
     }
     async compact() {
       this.isCompacting = true;
-      await new Promise(() => {});
+      await new Promise<void>((_resolve, reject) => { this._compactReject = reject; });
     }
     abortCompaction() {
       this.isCompacting = false;
+      this._compactReject?.(new Error("Compaction cancelled"));
+      this._compactReject = null;
     }
     async prompt() {
       for (const listener of this.listeners) {

@@ -64,7 +64,7 @@ export async function enforceRequestGuards(
   const internalSecretEnabled = channel.authGateway.isInternalSecretEnabled();
   const hasInternalAccess = internalSecretEnabled && channel.authGateway.verifyInternalSecret(req);
 
-  if (flags.isInternalPost || flags.isInternalPatch) {
+  if (flags.isInternalPost) {
     if (internalSecretEnabled && !hasInternalAccess) {
       log.warn("Internal secret required", {
         operation: "web_request_guards.internal_secret_required",
