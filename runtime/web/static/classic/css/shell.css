@@ -5704,6 +5704,175 @@ pre.frontmatter-block {
   font-weight: 700;
 }
 
+/* ── #375 Extension panels ──────────────────────── */
+/* State dot colors */
+.agent-ext-panel__dot--running {
+  background: var(--accent-color, #89b4fa);
+  animation: agentExtPanelPulse 1.4s ease-in-out infinite;
+}
+.agent-ext-panel__dot--idle    { background: var(--text-muted, #6c7086); }
+.agent-ext-panel__dot--error   { background: #f38ba8; }
+.agent-ext-panel__dot--done    { background: #a6e3a1; }
+
+@keyframes agentExtPanelPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-color, #89b4fa) 40%, transparent); }
+  50% { opacity: 0.75; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-color, #89b4fa) 0%, transparent); }
+}
+
+/* Card variant */
+.agent-status-card--extension .agent-status-card__header {
+  gap: 8px;
+}
+
+/* Meta/subtitle label */
+.agent-ext-panel__meta {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-right: auto;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inline action buttons */
+.agent-ext-panel__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.agent-ext-panel__action-btn {
+  border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 88%, transparent);
+  background: color-mix(in srgb, var(--bg-tertiary, var(--bg-primary)) 82%, transparent);
+  color: var(--text-primary, var(--text));
+  border-radius: var(--radius-full, 999px);
+  padding: 3px 10px;
+  font-size: var(--font-size-xs, 10px);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.agent-ext-panel__action-btn:hover,
+.agent-ext-panel__action-btn:focus-visible {
+  border-color: var(--accent-color, var(--accent));
+  color: var(--accent-color, var(--accent));
+  outline: none;
+}
+.agent-ext-panel__action-btn--danger {
+  color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--border-color, var(--border)) 92%, transparent);
+}
+.agent-ext-panel__action-btn--danger:hover,
+.agent-ext-panel__action-btn--danger:focus-visible {
+  border-color: color-mix(in srgb, #f38ba8 45%, var(--border-color, var(--border)));
+  color: var(--text-primary, var(--text));
+}
+.agent-ext-panel__action-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* Expand/collapse toggle button */
+.agent-ext-panel__toggle {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 4px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.agent-ext-panel__toggle:hover {
+  color: var(--text-primary, var(--text));
+}
+
+/* Expanded content area */
+.agent-ext-panel__content {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-soft, var(--text-muted));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: none;
+}
+
+/* Detail markdown */
+.agent-ext-panel__detail {
+  color: var(--text, var(--fg));
+}
+
+/* Tmux command block (mirrors agent-series-chart-command from agent.css) */
+.agent-ext-panel__tmux-block {
+  margin-top: 4px;
+}
+.agent-ext-panel__tmux-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs, 10px);
+}
+.agent-ext-panel__tmux-shell {
+  position: relative;
+}
+.agent-ext-panel__tmux-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 90%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  background: color-mix(in srgb, var(--bg-primary) 76%, var(--bg-secondary, var(--bg-primary)));
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+.agent-ext-panel__tmux-copy:hover,
+.agent-ext-panel__tmux-copy:focus-visible {
+  color: var(--text-primary, var(--text));
+  border-color: var(--accent-color, var(--accent));
+  outline: none;
+}
+.agent-ext-panel__tmux-code {
+  margin: 0;
+  padding: 8px 44px 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 88%, transparent);
+  border-radius: var(--radius-md, 6px);
+  background: color-mix(in srgb, var(--bg-secondary, var(--bg-primary)) 86%, var(--bg-primary));
+  color: var(--text-primary, var(--text));
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Series placeholder */
+.agent-ext-panel__series-placeholder {
+  padding: 8px;
+  background: color-mix(in srgb, var(--bg-secondary, var(--bg-primary)) 60%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  border: 1px dashed color-mix(in srgb, var(--border-color, var(--border)) 60%, transparent);
+}
+.agent-ext-panel__series-placeholder-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* ── Adaptive Cards ─────────────────────────────── */
 .message-list__adaptive-cards {
   margin: 8px 0;
