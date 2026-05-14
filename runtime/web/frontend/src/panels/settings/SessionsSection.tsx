@@ -2,6 +2,7 @@ import { useSignal } from "@preact/signals";
 import { type SettingsData, type SettingsSectionProps } from "./types";
 import { NumberStepper } from "./NumberStepper";
 import { registerSettingsPane } from "./pane-registry";
+import { CustomSelect } from "../../components/CustomSelect";
 
 export function SessionsSection({
   data,
@@ -55,17 +56,15 @@ export function SessionsSection({
       <div className="settings-panel__field">
         <label className="settings-panel__label">Session isolation</label>
         <div className="settings-panel__field-content">
-          <select
-            className="settings-panel__select"
+          <CustomSelect
             value={data.sessionIsolation ?? "none"}
-            onChange={(e) =>
-              onSaveGeneral("sessionIsolation", (e.target as HTMLSelectElement).value)
-            }
-          >
-            <option value="none">None — full cross-session visibility</option>
-            <option value="summary">Summary</option>
-            <option value="full">Full</option>
-          </select>
+            options={[
+              { value: "none", label: "None — full cross-session visibility" },
+              { value: "summary", label: "Summary" },
+              { value: "full", label: "Full" },
+            ]}
+            onChange={(val) => onSaveGeneral("sessionIsolation", val)}
+          />
           <span className="settings-panel__description">Controls visibility between sessions</span>
         </div>
       </div>
