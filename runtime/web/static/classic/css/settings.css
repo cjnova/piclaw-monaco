@@ -2246,3 +2246,120 @@
 .avatar-section__preview-wrap { position: relative; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid var(--border); background: var(--bg-elevated); }
 .avatar-section__preview-wrap .avatar-section__preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 .avatar-section__fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: var(--text-muted); z-index: 0; }
+
+/* ── VS Code theme cards ─────────────────────────────────────── */
+.vscode-theme-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 0 0 12px;
+}
+
+.vscode-theme-card {
+    position: relative;
+    border: 1.5px solid var(--border-color, rgba(128,128,128,0.22));
+    border-radius: 6px;
+    background: var(--bg-primary);
+    cursor: pointer;
+    padding: 0 0 4px;
+    text-align: left;
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.vscode-theme-card:hover {
+    border-color: color-mix(in srgb, var(--accent-color, #1d9bf0) 55%, var(--border-color));
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.vscode-theme-card--active {
+    border-color: var(--accent-color, #1d9bf0);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, #1d9bf0) 30%, transparent);
+}
+
+.vscode-theme-card__preview {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 6px;
+    height: 28px;
+    border-radius: 6px 6px 0 0;
+}
+
+.vscode-theme-card__swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.12);
+}
+
+.vscode-theme-card__label {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding: 4px 7px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.vscode-theme-card__check {
+    font-size: 0.85em;
+    color: var(--accent-color, #1d9bf0);
+}
+
+.vscode-theme-card__badge {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    font-size: 10px;
+    opacity: 0.85;
+}
+
+.vscode-theme-active-badge {
+    font-size: 0.82em;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-left: 4px;
+}
+
+.vscode-theme-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.vscode-theme-confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--accent-color, #1d9bf0) 40%, var(--border-color));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent-color, #1d9bf0) 5%, var(--bg-primary));
+}
+
+.vscode-theme-confirm__label {
+    flex: 1;
+    font-size: 0.87em;
+    color: var(--text-primary);
+}
+
+.vscode-theme-status {
+    margin-top: 8px;
+    font-size: 0.82em;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+    .vscode-theme-grid {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    }
+}
