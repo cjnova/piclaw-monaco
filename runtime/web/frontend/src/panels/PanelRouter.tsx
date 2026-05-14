@@ -21,7 +21,7 @@ export function PanelRouter({ activePanel, onPageSelect }: PanelRouterProps) {
     case "extensions":
       return <AddonsPanel />;
     case "agent":
-      return <AgentPanel onPageSelect={onPageSelect ?? (() => {})} />;
+      return <AgentPanel />;
     case "tasks":
       return <TasksPanel />;
     case "scratchpad":

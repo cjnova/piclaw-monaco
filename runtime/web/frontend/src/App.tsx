@@ -27,7 +27,7 @@ import { providerConfigured } from "./app/providerState";
 
 const PANEL_NAMES: Record<string, string> = {
   explorer: "Workspace", search: "Search", extensions: "Addons",
-  agent: "Dashboards", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings",
+  agent: "Dashboard", tasks: "Tasks", scratchpad: "Scratchpad", settings: "Settings",
 };
 const activateOnEnterOrSpace = (e: KeyboardEvent, handler: () => void) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handler(); }
@@ -130,7 +130,7 @@ function AppContent() {
       wizardDismissed.value = false;
       // If the settings panel is active, navigate away so the wizard can be seen
       if (activePanel.value === "settings") {
-        activePanel.value = previousPanel.value || "agent";
+        activePanel.value = previousPanel.value || "explorer";
         sidebarCollapsed.value = true;
       }
     };
