@@ -216,7 +216,7 @@ export function AppearanceSection({
       )}
 
       {importStatus.value && (
-        <div className="vscode-theme-status" style={{ position: 'absolute', marginTop: '-4px' }}>{importStatus.value}</div>
+        <div className="vscode-theme-status" style={{ position: 'absolute', top: '-20px', right: '20px', fontSize: '11px' }}>{importStatus.value}</div>
       )}
 
       <input
