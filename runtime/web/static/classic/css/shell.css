@@ -4323,6 +4323,7 @@ body {
   font-family: inherit;
   outline: none;
   cursor: pointer;
+  color-scheme: dark;
   -webkit-appearance: none;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
@@ -4331,10 +4332,6 @@ body {
   padding-right: 28px;
 }
 .settings-panel__select:focus { border-color: var(--accent); }
-.settings-panel__select option {
-  background: var(--bg-elevated, #2a2a3e);
-  color: var(--text, #cdd6f4);
-}
 
 .settings-panel__checkbox-row {
   display: flex;
@@ -4609,9 +4606,9 @@ body {
 
 .settings-panel__tool-row {
   display: grid;
-  grid-template-columns: 28px 160px 36px 28px 1fr 90px;
+  grid-template-columns: 50px 180px 55px 36px 1fr 110px;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   padding: 4px 12px 4px 38px;
   font-size: 12px;
 }

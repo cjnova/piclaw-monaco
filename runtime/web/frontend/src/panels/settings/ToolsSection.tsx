@@ -169,6 +169,7 @@ export function ToolsSection({
                 className="settings-panel__toolset-checkbox"
                 title={isEnabled ? "Disable group" : "Enable group"}
                 onChange={() => toggleGroup(ts.name)}
+                style={{ display: 'none' }}
               />
               <strong className="settings-panel__toolset-name">{ts.name}</strong>
               <span className="settings-panel__toolset-count">({tools.length})</span>
