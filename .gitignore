@@ -49,3 +49,7 @@ runtime/web/static/**/*.gz
 workspace/.piclaw/store/messages.db
 workspace/.piclaw/store/messages.db-shm
 workspace/.piclaw/store/messages.db-wal
+dev-start.sh
+int-start.sh
+int-stop.sh
+dev-stop.sh
