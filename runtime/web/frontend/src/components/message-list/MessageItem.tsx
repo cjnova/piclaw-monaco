@@ -13,6 +13,44 @@ import type { ContentBlock, Interaction } from "./types";
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────
 
+const TOOL_OUTPUT_TAIL_LINES = 20;
+
+interface CopyButtonProps {
+  text: string;
+}
+
+function CopyButton({ text }: CopyButtonProps) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      type="button"
+      className={`tool-call__copy${copied ? " tool-call__copy--copied" : ""}`}
+      aria-label={copied ? "Copied!" : "Copy"}
+      title={copied ? "Copied!" : "Copy"}
+      onClick={handleCopy}
+    >
+      <i className={`codicon ${copied ? "codicon-check" : "codicon-copy"}`} />
+    </button>
+  );
+}
+
 interface ToolCallBlockProps {
   useBlock: ContentBlock;
   resultBlock?: ContentBlock;
@@ -20,6 +58,7 @@ interface ToolCallBlockProps {
 
 export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
   const [open, setOpen] = useState(false);
+  const [resultExpanded, setResultExpanded] = useState(false);
 
   const inputStr = useBlock.input
     ? JSON.stringify(useBlock.input, null, 2)
@@ -34,6 +73,16 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
       return String(resultBlock.content);
     }
   })();
+
+  const resultLines = resultStr ? resultStr.split("\n") : [];
+  const hiddenLineCount =
+    resultLines.length > TOOL_OUTPUT_TAIL_LINES && !resultExpanded
+      ? resultLines.length - TOOL_OUTPUT_TAIL_LINES
+      : 0;
+  const displayedResult =
+    hiddenLineCount > 0
+      ? resultLines.slice(-TOOL_OUTPUT_TAIL_LINES).join("\n")
+      : resultStr;
 
   return (
     <div className="message-list__tool-call">
@@ -54,12 +103,37 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
       {open && (
         <div className="message-list__tool-call-body">
           {inputStr && (
-            <pre className="message-list__tool-call-code">{inputStr}</pre>
+            <div className="tool-call__pre-wrapper">
+              <CopyButton text={inputStr} />
+              <pre className="message-list__tool-call-code">{inputStr}</pre>
+            </div>
           )}
-          {resultStr && (
+          {displayedResult && (
             <>
               <div className="message-list__tool-call-result-label">Result</div>
-              <pre className="message-list__tool-call-code">{resultStr}</pre>
+              <div className="tool-call__pre-wrapper">
+                {hiddenLineCount > 0 && (
+                  <button
+                    type="button"
+                    className="tool-call__hidden-lines"
+                    onClick={() => setResultExpanded(true)}
+                    title="Show full output"
+                  >
+                    {hiddenLineCount} lines hidden — click to expand
+                  </button>
+                )}
+                {resultExpanded && (
+                  <button
+                    type="button"
+                    className="tool-call__hidden-lines tool-call__hidden-lines--collapse"
+                    onClick={() => setResultExpanded(false)}
+                  >
+                    collapse
+                  </button>
+                )}
+                <CopyButton text={resultStr ?? ""} />
+                <pre className="message-list__tool-call-code">{displayedResult}</pre>
+              </div>
             </>
           )}
         </div>
