@@ -173,4 +173,6 @@ RUN ln -sf /usr/local/lib/bun/bin/bun /usr/local/bin/bun && \
     chown -R agent:agent /home/agent /etc/skel.agent /usr/local/share/piclaw && \
     chmod +x /entrypoint.sh /usr/local/bin/run-piclaw.sh /usr/local/bin/restic
 
+ENV PICLAW_WEB_UI_MODE=visual
+
 ENTRYPOINT ["/entrypoint.sh"]

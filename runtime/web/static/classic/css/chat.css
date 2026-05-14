@@ -441,7 +441,7 @@
     color: var(--text-primary);
     background-color: transparent;
     outline: none;
-    padding: 0 calc(var(--spacing-xs) + 28px) 0 0;
+    padding: 0;
     line-height: 1.5;
     overflow-y: auto;
     overflow-wrap: anywhere;

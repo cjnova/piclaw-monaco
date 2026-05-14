@@ -6,8 +6,6 @@
  */
 
 @import "./base.css";
-@import "./fonts.css";
-@import "./codicons.css";
 @import "./shell.css";
 @import "./workspace.css";
 @import "./editor.css";
