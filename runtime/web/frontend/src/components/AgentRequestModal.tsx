@@ -223,52 +223,60 @@ export function AgentRequestModal({ request, onClose }: AgentRequestModalProps) 
   };
 
   return (
-    <div className="agent-request-modal" role="dialog" aria-modal="true" aria-label="Agent approval request">
-      <div className="agent-request-content" ref={modalRef}>
+    <div className="modal-dialog__backdrop" role="dialog" aria-modal="true" aria-label="Agent approval request">
+      <div className="modal-dialog" ref={modalRef}>
         {/* Header */}
-        <div className="agent-request-header">
-          <div className="agent-request-icon">{SHIELD_SVG}</div>
-          <div className="agent-request-title">{title}</div>
-        </div>
+        <h2 className="modal-dialog__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ flexShrink: 0, color: 'var(--warning, #f9e2af)' }}>{SHIELD_SVG}</span>
+          {title}
+        </h2>
 
         {/* Body */}
         {(explanation || command || diff || uniquePaths.length > 0) && (
-          <div className="agent-request-body">
-            {explanation && (
-              <div className="agent-request-description">{explanation}</div>
-            )}
+          <div className="modal-dialog__description" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {explanation && <div>{explanation}</div>}
             {uniquePaths.length > 0 && (
-              <div className="agent-request-files">
-                <div className="agent-request-subtitle">Files</div>
-                <ul>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '3px' }}>Files</div>
+                <ul style={{ margin: 0, paddingLeft: '1.5em', listStyle: 'disc' }}>
                   {uniquePaths.map((p, i) => (
-                    <li key={i}>{p}</li>
+                    <li key={i} style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '12px', color: 'var(--accent)' }}>{p}</li>
                   ))}
                 </ul>
               </div>
             )}
             {command && (
-              <pre className="agent-request-command">{command}</pre>
+              <pre style={{
+                fontFamily: 'var(--font-mono, monospace)', fontSize: '12px',
+                background: 'var(--overlay-black-35, rgba(0,0,0,0.15))',
+                border: '1px solid var(--border)', borderRadius: '6px',
+                padding: '8px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                color: 'var(--text)', margin: 0
+              }}>{command}</pre>
             )}
             {diff && (
-              <details className="agent-request-diff">
-                <summary>Proposed diff</summary>
-                <pre>{diff}</pre>
+              <details>
+                <summary style={{ cursor: 'pointer', fontSize: '12px', color: 'var(--accent)' }}>Proposed diff</summary>
+                <pre style={{
+                  fontSize: '11px', maxHeight: '160px', overflow: 'auto',
+                  background: 'var(--overlay-black-35, rgba(0,0,0,0.15))',
+                  borderRadius: '6px', padding: '6px', marginTop: '4px'
+                }}>{diff}</pre>
               </details>
             )}
           </div>
         )}
 
         {/* Actions */}
-        <div className="agent-request-actions">
+        <div className="modal-dialog__actions">
           {hasOptions ? (
             options!.map((opt, i) => (
               <button
                 key={opt.optionId || opt.id || String(i)}
                 ref={i === 0 ? firstBtnRef : undefined}
                 type="button"
-                className={`agent-request-btn${
-                  opt.kind === "allow_once" || opt.kind === "allow_always" ? " primary" : ""
+                className={`modal-dialog__btn${
+                  opt.kind === "allow_once" || opt.kind === "allow_always" ? " modal-dialog__btn--primary" : ""
                 }`}
                 onClick={() => void handleOptionResponse(opt.optionId || opt.id || String(opt))}
               >
@@ -277,30 +285,29 @@ export function AgentRequestModal({ request, onClose }: AgentRequestModalProps) 
             ))
           ) : (
             <>
-              {/* Allow — primary action */}
               <button
-                ref={firstBtnRef}
                 type="button"
-                className="agent-request-btn primary"
-                onClick={() => void handleAllow()}
+                className="modal-dialog__btn"
+                style={{ color: 'var(--text-muted)' }}
+                onClick={() => void handleAlwaysAllow()}
               >
-                Allow
+                Always Allow
               </button>
-              {/* Deny — safe default; also triggered by Escape */}
               <button
                 type="button"
-                className="agent-request-btn"
+                className="modal-dialog__btn modal-dialog__btn--destructive"
                 onClick={() => void handleDeny()}
               >
                 Deny
               </button>
-              {/* Always Allow — persists whitelist entry */}
               <button
+                ref={firstBtnRef}
                 type="button"
-                className="agent-request-btn always-allow"
-                onClick={() => void handleAlwaysAllow()}
+                className="modal-dialog__btn"
+                style={{ borderColor: 'var(--success, #a6e3a1)', background: 'var(--success, #a6e3a1)', color: '#111', fontWeight: 600 }}
+                onClick={() => void handleAllow()}
               >
-                Always Allow This
+                Allow
               </button>
             </>
           )}
