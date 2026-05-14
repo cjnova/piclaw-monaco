@@ -4324,12 +4324,6 @@ body {
   outline: none;
   cursor: pointer;
   color-scheme: dark;
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 28px;
 }
 .settings-panel__select:focus { border-color: var(--accent); }
 
@@ -7204,6 +7198,7 @@ pre.frontmatter-block {
   padding: 4px 8px !important;
   color: var(--text) !important;
   font-size: 12px !important;
+  color-scheme: dark !important;
 }
 .settings-panel__content hr {
   border: none !important;
@@ -7217,3 +7212,34 @@ pre.frontmatter-block {
   border-top: 1px solid var(--border);
   margin: 6px 12px;
 }
+
+/* ── Custom Select dropdown (dark-themed) ─────────────────────────── */
+.custom-select { position: relative; display: inline-block; min-width: 180px; }
+.custom-select__trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 5px 10px;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text); font-size: 13px;
+  cursor: pointer; font-family: inherit; text-align: left;
+}
+.custom-select__trigger:hover { border-color: var(--accent); }
+.custom-select__arrow { font-size: 10px; color: var(--text-muted); margin-left: 8px; }
+.custom-select__dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--bg-elevated, #2a2a3e); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  z-index: 100; max-height: 280px; overflow-y: auto;
+  padding: 4px; scrollbar-width: thin;
+  scrollbar-color: var(--overlay-white-15) transparent;
+}
+.custom-select__option {
+  display: block; width: 100%; padding: 5px 10px;
+  background: none; border: none; border-radius: 4px;
+  color: var(--text); font-size: 12px; text-align: left;
+  cursor: pointer; font-family: inherit;
+}
+.custom-select__option:hover { background: var(--overlay-white-06, rgba(255,255,255,0.06)); }
+.custom-select__option--active {
+  background: var(--accent); color: var(--bg, #1e1e2e); font-weight: 600;
+}
+.custom-select__option--active:hover { opacity: 0.9; }

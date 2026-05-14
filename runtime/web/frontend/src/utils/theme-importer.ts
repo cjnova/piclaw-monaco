@@ -204,19 +204,22 @@ function normalizeColor(val: string): string {
 
 /** Apply a CSS var map to document.documentElement */
 export function applyTheme(vars: Record<string, string>): void {
-  const root = document.documentElement;
-  for (const [prop, val] of Object.entries(vars)) {
-    root.style.setProperty(prop, val);
-  }
+  // Remove any previous injected theme style
+  const existing = document.getElementById('piclaw-theme-override');
+  if (existing) existing.remove();
+
+  // Inject a <style> block with :root overrides — wins over stylesheet :root
+  const css = `:root { ${Object.entries(vars).map(([k, v]) => `${k}: ${v} !important`).join('; ')} }`;
+  const style = document.createElement('style');
+  style.id = 'piclaw-theme-override';
+  style.textContent = css;
+  document.head.appendChild(style);
 }
 
 /** Remove all custom properties set by applyTheme / loadSavedTheme */
 export function resetTheme(): void {
-  const saved = loadSavedThemeVars();
-  const root = document.documentElement;
-  for (const prop of Object.keys(saved)) {
-    root.style.removeProperty(prop);
-  }
+  const existing = document.getElementById('piclaw-theme-override');
+  if (existing) existing.remove();
   localStorage.removeItem(LS_KEY);
 }
 

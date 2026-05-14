@@ -2250,18 +2250,18 @@
 /* ── VS Code theme cards ─────────────────────────────────────── */
 .vscode-theme-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 8px;
-    margin: 10px 0;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 0 0 12px;
 }
 
 .vscode-theme-card {
     position: relative;
     border: 1.5px solid var(--border-color, rgba(128,128,128,0.22));
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--bg-primary);
     cursor: pointer;
-    padding: 0 0 6px;
+    padding: 0 0 4px;
     text-align: left;
     overflow: hidden;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -2280,22 +2280,22 @@
 .vscode-theme-card__preview {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 8px;
-    height: 36px;
+    gap: 3px;
+    padding: 6px;
+    height: 28px;
     border-radius: 6px 6px 0 0;
 }
 
 .vscode-theme-card__swatch {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     flex-shrink: 0;
     border: 1px solid rgba(0,0,0,0.12);
 }
 
 .vscode-theme-card__label {
-    font-size: 0.78em;
+    font-size: 0.7em;
     font-weight: 600;
     color: var(--text-primary);
     padding: 4px 7px 0;

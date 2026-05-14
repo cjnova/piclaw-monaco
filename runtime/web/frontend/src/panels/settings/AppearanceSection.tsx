@@ -4,6 +4,7 @@ import { type SettingsData, type SettingsSectionProps } from "./types";
 import { AvatarSection } from "./AvatarSection";
 import { registerSettingsPane } from "./pane-registry";
 import { BUNDLED_THEMES, type BundledTheme } from "../../utils/bundled-themes";
+import { CustomSelect } from "../../components/CustomSelect";
 import {
   importVSCodeTheme,
   applyTheme,
@@ -60,9 +61,9 @@ export function AppearanceSection({
 
   // Current active custom theme name (stored in localStorage key piclaw_custom_theme_name)
   const LS_NAME_KEY = "piclaw_custom_theme_name";
-  const activeThemeName = useSignal<string | null>(() => {
-    try { return localStorage.getItem(LS_NAME_KEY); } catch { return null; }
-  });
+  const activeThemeName = useSignal<string | null>(
+    (() => { try { return localStorage.getItem(LS_NAME_KEY); } catch { return null; } })()
+  );
 
   // Pending import state
   const pendingVars = useSignal<Record<string, string> | null>(null);
@@ -148,105 +149,83 @@ export function AppearanceSection({
     <section className="settings-panel__section">
       <h2 className="settings-panel__section-title">Appearance</h2>
 
-      {/* Legacy theme select (server-side themes) */}
+      {/* Theme selector */}
       <div className="settings-panel__field">
         <label className="settings-panel__label">Theme</label>
-        <select
-          className="settings-panel__select"
-          value={data.uiTheme ?? ""}
-          onChange={(e) =>
-            onSaveGeneral("uiTheme", (e.target as HTMLSelectElement).value)
-          }
-        >
-          {themes.length === 0 && (
-            <option value={data.uiTheme ?? ""}>{data.uiTheme ?? "Default"}</option>
-          )}
-          {themes.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.label} ({t.mode})
-            </option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <CustomSelect
+            value={activeThemeName.value || ''}
+            options={[
+              { value: '', label: 'Default' },
+              ...BUNDLED_THEMES.map((t) => ({ value: t.name, label: `${t.name} (${t.type})` })),
+            ]}
+            onChange={(name) => {
+              if (!name) {
+                handleReset();
+              } else {
+                const bt = BUNDLED_THEMES.find((t) => t.name === name);
+                if (bt) applyBundled(bt);
+              }
+            }}
+          />
+          <button className="settings-panel__btn" type="button" onClick={() => fileInputRef.current?.click()}>
+            Import…
+          </button>
+          <button className="settings-panel__btn settings-panel__btn--secondary" type="button" onClick={handleReset}>
+            Reset
+          </button>
+        </div>
       </div>
 
+      {/* Tint color */}
       <div className="settings-panel__field">
         <label className="settings-panel__label">Tint color</label>
-        <input
-          className="settings-panel__input"
-          type="text"
-          value={uiTint.value}
-          placeholder="e.g. #3a86ff or empty"
-          onInput={(e) => (uiTint.value = (e.target as HTMLInputElement).value)}
-          onBlur={() =>
-            onSaveGeneral("uiTint", uiTint.value.trim() || null)
-          }
-        />
-      </div>
-
-      {/* VS Code themes */}
-      <div className="settings-panel__field">
-        <label className="settings-panel__label">
-          VS Code Themes
-          {activeThemeName.value && (
-            <span className="vscode-theme-active-badge"> — {activeThemeName.value}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="color"
+            value={uiTint.value || '#1d9bf0'}
+            onInput={(e) => {
+              uiTint.value = (e.target as HTMLInputElement).value;
+              onSaveGeneral("uiTint", uiTint.value);
+            }}
+            style={{ width: '28px', height: '28px', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', background: 'transparent', padding: 0 }}
+          />
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{uiTint.value || 'none'}</span>
+          {uiTint.value && (
+            <button
+              type="button"
+              className="settings-panel__btn settings-panel__btn--secondary"
+              style={{ padding: '2px 8px', fontSize: '11px' }}
+              onClick={() => { uiTint.value = ''; onSaveGeneral("uiTint", null); }}
+            >
+              Clear
+            </button>
           )}
-        </label>
-
-        <div className="vscode-theme-grid">
-          {BUNDLED_THEMES.map((t) => (
-            <ThemeCard
-              key={t.name}
-              theme={t}
-              active={activeThemeName.value === t.name && !pendingVars.value}
-              onClick={() => applyBundled(t)}
-            />
-          ))}
         </div>
-
-        <div className="vscode-theme-actions">
-          <button
-            className="settings-panel__btn"
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <i className="codicon codicon-cloud-upload" /> Import Custom…
-          </button>
-          <button
-            className="settings-panel__btn settings-panel__btn--secondary"
-            type="button"
-            onClick={handleReset}
-          >
-            <i className="codicon codicon-discard" /> Reset to Default
-          </button>
-        </div>
-
-        {/* Pending import confirm/cancel */}
-        {pendingVars.value && (
-          <div className="vscode-theme-confirm">
-            <span className="vscode-theme-confirm__label">
-              Preview: <strong>{pendingName.value}</strong>
-            </span>
-            <button className="settings-panel__btn" type="button" onClick={confirmImport}>
-              <i className="codicon codicon-check" /> Apply
-            </button>
-            <button className="settings-panel__btn settings-panel__btn--secondary" type="button" onClick={cancelImport}>
-              <i className="codicon codicon-close" /> Cancel
-            </button>
-          </div>
-        )}
-
-        {importStatus.value && (
-          <div className="vscode-theme-status">{importStatus.value}</div>
-        )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          style={{ display: "none" }}
-          onChange={handleFileChange}
-        />
       </div>
+
+      {/* Pending import confirm/cancel */}
+      {pendingVars.value && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
+          <span style={{ fontSize: '12px' }}>
+            Preview: <strong>{pendingName.value}</strong>
+          </span>
+          <button className="settings-panel__btn" type="button" onClick={confirmImport}>Apply</button>
+          <button className="settings-panel__btn settings-panel__btn--secondary" type="button" onClick={cancelImport}>Cancel</button>
+        </div>
+      )}
+
+      {importStatus.value && (
+        <div className="vscode-theme-status">{importStatus.value}</div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
 
       <AvatarSection />
     </section>
