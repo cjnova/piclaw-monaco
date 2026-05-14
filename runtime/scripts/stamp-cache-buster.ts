@@ -17,7 +17,9 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 
 const INDEX = resolve(import.meta.dir, "../web/static/classic/index.html");
+const VISUAL_INDEX = resolve(import.meta.dir, "../web/static/visual/index.html");
 const CLASSIC_DIST = resolve(import.meta.dir, "../web/static/classic/dist");
+const VISUAL_DIST = resolve(import.meta.dir, "../web/static/visual/dist");
 const COMMON_DIST = resolve(import.meta.dir, "../web/static/common/dist");
 
 // Build a content hash from the main bundle files so the stamp is
@@ -36,6 +38,27 @@ function computeBundleContentHash(): string {
       hash.update(readFileSync(file));
     } catch (e) {
       // File may not exist in minimal builds; skip but log if unexpected.
+      if (existsSync(file)) {
+        console.warn(`[cache-buster] failed to read ${file}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+  }
+  return hash.digest("hex").slice(0, 12);
+}
+
+function computeVisualBundleContentHash(): string {
+  const bundleFiles = [
+    resolve(VISUAL_DIST, "app.bundle.js"),
+    resolve(VISUAL_DIST, "app.bundle.css"),
+    resolve(VISUAL_DIST, "editor.bundle.js"),
+    resolve(COMMON_DIST, "login.bundle.js"),
+    resolve(COMMON_DIST, "login.bundle.css"),
+  ];
+  const hash = createHash("sha256");
+  for (const file of bundleFiles) {
+    try {
+      hash.update(readFileSync(file));
+    } catch (e) {
       if (existsSync(file)) {
         console.warn(`[cache-buster] failed to read ${file}: ${e instanceof Error ? e.message : e}`);
       }
@@ -76,4 +99,18 @@ if (html !== original) {
   console.log(`[cache-buster] stamped index.html → v=${stamp}, vendor=${vendorStamp}`);
 } else {
   console.log(`[cache-buster] no tokens changed in index.html`);
+}
+
+// Stamp visual/index.html with visual bundle hash.
+if (existsSync(VISUAL_INDEX)) {
+  const visualStamp = computeVisualBundleContentHash();
+  const visualOriginal = readFileSync(VISUAL_INDEX, "utf-8");
+  let visualHtml = visualOriginal;
+  visualHtml = visualHtml.replace(/\?v=(?:[\da-f]+|__APP_ASSET_VERSION__)/g, `?v=${visualStamp}`);
+  if (visualHtml !== visualOriginal) {
+    writeFileSync(VISUAL_INDEX, visualHtml, "utf-8");
+    console.log(`[cache-buster] stamped visual/index.html → v=${visualStamp}`);
+  } else {
+    console.log(`[cache-buster] no tokens changed in visual/index.html`);
+  }
 }

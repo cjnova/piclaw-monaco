@@ -41,6 +41,7 @@ const APP_ASSET_VERSION_PLACEHOLDER = "__APP_ASSET_VERSION__";
 const LOGIN_ASSET_VERSION_PLACEHOLDER = "__LOGIN_ASSET_VERSION__";
 const NOTIFICATION_SOURCE_LABELS_PLACEHOLDER = "__PICLAW_NOTIFICATION_SOURCE_LABELS_FLAG__";
 const APP_VERSION_FILES = ["classic/dist/app.bundle.js", "classic/dist/app.bundle.css"];
+const VISUAL_VERSION_FILES = ["visual/dist/app.bundle.js", "visual/dist/app.bundle.css"];
 const LOGIN_VERSION_FILES = ["common/dist/login.bundle.js", "common/dist/login.bundle.css"];
 const TEXT_ASSET_CACHE = new Map<string, { mtimeMs: number; text: string }>();
 const GZIP_ASSET_CACHE = new Map<string, { mtimeMs: number; data: Uint8Array }>();
@@ -87,6 +88,10 @@ export function getAppAssetVersion(): string {
   return readAssetVersion(APP_VERSION_FILES);
 }
 
+export function getVisualAssetVersion(): string {
+  return readAssetVersion(VISUAL_VERSION_FILES);
+}
+
 export function getLoginAssetVersion(): string {
   return readAssetVersion(LOGIN_VERSION_FILES);
 }
@@ -100,7 +105,7 @@ function renderHtmlTemplate(relPath: string, html: string): string {
     return renderedWithSharedFlags.replaceAll(APP_ASSET_VERSION_PLACEHOLDER, getAppAssetVersion());
   }
   if (relPath === "visual/index.html") {
-    return renderedWithSharedFlags;
+    return renderedWithSharedFlags.replaceAll(APP_ASSET_VERSION_PLACEHOLDER, getVisualAssetVersion());
   }
   if (relPath === "login.html") {
     return renderedWithSharedFlags.replaceAll(LOGIN_ASSET_VERSION_PLACEHOLDER, getLoginAssetVersion());
