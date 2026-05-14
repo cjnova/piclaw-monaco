@@ -2281,7 +2281,7 @@ body {
 
 .message-list__content ul,
 .message-list__content ol {
-  padding-left: 20px;
+  padding-left: 2.5em;
   margin: 4px 0;
 }
 
@@ -5333,9 +5333,19 @@ pre.frontmatter-block {
 }
 
 .agent-status-panel__body-text {
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.agent-status-panel__body-text pre,
+.agent-status-panel__body-text code {
+  white-space: pre-wrap;
+}
+
+.agent-status-panel__body-text p {
+  margin: 0.25em 0;
 }
 
 .agent-status-panel__more {
@@ -5509,11 +5519,13 @@ pre.frontmatter-block {
 .agent-status-card--draft .agent-status-card__toggle { color: #fab387; }
 .agent-status-card__more-btn { display: block; width: 100%; padding: 4px 10px; font-size: 11px; color: var(--accent); background: none; border: none; border-top: 1px solid var(--border); cursor: pointer; text-align: center; }
 .agent-status-card__more-btn:hover { background: rgba(137, 180, 250, 0.1); }
+.agent-status-card__close { margin-left: auto; border: none; background: transparent; color: var(--text-muted); font-size: 18px; line-height: 1; padding: 4px 8px; border-radius: 4px; cursor: pointer; flex-shrink: 0; min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; transition: color 0.15s ease, background-color 0.15s ease; }
+.agent-status-card__close:hover { color: var(--text, var(--fg)); background-color: var(--bg-elevated, rgba(255,255,255,0.08)); }
 .agent-status-card__content {
   padding: 6px 10px;
   font-size: 12px;
   color: var(--text-soft, var(--text-muted));
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
   font-family: var(--font-mono, monospace);
@@ -5522,6 +5534,15 @@ pre.frontmatter-block {
   margin: 0;
   border-top: 1px solid var(--border);
   line-height: 1.4;
+}
+.agent-status-card__content ol,
+.agent-status-card__content ul {
+  padding-left: 2em;
+  margin: 0.25em 0;
+}
+.agent-status-card__content pre,
+.agent-status-card__content code {
+  white-space: pre-wrap;
 }
 .agent-status-card__content--collapsed {
   max-height: 80px;
