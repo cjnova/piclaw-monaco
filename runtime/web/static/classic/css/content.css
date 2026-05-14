@@ -657,6 +657,9 @@
     font-size: 0.9em;
     line-height: 1.35;
     tab-size: 4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .post-content pre code.hljs {
