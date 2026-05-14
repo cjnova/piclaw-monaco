@@ -834,6 +834,13 @@ export function AgentStatusPanel() {
               })
             );
           }}
+          onDismiss={(panelId) => {
+            setExtensionPanels((prev) => {
+              const next = new Map(prev);
+              next.delete(panelId);
+              return next;
+            });
+          }}
         />
       ))}
     </div>

@@ -93,9 +93,10 @@ interface ExtensionPanelCardProps {
   panel: ExtensionPanel;
   nowMs: number;
   onAction?: (panelId: string, actionId: string) => void;
+  onDismiss?: (panelId: string) => void;
 }
 
-export function ExtensionPanelCard({ panel, nowMs, onAction }: ExtensionPanelCardProps) {
+export function ExtensionPanelCard({ panel, nowMs, onAction, onDismiss }: ExtensionPanelCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const detailRef = useRef<HTMLDivElement>(null);
@@ -192,6 +193,18 @@ export function ExtensionPanelCard({ panel, nowMs, onAction }: ExtensionPanelCar
               </button>
             ))}
           </div>
+        )}
+
+        {/* Close/dismiss button */}
+        {onDismiss && (
+          <button
+            type="button"
+            className="agent-status-card__close"
+            onClick={(e) => { e.stopPropagation(); onDismiss(panel.id); }}
+            aria-label="Dismiss panel"
+          >
+            ×
+          </button>
         )}
 
         {/* Expand/collapse toggle */}
