@@ -2475,6 +2475,74 @@ body {
   letter-spacing: 0.05em;
 }
 
+/* Tool call pre block with copy button */
+.tool-call__pre-wrapper {
+  position: relative;
+}
+
+.tool-call__copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  z-index: 1;
+}
+
+.tool-call__pre-wrapper:hover .tool-call__copy,
+.tool-call__copy:focus-visible {
+  opacity: 1;
+}
+
+.tool-call__copy:hover {
+  background: var(--hover-overlay, var(--overlay-white-07));
+  color: var(--text);
+}
+
+.tool-call__copy--copied {
+  opacity: 1 !important;
+  color: var(--success);
+}
+
+/* Truncation indicator */
+.tool-call__hidden-lines {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono, 'Fira Mono', monospace);
+  text-align: center;
+  padding: 2px 0 3px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: color 0.12s;
+}
+
+.tool-call__hidden-lines:hover {
+  color: var(--accent);
+}
+
+.tool-call__hidden-lines--collapse {
+  border-bottom: none;
+  border-top: 1px dashed var(--border);
+  margin-top: 2px;
+  margin-bottom: 0;
+  padding-top: 3px;
+  padding-bottom: 2px;
+}
+
 /* ===== Panel Placeholder ===== */
 .panel-placeholder {
   padding: 12px;
