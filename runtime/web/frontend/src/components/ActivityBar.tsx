@@ -5,8 +5,8 @@ const PANELS = [
   { id: "search", icon: "search", label: "Search" },
   { id: "extensions", icon: "extensions", label: "Addons" },
   { id: "tasks", icon: "tasklist", label: "Tasks" },
-  { id: "agent", icon: "dashboard", label: "Dashboard" },
   { id: "scratchpad", icon: "notebook", label: "Scratchpad" },
+  { id: "agent", icon: "dashboard", label: "Dashboard" },
   { id: "settings", icon: "gear", label: "Settings", alignBottom: true },
 ] as const;
 
