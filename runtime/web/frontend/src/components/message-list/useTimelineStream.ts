@@ -131,6 +131,18 @@ export function useTimelineStream({
       }
     });
 
+    es.addEventListener("extension_ui_widget", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        // Only relay status-panel surface widgets as extension panel events
+        if (data?.options?.surface === "status-panel") {
+          window.dispatchEvent(new CustomEvent("piclaw:extension-panel", { detail: data }));
+        }
+      } catch (err) {
+        console.warn("[MessageList] SSE extension_ui_widget parse error:", err);
+      }
+    });
+
     es.addEventListener("extension_ui_request", (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);

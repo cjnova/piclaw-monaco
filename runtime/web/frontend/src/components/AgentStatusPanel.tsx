@@ -2,6 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
 import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
+import {
+  ExtensionPanelCard,
+  normalizeExtensionPanelPayload,
+  type ExtensionPanel,
+} from "./ExtensionPanelCard";
 
 /**
  * Decide whether to show a dot, spinner, or nothing for a given status.
@@ -270,6 +275,18 @@ export function AgentStatusPanel() {
   const lastProgressTimeRef = useRef<number | null>(null);
   const agentRunningRef = useRef(false);
 
+  // #375 Extension panels
+  const [extensionPanels, setExtensionPanels] = useState<Map<string, ExtensionPanel>>(new Map());
+  const [extensionPanelNowMs, setExtensionPanelNowMs] = useState(() => Date.now());
+
+  // Tick extensionPanelNowMs every second when any panel has a lastActivity timestamp
+  useEffect(() => {
+    const hasTimestamp = Array.from(extensionPanels.values()).some((p) => !!p.lastActivity);
+    if (!hasTimestamp) return;
+    const interval = setInterval(() => setExtensionPanelNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [extensionPanels]);
+
   const draftBufferRef = useRef("");
   const thoughtBufferRef = useRef("");
   const draftRafRef = useRef<number | null>(null);
@@ -460,6 +477,8 @@ export function AgentStatusPanel() {
       // #377 Clear pending request on turn end
       setPendingRequest(null);
       setModalOpen(false);
+      // #375 Clear extension panels on turn end
+      setExtensionPanels(new Map());
     };
 
     let mounted = true;
@@ -482,6 +501,24 @@ export function AgentStatusPanel() {
     };
     window.addEventListener("piclaw:agent-request", handleAgentRequest);
 
+    // #375 Extension panel events from extension_ui_widget SSE
+    const handleExtensionPanel = (e: Event) => {
+      const payload = (e as CustomEvent).detail;
+      if (!payload) return;
+      const result = normalizeExtensionPanelPayload(payload);
+      if (!result) return;
+      setExtensionPanels((prev) => {
+        const next = new Map(prev);
+        if (result.panel === null) {
+          next.delete(result.id);
+        } else {
+          next.set(result.id, result.panel);
+        }
+        return next;
+      });
+    };
+    window.addEventListener("piclaw:extension-panel", handleExtensionPanel);
+
     return () => {
       mounted = false;
       window.removeEventListener("piclaw:agent-draft", handleDraft);
@@ -489,6 +526,7 @@ export function AgentStatusPanel() {
       window.removeEventListener("piclaw:agent-status", handleStatus);
       window.removeEventListener("piclaw:agent-turn-end", handleTurnEnd);
       window.removeEventListener("piclaw:agent-request", handleAgentRequest);
+      window.removeEventListener("piclaw:extension-panel", handleExtensionPanel);
       if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
     };
@@ -523,7 +561,7 @@ export function AgentStatusPanel() {
     window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
   };
 
-  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest;
+  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest || extensionPanels.size > 0;
   if (!hasContent) return null;
 
   const toggleDraftExpand = () => {
@@ -782,6 +820,29 @@ export function AgentStatusPanel() {
           onDismiss={dismissDraft}
         />
       )}
+
+      {/* #375 Extension panels */}
+      {extensionPanels.size > 0 && Array.from(extensionPanels.values()).map((panel) => (
+        <ExtensionPanelCard
+          key={panel.id}
+          panel={panel}
+          nowMs={extensionPanelNowMs}
+          onAction={(panelId, actionId) => {
+            window.dispatchEvent(
+              new CustomEvent("piclaw:extension-panel-action", {
+                detail: { panelId, actionId },
+              })
+            );
+          }}
+          onDismiss={(panelId) => {
+            setExtensionPanels((prev) => {
+              const next = new Map(prev);
+              next.delete(panelId);
+              return next;
+            });
+          }}
+        />
+      ))}
     </div>
   );
 }
