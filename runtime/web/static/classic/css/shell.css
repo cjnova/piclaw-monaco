@@ -7022,3 +7022,19 @@ pre.frontmatter-block {
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── #388 Addon settings pane styles ──────────────────────────────── */
+.settings-panel__nav-item--addon {
+  border-left: 2px solid transparent;
+  font-style: italic;
+}
+.settings-panel__addon-error {
+  padding: 16px;
+  color: var(--error, #f38ba8);
+  font-size: 13px;
+}
+.settings-panel__addon-loading {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
