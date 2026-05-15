@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
+import { safeParseJSON, safeSetItem } from "../utils/storage";
 import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
 import { CollapsibleContent, MarkdownContent } from "./CollapsibleContent";
 import {
@@ -43,17 +44,11 @@ const COLLAPSED_MAX_LINES = 8;
 const STORAGE_KEY = "piclaw:agent-panel-prefs";
 
 function loadPanelPrefs(): { draftExpanded: boolean; thoughtExpanded: boolean } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return { draftExpanded: false, thoughtExpanded: false };
+  return safeParseJSON(STORAGE_KEY, { draftExpanded: false, thoughtExpanded: false });
 }
 
 function savePanelPrefs(prefs: { draftExpanded: boolean; thoughtExpanded: boolean }) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-  } catch {}
+  safeSetItem(STORAGE_KEY, JSON.stringify(prefs));
 }
 
 /** Strip <internal>...</internal> blocks from text before rendering. */

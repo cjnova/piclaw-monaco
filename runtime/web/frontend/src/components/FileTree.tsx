@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "preact/hooks";
 import { formatBytes } from "../utils/formatBytes";
 import { getChatJid } from "../api/chat-jid";
 import { FileIcon } from "./FileIcon";
+import { safeGetItem, safeSetItem, safeRemoveItem, safeParseJSON } from "../utils/storage";
 
 /** Tree node shape returned by GET /workspace/tree */
 interface TreeNode {
@@ -37,31 +38,21 @@ const EXPANDED_KEY = () => `piclaw:tree-expanded:${getChatJid()}`;
 const SELECTED_KEY = () => `piclaw:tree-selected:${getChatJid()}`;
 
 function loadExpandedPaths(): Set<string> {
-  try {
-    const raw = localStorage.getItem(EXPANDED_KEY());
-    if (raw) return new Set(JSON.parse(raw) as string[]);
-  } catch {}
-  return new Set();
+  const arr = safeParseJSON<string[]>(EXPANDED_KEY(), []);
+  return new Set(arr);
 }
 
 function saveExpandedPaths(paths: Set<string>): void {
-  try {
-    localStorage.setItem(EXPANDED_KEY(), JSON.stringify([...paths]));
-  } catch {}
+  safeSetItem(EXPANDED_KEY(), JSON.stringify([...paths]));
 }
 
 function loadSelectedPath(): string | null {
-  try {
-    return localStorage.getItem(SELECTED_KEY());
-  } catch {}
-  return null;
+  return safeGetItem(SELECTED_KEY());
 }
 
 function saveSelectedPath(path: string | null): void {
-  try {
-    if (path) localStorage.setItem(SELECTED_KEY(), path);
-    else localStorage.removeItem(SELECTED_KEY());
-  } catch {}
+  if (path) safeSetItem(SELECTED_KEY(), path);
+  else safeRemoveItem(SELECTED_KEY());
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
