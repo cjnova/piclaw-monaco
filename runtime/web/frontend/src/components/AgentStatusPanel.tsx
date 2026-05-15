@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
 import { safeParseJSON, safeSetItem } from "../utils/storage";
+import { extractToolContextPath, getWorkspaceBranch } from "../utils/tool-git-context";
 import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
 import { CollapsibleContent, MarkdownContent } from "./CollapsibleContent";
+import { PanelHeader } from "./PanelHeader";
 import {
   ExtensionPanelCard,
   normalizeExtensionPanelPayload,
@@ -234,6 +236,8 @@ export function AgentStatusPanel() {
   const prefs = loadPanelPrefs();
   const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded, dismissed: false });
   const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded, dismissed: false });
+  const [output, setOutputState] = useState<PanelState>({ text: "", expanded: false, dismissed: false });
+  const [outputMeta, setOutputMeta] = useState<{ toolName: string; startedAt: string; gitBranch: string }>({ toolName: "", startedAt: "", gitBranch: "" });
   const [status, setStatus] = useState<string | null>(null);
   const [steerQueued, setSteerQueued] = useState(false);
   const [turnColor, setTurnColor] = useState<string | null>(null);
@@ -273,8 +277,10 @@ export function AgentStatusPanel() {
 
   const draftBufferRef = useRef("");
   const thoughtBufferRef = useRef("");
+  const outputBufferRef = useRef("");
   const draftRafRef = useRef<number | null>(null);
   const thoughtRafRef = useRef<number | null>(null);
+  const outputRafRef = useRef<number | null>(null);
   const draftStartRef = useRef<number | null>(null);
   const thoughtStartRef = useRef<number | null>(null);
   const toolsStartRef = useRef<number | null>(null);
@@ -287,6 +293,11 @@ export function AgentStatusPanel() {
   const flushThought = useCallback(() => {
     thoughtRafRef.current = null;
     setThoughtState((prev) => ({ ...prev, text: thoughtBufferRef.current }));
+  }, []);
+
+  const flushOutput = useCallback(() => {
+    outputRafRef.current = null;
+    setOutputState((prev) => ({ ...prev, text: outputBufferRef.current }));
   }, []);
 
   useEffect(() => {
@@ -374,6 +385,27 @@ export function AgentStatusPanel() {
           const newStatus = retryAt ? "running" as const : "done" as const;
           return { ...t, status: newStatus, retryAt: retryAt ?? null };
         }));
+        // Accumulate tool output preview text
+        const outputPreview = detail.output_preview ?? detail.outputPreview;
+        if (typeof outputPreview === "string" && outputPreview) {
+          outputBufferRef.current = outputPreview;
+          if (!outputRafRef.current) {
+            outputRafRef.current = requestAnimationFrame(flushOutput);
+          }
+          // Capture meta for output panel header
+          const toolName = detail.title || detail.tool_name || "";
+          const startedAt = detail.started_at || detail.startedAt || "";
+          setOutputMeta((prev) => ({ ...prev, toolName, startedAt }));
+          // Async: fetch git branch from workspace API (like classic)
+          const contextPath = extractToolContextPath(detail.tool_name, detail.tool_args);
+          if (contextPath) {
+            getWorkspaceBranch(contextPath).then((result) => {
+              if (result?.branch) {
+                setOutputMeta((prev) => ({ ...prev, gitBranch: result.branch }));
+              }
+            });
+          }
+        }
       }
       if (detail.type && detail.type !== "context_usage" && detail.type !== "done") {
         setStatus(detail.type);
@@ -434,16 +466,21 @@ export function AgentStatusPanel() {
     const handleTurnEnd = () => {
       draftBufferRef.current = "";
       thoughtBufferRef.current = "";
+      outputBufferRef.current = "";
       if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
+      if (outputRafRef.current) cancelAnimationFrame(outputRafRef.current);
       draftRafRef.current = null;
       thoughtRafRef.current = null;
+      outputRafRef.current = null;
       draftStartRef.current = null;
       thoughtStartRef.current = null;
       toolsStartRef.current = null;
       const savedPrefs = loadPanelPrefs();
       setDraftState({ text: "", expanded: savedPrefs.draftExpanded, dismissed: false });
       setThoughtState({ text: "", expanded: savedPrefs.thoughtExpanded, dismissed: false });
+      setOutputState({ text: "", expanded: false, dismissed: false });
+      setOutputMeta({ toolName: "", startedAt: "", gitBranch: "" });
       setElapsed({ draft: 0, thought: 0, tools: 0 });
       setStatus(null);
       setStatusText("");
@@ -513,8 +550,9 @@ export function AgentStatusPanel() {
       window.removeEventListener("piclaw:extension-panel", handleExtensionPanel);
       if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
+      if (outputRafRef.current) cancelAnimationFrame(outputRafRef.current);
     };
-  }, [flushDraft, flushThought]);
+  }, [flushDraft, flushThought, flushOutput]);
 
   // #323 Watchdog interval
   useEffect(() => {
@@ -545,7 +583,7 @@ export function AgentStatusPanel() {
     window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
   };
 
-  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest || extensionPanels.size > 0;
+  const hasContent = draft.text || thought.text || output.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest || extensionPanels.size > 0;
   if (!hasContent) return null;
 
   const toggleDraftExpand = () => {
@@ -569,6 +607,13 @@ export function AgentStatusPanel() {
   const dismissThought = (e: MouseEvent) => {
     e.stopPropagation();
     setThoughtState((prev) => ({ ...prev, dismissed: true }));
+  };
+  const dismissOutput = (e: MouseEvent) => {
+    e.stopPropagation();
+    setOutputState((prev) => ({ ...prev, dismissed: true }));
+  };
+  const toggleOutputExpand = () => {
+    setOutputState((prev) => ({ ...prev, expanded: !prev.expanded }));
   };
 
   // Escape key: collapse any expanded panel
@@ -774,6 +819,18 @@ export function AgentStatusPanel() {
         </div>
       )}
 
+      {output.text && !output.dismissed && (
+        <OutputPanel
+          text={output.text}
+          expanded={output.expanded}
+          toolName={outputMeta.toolName}
+          startedAt={outputMeta.startedAt}
+          gitBranch={outputMeta.gitBranch}
+          onToggle={toggleOutputExpand}
+          onDismiss={dismissOutput}
+        />
+      )}
+
       {thought.text && !thought.dismissed && (
         <AgentPanel
           title="Thoughts"
@@ -840,28 +897,60 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDism
 
   return (
     <div className={`agent-status-card agent-status-card--${type}`}>
-      <div className="agent-status-card__header" onClick={onToggle}>
-        <span className={`agent-status-card__dot agent-status-card__dot--${type}`} aria-hidden="true" />
-        <span className="agent-status-card__title">{title}</span>
-        {elapsed > 0 && (
-          <span className="agent-status-card__timer">{elapsed}s</span>
-        )}
-        <button
-          type="button"
-          className="agent-status-card__close"
-          aria-label={`Close ${title} panel`}
-          onClick={onDismiss}
-          title="Dismiss"
-        >
-          ×
-        </button>
-      </div>
+      <PanelHeader
+        title={title}
+        dotColor={type}
+        elapsed={elapsed}
+        onToggle={onToggle}
+        onDismiss={onDismiss}
+      />
       <CollapsibleContent
         expanded={expanded}
         onToggle={onToggle}
         text={stripped}
         maxLines={COLLAPSED_MAX_LINES}
         renderContent={(visibleText) => <MarkdownContent text={visibleText} />}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OutputPanel — live tool output, monospace, tail-direction, green dot
+// ---------------------------------------------------------------------------
+
+const OUTPUT_MAX_LINES = 9;
+
+interface OutputPanelProps {
+  text: string;
+  expanded: boolean;
+  toolName?: string;
+  startedAt?: string;
+  gitBranch?: string;
+  onToggle: () => void;
+  onDismiss: (e: MouseEvent) => void;
+}
+
+function OutputPanel({ text, expanded, toolName, startedAt, gitBranch, onToggle, onDismiss }: OutputPanelProps) {
+  const elapsed = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 1000) : 0;
+
+  return (
+    <div className="agent-status-card agent-status-card--output">
+      <PanelHeader
+        title={toolName || "Output"}
+        dotColor="output"
+        elapsed={elapsed}
+        gitBranch={gitBranch}
+        onToggle={onToggle}
+        onDismiss={onDismiss}
+      />
+      <CollapsibleContent
+        text={text}
+        maxLines={OUTPUT_MAX_LINES}
+        direction="tail"
+        expanded={expanded}
+        onToggle={onToggle}
+        renderContent={(visible) => <pre className="agent-output-text">{visible}</pre>}
       />
     </div>
   );
