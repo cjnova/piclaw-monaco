@@ -91,37 +91,60 @@ export function applyHighlights(container: HTMLElement, highlights: HighlightRan
   }
 }
 
+function wrapPartOfTextNode(node: Text, start: number, end: number, color: string): void {
+  const len = node.textContent?.length ?? 0;
+  const clampedEnd = Math.min(end, len);
+  if (start >= clampedEnd) return;
+
+  const range = document.createRange();
+  range.setStart(node, start);
+  range.setEnd(node, clampedEnd);
+
+  const mark = document.createElement("mark");
+  mark.setAttribute("data-highlight", "");
+  mark.style.background = color;
+  mark.style.borderRadius = "2px";
+  mark.style.padding = "0 1px";
+
+  try {
+    range.surroundContents(mark);
+  } catch {
+    // Range spans element boundaries — extract and rewrap
+    const fragment = range.extractContents();
+    mark.appendChild(fragment);
+    range.insertNode(mark);
+  }
+}
+
 function applyOneHighlight(container: HTMLElement, hl: HighlightRange): void {
+  // Collect text nodes once; surroundContents keeps node references valid
   const textNodes = getTextNodes(container);
   let remaining = hl.endOffset - hl.startOffset;
-  let pos = hl.startOffset;
+  let started = false;
 
   for (const { node, start } of textNodes) {
-    const nodeEnd = start + node.length;
-    if (nodeEnd <= pos) continue;
-    if (start >= hl.endOffset) break;
+    // Skip nodes already wrapped in a highlight span (avoid double-wrapping)
+    if (node.parentElement?.closest("mark[data-highlight]")) continue;
 
-    const localStart = Math.max(0, pos - start);
-    const localEnd = Math.min(node.length, hl.endOffset - start);
+    const nodeLen = node.length;
+    const nodeEnd = start + nodeLen;
 
-    if (localStart >= localEnd) continue;
-
-    // Split the text node and wrap the middle part
-    const before = node.splitText(localStart);
-    const middle = before.splitText(localEnd - localStart);
-    void middle; // the rest after highlight
-
-    const mark = document.createElement("mark");
-    mark.setAttribute("data-highlight", "");
-    mark.style.background = hl.color;
-    mark.style.borderRadius = "2px";
-    mark.style.padding = "0 1px";
-
-    const parent = before.parentNode!;
-    parent.insertBefore(mark, before);
-    mark.appendChild(before);
-
-    // After DOM mutation, break — caller will re-collect nodes next call
-    break;
+    if (!started) {
+      if (hl.startOffset >= start && hl.startOffset < nodeEnd) {
+        started = true;
+        const localStart = hl.startOffset - start;
+        const localEnd = Math.min(nodeLen, localStart + remaining);
+        const wrapped = localEnd - localStart;
+        wrapPartOfTextNode(node, localStart, localEnd, hl.color);
+        remaining -= wrapped;
+        if (remaining <= 0) return;
+      }
+    } else {
+      if (start >= hl.endOffset) break;
+      const localEnd = Math.min(nodeLen, remaining);
+      wrapPartOfTextNode(node, 0, localEnd, hl.color);
+      remaining -= localEnd;
+      if (remaining <= 0) return;
+    }
   }
 }
