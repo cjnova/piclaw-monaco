@@ -513,7 +513,7 @@ export function MessageItem({
                                     a { color: #89b4fa; }
                                   }
                                 </style>
-                                ${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/\n/g, '<br>')}
+                                ${renderMarkdown(text)}
                               `;
                               window.dispatchEvent(new CustomEvent('piclaw:widget-open', {
                                 detail: { title: filename, html: previewHtml, widget_id: `preview-${mediaId}` }
