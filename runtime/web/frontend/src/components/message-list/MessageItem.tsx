@@ -13,6 +13,7 @@ import { AvatarPopover } from "../AvatarPopover";
 import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer";
 import { CopyButton } from "../CopyButton";
 import type { ContentBlock, Interaction } from "./types";
+import { safeParseJSON, safeSetItem } from "../../utils/storage";
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────
 
@@ -185,17 +186,11 @@ export function MessageItem({
   const [popup, setPopup] = useState<{ x: number; y: number } | null>(null);
   const pendingSelectionRef = useRef<{ startOffset: number; endOffset: number; text: string } | null>(null);
 
-  const getStoredHighlights = (id: number): HighlightRange[] => {
-    try {
-      const raw = localStorage.getItem(`highlights:${id}`);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  };
+  const getStoredHighlights = (id: number): HighlightRange[] =>
+    safeParseJSON<HighlightRange[]>(`highlights:${id}`, []);
 
   const saveHighlights = (id: number, highlights: HighlightRange[]) => {
-    localStorage.setItem(`highlights:${id}`, JSON.stringify(highlights));
+    safeSetItem(`highlights:${id}`, JSON.stringify(highlights));
   };
 
   useEffect(() => {
