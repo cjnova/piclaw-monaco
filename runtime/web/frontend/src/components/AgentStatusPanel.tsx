@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
-import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
+import { CollapsibleContent, MarkdownContent } from "./CollapsibleContent";
 import {
   ExtensionPanelCard,
   normalizeExtensionPanelPayload,
@@ -61,18 +61,7 @@ function stripInternalTags(text: string): string {
   return text.replace(/<internal>[\s\S]*?<\/internal>/g, "");
 }
 
-/** Truncate text for collapsed view by line count. Returns visible text, omitted line count, total line count. */
-function truncateByLines(
-  text: string,
-  maxLines: number
-): { visible: string; omitted: number; totalLines: number } {
-  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = normalized.split("\n");
-  const totalLines = lines.length;
-  if (totalLines <= maxLines) return { visible: normalized, omitted: 0, totalLines };
-  const visible = lines.slice(0, maxLines).join("\n");
-  return { visible, omitted: totalLines - maxLines, totalLines };
-}
+// truncateByLines is exported from CollapsibleContent.tsx
 
 // ---------------------------------------------------------------------------
 // Tool argument parsing helpers
@@ -696,14 +685,11 @@ export function AgentStatusPanel() {
             {elapsed.tools > 0 && (
               <span className="agent-status-card__timer">{elapsed.tools}s</span>
             )}
-            {(toolsExpanded || tools.length > 3) && (
-              <span className="agent-status-card__toggle">
-                {toolsExpanded ? <span className="agent-status-card__toggle-label">▾ less</span> : <span className="agent-status-card__toggle-label">▸ more…</span>}
-              </span>
-            )}
           </div>
-          <div className={`agent-status-card__content${toolsExpanded ? "" : " agent-status-card__content--collapsed"}`}>
-            {(toolsExpanded ? tools : tools.slice(-3)).map((tool) => {
+          <CollapsibleContent
+            expanded={toolsExpanded}
+            onToggle={() => setToolsExpanded(prev => !prev)}
+            items={tools.map((tool) => {
               const parsed = resolveTitleFromArgs(tool.name, tool.rawTitle, tool.toolArgs);
               const kindMeta = TOOL_KIND_LABELS[tool.kind] || TOOL_KIND_LABELS.other;
               const retryLabel = tool.retryAt != null ? formatRetryCountdown(tool.retryAt - nowMs) : null;
@@ -756,12 +742,8 @@ export function AgentStatusPanel() {
               </div>
               );
             })}
-            {!toolsExpanded && tools.length > 3 && (
-              <button type="button" className="agent-status-card__more-btn" onClick={() => setToolsExpanded(true)}>
-                +{tools.length - 3} more…
-              </button>
-            )}
-          </div>
+            maxItems={3}
+          />
         </div>
       )}
 
@@ -858,25 +840,8 @@ interface AgentPanelProps {
 }
 
 function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDismiss }: AgentPanelProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  // Strip <internal> blocks, then truncate by lines
+  // Strip <internal> blocks before passing to CollapsibleContent
   const stripped = stripInternalTags(text);
-  const { visible, omitted } = expanded
-    ? { visible: stripped, omitted: 0 }
-    : truncateByLines(stripped, COLLAPSED_MAX_LINES);
-  const canTruncate = stripped.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").length > COLLAPSED_MAX_LINES;
-
-  // Render markdown into DOM via ref to avoid reconciliation issues
-  useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.innerHTML = "";
-      const div = document.createElement("div");
-      div.className = "agent-status-panel__body-text";
-      div.innerHTML = renderThinkingMarkdown(visible);
-      contentRef.current.appendChild(div);
-    }
-  }, [visible]);
 
   return (
     <div className={`agent-status-card agent-status-card--${type}`}>
@@ -885,11 +850,6 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDism
         <span className="agent-status-card__title">{title}</span>
         {elapsed > 0 && (
           <span className="agent-status-card__timer">{elapsed}s</span>
-        )}
-        {canTruncate && (
-          <span className="agent-status-card__toggle" aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`} onClick={onToggle}>
-            {expanded ? <span className="agent-status-card__toggle-label">▾ less</span> : <span className="agent-status-card__toggle-label">▸ more…</span>}
-          </span>
         )}
         <button
           type="button"
@@ -901,20 +861,13 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDism
           ×
         </button>
       </div>
-      <div
-        className={`agent-status-card__content${expanded ? "" : " agent-status-card__content--collapsed"}`}
-        ref={contentRef}
+      <CollapsibleContent
+        expanded={expanded}
+        onToggle={onToggle}
+        text={stripped}
+        maxLines={COLLAPSED_MAX_LINES}
+        renderContent={(visibleText) => <MarkdownContent text={visibleText} />}
       />
-      {!expanded && omitted > 0 && (
-        <button type="button" className="agent-status-panel__more" onClick={onToggle}>
-          <span className="agent-status-card__more">▸ {omitted} more lines</span>
-        </button>
-      )}
-      {expanded && canTruncate && (
-        <button type="button" className="agent-status-panel__more" onClick={onToggle}>
-          ▴ show less
-        </button>
-      )}
     </div>
   );
 }
