@@ -14,7 +14,7 @@
     --workspace-row-height: 22px;
     --workspace-row-gap: 2px;
     --workspace-caret-box-size: 14px;
-    --workspace-caret-icon-size: var(--ui-disclosure-triangle-size);
+    --workspace-caret-icon-size: 8px;
     --workspace-file-icon-size: 14px;
     --workspace-folder-icon-size: 16px;
     --workspace-folder-upload-icon-size: 13px;
@@ -44,7 +44,7 @@
     --workspace-row-height: 20px;
     --workspace-row-gap: 2px;
     --workspace-caret-box-size: 13px;
-    --workspace-caret-icon-size: var(--ui-disclosure-triangle-size);
+    --workspace-caret-icon-size: 7px;
     --workspace-file-icon-size: 13px;
     --workspace-folder-icon-size: 15px;
     --workspace-folder-upload-icon-size: 12px;
@@ -62,7 +62,7 @@
     --workspace-row-height: 22px;
     --workspace-row-gap: 2px;
     --workspace-caret-box-size: 14px;
-    --workspace-caret-icon-size: var(--ui-disclosure-triangle-size);
+    --workspace-caret-icon-size: 8px;
     --workspace-file-icon-size: 14px;
     --workspace-folder-icon-size: 16px;
     --workspace-folder-upload-icon-size: 13px;
@@ -80,7 +80,7 @@
     --workspace-row-height: 28px;
     --workspace-row-gap: 4px;
     --workspace-caret-box-size: 16px;
-    --workspace-caret-icon-size: var(--ui-disclosure-triangle-size);
+    --workspace-caret-icon-size: 9px;
     --workspace-file-icon-size: 16px;
     --workspace-folder-icon-size: 18px;
     --workspace-folder-upload-icon-size: 15px;
@@ -1127,4 +1127,44 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ── Workspace files toolbar (filter + refresh icons) ── */
+.workspace__files-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace__files-toolbar-icon {
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 14px;
+  transition: opacity 0.15s;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace__files-toolbar-icon:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+.workspace__files-toolbar-icon--active {
+  opacity: 1;
+}
+
+@keyframes workspace-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.workspace__files-toolbar-icon--spinning {
+  animation: workspace-spin 0.8s linear infinite;
+  opacity: 0.8;
 }

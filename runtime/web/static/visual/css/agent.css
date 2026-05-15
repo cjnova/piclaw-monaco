@@ -10,7 +10,7 @@
     align-items: center;
     gap: var(--spacing-sm);
     padding: calc(var(--spacing-md) / 2);
-    margin: 0;
+    margin: 0 var(--spacing-sm);
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-bottom-color: transparent;
@@ -266,7 +266,7 @@
 
 .agent-thinking {
     padding: var(--chat-surface-padding-y) var(--chat-surface-padding-x);
-    margin: 0;
+    margin: 0 var(--spacing-sm);
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-bottom-color: transparent;
@@ -276,8 +276,6 @@
     animation: fadeIn 0.2s ease-out;
     --turn-color: var(--accent-color);
     --pane-bottom-border: color-mix(in srgb, var(--border-color) 85%, transparent);
-    --agent-intent-tool-argument-font-size: 0.9em;
-    --agent-tool-output-font-size: 0.8em;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -310,40 +308,6 @@
 .agent-thinking-title-text {
     min-width: 0;
     flex: 0 1 auto;
-}
-
-.agent-tool-argument,
-.agent-tool-command-line {
-    font-family: var(--font-mono, monospace);
-    overflow-wrap: anywhere;
-}
-
-.agent-thinking-intent .agent-tool-argument,
-.agent-thinking-intent .agent-tool-command-line {
-    font-size: var(--agent-intent-tool-argument-font-size, 0.9em);
-}
-
-.agent-thinking-title-text .agent-tool-argument,
-.agent-thinking-title-text .agent-tool-command-line {
-    font-weight: 600;
-}
-
-.agent-tool-status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1px 6px;
-    border: 1px solid color-mix(in srgb, var(--turn-color, var(--accent-color)) 28%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--turn-color, var(--accent-color)) 12%, transparent);
-    color: var(--turn-color, var(--accent-color));
-    font-size: 0.74em;
-    font-weight: 600;
-    line-height: 1.35;
-    letter-spacing: 0.01em;
-    text-transform: lowercase;
-    vertical-align: 0.08em;
-    white-space: nowrap;
 }
 
 .agent-thinking-title-meta {
@@ -465,30 +429,6 @@
     opacity: 1;
 }
 
-.agent-thinking[data-panel-key="thought"] .agent-thinking-body-collapsible,
-.agent-thinking[data-panel-key="draft"] .agent-thinking-body-collapsible,
-.agent-thinking[data-panel-key="tool-output"] .agent-thinking-body-collapsible {
-    max-height: calc((var(--agent-thinking-line-height) * 1em * var(--agent-thinking-collapsed-lines, 9)) + 0.4em);
-    overflow: hidden auto;
-    overscroll-behavior: contain;
-    padding-right: 0.35rem;
-    scrollbar-gutter: stable;
-}
-
-.agent-thinking[data-panel-key="tool-output"] .agent-thinking-body-collapsible {
-    min-height: calc((var(--agent-thinking-line-height) * 1em * var(--agent-thinking-collapsed-lines, 6)) + 0.4em);
-}
-
-.agent-thinking[data-panel-key="tool-output"] .agent-thinking-body {
-    font-family: var(--font-mono, monospace);
-    font-size: var(--agent-tool-output-font-size, 0.8em);
-}
-
-.agent-thinking[data-panel-key="tool-output"] .agent-thinking-body * {
-    font-family: inherit;
-    font-size: inherit;
-}
-
 .agent-thinking-body,
 .agent-thinking-body * {
     line-height: 1.35;
@@ -496,42 +436,26 @@
 }
 
 .agent-thinking-truncation {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    flex: 0 0 auto;
-    width: auto;
-    margin: 0 0 0 auto;
-    padding: 2px 8px;
-    border: 1px solid color-mix(in srgb, var(--turn-color, var(--accent-color)) 24%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--turn-color, var(--accent-color)) 10%, transparent);
+    display: block;
+    width: 100%;
+    margin-top: var(--spacing-xs);
+    padding: 0;
+    background: none;
+    border: none;
     text-align: left;
     cursor: pointer;
-    color: var(--turn-color, var(--accent-color));
+    color: var(--text-tertiary);
     font-size: var(--font-size-xs);
     font-family: inherit;
-    font-weight: 600;
-    line-height: 1.2;
-    white-space: nowrap;
-    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+    transition: color 0.15s ease, transform 0.15s ease;
 }
 
-.agent-thinking-truncation-arrow {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: var(--ui-disclosure-triangle-size);
-    line-height: 1;
+.agent-thinking[data-expanded="true"] .agent-thinking-truncation {
+    transform: translateY(1px);
 }
 
-.agent-thinking-truncation:hover,
-.agent-thinking-truncation:focus-visible {
-    color: var(--text-primary);
-    border-color: color-mix(in srgb, var(--turn-color, var(--accent-color)) 42%, var(--border-color));
-    background: color-mix(in srgb, var(--turn-color, var(--accent-color)) 16%, transparent);
-    outline: none;
+.agent-thinking-truncation:hover {
+    color: var(--text-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -551,51 +475,6 @@
 
 .agent-thinking-body p + p {
     margin-top: 0;
-}
-
-.agent-thinking-body table {
-    display: table;
-    border-collapse: collapse;
-    margin: 0.5em 0;
-    width: 100%;
-    max-width: 100%;
-    table-layout: auto;
-    font-family: inherit;
-    font-size: inherit;
-    color: inherit;
-}
-
-.agent-thinking-body th,
-.agent-thinking-body td {
-    border: 1px solid var(--border-color);
-    padding: 0.4em 0.75em;
-    text-align: left;
-    vertical-align: top;
-    white-space: normal;
-    overflow-wrap: break-word;
-    word-break: normal;
-    font-family: inherit;
-    font-size: inherit;
-    color: inherit;
-}
-
-.agent-thinking-body th {
-    font-weight: 600;
-    background: var(--bg-secondary);
-}
-
-.agent-thinking-body tbody tr:nth-child(even) td {
-    background: color-mix(in srgb, var(--bg-secondary, #f5f5f5) 38%, transparent);
-}
-
-.agent-thinking-body tbody tr:nth-child(odd) td {
-    background: color-mix(in srgb, var(--bg-primary, #ffffff) 92%, var(--bg-secondary, #f5f5f5) 8%);
-}
-
-.agent-thinking-body th:first-child,
-.agent-thinking-body td:first-child {
-    width: auto;
-    white-space: normal;
 }
 
 .agent-thinking-autoresearch-summary {

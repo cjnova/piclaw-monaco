@@ -6,7 +6,7 @@ import { build, context, type BuildOptions } from "esbuild";
 const watchMode = process.argv.includes("--watch");
 const frontendDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(frontendDir, "../../..");
-const outputDir = path.join(rootDir, "runtime/web/static/classic/dist");
+const outputDir = path.join(rootDir, "runtime/web/static/visual/dist");
 
 const options: BuildOptions = {
   entryPoints: [path.join(frontendDir, "src/index.tsx")],
@@ -29,5 +29,5 @@ if (watchMode) {
   console.log("[frontend] watching for changes...");
 } else {
   await build(options);
-  console.log("[frontend] built runtime/web/static/classic/dist/app.bundle.js");
+  console.log("[frontend] built runtime/web/static/visual/dist/app.bundle.js");
 }

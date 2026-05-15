@@ -34,7 +34,7 @@
     }
 
     .compose-box {
-        padding: var(--spacing-sm) 0 2px;
+        padding: var(--spacing-sm) var(--spacing-md) 2px;
     }
 
     .compose-box textarea {
@@ -42,22 +42,8 @@
         font-size: var(--chat-content-font-size);
     }
 
-    .compose-session-trigger-top {
-        position: absolute;
-        top: 4px;
-        right: 6px;
-        z-index: 7;
-        align-self: auto;
-        max-width: min(42vw, 148px);
-        margin-bottom: 0;
-    }
-
-    .compose-session-trigger-top + .compose-input-main textarea {
-        padding-right: max(calc(var(--spacing-xs) + 28px), min(44vw, 156px));
-    }
-
     .compose-queue-stack {
-        margin: var(--chat-surface-stack-gap) 0 0;
+        margin: var(--chat-surface-stack-gap) var(--spacing-md) 0;
     }
 
     .compose-box > .compose-queue-stack {
@@ -80,7 +66,7 @@
     }
 
     .agent-thinking {
-        margin: 0;
+        margin: 0 var(--spacing-md);
     }
 
     .agent-thinking-title {
@@ -211,20 +197,6 @@
 
     .compose-model-meta {
         min-width: 0;
-    }
-
-    .compose-session-trigger-top {
-        position: absolute;
-        top: 4px;
-        right: 6px;
-        z-index: 7;
-        align-self: auto;
-        max-width: min(42vw, 148px);
-        margin-bottom: 0;
-    }
-
-    .compose-session-trigger-top + .compose-input-main textarea {
-        padding-right: max(calc(var(--spacing-xs) + 28px), min(44vw, 156px));
     }
 
     .compose-model-hint,
