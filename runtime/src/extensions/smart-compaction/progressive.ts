@@ -17,13 +17,13 @@ import {
   PROGRESSIVE_FALLBACK_CONTEXT_WINDOW,
   PROGRESSIVE_INPUT_CONTEXT_FRACTION,
   PROGRESSIVE_TIME_BUDGET_FRACTION,
-  SYSTEM_PROMPT_OVERHEAD_TOKENS,
   parsePositiveEnvInt,
 } from "./config.js";
+import { getEffectiveContextWindow, getSystemPromptOverheadTokens } from "../../utils/context-window-budget.js";
 import { estimateCompactionPromptTokens, getModelContextWindow } from "./context.js";
 import { compressFilePaths, fileListsFromOps } from "./files.js";
 import { serializeMessage, serializeToolCompact } from "./messages.js";
-import { getSafeCompactionMaxTokens } from "./safety.js";
+import { getCompactionReasoningEffort, getSafeCompactionMaxTokens } from "./safety.js";
 import { SYSTEM_PROMPT } from "./selective-prompt.js";
 
 export interface ProgressiveCompactionBudget {
@@ -42,18 +42,22 @@ export interface ProgressiveCompactionChunk {
   estimatedChars: number;
 }
 
-export function getProgressiveCompactionBudget(model: unknown): ProgressiveCompactionBudget {
-  const contextWindow = Math.max(8_000, getModelContextWindow(model) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW);
+export function getProgressiveCompactionBudget(model: unknown, targetContextWindow?: number | null): ProgressiveCompactionBudget {
+  const reportedWindow = getModelContextWindow(model) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
+  const contextWindow = typeof targetContextWindow === "number" && Number.isFinite(targetContextWindow) && targetContextWindow > 0
+    ? Math.min(Math.trunc(targetContextWindow), reportedWindow)
+    : reportedWindow;
   // Subtract system prompt overhead before computing input budgets.
   // The overhead (AGENTS.md, tools, skills, memory) is invisible to message
   // token estimates but eats real context space.
-  const effectiveWindow = Math.max(4_000, contextWindow - SYSTEM_PROMPT_OVERHEAD_TOKENS);
+  const effectiveWindow = getEffectiveContextWindow(contextWindow, getSystemPromptOverheadTokens());
   const envBudget = parsePositiveEnvInt("PICLAW_PROGRESSIVE_COMPACTION_PROMPT_CHARS");
-  const rawPromptBudget = envBudget ?? Math.max(10_000, Math.min(MAX_PROMPT_CHARS, Math.floor(effectiveWindow * 4 * PROGRESSIVE_INPUT_CONTEXT_FRACTION)));
+  const computedPromptBudget = Math.floor(effectiveWindow * 4 * PROGRESSIVE_INPUT_CONTEXT_FRACTION);
+  const rawPromptBudget = envBudget ?? Math.min(MAX_PROMPT_CHARS, Math.max(2_000, computedPromptBudget));
   // Apply safety margin: leave room for estimation inaccuracy
-  const promptBudgetChars = Math.floor(rawPromptBudget * BUDGET_SAFETY_MARGIN);
-  const chunkBudgetChars = Math.max(6_000, Math.floor(promptBudgetChars * PROGRESSIVE_CHUNK_FRACTION));
-  const mergeBudgetChars = Math.max(8_000, promptBudgetChars);
+  const promptBudgetChars = Math.max(1_000, Math.floor(rawPromptBudget * BUDGET_SAFETY_MARGIN));
+  const chunkBudgetChars = Math.min(promptBudgetChars, Math.max(1_000, Math.floor(promptBudgetChars * PROGRESSIVE_CHUNK_FRACTION)));
+  const mergeBudgetChars = Math.max(2_000, promptBudgetChars);
   return {
     contextWindow,
     promptBudgetChars,
@@ -247,7 +251,7 @@ async function completeCompactionPrompt(
       messages: [{ role: "user", content: [{ type: "text", text: promptText }], timestamp: Date.now() }],
     },
     (model as any).reasoning
-      ? { maxTokens: safeOutput.maxTokens, signal: abortSignal, apiKey: auth.apiKey, headers: auth.headers, reasoning: "high" as const }
+      ? { maxTokens: safeOutput.maxTokens, signal: abortSignal, apiKey: auth.apiKey, headers: auth.headers, reasoning: getCompactionReasoningEffort(model) }
       : { maxTokens: safeOutput.maxTokens, signal: abortSignal, apiKey: auth.apiKey, headers: auth.headers },
   );
   if ((response as any).stopReason === "error") {

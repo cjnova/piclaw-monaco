@@ -11,8 +11,8 @@ import {
   MAX_KEEP_RECENT_FRACTION,
   MIN_COMPACTION_OUTPUT_TOKENS,
   PROGRESSIVE_FALLBACK_CONTEXT_WINDOW,
-  SYSTEM_PROMPT_OVERHEAD_TOKENS,
 } from "./config.js";
+import { applyTokenEstimateSafetyMultiplier, getEffectiveContextWindow, getSystemPromptOverheadTokens } from "../../utils/context-window-budget.js";
 import { estimateCompactionPromptTokens, estimateTokensFromChars, getModelContextWindow } from "./context.js";
 
 
@@ -27,9 +27,9 @@ import { estimateCompactionPromptTokens, estimateTokensFromChars, getModelContex
  * don't fit.
  */
 export function clampKeepRecentTokens(keepRecentTokens: number, contextWindow: number): number {
-  const effectiveWindow = Math.max(4_000, contextWindow - SYSTEM_PROMPT_OVERHEAD_TOKENS);
+  const effectiveWindow = getEffectiveContextWindow(contextWindow, getSystemPromptOverheadTokens());
   const maxKeep = Math.floor(effectiveWindow * MAX_KEEP_RECENT_FRACTION);
-  return Math.min(keepRecentTokens, maxKeep);
+  return Math.max(0, Math.min(Math.floor(keepRecentTokens), maxKeep));
 }
 
 /**
@@ -43,9 +43,10 @@ export function estimatePostCompactionFit(summary: string, keepRecentTokens: num
   overheadTokens: number;
   margin: number;
 } {
-  const summaryTokens = estimateTokensFromChars(summary);
-  const overheadTokens = SYSTEM_PROMPT_OVERHEAD_TOKENS;
-  const estimatedTotal = summaryTokens + keepRecentTokens + overheadTokens;
+  const summaryTokens = applyTokenEstimateSafetyMultiplier(estimateTokensFromChars(summary));
+  const safeKeepRecentTokens = applyTokenEstimateSafetyMultiplier(keepRecentTokens);
+  const overheadTokens = getSystemPromptOverheadTokens();
+  const estimatedTotal = summaryTokens + safeKeepRecentTokens + overheadTokens;
   const margin = contextWindow - estimatedTotal;
   return {
     estimatedTotal,
@@ -56,18 +57,30 @@ export function estimatePostCompactionFit(summary: string, keepRecentTokens: num
   };
 }
 
+export function getCompactionReasoningReserveTokens(model: unknown): number {
+  const anyModel = model as { reasoning?: unknown } | null | undefined;
+  if (!anyModel?.reasoning) return 0;
+  const contextWindow = getModelContextWindow(model) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
+  if (contextWindow <= 64_000) return 512;
+  if (contextWindow <= 128_000) return 1_024;
+  if (contextWindow <= 256_000) return 2_048;
+  return 4_096;
+}
+
 export function getSafeCompactionMaxTokens(model: unknown, promptText: string, requestedMaxTokens: number): {
   maxTokens: number;
   promptTokens: number;
   availableOutputTokens: number;
   contextWindow: number;
+  reasoningReserveTokens: number;
 } {
   const contextWindow = getModelContextWindow(model) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
   const promptTokens = estimateCompactionPromptTokens(promptText);
-  const availableOutputTokens = Math.floor((contextWindow - promptTokens) * BUDGET_SAFETY_MARGIN);
+  const reasoningReserveTokens = getCompactionReasoningReserveTokens(model);
+  const availableOutputTokens = Math.floor((contextWindow - promptTokens - reasoningReserveTokens) * BUDGET_SAFETY_MARGIN);
   if (availableOutputTokens < MIN_COMPACTION_OUTPUT_TOKENS) {
     throw new Error(
-      `Compaction prompt exceeds safe model budget: prompt+overhead=${promptTokens}t, context=${contextWindow}t, availableOutput=${availableOutputTokens}t`,
+      `Compaction prompt exceeds safe model budget: prompt+overhead=${promptTokens}t, reasoningReserve=${reasoningReserveTokens}t, context=${contextWindow}t, availableOutput=${availableOutputTokens}t`,
     );
   }
   return {
@@ -78,7 +91,16 @@ export function getSafeCompactionMaxTokens(model: unknown, promptText: string, r
     promptTokens,
     availableOutputTokens,
     contextWindow,
+    reasoningReserveTokens,
   };
+}
+
+export function getCompactionReasoningEffort(model: unknown): "minimal" | "low" | "medium" | "high" {
+  const contextWindow = getModelContextWindow(model) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
+  if (contextWindow <= 64_000) return "minimal";
+  if (contextWindow <= 128_000) return "low";
+  if (contextWindow <= 256_000) return "medium";
+  return "high";
 }
 
 export interface ProgressiveCompactionBudget {

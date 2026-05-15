@@ -36,7 +36,6 @@ import {
   waitForSessionIdle,
 } from "./prompt-utils.js";
 import {
-  DEFAULT_FALLBACK_CONTEXT_WINDOW,
   cancelScheduledIdleAutoCompaction,
   clearCompactionFailureBackoff,
   estimateContextTokensFromSession,
@@ -47,6 +46,13 @@ import {
   runCompactionWithTimeout,
   scheduleIdleAutoCompaction,
 } from "./compaction.js";
+import {
+  applyTokenEstimateSafetyMultiplier,
+  getContextThresholdTokens,
+  getEffectiveContextWindow,
+  getSystemPromptOverheadTokens,
+  getUnknownModelContextWindow,
+} from "../utils/context-window-budget.js";
 import {
   inspectBlankTurnSessionDelta,
   isBlankTurnSessionDelta,
@@ -580,15 +586,21 @@ async function runPromptAttempt(
   ].includes(toolName);
   let sawTerminalSideEffectToolActivity = false;
 
-  const readContextUsageSnapshot = (): { tokens: number; contextWindow: number; thresholdTokens: number; thresholdPercent: number; overThreshold: boolean } | null => {
-    const contextWindow = getModelContextWindow(session) ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
+  const readContextUsageSnapshot = (): { tokens: number; rawTokens: number; contextWindow: number; effectiveContextWindow: number; overheadTokens: number; thresholdTokens: number; thresholdPercent: number; overThreshold: boolean } | null => {
+    const contextWindow = getModelContextWindow(session) ?? getUnknownModelContextWindow();
     if (!Number.isFinite(contextWindow) || contextWindow <= 0) return null;
-    const tokens = estimateContextTokensFromSession(session);
+    const rawTokens = estimateContextTokensFromSession(session);
+    const tokens = applyTokenEstimateSafetyMultiplier(rawTokens);
     const thresholdPercent = getCompactionRuntimeConfig().thresholdPercent;
-    const thresholdTokens = Math.floor(contextWindow * (thresholdPercent / 100));
+    const overheadTokens = getSystemPromptOverheadTokens();
+    const effectiveContextWindow = getEffectiveContextWindow(contextWindow, overheadTokens);
+    const thresholdTokens = getContextThresholdTokens(contextWindow, thresholdPercent, overheadTokens);
     return {
       tokens,
+      rawTokens,
       contextWindow,
+      effectiveContextWindow,
+      overheadTokens,
       thresholdTokens,
       thresholdPercent,
       overThreshold: tokens > thresholdTokens,
@@ -1016,9 +1028,10 @@ async function runPromptAttempt(
         // context pressure on the snapshot so recovery compacts first
         // instead of retrying into the same wall.
         try {
-          const tokens = estimateContextTokensFromSession(session);
-          const cw = getModelContextWindow(session) ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
-          if (cw > 0 && tokens > cw * 0.6) {
+          const tokens = applyTokenEstimateSafetyMultiplier(estimateContextTokensFromSession(session));
+          const cw = getModelContextWindow(session) ?? getUnknownModelContextWindow();
+          const threshold = getContextThresholdTokens(cw, 60, getSystemPromptOverheadTokens());
+          if (cw > 0 && tokens > threshold) {
             sawCompactionIntent = true;
           }
         } catch (err) { debugSuppressedError(log, "Failed to estimate context tokens for compaction heuristic; skipping pressure check.", err); }

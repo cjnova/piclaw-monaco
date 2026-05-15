@@ -351,9 +351,20 @@ function formatK(n) {
     return String(n);
 }
 
+const MODEL_PICKER_CONTEXT_OVERHEAD_TOKENS = 4000;
+const MODEL_PICKER_TOKEN_ESTIMATE_SAFETY_MULTIPLIER = 1.1;
+
 function normalizeContextUsageTokens(contextUsage) {
     const tokens = Number(contextUsage?.tokens);
     return Number.isFinite(tokens) && tokens > 0 ? tokens : null;
+}
+
+function getModelPickerEffectiveContextWindow(contextWindow) {
+    return Math.max(0, Math.floor(Number(contextWindow) - MODEL_PICKER_CONTEXT_OVERHEAD_TOKENS));
+}
+
+function applyModelPickerTokenSafety(tokens) {
+    return Math.ceil((Number(tokens) * MODEL_PICKER_TOKEN_ESTIMATE_SAFETY_MULTIPLIER) - 1e-9);
 }
 
 export function getModelPickerContextLimit(modelOption, contextUsage) {
@@ -368,21 +379,27 @@ export function getModelPickerContextLimit(modelOption, contextUsage) {
             contextWindow: Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : null,
         };
     }
-    if (tokens <= contextWindow) {
+    const effectiveContextWindow = getModelPickerEffectiveContextWindow(contextWindow);
+    const safetyAdjustedTokens = applyModelPickerTokenSafety(tokens);
+    if (safetyAdjustedTokens <= effectiveContextWindow) {
         return {
             blocked: false,
             note: '',
             title: '',
             tokens,
+            safetyAdjustedTokens,
             contextWindow,
+            effectiveContextWindow,
         };
     }
     return {
         blocked: true,
         note: 'Current context won’t fit — compact first',
-        title: `Current context uses ${formatK(tokens)} tokens, but this model only fits ${formatK(contextWindow)}. Compact first.`,
+        title: `Current context uses ${formatK(tokens)} tokens (~${formatK(safetyAdjustedTokens)} with estimator safety) plus app/tool overhead, but this model effectively fits about ${formatK(effectiveContextWindow)} (${formatK(contextWindow)} raw). Compact first.`,
         tokens,
+        safetyAdjustedTokens,
         contextWindow,
+        effectiveContextWindow,
     };
 }
 

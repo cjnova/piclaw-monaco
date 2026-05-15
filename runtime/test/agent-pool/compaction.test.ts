@@ -20,10 +20,6 @@ function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => voi
   return { promise, resolve };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function makeSession(messages: any[], usageTokens?: number): any {
   return {
     getContextUsage: usageTokens === undefined ? undefined : () => ({ tokens: usageTokens }),
@@ -116,6 +112,45 @@ test("runCompactionWithTimeout keeps the single-flight lock until timed-out comp
   } finally {
     if (previousTimeout === undefined) delete process.env.PICLAW_COMPACTION_TIMEOUT_MS;
     else process.env.PICLAW_COMPACTION_TIMEOUT_MS = previousTimeout;
+  }
+});
+
+test("maybeAutoCompactSessionBeforePrompt subtracts overhead before threshold checks", async () => {
+  const previousThreshold = process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT;
+  const previousOverhead = process.env.PICLAW_SYSTEM_PROMPT_OVERHEAD_TOKENS;
+  process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT = "75";
+  process.env.PICLAW_SYSTEM_PROMPT_OVERHEAD_TOKENS = "4000";
+  try {
+    const events: any[] = [];
+    let compactCalls = 0;
+    const session = {
+      ...makeSession([
+        { role: "user", content: [{ type: "text", text: "x".repeat(4000) }] },
+      ], 73_000),
+      model: { provider: "test", id: "effective-window", contextWindow: 100_000 },
+      settingsManager: { getCompactionSettings: () => ({ enabled: true, reserveTokens: 25_000 }) },
+      isStreaming: false,
+      isCompacting: false,
+      isRetrying: false,
+      async compact() {
+        compactCalls += 1;
+      },
+    };
+
+    await maybeAutoCompactSessionBeforePrompt(
+      session as any,
+      "web:effective-window",
+      { onWarn: () => undefined, onInfo: () => undefined },
+      (event) => events.push(event),
+    );
+
+    expect(compactCalls).toBe(1);
+    expect(events).toContainEqual(expect.objectContaining({ type: "compaction_start", reason: "threshold" }));
+  } finally {
+    if (previousThreshold === undefined) delete process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT;
+    else process.env.PICLAW_COMPACTION_THRESHOLD_PERCENT = previousThreshold;
+    if (previousOverhead === undefined) delete process.env.PICLAW_SYSTEM_PROMPT_OVERHEAD_TOKENS;
+    else process.env.PICLAW_SYSTEM_PROMPT_OVERHEAD_TOKENS = previousOverhead;
   }
 });
 

@@ -17,6 +17,7 @@ export type AgentControlCommand =
       type: "model";
       provider?: string;
       modelId?: string;
+      compact?: boolean;
       raw: string;
     }
   | {
