@@ -49,3 +49,4 @@ runtime/web/static/**/*.gz
 workspace/.piclaw/store/messages.db
 workspace/.piclaw/store/messages.db-shm
 workspace/.piclaw/store/messages.db-wal
+workspace/

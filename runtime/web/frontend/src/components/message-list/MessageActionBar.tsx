@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { useDialog } from "../../hooks/useDialog";
+import { copyToClipboard } from "../../utils/clipboard";
 
 interface MessageActionBarProps {
   messageId: number;
@@ -53,20 +54,14 @@ export function MessageActionBar({
   };
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      window.dispatchEvent(
-        new CustomEvent("piclaw:status-flash", {
-          detail: { message: "Copied to clipboard", type: "success" },
-        })
-      );
-    } catch {
-      window.dispatchEvent(
-        new CustomEvent("piclaw:status-flash", {
-          detail: { message: "Copy failed", type: "error" },
-        })
-      );
-    }
+    const ok = await copyToClipboard(content);
+    window.dispatchEvent(
+      new CustomEvent("piclaw:status-flash", {
+        detail: ok
+          ? { message: "Copied to clipboard", type: "success" }
+          : { message: "Copy failed", type: "error" },
+      })
+    );
   };
 
   return (
