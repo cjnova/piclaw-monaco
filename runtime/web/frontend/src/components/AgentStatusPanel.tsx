@@ -235,6 +235,7 @@ export function AgentStatusPanel() {
   const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded, dismissed: false });
   const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded, dismissed: false });
   const [output, setOutputState] = useState<PanelState>({ text: "", expanded: false, dismissed: false });
+  const [outputMeta, setOutputMeta] = useState<{ toolName: string; startedAt: string; gitBranch: string }>({ toolName: "", startedAt: "", gitBranch: "" });
   const [status, setStatus] = useState<string | null>(null);
   const [steerQueued, setSteerQueued] = useState(false);
   const [turnColor, setTurnColor] = useState<string | null>(null);
@@ -389,6 +390,11 @@ export function AgentStatusPanel() {
           if (!outputRafRef.current) {
             outputRafRef.current = requestAnimationFrame(flushOutput);
           }
+          // Capture meta for output panel header
+          const toolName = detail.title || detail.tool_name || "";
+          const startedAt = detail.started_at || detail.startedAt || "";
+          const gitBranch = detail.tool_args?.ref || detail.tool_args?.branch || "";
+          setOutputMeta({ toolName, startedAt, gitBranch });
         }
       }
       if (detail.type && detail.type !== "context_usage" && detail.type !== "done") {
@@ -464,6 +470,7 @@ export function AgentStatusPanel() {
       setDraftState({ text: "", expanded: savedPrefs.draftExpanded, dismissed: false });
       setThoughtState({ text: "", expanded: savedPrefs.thoughtExpanded, dismissed: false });
       setOutputState({ text: "", expanded: false, dismissed: false });
+      setOutputMeta({ toolName: "", startedAt: "", gitBranch: "" });
       setElapsed({ draft: 0, thought: 0, tools: 0 });
       setStatus(null);
       setStatusText("");
@@ -806,6 +813,9 @@ export function AgentStatusPanel() {
         <OutputPanel
           text={output.text}
           expanded={output.expanded}
+          toolName={outputMeta.toolName}
+          startedAt={outputMeta.startedAt}
+          gitBranch={outputMeta.gitBranch}
           onToggle={toggleOutputExpand}
           onDismiss={dismissOutput}
         />
@@ -913,11 +923,16 @@ const OUTPUT_MAX_LINES = 9;
 interface OutputPanelProps {
   text: string;
   expanded: boolean;
+  toolName?: string;
+  startedAt?: string;
+  gitBranch?: string;
   onToggle: () => void;
   onDismiss: (e: MouseEvent) => void;
 }
 
-function OutputPanel({ text, expanded, onToggle, onDismiss }: OutputPanelProps) {
+function OutputPanel({ text, expanded, toolName, startedAt, gitBranch, onToggle, onDismiss }: OutputPanelProps) {
+  // Elapsed time
+  const elapsed = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 1000) : 0;
   // Tail-direction: show last OUTPUT_MAX_LINES lines when collapsed
   const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const totalLines = lines.length;
@@ -929,7 +944,16 @@ function OutputPanel({ text, expanded, onToggle, onDismiss }: OutputPanelProps) 
     <div className="agent-status-card agent-status-card--output">
       <div className="agent-status-card__header" onClick={onToggle}>
         <span className="agent-status-card__dot agent-status-card__dot--output" aria-hidden="true" />
-        <span className="agent-status-card__title">Output</span>
+        <span className="agent-status-card__title">{toolName || "Output"}</span>
+        {gitBranch && (
+          <span className="agent-status-card__git-hint">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            {gitBranch}
+          </span>
+        )}
+        {elapsed > 0 && (
+          <span className="agent-status-card__timer">{elapsed}s</span>
+        )}
         <button
           type="button"
           className="agent-status-card__close"
