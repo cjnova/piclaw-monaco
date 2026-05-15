@@ -44,11 +44,13 @@ function parseSearchScope(value: string | undefined): SearchScope {
 /** Parse /model arguments: provider/modelId or bare model name. */
 export function parseModel(args: string, raw: string): AgentControlCommand {
   const tokens = args.split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) {
-    return { type: "model", raw };
+  const compact = tokens.includes("--compact");
+  const modelTokens = tokens.filter((token) => token !== "--compact");
+  if (modelTokens.length === 0) {
+    return compact ? { type: "model", compact, raw } : { type: "model", raw };
   }
 
-  const [first, ...remaining] = tokens;
+  const [first, ...remaining] = modelTokens;
   if (first && first.includes("/")) {
     const [provider, ...modelParts] = first.split("/");
     const modelId = modelParts.join("/");
@@ -56,6 +58,7 @@ export function parseModel(args: string, raw: string): AgentControlCommand {
       type: "model",
       provider: provider || undefined,
       modelId: modelId || undefined,
+      ...(compact ? { compact } : {}),
       raw,
     };
   }
@@ -65,6 +68,7 @@ export function parseModel(args: string, raw: string): AgentControlCommand {
       type: "model",
       provider: first,
       modelId: remaining.join(" "),
+      ...(compact ? { compact } : {}),
       raw,
     };
   }
@@ -72,6 +76,7 @@ export function parseModel(args: string, raw: string): AgentControlCommand {
   return {
     type: "model",
     modelId: first,
+    ...(compact ? { compact } : {}),
     raw,
   };
 }
