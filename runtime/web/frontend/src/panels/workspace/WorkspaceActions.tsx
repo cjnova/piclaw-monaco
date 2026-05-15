@@ -47,7 +47,6 @@ export function WorkspaceActions({ node, downloadUrl, isDeleting, onDelete }: Wo
         const data = await res.json() as { content?: string; text?: string };
         const text = data.content ?? data.text ?? '';
         const html = renderMarkdown(text);
-        console.log('[DEBUG md-preview] input length:', text.length, 'output length:', html.length, 'first 200 of output:', html.slice(0, 200));
         window.dispatchEvent(new CustomEvent('piclaw:open-page', { detail: { html, name, mode: 'markdown' } }));
       } catch {
         window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Failed to open file preview", type: "error" } }));
