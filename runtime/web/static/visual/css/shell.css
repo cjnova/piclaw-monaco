@@ -5706,10 +5706,7 @@ pre.frontmatter-block {
 .agent-status-card__content code {
   white-space: pre-wrap;
 }
-.agent-status-card__content--collapsed {
-  max-height: 80px;
-  overflow: hidden;
-}
+/* .agent-status-card__content--collapsed removed: JS now controls visible content via CollapsibleContent */
 .agent-status-card__more {
   color: var(--accent);
   cursor: pointer;
