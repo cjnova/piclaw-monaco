@@ -245,16 +245,8 @@ function extractLeadingYamlFrontmatter(text: string): { text: string; frontmatte
 }
 
 function normalizeLeadingFrontmatter(text: string): string {
-  const { text: body, frontmatter } = extractLeadingYamlFrontmatter(text);
-  if (frontmatter === null) return body;
-  return [
-    "<!--frontmatter-block-start-->",
-    "```yaml",
-    frontmatter,
-    "```",
-    "<!--frontmatter-block-end-->",
-    body,
-  ].filter(Boolean).join("\n\n");
+  const { text: body } = extractLeadingYamlFrontmatter(text);
+  return body;
 }
 
 function normalizeMathFences(text: string): string {
@@ -478,7 +470,10 @@ export function prepareMarkdownSource(text: string): { safeHtml: string; mermaid
   const normalizedMath = normalizeMathFences(normalizedFrontmatter);
   const { text: stripped, blocks: mermaidBlocks } = extractMermaidBlocks(normalizedMath);
 
-  const decoded = decodeEntitiesDeep(stripped, 2);
+  // Only run DOMParser-based entity decoding if text contains HTML entities.
+  // DOMParser.textContent can collapse whitespace/newlines, breaking markdown block structure.
+  const hasEntities = /&(?:#\d+|#x[\da-f]+|[a-z]\w*);/i.test(stripped);
+  const decoded = hasEntities ? decodeEntitiesDeep(stripped, 2) : stripped;
   const normalized = normalizeHtmlCodeTags(decoded);
   const escaped = normalized.replace(/</g, "&lt;");
   const safeHtml = restoreAllowedHtmlTags(escaped);
