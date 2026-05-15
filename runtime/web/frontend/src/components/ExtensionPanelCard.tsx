@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 import { copyToClipboard } from "../utils/clipboard";
+import { formatElapsed } from "../utils/format";
 
 // ---------------------------------------------------------------------------
 // ExtensionPanel type
@@ -48,20 +49,7 @@ export interface ExtensionPanel {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatElapsed(isoTimestamp: string, nowMs: number): string {
-  const ts = Date.parse(isoTimestamp);
-  if (!Number.isFinite(ts)) return "";
-  const diffMs = nowMs - ts;
-  if (diffMs < 0) return "";
-  const secs = Math.floor(diffMs / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remSecs = secs % 60;
-  if (mins < 60) return `${mins}m ${remSecs}s`;
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return `${hours}h ${remMins}m`;
-}
+
 
 // Copy icon SVG (matches upstream COPY_ICON_SVG)
 const CopyIcon = () => (
