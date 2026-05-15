@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
+import { OverlayShell } from "./OverlayShell";
 
 interface WidgetState {
   html: string;
@@ -187,8 +188,8 @@ export function WidgetPane({ tabMode = false, widgetHtml, widgetSrc, widgetTitle
   }
 
   return (
-    <div className="widget-pane__backdrop" onClick={handleClose}>
-      <div className="widget-pane" onClick={(e) => e.stopPropagation()}>
+    <OverlayShell open onClose={handleClose} escape="close" backdrop="close" tier="overlay" className="widget-pane__backdrop" ariaLabel={widget.title}>
+      <div className="widget-pane" onMouseDown={e => e.stopPropagation()}>
         <div className="widget-pane__header">
           <div className="widget-pane__heading">
             <div className="widget-pane__eyebrow">
@@ -224,6 +225,6 @@ export function WidgetPane({ tabMode = false, widgetHtml, widgetSrc, widgetTitle
           )}
         </div>
       </div>
-    </div>
+    </OverlayShell>
   );
 }
