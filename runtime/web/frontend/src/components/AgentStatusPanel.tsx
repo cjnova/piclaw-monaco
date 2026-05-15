@@ -234,6 +234,7 @@ export function AgentStatusPanel() {
   const prefs = loadPanelPrefs();
   const [draft, setDraftState] = useState<PanelState>({ text: "", expanded: prefs.draftExpanded, dismissed: false });
   const [thought, setThoughtState] = useState<PanelState>({ text: "", expanded: prefs.thoughtExpanded, dismissed: false });
+  const [output, setOutputState] = useState<PanelState>({ text: "", expanded: false, dismissed: false });
   const [status, setStatus] = useState<string | null>(null);
   const [steerQueued, setSteerQueued] = useState(false);
   const [turnColor, setTurnColor] = useState<string | null>(null);
@@ -273,8 +274,10 @@ export function AgentStatusPanel() {
 
   const draftBufferRef = useRef("");
   const thoughtBufferRef = useRef("");
+  const outputBufferRef = useRef("");
   const draftRafRef = useRef<number | null>(null);
   const thoughtRafRef = useRef<number | null>(null);
+  const outputRafRef = useRef<number | null>(null);
   const draftStartRef = useRef<number | null>(null);
   const thoughtStartRef = useRef<number | null>(null);
   const toolsStartRef = useRef<number | null>(null);
@@ -287,6 +290,11 @@ export function AgentStatusPanel() {
   const flushThought = useCallback(() => {
     thoughtRafRef.current = null;
     setThoughtState((prev) => ({ ...prev, text: thoughtBufferRef.current }));
+  }, []);
+
+  const flushOutput = useCallback(() => {
+    outputRafRef.current = null;
+    setOutputState((prev) => ({ ...prev, text: outputBufferRef.current }));
   }, []);
 
   useEffect(() => {
@@ -374,6 +382,14 @@ export function AgentStatusPanel() {
           const newStatus = retryAt ? "running" as const : "done" as const;
           return { ...t, status: newStatus, retryAt: retryAt ?? null };
         }));
+        // Accumulate tool output preview text
+        const outputPreview = detail.output_preview ?? detail.outputPreview;
+        if (typeof outputPreview === "string" && outputPreview) {
+          outputBufferRef.current = outputPreview;
+          if (!outputRafRef.current) {
+            outputRafRef.current = requestAnimationFrame(flushOutput);
+          }
+        }
       }
       if (detail.type && detail.type !== "context_usage" && detail.type !== "done") {
         setStatus(detail.type);
@@ -434,16 +450,20 @@ export function AgentStatusPanel() {
     const handleTurnEnd = () => {
       draftBufferRef.current = "";
       thoughtBufferRef.current = "";
+      outputBufferRef.current = "";
       if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
+      if (outputRafRef.current) cancelAnimationFrame(outputRafRef.current);
       draftRafRef.current = null;
       thoughtRafRef.current = null;
+      outputRafRef.current = null;
       draftStartRef.current = null;
       thoughtStartRef.current = null;
       toolsStartRef.current = null;
       const savedPrefs = loadPanelPrefs();
       setDraftState({ text: "", expanded: savedPrefs.draftExpanded, dismissed: false });
       setThoughtState({ text: "", expanded: savedPrefs.thoughtExpanded, dismissed: false });
+      setOutputState({ text: "", expanded: false, dismissed: false });
       setElapsed({ draft: 0, thought: 0, tools: 0 });
       setStatus(null);
       setStatusText("");
@@ -513,8 +533,9 @@ export function AgentStatusPanel() {
       window.removeEventListener("piclaw:extension-panel", handleExtensionPanel);
       if (draftRafRef.current) cancelAnimationFrame(draftRafRef.current);
       if (thoughtRafRef.current) cancelAnimationFrame(thoughtRafRef.current);
+      if (outputRafRef.current) cancelAnimationFrame(outputRafRef.current);
     };
-  }, [flushDraft, flushThought]);
+  }, [flushDraft, flushThought, flushOutput]);
 
   // #323 Watchdog interval
   useEffect(() => {
@@ -545,7 +566,7 @@ export function AgentStatusPanel() {
     window.dispatchEvent(new CustomEvent("piclaw:agent-status", { detail: { type: "done" } }));
   };
 
-  const hasContent = draft.text || thought.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest || extensionPanels.size > 0;
+  const hasContent = draft.text || thought.text || output.text || tools.length > 0 || (status && status !== "idle" && status !== "done") || recoveryState || watchdogState || pendingRequest || extensionPanels.size > 0;
   if (!hasContent) return null;
 
   const toggleDraftExpand = () => {
@@ -569,6 +590,13 @@ export function AgentStatusPanel() {
   const dismissThought = (e: MouseEvent) => {
     e.stopPropagation();
     setThoughtState((prev) => ({ ...prev, dismissed: true }));
+  };
+  const dismissOutput = (e: MouseEvent) => {
+    e.stopPropagation();
+    setOutputState((prev) => ({ ...prev, dismissed: true }));
+  };
+  const toggleOutputExpand = () => {
+    setOutputState((prev) => ({ ...prev, expanded: !prev.expanded }));
   };
 
   // Escape key: collapse any expanded panel
@@ -774,6 +802,15 @@ export function AgentStatusPanel() {
         </div>
       )}
 
+      {output.text && !output.dismissed && (
+        <OutputPanel
+          text={output.text}
+          expanded={output.expanded}
+          onToggle={toggleOutputExpand}
+          onDismiss={dismissOutput}
+        />
+      )}
+
       {thought.text && !thought.dismissed && (
         <AgentPanel
           title="Thoughts"
@@ -863,6 +900,59 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDism
         maxLines={COLLAPSED_MAX_LINES}
         renderContent={(visibleText) => <MarkdownContent text={visibleText} />}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OutputPanel — live tool output, monospace, tail-direction, green dot
+// ---------------------------------------------------------------------------
+
+const OUTPUT_MAX_LINES = 9;
+
+interface OutputPanelProps {
+  text: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onDismiss: (e: MouseEvent) => void;
+}
+
+function OutputPanel({ text, expanded, onToggle, onDismiss }: OutputPanelProps) {
+  // Tail-direction: show last OUTPUT_MAX_LINES lines when collapsed
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  const totalLines = lines.length;
+  const visibleLines = expanded ? lines : lines.slice(-OUTPUT_MAX_LINES);
+  const visibleText = visibleLines.join("\n");
+  const omitted = expanded ? 0 : Math.max(0, totalLines - OUTPUT_MAX_LINES);
+
+  return (
+    <div className="agent-status-card agent-status-card--output">
+      <div className="agent-status-card__header" onClick={onToggle}>
+        <span className="agent-status-card__dot agent-status-card__dot--output" aria-hidden="true" />
+        <span className="agent-status-card__title">Output</span>
+        <button
+          type="button"
+          className="agent-status-card__close"
+          aria-label="Close Output panel"
+          onClick={onDismiss}
+          title="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+      <div className="agent-status-card__content agent-status-card__content--output">
+        {omitted > 0 && (
+          <button type="button" className="agent-status-panel__more" onClick={onToggle}>
+            <span className="agent-status-card__more">▸ {omitted} more lines</span>
+          </button>
+        )}
+        <pre className="agent-output-text">{visibleText}</pre>
+        {expanded && totalLines > OUTPUT_MAX_LINES && (
+          <button type="button" className="agent-status-panel__more" onClick={onToggle}>
+            ▴ show less
+          </button>
+        )}
+      </div>
     </div>
   );
 }
