@@ -902,7 +902,7 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDism
         </button>
       </div>
       <div
-        className={`agent-status-card__content${expanded ? "" : " agent-status-card__content--collapsed"}`}
+        className="agent-status-card__content"
         ref={contentRef}
       />
       {!expanded && omitted > 0 && (
