@@ -5,6 +5,8 @@
  * ../smart-compaction.ts.
  */
 
+import { getSystemPromptOverheadTokens, getUnknownModelContextWindow } from "../../utils/context-window-budget.js";
+
 // ---------------------------------------------------------------------------
 // Env helpers (must precede constant definitions that reference them)
 // ---------------------------------------------------------------------------
@@ -48,7 +50,7 @@ export const USER_PREVIEW_MAX_CHARS = 300;
 export const MIN_SUMMARY_CHARS = 100;
 
 /** Conservative fallback context window for models that do not publish one. */
-export const PROGRESSIVE_FALLBACK_CONTEXT_WINDOW = 64_000;
+export const PROGRESSIVE_FALLBACK_CONTEXT_WINDOW = getUnknownModelContextWindow();
 
 /** Reserve this much of the model context for system prompt, instructions, and output. */
 export const PROGRESSIVE_INPUT_CONTEXT_FRACTION = 0.42;
@@ -73,7 +75,7 @@ export const PROGRESSIVE_CHUNK_FRACTION = 0.72;
  * Conservative estimate: ~4000 tokens (AGENTS.md ~2k, tools ~1k, skills/memory ~1k).
  * Can be overridden via PICLAW_SYSTEM_PROMPT_OVERHEAD_TOKENS.
  */
-export const SYSTEM_PROMPT_OVERHEAD_TOKENS = parsePositiveEnvInt("PICLAW_SYSTEM_PROMPT_OVERHEAD_TOKENS") ?? 4_000;
+export const SYSTEM_PROMPT_OVERHEAD_TOKENS = getSystemPromptOverheadTokens();
 
 /**
  * Safety margin applied to all budget calculations. Accounts for:

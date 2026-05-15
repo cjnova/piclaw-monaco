@@ -5,7 +5,7 @@
  * ../smart-compaction.ts.
  */
 
-import { SYSTEM_PROMPT_OVERHEAD_TOKENS } from "./config.js";
+import { applyTokenEstimateSafetyMultiplier, getContextWindowFromModel, getSystemPromptOverheadTokens } from "../../utils/context-window-budget.js";
 
 // ---------------------------------------------------------------------------
 // Live context usage estimates
@@ -19,13 +19,7 @@ export type SmartCompactionUiContext = {
 };
 
 export function getModelContextWindow(model: unknown): number | null {
-  const anyModel = model as { contextWindow?: number; contextLength?: number } | null | undefined;
-  const raw = typeof anyModel?.contextWindow === "number"
-    ? anyModel.contextWindow
-    : typeof anyModel?.contextLength === "number"
-      ? anyModel.contextLength
-      : null;
-  return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : null;
+  return getContextWindowFromModel(model);
 }
 
 export function getContextWindowEstimate(ctx: SmartCompactionUiContext): number | null {
@@ -37,7 +31,7 @@ export function estimateTokensFromChars(text: string): number {
 }
 
 export function estimateCompactionPromptTokens(promptText: string): number {
-  return estimateTokensFromChars(promptText) + SYSTEM_PROMPT_OVERHEAD_TOKENS;
+  return applyTokenEstimateSafetyMultiplier(estimateTokensFromChars(promptText)) + getSystemPromptOverheadTokens();
 }
 
 export function publishContextEstimate(

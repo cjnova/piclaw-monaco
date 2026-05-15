@@ -13,6 +13,10 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import type { AgentControlCommand, AgentControlResult } from "../agent-control-types.js";
 import { THINKING_LEVELS, normalizeModelMatch, resolveThinkingAlias, isEffortProvider, formatThinkingLevelForDisplay } from "../agent-control-helpers.js";
 import { createLogger, debugSuppressedError } from "../../utils/logger.js";
+import { getChatJid } from "../../core/chat-context.js";
+import { estimateContextTokensFromSession, runCompactionWithTimeout } from "../../agent-pool/compaction.js";
+import { buildTargetContextCompactionInstructions } from "../../extensions/smart-compaction.js";
+import { applyTokenEstimateSafetyMultiplier, getContextWindowFromModel, getEffectiveContextWindow, getSystemPromptOverheadTokens, getUnknownModelContextWindow } from "../../utils/context-window-budget.js";
 
 const log = createLogger("agent-control.model");
 
@@ -30,23 +34,24 @@ function getModelLabel(model: Model<Api> | null | undefined): string {
 }
 
 function getModelContextWindow(model: Model<Api> | null | undefined): number | null {
-  const contextWindow = Number(model?.contextWindow);
-  return Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : null;
+  return getContextWindowFromModel(model);
 }
 
-function buildContextFitError(model: Model<Api>, tokens: number, contextWindow: number): string {
-  return `Current context won’t fit in ${getModelLabel(model)} (${formatCompactTokens(tokens)} used, ${formatCompactTokens(contextWindow)} max). Compact first.`;
+function buildContextFitError(model: Model<Api>, tokens: number, contextWindow: number, overheadTokens = getSystemPromptOverheadTokens()): string {
+  const effectiveWindow = getEffectiveContextWindow(contextWindow, overheadTokens);
+  return `Current context won’t fit in ${getModelLabel(model)} (${formatCompactTokens(tokens)} used + ~${formatCompactTokens(overheadTokens)} overhead, ${formatCompactTokens(effectiveWindow)} effective / ${formatCompactTokens(contextWindow)} raw max). Compact first.`;
 }
 
 function getContextFitError(session: AgentSession, model: Model<Api> | null | undefined): string | null {
   if (!model) return null;
-  const usage = session.getContextUsage?.();
-  const tokens = Number(usage?.tokens);
+  const rawTokens = estimateContextTokensFromSession(session);
+  const tokens = applyTokenEstimateSafetyMultiplier(rawTokens);
   if (!Number.isFinite(tokens) || tokens <= 0) return null;
-  const contextWindow = getModelContextWindow(model);
-  if (!contextWindow) return null;
-  if (tokens <= contextWindow) return null;
-  return buildContextFitError(model, tokens, contextWindow);
+  const contextWindow = getModelContextWindow(model) ?? getUnknownModelContextWindow();
+  const overheadTokens = getSystemPromptOverheadTokens();
+  const effectiveWindow = getEffectiveContextWindow(contextWindow, overheadTokens);
+  if (tokens <= effectiveWindow) return null;
+  return buildContextFitError(model, tokens, contextWindow, overheadTokens);
 }
 
 function listUniqueAvailableModels(registry: ModelRegistry): Model<Api>[] {
@@ -157,7 +162,33 @@ export async function handleModel(session: AgentSession, modelRegistry: ModelReg
 
   const contextFitError = getContextFitError(session, selected);
   if (contextFitError) {
-    return { status: "error", message: contextFitError };
+    if (!command.compact) {
+      return { status: "error", message: `${contextFitError} Use \`/model ${getModelLabel(selected)} --compact\` to try compacting to this target first.` };
+    }
+
+    const targetContextWindow = getModelContextWindow(selected) ?? getUnknownModelContextWindow();
+    const chatJid = getChatJid("control:/model");
+    const compactionResult = await runCompactionWithTimeout(
+      session,
+      chatJid,
+      { onWarn: (message, details) => log.warn(message, details) },
+      async () => await session.compact(buildTargetContextCompactionInstructions(targetContextWindow, getModelLabel(selected))),
+      "model_switch",
+    );
+    if (!compactionResult.ok) {
+      return {
+        status: "error",
+        message: `Could not compact enough to switch to ${getModelLabel(selected)}: ${compactionResult.errorMessage}`,
+      };
+    }
+
+    const remainingFitError = getContextFitError(session, selected);
+    if (remainingFitError) {
+      return {
+        status: "error",
+        message: `Still too large for ${getModelLabel(selected)} after target-aware compaction. ${remainingFitError} Reduce kept context, rotate the session, or choose a larger model.`,
+      };
+    }
   }
 
   try {

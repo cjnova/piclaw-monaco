@@ -13,14 +13,15 @@ import { completeSimple } from "@earendil-works/pi-ai";
 import type { Message } from "@earendil-works/pi-ai";
 import { resolveModelRequestAuth } from "../utils/model-auth.js";
 import { createLogger } from "../utils/logger.js";
+import { applyTokenEstimateSafetyMultiplier } from "../utils/context-window-budget.js";
 
 import { MIN_SUMMARY_CHARS, PROGRESSIVE_FALLBACK_CONTEXT_WINDOW, SELECTIVE_THRESHOLD } from "./smart-compaction/config.js";
-import { estimateCompactionPromptTokens, getContextWindowEstimate, publishContextEstimate } from "./smart-compaction/context.js";
+import { estimateCompactionPromptTokens, estimateTokensFromChars, getContextWindowEstimate, publishContextEstimate } from "./smart-compaction/context.js";
 import { compressFilePaths, fileListsFromOps } from "./smart-compaction/files.js";
 import { convertMessagesWithMetadata, type SourceMessage } from "./smart-compaction/messages.js";
 import { appendFileLists, buildTurnPrefixSummary, extractKeptMessagesSummary, tryNoOpCompaction } from "./smart-compaction/noop.js";
 import { buildProgressiveCompactionChunks, getProgressiveCompactionBudget, runProgressiveCompaction } from "./smart-compaction/progressive.js";
-import { clampKeepRecentTokens, estimatePostCompactionFit, getSafeCompactionMaxTokens } from "./smart-compaction/safety.js";
+import { clampKeepRecentTokens, estimatePostCompactionFit, getCompactionReasoningEffort, getSafeCompactionMaxTokens } from "./smart-compaction/safety.js";
 import { buildSelectivePrompt, detectRecentTopicShift, SYSTEM_PROMPT } from "./smart-compaction/selective-prompt.js";
 
 export {
@@ -46,7 +47,7 @@ function resilientUi(ctx: { ui: Record<string, unknown> }): typeof ctx.ui {
       if (typeof value !== "function") return value;
       return (...args: unknown[]) => {
         try {
-          return (value as Function).apply(target, args);
+          return (value as (...fnArgs: unknown[]) => unknown).apply(target, args);
         } catch (err) {
           if (err instanceof Error && /stale|disposed|invalid/i.test(err.message)) {
             log.debug(`UI call ${String(prop)} suppressed (stale ctx)`);
@@ -65,6 +66,126 @@ function makeResilientCtx<T extends { ui: Record<string, unknown> }>(ctx: T): Re
   return Object.create(ctx, { ui: { get: () => resilientUi(ctx), configurable: true } });
 }
 
+function estimateEntryTokens(entry: any): number {
+  if (!entry || typeof entry !== "object") return 0;
+  if (entry.type === "message" && entry.message) {
+    const converted = convertMessagesWithMetadata([entry.message as SourceMessage]);
+    const serialized = converted.llmMessages
+      .map((message, index) => {
+        const content = Array.isArray((message as any).content)
+          ? (message as any).content
+              .map((block: any) => {
+                if (block?.type === "text") return String(block.text || "");
+                if (block?.type === "thinking") return String(block.thinking || "");
+                if (block?.type === "toolCall") return `${block.name || "tool"} ${JSON.stringify(block.arguments ?? {})}`;
+                if (block?.type === "image") return "[image]".repeat(1200);
+                return "";
+              })
+              .join("\n")
+          : "";
+        return `${message.role}:${index}:${content}`;
+      })
+      .join("\n");
+    return estimateTokensFromChars(serialized);
+  }
+  if (entry.type === "custom_message") {
+    return estimateTokensFromChars(typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content ?? ""));
+  }
+  if (entry.type === "branch_summary") {
+    return estimateTokensFromChars(String(entry.summary || ""));
+  }
+  return 0;
+}
+
+function chooseFirstKeptEntryForBudget(branchEntries: any[] | undefined, keepBudgetTokens: number): { firstKeptEntryId: string; estimatedKeepTokens: number } | null {
+  if (!Array.isArray(branchEntries) || branchEntries.length === 0) return null;
+  const budget = Math.max(0, Math.floor(keepBudgetTokens));
+  let estimatedKeepTokens = 0;
+  let selected: string | null = null;
+
+  for (let i = branchEntries.length - 1; i >= 0; i--) {
+    const entry = branchEntries[i];
+    if (!entry || typeof entry !== "object" || entry.type === "header" || entry.type === "compaction") continue;
+    const id = typeof entry.id === "string" ? entry.id : "";
+    if (!id) continue;
+    const tokens = applyTokenEstimateSafetyMultiplier(estimateEntryTokens(entry));
+    if (selected && estimatedKeepTokens + tokens > budget) break;
+    selected = id;
+    estimatedKeepTokens += tokens;
+    if (estimatedKeepTokens >= budget) break;
+  }
+
+  return selected ? { firstKeptEntryId: selected, estimatedKeepTokens } : null;
+}
+
+const TARGET_CONTEXT_INSTRUCTIONS_RE = /^<!--\s*piclaw:target-context-window=(\d+)\s+target-model=([^\s]+)\s*-->\n?/;
+
+export function buildTargetContextCompactionInstructions(targetContextWindow: number, targetModelLabel: string, userInstructions?: string): string {
+  const normalizedWindow = Math.max(1, Math.trunc(targetContextWindow));
+  const normalizedModel = targetModelLabel.replace(/\s+/g, "_");
+  const suffix = userInstructions?.trim() ? `\n${userInstructions.trim()}` : "";
+  return `<!-- piclaw:target-context-window=${normalizedWindow} target-model=${normalizedModel} -->${suffix}`;
+}
+
+function parseTargetContextInstructions(customInstructions: string | undefined): {
+  targetContextWindow: number | null;
+  targetModelLabel: string | null;
+  instructions: string | undefined;
+} {
+  const raw = String(customInstructions || "");
+  const match = raw.match(TARGET_CONTEXT_INSTRUCTIONS_RE);
+  if (!match) return { targetContextWindow: null, targetModelLabel: null, instructions: customInstructions };
+  const parsedWindow = Number.parseInt(match[1] || "", 10);
+  const instructions = raw.slice(match[0].length).trim();
+  return {
+    targetContextWindow: Number.isFinite(parsedWindow) && parsedWindow > 0 ? parsedWindow : null,
+    targetModelLabel: match[2] || null,
+    instructions: instructions || undefined,
+  };
+}
+
+function maybeAdjustFirstKeptForFit(input: {
+  summary: string;
+  currentFirstKeptEntryId: string;
+  configuredKeepRecent: number;
+  targetKeepRecent: number;
+  contextWindow: number;
+  branchEntries?: any[];
+}): { firstKeptEntryId: string; estimatedTotal: number; adjusted: boolean; margin: number } {
+  const targetKeepRecent = Math.max(0, Math.min(input.configuredKeepRecent, input.targetKeepRecent));
+  const initial = estimatePostCompactionFit(input.summary, input.configuredKeepRecent, input.contextWindow);
+  const mustReduceKeptWindow = targetKeepRecent < input.configuredKeepRecent;
+  if (initial.fits && !mustReduceKeptWindow) {
+    return { firstKeptEntryId: input.currentFirstKeptEntryId, estimatedTotal: initial.estimatedTotal, adjusted: false, margin: initial.margin };
+  }
+
+  const summaryTokens = applyTokenEstimateSafetyMultiplier(estimateTokensFromChars(input.summary));
+  const overheadTokens = initial.overheadTokens;
+  const safetyReserve = 512;
+  const fitBudget = Math.max(0, input.contextWindow - summaryTokens - overheadTokens - safetyReserve);
+  const keepBudget = Math.min(targetKeepRecent, fitBudget);
+  const adjusted = chooseFirstKeptEntryForBudget(input.branchEntries, keepBudget);
+  if (!adjusted) {
+    throw new Error(
+      `Compaction result still exceeds model context window: summary ${summaryTokens}t + kept ${input.configuredKeepRecent}t + overhead ${overheadTokens}t > ${input.contextWindow}t; no safe kept-window adjustment was available.`,
+    );
+  }
+
+  const adjustedFit = estimatePostCompactionFit(input.summary, adjusted.estimatedKeepTokens, input.contextWindow);
+  if (!adjustedFit.fits) {
+    throw new Error(
+      `Compaction result still exceeds model context window after kept-window adjustment: estimated ${adjustedFit.estimatedTotal}t > ${input.contextWindow}t.`,
+    );
+  }
+
+  return {
+    firstKeptEntryId: adjusted.firstKeptEntryId,
+    estimatedTotal: adjustedFit.estimatedTotal,
+    adjusted: adjusted.firstKeptEntryId !== input.currentFirstKeptEntryId,
+    margin: adjustedFit.margin,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Extension factory
 // ---------------------------------------------------------------------------
@@ -74,6 +195,8 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
   pi.on("session_before_compact", async (event, rawCtx) => {
     const ctx = makeResilientCtx(rawCtx as any) as typeof rawCtx;
     const { preparation, signal, customInstructions, branchEntries } = event;
+    const targetContext = parseTargetContextInstructions(customInstructions);
+    const effectiveCustomInstructions = targetContext.instructions;
     const {
       messagesToSummarize,
       tokensBefore,
@@ -154,16 +277,40 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         ctx,
       );
       if (noOpResult) {
-        const contextWindow = getContextWindowEstimate(ctx) || PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
+        const contextWindow = targetContext.targetContextWindow ?? getContextWindowEstimate(ctx) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
         const configuredKeepRecent = Math.max(0, Number(settings.keepRecentTokens) || 0);
         const safeKeepRecent = clampKeepRecentTokens(configuredKeepRecent, contextWindow);
         const postFit = estimatePostCompactionFit(noOpResult.compaction.summary, configuredKeepRecent, contextWindow);
         if (!postFit.fits || configuredKeepRecent > safeKeepRecent) {
-          log.debug(
-            `No-op compaction: post-compaction estimate ${postFit.estimatedTotal} tokens is unsafe for ${contextWindow} context (configured kept ${configuredKeepRecent}t, safe kept ${safeKeepRecent}t, margin ${postFit.margin}t). Falling through to LLM compaction.`,
-          );
-          publishContextEstimate(ctx, postFit.estimatedTotal, "noop_unsafe");
-          // Don't return the no-op — fall through to LLM-based compaction
+          try {
+            const adjusted = maybeAdjustFirstKeptForFit({
+              summary: noOpResult.compaction.summary,
+              currentFirstKeptEntryId: noOpResult.compaction.firstKeptEntryId,
+              configuredKeepRecent,
+              targetKeepRecent: safeKeepRecent,
+              contextWindow,
+              branchEntries,
+            });
+            if (adjusted.adjusted) {
+              log.debug(
+                `No-op compaction adjusted kept window to fit ${contextWindow} context (firstKept ${noOpResult.compaction.firstKeptEntryId} → ${adjusted.firstKeptEntryId}, estimated ${adjusted.estimatedTotal}t, margin ${adjusted.margin}t).`,
+              );
+            }
+            finalContextTokens = adjusted.estimatedTotal;
+            publishContextEstimate(ctx, adjusted.estimatedTotal, "completed_noop_adjusted");
+            return {
+              compaction: {
+                ...noOpResult.compaction,
+                firstKeptEntryId: adjusted.firstKeptEntryId,
+              },
+            };
+          } catch {
+            log.debug(
+              `No-op compaction: post-compaction estimate ${postFit.estimatedTotal} tokens is unsafe for ${contextWindow} context (configured kept ${configuredKeepRecent}t, safe kept ${safeKeepRecent}t, margin ${postFit.margin}t). Falling through to LLM compaction.`,
+            );
+            publishContextEstimate(ctx, postFit.estimatedTotal, "noop_unsafe");
+            // Don't return the no-op — fall through to LLM-based compaction
+          }
         } else {
           finalContextTokens = postFit.estimatedTotal;
           publishContextEstimate(ctx, postFit.estimatedTotal, "completed_noop");
@@ -178,7 +325,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
       }
 
       const compactionStartedAt = Date.now();
-      const contextWindow = getContextWindowEstimate(ctx) || PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
+      const contextWindow = targetContext.targetContextWindow ?? getContextWindowEstimate(ctx) ?? PROGRESSIVE_FALLBACK_CONTEXT_WINDOW;
       const configuredKeepRecent = Math.max(0, Number(settings.keepRecentTokens) || 0);
       const safeKeepRecent = clampKeepRecentTokens(configuredKeepRecent, contextWindow);
       if (safeKeepRecent < configuredKeepRecent) {
@@ -196,7 +343,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
       const promptText = buildSelectivePrompt(
         llmMessages,
         { tokensBefore, previousSummary, fileOps: preparation.fileOps, keptMessagesSummary, turnPrefixSummary },
-        customInstructions,
+        effectiveCustomInstructions,
         topicShift,
         humanUserIndexes,
       );
@@ -218,7 +365,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         return;
       }
 
-      const budget = getProgressiveCompactionBudget(model);
+      const budget = getProgressiveCompactionBudget(model, targetContext.targetContextWindow);
       if (budget.forceProgressive || promptText.length > budget.promptBudgetChars) {
         try {
           ctx.ui.setWorkingMessage("Smart compaction: progressive iterative mode…");
@@ -234,7 +381,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
             previousSummary,
             keptMessagesSummary,
             turnPrefixSummary,
-            customInstructions,
+            customInstructions: effectiveCustomInstructions,
             fileOps: preparation.fileOps,
             budget,
             abortSignal,
@@ -247,22 +394,26 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
             ? progressiveSummary
             : appendFileLists(progressiveSummary, preparation.fileOps);
 
-          // Post-compaction fit verification uses the configured kept-window
-          // estimate, not the safe clamp, because the upstream preparation has
-          // already selected firstKeptEntryId before this extension runs.
-          const postFit = estimatePostCompactionFit(fullSummary, configuredKeepRecent, contextWindow);
-          finalContextTokens = postFit.estimatedTotal;
-          publishContextEstimate(ctx, postFit.estimatedTotal, "completed_progressive");
-          if (!postFit.fits) {
+          const adjustedFit = maybeAdjustFirstKeptForFit({
+            summary: fullSummary,
+            currentFirstKeptEntryId: firstKeptEntryId,
+            configuredKeepRecent,
+            targetKeepRecent: safeKeepRecent,
+            contextWindow,
+            branchEntries,
+          });
+          finalContextTokens = adjustedFit.estimatedTotal;
+          publishContextEstimate(ctx, adjustedFit.estimatedTotal, "completed_progressive");
+          if (adjustedFit.adjusted) {
             log.debug(
-              `⚠️ Progressive compaction: post-compaction estimate ${postFit.estimatedTotal} tokens still exceeds ${contextWindow} context window (summary ${postFit.summaryTokens}t + kept ${configuredKeepRecent}t + overhead ${postFit.overheadTokens}t, margin ${postFit.margin}t)`,
-          );
+              `Progressive compaction adjusted kept window for ${contextWindow} context (firstKept ${firstKeptEntryId} → ${adjustedFit.firstKeptEntryId}, estimated ${adjustedFit.estimatedTotal}t, margin ${adjustedFit.margin}t).`,
+            );
           }
           log.debug("Progressive compaction complete ✓");
           return {
             compaction: {
               summary: fullSummary,
-              firstKeptEntryId,
+              firstKeptEntryId: adjustedFit.firstKeptEntryId,
               tokensBefore,
             } satisfies CompactionResult,
           };
@@ -288,7 +439,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
       try {
         const safeOutput = getSafeCompactionMaxTokens(model, promptText, requestedMaxTokens);
         const completionOptions = (model as any).reasoning
-          ? { maxTokens: safeOutput.maxTokens, signal: abortSignal, apiKey: authForCompletion.apiKey, headers: authForCompletion.headers, reasoning: "high" as const }
+          ? { maxTokens: safeOutput.maxTokens, signal: abortSignal, apiKey: authForCompletion.apiKey, headers: authForCompletion.headers, reasoning: getCompactionReasoningEffort(model) }
           : { maxTokens: safeOutput.maxTokens, signal: abortSignal, apiKey: authForCompletion.apiKey, headers: authForCompletion.headers };
         ctx.ui.setWorkingMessage("Smart compaction: generating selective summary…");
         publishContextEstimate(ctx, estimateCompactionPromptTokens(promptText), "generating_summary");
@@ -341,20 +492,24 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
           if (parts.length) fullSummary += "\n" + parts.join("\n");
         }
 
-        // Post-compaction fit verification uses the configured kept-window
-        // estimate, not the safe clamp, because the upstream preparation has
-        // already selected firstKeptEntryId before this extension runs.
-        const postFit = estimatePostCompactionFit(fullSummary, configuredKeepRecent, contextWindow);
-        finalContextTokens = postFit.estimatedTotal;
+        const adjustedFit = maybeAdjustFirstKeptForFit({
+          summary: fullSummary,
+          currentFirstKeptEntryId: firstKeptEntryId,
+          configuredKeepRecent,
+          targetKeepRecent: safeKeepRecent,
+          contextWindow,
+          branchEntries,
+        });
+        finalContextTokens = adjustedFit.estimatedTotal;
         publishContextEstimate(
           ctx,
-          postFit.estimatedTotal,
+          adjustedFit.estimatedTotal,
           "completed_selective",
         );
 
-        if (!postFit.fits) {
+        if (adjustedFit.adjusted) {
           log.debug(
-            `⚠️ Single-pass compaction: post-compaction estimate ${postFit.estimatedTotal} tokens still exceeds ${contextWindow} context window (summary ${postFit.summaryTokens}t + kept ${configuredKeepRecent}t + overhead ${postFit.overheadTokens}t, margin ${postFit.margin}t)`,
+            `Single-pass compaction adjusted kept window for ${contextWindow} context (firstKept ${firstKeptEntryId} → ${adjustedFit.firstKeptEntryId}, estimated ${adjustedFit.estimatedTotal}t, margin ${adjustedFit.margin}t).`,
           );
         }
         log.debug("Smart compaction complete ✓");
@@ -362,7 +517,7 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         return {
           compaction: {
             summary: fullSummary,
-            firstKeptEntryId,
+            firstKeptEntryId: adjustedFit.firstKeptEntryId,
             tokensBefore,
           } satisfies CompactionResult,
         };
@@ -371,9 +526,11 @@ export const smartCompaction: ExtensionFactory = (pi: ExtensionAPI) => {
         if (!abortSignal.aborted) {
           log.debug(`Smart compaction error: ${msg}`);
         }
-        // If aborted, return cancel so upstream doesn't access the
-        // potentially-cleared _compactionAbortController.
-        if (abortSignal.aborted) return { cancel: true };
+        // If aborted or our safety checks prove the compacted result still
+        // cannot fit this model, cancel instead of falling through to the
+        // built-in full-pass compactor (which would use an even larger prompt
+        // and can re-enter the same overflow path on lower-context models).
+        if (abortSignal.aborted || /Compaction result still exceeds|exceeds safe model budget/i.test(msg)) return { cancel: true };
         return; // fall through to built-in
       }
     } finally {

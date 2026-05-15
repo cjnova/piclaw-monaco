@@ -15,6 +15,7 @@ import {
 } from "../db.js";
 import { formatTimeoutDuration } from "./prompt-utils.js";
 import { updateSessionCompacting } from "../extensions/session-status.js";
+import { applyTokenEstimateSafetyMultiplier, getContextThresholdTokens, getContextWindowFromModel, getEffectiveContextWindow, getSystemPromptOverheadTokens, getUnknownModelContextWindow } from "../utils/context-window-budget.js";
 
 export interface CompactionLifecycleOptions {
   onInfo?: (message: string, details: Record<string, unknown>) => void;
@@ -82,8 +83,17 @@ type ContextEstimateCacheEntry = {
 const ctxEstimateCache = new WeakMap<object, ContextEstimateCacheEntry>();
 const CTX_ESTIMATE_CACHE_TTL_MS = 2_000;
 
+export function clearContextEstimateCache(session: AgentSession): void {
+  const mgr = session.sessionManager;
+  if (mgr && typeof mgr === "object") ctxEstimateCache.delete(mgr as object);
+}
+
 export function estimateContextTokensFromSession(session: AgentSession): number {
   const mgr = session.sessionManager;
+  if (!mgr || typeof mgr !== "object") {
+    const usage = session.getContextUsage?.();
+    return typeof usage?.tokens === "number" && Number.isFinite(usage.tokens) ? usage.tokens : 0;
+  }
   const leafId = typeof mgr.getLeafId === "function" ? (mgr.getLeafId() ?? "") : "";
   const entryCount = typeof mgr.getEntries === "function" ? mgr.getEntries().length : -1;
   const now = Date.now();
@@ -96,6 +106,11 @@ export function estimateContextTokensFromSession(session: AgentSession): number 
     now - cached.at < CTX_ESTIMATE_CACHE_TTL_MS
   ) {
     return cached.tokens;
+  }
+
+  if (typeof mgr.buildSessionContext !== "function") {
+    const usage = session.getContextUsage?.();
+    return typeof usage?.tokens === "number" && Number.isFinite(usage.tokens) ? usage.tokens : 0;
   }
 
   const context = mgr.buildSessionContext();
@@ -133,19 +148,10 @@ export function resetCompactionSuccessCount(chatJid: string): void {
   compactionSuccessCounters.delete(chatJid);
 }
 
-export const DEFAULT_FALLBACK_CONTEXT_WINDOW = 128_000;
+export const DEFAULT_FALLBACK_CONTEXT_WINDOW = getUnknownModelContextWindow();
 
 export function getModelContextWindow(session: AgentSession): number | null {
-  const model = session.model as (AgentSession["model"] & { contextLength?: number }) | undefined;
-  const contextWindow = typeof model?.contextWindow === "number"
-    ? model.contextWindow
-    : typeof model?.contextLength === "number"
-      ? model.contextLength
-      : null;
-  if (typeof contextWindow !== "number" || !Number.isFinite(contextWindow) || contextWindow <= 0) {
-    return null;
-  }
-  return contextWindow;
+  return getContextWindowFromModel(session.model);
 }
 
 function parseNonNegativeInt(value: string | undefined, fallback: number): number {
@@ -295,6 +301,7 @@ async function runCompactionWithTimeoutExclusive<T>(
     } catch (error) {
       return { ok: false, errorMessage: error instanceof Error ? error.message : String(error) };
     } finally {
+      clearContextEstimateCache(session);
       updateSessionCompacting(chatJid, false);
       clearChatCompactionActive(chatJid);
       clearActive();
@@ -311,6 +318,7 @@ async function runCompactionWithTimeoutExclusive<T>(
     }))
     .finally(() => {
       if (timeoutId) clearTimeout(timeoutId);
+      clearContextEstimateCache(session);
       updateSessionCompacting(chatJid, false);
       clearChatCompactionActive(chatJid);
       clearActive();
@@ -340,20 +348,24 @@ async function runCompactionWithTimeoutExclusive<T>(
 
   updateSessionCompacting(chatJid, false);
   clearChatCompactionActive(chatJid);
+  // Release the in-memory single-flight lock after timeout+settlement grace
+  // even if the upstream compaction promise never resolves. A late settlement
+  // will run the promise's finally and call clearActive() again harmlessly.
+  clearActive();
   return {
     ok: false,
     errorMessage: `Compaction timed out after ${formatTimeoutDuration(timeoutMs)}`,
   };
 }
 
-function getAutoCompactionContext(session: AgentSession, chatJid: string, options: Pick<CompactionLifecycleOptions, "onWarn">, reason: AutoCompactionReason): {
+function getAutoCompactionContext(session: AgentSession, chatJid: string, options: Pick<CompactionLifecycleOptions, "onInfo" | "onWarn">, reason: AutoCompactionReason): {
   contextTokens: number;
   contextWindow: number;
   reserveTokens: number;
 } | null {
   if (session.isStreaming || session.isCompacting || session.isRetrying) return null;
   const reportedContextWindow = getModelContextWindow(session);
-  const contextWindow = reportedContextWindow ?? DEFAULT_FALLBACK_CONTEXT_WINDOW;
+  const contextWindow = reportedContextWindow ?? getUnknownModelContextWindow();
   if (!reportedContextWindow) {
     options.onWarn?.(
       reason === "idle"
@@ -379,11 +391,34 @@ function getAutoCompactionContext(session: AgentSession, chatJid: string, option
     : null;
   if (!settings) return null;
 
-  const contextTokens = estimateContextTokensFromSession(session);
+  const rawContextTokens = estimateContextTokensFromSession(session);
+  const contextTokens = applyTokenEstimateSafetyMultiplier(rawContextTokens);
   const compactionConfig = getCompactionRuntimeConfig();
-  const thresholdTokens = Math.floor(contextWindow * (compactionConfig.thresholdPercent / 100));
+  const overheadTokens = getSystemPromptOverheadTokens();
+  const effectiveContextWindow = getEffectiveContextWindow(contextWindow, overheadTokens);
+  const thresholdTokens = getContextThresholdTokens(contextWindow, compactionConfig.thresholdPercent, overheadTokens);
   const reserveTokens = contextWindow - thresholdTokens;
   if (contextTokens <= thresholdTokens) return null;
+
+  options.onInfo?.(
+    reason === "idle"
+      ? "Idle auto-compaction threshold exceeded"
+      : "Pre-prompt auto-compaction threshold exceeded",
+    {
+      operation: reason === "idle"
+        ? "schedule_idle_auto_compaction.threshold"
+        : "maybe_auto_compact_session_before_prompt.threshold",
+      chatJid,
+      contextTokens,
+      rawContextTokens,
+      contextWindow,
+      effectiveContextWindow,
+      overheadTokens,
+      thresholdTokens,
+      thresholdPercent: compactionConfig.thresholdPercent,
+      reserveTokens,
+    },
+  );
 
   return { contextTokens, contextWindow, reserveTokens };
 }

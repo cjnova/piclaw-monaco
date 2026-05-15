@@ -340,15 +340,29 @@ test('model picker helpers expose searchable names, formatted context windows, a
     note: '',
     title: '',
     tokens: 150000,
+    safetyAdjustedTokens: 165000,
     contextWindow: 200000,
+    effectiveContextWindow: 196000,
   });
 
   expect(getModelPickerContextLimit({ ...option, contextWindow: 128000 }, { tokens: 150000 })).toEqual({
     blocked: true,
     note: 'Current context won’t fit — compact first',
-    title: 'Current context uses 150K tokens, but this model only fits 128K. Compact first.',
+    title: 'Current context uses 150K tokens (~165K with estimator safety) plus app/tool overhead, but this model effectively fits about 124K (128K raw). Compact first.',
     tokens: 150000,
+    safetyAdjustedTokens: 165000,
     contextWindow: 128000,
+    effectiveContextWindow: 124000,
+  });
+
+  expect(getModelPickerContextLimit({ ...option, contextWindow: 4096 }, { tokens: 100 })).toEqual({
+    blocked: true,
+    note: 'Current context won’t fit — compact first',
+    title: 'Current context uses 100 tokens (~110 with estimator safety) plus app/tool overhead, but this model effectively fits about 96 (4K raw). Compact first.',
+    tokens: 100,
+    safetyAdjustedTokens: 110,
+    contextWindow: 4096,
+    effectiveContextWindow: 96,
   });
 });
 

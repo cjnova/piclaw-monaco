@@ -478,6 +478,7 @@ test("agent control blocks undersized model switches and skips them while cyclin
   const models = [
     { provider: "openai", id: "gpt-large", reasoning: true, contextWindow: 200000 },
     { provider: "openai", id: "gpt-small", reasoning: true, contextWindow: 128000 },
+    { provider: "openai", id: "gpt-length", reasoning: true, contextLength: 128000 },
     { provider: "anthropic", id: "claude-large", reasoning: true, contextWindow: 256000 },
   ] as any[];
   const sizedRegistry = createTestModelRegistry(models);
@@ -506,7 +507,50 @@ test("agent control blocks undersized model switches and skips them while cyclin
   });
   expect(blockedModel.status).toBe("error");
   expect(blockedModel.message).toContain("Current context won’t fit");
+  expect(blockedModel.message).toContain("--compact");
   expect(session.model?.id).toBe("gpt-large");
+
+  const blockedContextLengthModel = await applyControlCommand(runtime as any, sizedRegistry, {
+    type: "model",
+    provider: "openai",
+    modelId: "gpt-length",
+    raw: "/model openai/gpt-length",
+  });
+  expect(blockedContextLengthModel.status).toBe("error");
+  expect(blockedContextLengthModel.message).toContain("Current context won’t fit");
+  expect(session.model?.id).toBe("gpt-large");
+
+  let compactInstructions = "";
+  session.compact = async (instructions?: string) => {
+    session.compactCalls += 1;
+    compactInstructions = instructions || "";
+    session.sessionContext = {
+      messages: [
+        { role: "compactionSummary", summary: "small target-aware summary", tokensBefore: 150000 },
+        { role: "assistant", content: [{ type: "text", text: "kept" }] },
+      ],
+    } as any;
+    return { tokensBefore: 150000, firstKeptEntryId: "entry-1", summary: "small target-aware summary" } as any;
+  };
+
+  const compactModel = await applyControlCommand(runtime as any, sizedRegistry, {
+    type: "model",
+    provider: "openai",
+    modelId: "gpt-small",
+    compact: true,
+    raw: "/model openai/gpt-small --compact",
+  });
+  expect(compactModel.status).toBe("success");
+  expect(compactModel.model_label).toBe("openai/gpt-small");
+  expect(session.compactCalls).toBe(1);
+  expect(compactInstructions).toContain("piclaw:target-context-window=128000");
+  expect(session.model?.id).toBe("gpt-small");
+
+  session.model = models[0];
+  currentIndex = 0;
+  session.compactCalls = 0;
+  session.sessionContext = { messages: [{ role: "user", content: [{ type: "text", text: "large" }] }] } as any;
+  (session.sessionManager as any).getLeafId = () => "entry-large";
 
   const cycledModel = await applyControlCommand(runtime as any, sizedRegistry, {
     type: "cycle_model",

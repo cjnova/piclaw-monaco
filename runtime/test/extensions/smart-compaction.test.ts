@@ -664,6 +664,7 @@ describe("smart-compaction", () => {
           preparation: makePreparation(longMessages.length, {
             messagesToSummarize: longMessages,
             tokensBefore: 90_000,
+            settings: { enabled: true, reserveTokens: 16384, keepRecentTokens: 1000 },
             fileOps: {
               read: new Set<string>(),
               written: new Set<string>(),
@@ -758,7 +759,40 @@ describe("smart-compaction", () => {
       const fit = estimatePostCompactionFit(summary, 10_000, 128_000);
       expect(fit.fits).toBe(true);
       expect(fit.margin).toBeGreaterThan(0);
-      expect(fit.estimatedTotal).toBe(fit.summaryTokens + 10_000 + fit.overheadTokens);
+      expect(fit.estimatedTotal).toBe(fit.summaryTokens + 11_000 + fit.overheadTokens);
+    });
+
+    it("adjusts the kept window when no-op compaction would overflow a lower-context model", async () => {
+      const previousSummary = "## Goal\nKeep current work\n\n## Current Active Topic\n- lower context\n\n## Historical / Background Context\n- none\n\n## Constraints & Preferences\n- preserve state\n\n## Progress\n### Done\n- [x] prior\n\n### In Progress\n- [ ] current\n\n### Blocked\n- none\n\n## Key Decisions\n- **Safety**: fit target context\n\n## Next Steps\n1. continue\n\n## Critical Context\n- important";
+      const prep = makePreparation(45, {
+        messagesToSummarize: [
+          assistantToolCallMsg([{ id: "tc-overflow", name: "read", args: { path: "/workspace/a.ts" } }]),
+          toolResultMsg("tc-overflow", "read", "read ok"),
+        ],
+        previousSummary,
+        isSplitTurn: true,
+        settings: { enabled: true, reserveTokens: 4096, keepRecentTokens: 50_000 },
+        fileOps: { read: new Set<string>(), written: new Set<string>(), edited: new Set<string>() },
+      });
+      const branchEntries = Array.from({ length: 8 }, (_, index) => ({
+        type: "message",
+        id: `kept-${index}`,
+        message: userMsg(`kept message ${index} ${"x".repeat(12000)}`),
+      }));
+      prep.firstKeptEntryId = "kept-0";
+
+      const result = await handler!(
+        {
+          preparation: prep,
+          branchEntries,
+          signal: new AbortController().signal,
+        },
+        makeCtx({ model: { provider: "test", id: "small", contextWindow: 16_000, reasoning: false } }),
+      );
+
+      expect(result.compaction.firstKeptEntryId).not.toBe("kept-0");
+      expect(result.compaction.summary).toContain("Split-Turn Continuation");
+      expect(completeSimple).not.toHaveBeenCalled();
     });
 
     it("caps requested maxTokens so prompt + output fits the model window", () => {

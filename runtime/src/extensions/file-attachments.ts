@@ -141,7 +141,7 @@ async function execute(
   }
 
   const file = Bun.file(resolved);
-  let fileData: Uint8Array | null = null;
+  let fileData: Uint8Array;
   let fileSize: number;
   let pulledRemotely = false;
 

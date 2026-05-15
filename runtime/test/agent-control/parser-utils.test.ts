@@ -9,6 +9,26 @@ import { describe, test, expect } from "bun:test";
 import "../helpers.js";
 
 import { parseToggle, parseQueueMode, splitArgs, parseTreeArgs, stripTrigger } from "../../src/agent-control/parser-utils.js";
+import { parseModel } from "../../src/agent-control/command-parsers.js";
+
+describe("parseModel", () => {
+  test("parses target-aware compact flag without adding it to the model id", () => {
+    expect(parseModel("openai/gpt-small --compact", "/model openai/gpt-small --compact")).toEqual({
+      type: "model",
+      provider: "openai",
+      modelId: "gpt-small",
+      compact: true,
+      raw: "/model openai/gpt-small --compact",
+    });
+    expect(parseModel("openai gpt-small --compact", "/model openai gpt-small --compact")).toEqual({
+      type: "model",
+      provider: "openai",
+      modelId: "gpt-small",
+      compact: true,
+      raw: "/model openai gpt-small --compact",
+    });
+  });
+});
 
 describe("parseToggle", () => {
   test("returns true for on variants", () => {
