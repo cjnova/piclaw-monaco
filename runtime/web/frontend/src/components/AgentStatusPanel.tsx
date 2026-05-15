@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { getMessageUrl } from "../api/chat-jid";
 import { safeParseJSON, safeSetItem } from "../utils/storage";
+import { extractToolContextPath, getWorkspaceBranch } from "../utils/tool-git-context";
 import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
 import { CollapsibleContent, MarkdownContent } from "./CollapsibleContent";
 import { PanelHeader } from "./PanelHeader";
@@ -394,8 +395,16 @@ export function AgentStatusPanel() {
           // Capture meta for output panel header
           const toolName = detail.title || detail.tool_name || "";
           const startedAt = detail.started_at || detail.startedAt || "";
-          const gitBranch = detail.tool_args?.ref || detail.tool_args?.branch || "";
-          setOutputMeta({ toolName, startedAt, gitBranch });
+          setOutputMeta((prev) => ({ ...prev, toolName, startedAt }));
+          // Async: fetch git branch from workspace API (like classic)
+          const contextPath = extractToolContextPath(detail.tool_name, detail.tool_args);
+          if (contextPath) {
+            getWorkspaceBranch(contextPath).then((result) => {
+              if (result?.branch) {
+                setOutputMeta((prev) => ({ ...prev, gitBranch: result.branch }));
+              }
+            });
+          }
         }
       }
       if (detail.type && detail.type !== "context_usage" && detail.type !== "done") {
