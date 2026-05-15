@@ -1,4 +1,6 @@
-import { useState } from "preact/hooks";
+import { useState, useRef, useEffect } from "preact/hooks";
+import { HighlightPopup } from "./HighlightPopup";
+import { serializeSelection, applyHighlights, clearHighlights, HIGHLIGHT_COLORS, type HighlightRange } from "../../utils/highlight-serializer";
 import { ImageLightbox } from "../ImageLightbox";
 import { AttachmentChip } from "../AttachmentChip";
 import { DelimitedTable } from "./DelimitedTable";
@@ -200,6 +202,80 @@ export function MessageItem({
 }: MessageItemProps) {
   const isUser = interaction.type === "user";
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [popup, setPopup] = useState<{ x: number; y: number } | null>(null);
+  const pendingSelectionRef = useRef<{ startOffset: number; endOffset: number; text: string } | null>(null);
+
+  const getStoredHighlights = (id: number): HighlightRange[] => {
+    try {
+      const raw = localStorage.getItem(`highlights:${id}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveHighlights = (id: number, highlights: HighlightRange[]) => {
+    localStorage.setItem(`highlights:${id}`, JSON.stringify(highlights));
+  };
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const stored = getStoredHighlights(interaction.id);
+    if (stored.length) {
+      clearHighlights(contentRef.current);
+      applyHighlights(contentRef.current, stored);
+    }
+  }, [interaction.id, interaction.content]);
+
+  const handlePointerUp = (e: PointerEvent) => {
+    // Delay to let system selection menu appear first, then show ours above it
+    setTimeout(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !contentRef.current) return;
+      const serialized = serializeSelection(contentRef.current, sel);
+      if (!serialized) return;
+      pendingSelectionRef.current = serialized;
+      // Position above the selection, not at pointer (avoids system menu overlap)
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setPopup({ x: rect.left + rect.width / 2 - 60, y: rect.top - 32 });
+    }, 300);
+  };
+
+  const handleSelectColor = (color: string) => {
+    if (!pendingSelectionRef.current || !contentRef.current) return;
+    const newHl: HighlightRange = { color, ...pendingSelectionRef.current };
+    const existing = getStoredHighlights(interaction.id);
+    const updated = [...existing, newHl];
+    saveHighlights(interaction.id, updated);
+    clearHighlights(contentRef.current);
+    applyHighlights(contentRef.current, updated);
+    pendingSelectionRef.current = null;
+    setPopup(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleClearHighlight = () => {
+    if (!contentRef.current) return;
+    if (pendingSelectionRef.current) {
+      // Remove highlights that overlap the selected range
+      const { startOffset, endOffset } = pendingSelectionRef.current;
+      const existing = getStoredHighlights(interaction.id);
+      const updated = existing.filter(
+        (hl) => hl.endOffset <= startOffset || hl.startOffset >= endOffset
+      );
+      saveHighlights(interaction.id, updated);
+      clearHighlights(contentRef.current);
+      applyHighlights(contentRef.current, updated);
+    } else {
+      saveHighlights(interaction.id, []);
+      clearHighlights(contentRef.current);
+    }
+    pendingSelectionRef.current = null;
+    setPopup(null);
+    window.getSelection()?.removeAllRanges();
+  };
 
   const handleContentClick = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -462,8 +538,10 @@ export function MessageItem({
         )}
         {interaction.content && (
           <div
+            ref={contentRef}
             className="message-list__content"
             onClick={handleContentClick}
+            onPointerUp={handlePointerUp}
             // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by markdown-pipeline
             dangerouslySetInnerHTML={
               isUser
@@ -473,6 +551,15 @@ export function MessageItem({
           >
             {isUser ? renderUserContent(interaction.content) : undefined}
           </div>
+        )}
+        {popup && (
+          <HighlightPopup
+            x={popup.x}
+            y={popup.y}
+            onSelectColor={handleSelectColor}
+            onClear={handleClearHighlight}
+            onDismiss={() => setPopup(null)}
+          />
         )}
         {interaction.content_blocks?.some((b) => b.type === "generated_widget") && (
           <button

@@ -7242,3 +7242,10 @@ pre.frontmatter-block {
   background: var(--accent); color: var(--bg, #1e1e2e); font-weight: 600;
 }
 .custom-select__option--active:hover { opacity: 0.9; }
+
+/* ── Text highlighting popup (#366) ─────────────────────────────────────── */
+.highlight-popup { position: fixed; display: flex; align-items: center; gap: 4px; padding: 4px 6px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; }
+.highlight-popup__color { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.1s; }
+.highlight-popup__color:hover { transform: scale(1.2); border-color: var(--text); }
+.highlight-popup__clear { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); }
+mark[data-highlight] { border-radius: 2px; padding: 0 1px; }
