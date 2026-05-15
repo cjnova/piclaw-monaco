@@ -10,12 +10,15 @@ import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
 export function truncateByLines(
   text: string,
   maxLines: number,
+  direction: "head" | "tail" = "head",
 ): { visible: string; omitted: number; totalLines: number } {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = normalized.split("\n");
   const totalLines = lines.length;
   if (totalLines <= maxLines) return { visible: normalized, omitted: 0, totalLines };
-  const visible = lines.slice(0, maxLines).join("\n");
+  const visible = direction === "tail"
+    ? lines.slice(-maxLines).join("\n")
+    : lines.slice(0, maxLines).join("\n");
   return { visible, omitted: totalLines - maxLines, totalLines };
 }
 
@@ -48,9 +51,10 @@ export function MarkdownContent({ text }: MarkdownContentProps) {
 interface CollapsibleContentProps {
   expanded: boolean;
   onToggle: () => void;
-  // For text-based panels (thought/draft):
+  // For text-based panels (thought/draft/output):
   text?: string;
   maxLines?: number; // default 8
+  direction?: "head" | "tail"; // default "head"
   // Custom renderer for text content (e.g. markdown); receives the visible slice of text
   renderContent?: (visibleText: string) => VNode | null;
   // For item-based panels (tools):
@@ -72,6 +76,7 @@ export function CollapsibleContent({
   onToggle,
   text,
   maxLines = 8,
+  direction = "head",
   renderContent,
   items,
   maxItems = 3,
@@ -80,7 +85,7 @@ export function CollapsibleContent({
   if (text !== undefined) {
     const { visible, omitted } = expanded
       ? { visible: text, omitted: 0 }
-      : truncateByLines(text, maxLines);
+      : truncateByLines(text, maxLines, direction);
     const totalLines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").length;
     const canTruncate = totalLines > maxLines;
 

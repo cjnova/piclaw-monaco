@@ -3,6 +3,7 @@ import { getMessageUrl } from "../api/chat-jid";
 import { safeParseJSON, safeSetItem } from "../utils/storage";
 import { AgentRequestModal, type AgentRequest } from "./AgentRequestModal";
 import { CollapsibleContent, MarkdownContent } from "./CollapsibleContent";
+import { PanelHeader } from "./PanelHeader";
 import {
   ExtensionPanelCard,
   normalizeExtensionPanelPayload,
@@ -887,22 +888,13 @@ function AgentPanel({ title, type, text, expanded, elapsed = 0, onToggle, onDism
 
   return (
     <div className={`agent-status-card agent-status-card--${type}`}>
-      <div className="agent-status-card__header" onClick={onToggle}>
-        <span className={`agent-status-card__dot agent-status-card__dot--${type}`} aria-hidden="true" />
-        <span className="agent-status-card__title">{title}</span>
-        {elapsed > 0 && (
-          <span className="agent-status-card__timer">{elapsed}s</span>
-        )}
-        <button
-          type="button"
-          className="agent-status-card__close"
-          aria-label={`Close ${title} panel`}
-          onClick={onDismiss}
-          title="Dismiss"
-        >
-          ×
-        </button>
-      </div>
+      <PanelHeader
+        title={title}
+        dotColor={type}
+        elapsed={elapsed}
+        onToggle={onToggle}
+        onDismiss={onDismiss}
+      />
       <CollapsibleContent
         expanded={expanded}
         onToggle={onToggle}
@@ -931,52 +923,26 @@ interface OutputPanelProps {
 }
 
 function OutputPanel({ text, expanded, toolName, startedAt, gitBranch, onToggle, onDismiss }: OutputPanelProps) {
-  // Elapsed time
   const elapsed = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 1000) : 0;
-  // Tail-direction: show last OUTPUT_MAX_LINES lines when collapsed
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const totalLines = lines.length;
-  const visibleLines = expanded ? lines : lines.slice(-OUTPUT_MAX_LINES);
-  const visibleText = visibleLines.join("\n");
-  const omitted = expanded ? 0 : Math.max(0, totalLines - OUTPUT_MAX_LINES);
 
   return (
     <div className="agent-status-card agent-status-card--output">
-      <div className="agent-status-card__header" onClick={onToggle}>
-        <span className="agent-status-card__dot agent-status-card__dot--output" aria-hidden="true" />
-        <span className="agent-status-card__title">{toolName || "Output"}</span>
-        {gitBranch && (
-          <span className="agent-status-card__git-hint">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-            {gitBranch}
-          </span>
-        )}
-        {elapsed > 0 && (
-          <span className="agent-status-card__timer">{elapsed}s</span>
-        )}
-        <button
-          type="button"
-          className="agent-status-card__close"
-          aria-label="Close Output panel"
-          onClick={onDismiss}
-          title="Dismiss"
-        >
-          ×
-        </button>
-      </div>
-      <div className="agent-status-card__content agent-status-card__content--output">
-        {omitted > 0 && (
-          <button type="button" className="agent-status-panel__more" onClick={onToggle}>
-            <span className="agent-status-card__more">▸ {omitted} more lines</span>
-          </button>
-        )}
-        <pre className="agent-output-text">{visibleText}</pre>
-        {expanded && totalLines > OUTPUT_MAX_LINES && (
-          <button type="button" className="agent-status-panel__more" onClick={onToggle}>
-            ▴ show less
-          </button>
-        )}
-      </div>
+      <PanelHeader
+        title={toolName || "Output"}
+        dotColor="output"
+        elapsed={elapsed}
+        gitBranch={gitBranch}
+        onToggle={onToggle}
+        onDismiss={onDismiss}
+      />
+      <CollapsibleContent
+        text={text}
+        maxLines={OUTPUT_MAX_LINES}
+        direction="tail"
+        expanded={expanded}
+        onToggle={onToggle}
+        renderContent={(visible) => <pre className="agent-output-text">{visible}</pre>}
+      />
     </div>
   );
 }
