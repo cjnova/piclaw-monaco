@@ -1,4 +1,5 @@
 import type { ModelEntry } from "./types";
+import { formatTokenWindow } from "../../utils/format";
 
 interface ModelPickerProps {
   models: ModelEntry[];
@@ -14,11 +15,7 @@ export function ModelPicker({ models, activeModel, onSelectModel }: ModelPickerP
     >
       {models.map((entry) => {
         const isCurrent = entry.id === activeModel;
-        const ctxK = entry.context_window
-          ? (entry.context_window >= 1000000
-            ? `${(entry.context_window / 1000000).toFixed(1)}M`
-            : `${(entry.context_window / 1000).toFixed(0)}k`)
-          : "";
+        const ctxK = entry.context_window ? formatTokenWindow(entry.context_window) : "";
         return (
           <div
             key={entry.id}

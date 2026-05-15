@@ -1,5 +1,6 @@
 import { useEffect } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
+import { formatBytesCompact } from "../utils/format";
 
 interface StatsData {
   cpu_percent: number;
@@ -25,15 +26,7 @@ export function formatClock(date: Date): string {
   return `${dayName}, ${day} ${month} ${year} \u2014 ${hours}:${minutes}`;
 }
 
-function formatMegabytes(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))}M`;
-}
 
-function formatBufferCache(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  if (mb < 1024) return `${Math.round(mb)}M`;
-  return `${(mb / 1024).toFixed(1)}G`;
-}
 
 function percentSeverity(value: number | null): MetricSeverity {
   if (value == null || Number.isNaN(value)) return "normal";
@@ -73,14 +66,14 @@ function buildMetrics(stats: StatsData | null, withLabels = false) {
     ];
   }
 
-  const rss = formatMegabytes(stats.process_memory?.rss_bytes ?? 0);
+  const rss = formatBytesCompact(stats.process_memory?.rss_bytes ?? 0);
   const swapValue = stats.swap_percent != null ? `${stats.swap_percent}%` : "--";
   const metrics = [
     <Metric key="cpu" icon="codicon-pulse" title="CPU usage" value={`${stats.cpu_percent}%`} severity={percentSeverity(stats.cpu_percent)} label={withLabels ? "CPU" : undefined} />,
     <Metric key="ram" icon="codicon-circuit-board" title="RAM usage" value={`${stats.ram_percent}%`} severity={percentSeverity(stats.ram_percent)} label={withLabels ? "RAM" : undefined} />,
     <Metric key="rss" icon="codicon-package" title="Process RSS" value={rss} label={withLabels ? "RSS" : undefined} />,
     <Metric key="swp" icon="codicon-arrow-swap" title="Swap usage" value={swapValue} severity={swapSeverity(stats.swap_percent)} label={withLabels ? "SWP" : undefined} />,
-    <Metric key="buf" icon="codicon-database" title="Buffer/cache" value={formatBufferCache(stats.buffer_cache_bytes)} label={withLabels ? "BUF" : undefined} />,
+    <Metric key="buf" icon="codicon-database" title="Buffer/cache" value={formatBytesCompact(stats.buffer_cache_bytes)} label={withLabels ? "BUF" : undefined} />,
   ];
   if (stats.gpu_provider) {
     metrics.push(
