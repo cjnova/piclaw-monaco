@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "preact/hooks";
+import { OverlayShell } from "./OverlayShell";
 
 interface ImageLightboxProps {
   src: string;
@@ -7,31 +7,12 @@ interface ImageLightboxProps {
 }
 
 export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-  }, [onClose]);
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
-
   return (
-    <div className="lightbox__backdrop" onClick={onClose}>
-      <div className="lightbox__container" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className="lightbox__close"
-          onClick={onClose}
-          aria-label="Close preview"
-        >✕</button>
-        <img
-          className="lightbox__image"
-          src={src}
-          alt={alt || "Preview"}
-          loading="lazy"
-        />
+    <OverlayShell open onClose={onClose} escape="close" backdrop="close" tier="overlay" className="lightbox__backdrop" ariaLabel={alt || "Image preview"}>
+      <div className="lightbox__container" onMouseDown={e => e.stopPropagation()}>
+        <button type="button" className="lightbox__close" onClick={onClose} aria-label="Close preview">✕</button>
+        <img className="lightbox__image" src={src} alt={alt || "Preview"} loading="lazy" />
       </div>
-    </div>
+    </OverlayShell>
   );
 }

@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-
-const FOCUSABLE_SELECTOR = [
-  "button:not([disabled])",
-  "[href]",
-  'input:not([disabled]):not([type="hidden"])',
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(", ");
+import { OverlayShell } from "./OverlayShell";
 
 export type ModalDialogMode = "prompt" | "confirm" | "alert";
 
@@ -25,109 +17,47 @@ interface ModalDialogProps {
 }
 
 export function ModalDialog({
-  mode,
-  title,
-  description,
-  placeholder,
-  defaultValue,
-  confirmLabel,
-  cancelLabel,
-  destructive = false,
-  onConfirm,
-  onCancel,
+  mode, title, description, placeholder, defaultValue,
+  confirmLabel, cancelLabel, destructive = false, onConfirm, onCancel,
 }: ModalDialogProps) {
   const [value, setValue] = useState(defaultValue ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const titleIdRef = useRef(`modal-dialog-title-${Math.random().toString(36).slice(2, 9)}`);
-  const descriptionIdRef = useRef(`modal-dialog-description-${Math.random().toString(36).slice(2, 9)}`);
+  const titleId = useRef(`modal-title-${Math.random().toString(36).slice(2, 9)}`);
+  const descId = useRef(`modal-desc-${Math.random().toString(36).slice(2, 9)}`);
+
+  useEffect(() => { setValue(defaultValue ?? ""); }, [defaultValue]);
 
   useEffect(() => {
-    setValue(defaultValue ?? "");
-  }, [defaultValue]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (mode === "prompt") {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-        return;
-      }
-      confirmRef.current?.focus();
+    const t = window.setTimeout(() => {
+      if (mode === "prompt") { inputRef.current?.focus(); inputRef.current?.select(); }
+      else confirmRef.current?.focus();
     }, 0);
-
-    return () => window.clearTimeout(timeout);
+    return () => window.clearTimeout(t);
   }, [mode]);
 
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-
-      const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-      if (!focusableElements?.length) return;
-
-      const first = focusableElements[0];
-      const last = focusableElements[focusableElements.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-
-      if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      } else if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      }
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onCancel]);
-
   const canBackdropClose = !(mode === "confirm" && destructive);
-
-  const submit = () => {
-    if (mode === "prompt") {
-      onConfirm(value);
-      return;
-    }
-    onConfirm();
-  };
+  const submit = () => mode === "prompt" ? onConfirm(value) : onConfirm();
 
   return (
-    <div
+    <OverlayShell
+      open
+      onClose={onCancel}
+      escape="close"
+      backdrop={canBackdropClose ? "close" : "ignore"}
+      tier="modal"
       className="modal-dialog__backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && canBackdropClose) {
-          onCancel();
-        }
-      }}
+      ariaLabel={title}
     >
       <div
-        ref={dialogRef}
         className="modal-dialog"
-        role="dialog"
-        aria-modal="true"
         tabIndex={-1}
-        aria-labelledby={titleIdRef.current}
-        aria-describedby={description ? descriptionIdRef.current : undefined}
-        onMouseDown={(event) => event.stopPropagation()}
+        aria-labelledby={titleId.current}
+        aria-describedby={description ? descId.current : undefined}
+        onMouseDown={e => e.stopPropagation()}
       >
-        <h2 id={titleIdRef.current} className="modal-dialog__title">{title}</h2>
-        {description && <p id={descriptionIdRef.current} className="modal-dialog__description">{description}</p>}
-
+        <h2 id={titleId.current} className="modal-dialog__title">{title}</h2>
+        {description && <p id={descId.current} className="modal-dialog__description">{description}</p>}
         {mode === "prompt" && (
           <input
             ref={inputRef}
@@ -135,23 +65,13 @@ export function ModalDialog({
             type="text"
             value={value}
             placeholder={placeholder}
-            onInput={(event) => setValue((event.target as HTMLInputElement).value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submit();
-              }
-            }}
+            onInput={e => setValue((e.target as HTMLInputElement).value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
           />
         )}
-
         <div className="modal-dialog__actions">
           {mode !== "alert" && (
-            <button
-              type="button"
-              className="modal-dialog__btn"
-              onClick={onCancel}
-            >
+            <button type="button" className="modal-dialog__btn" onClick={onCancel}>
               {cancelLabel ?? "Cancel"}
             </button>
           )}
@@ -165,6 +85,6 @@ export function ModalDialog({
           </button>
         </div>
       </div>
-    </div>
+    </OverlayShell>
   );
 }
