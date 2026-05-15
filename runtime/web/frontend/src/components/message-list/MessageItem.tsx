@@ -11,47 +11,12 @@ import { MessageActionBar } from "./MessageActionBar";
 import { userAvatarUrl, assistantAvatarUrl } from "../../api/identity";
 import { AvatarPopover } from "../AvatarPopover";
 import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer";
+import { CopyButton } from "../CopyButton";
 import type { ContentBlock, Interaction } from "./types";
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────
 
 const TOOL_OUTPUT_TAIL_LINES = 20;
-
-interface CopyButtonProps {
-  text: string;
-}
-
-function CopyButton({ text }: CopyButtonProps) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async (e: MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <button
-      type="button"
-      className={`tool-call__copy${copied ? " tool-call__copy--copied" : ""}`}
-      aria-label={copied ? "Copied!" : "Copy"}
-      title={copied ? "Copied!" : "Copy"}
-      onClick={handleCopy}
-    >
-      <i className={`codicon ${copied ? "codicon-check" : "codicon-copy"}`} />
-    </button>
-  );
-}
 
 interface ToolCallBlockProps {
   useBlock: ContentBlock;
@@ -106,7 +71,14 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
         <div className="message-list__tool-call-body">
           {inputStr && (
             <div className="tool-call__pre-wrapper">
-              <CopyButton text={inputStr} />
+              <CopyButton
+                text={inputStr}
+                className="tool-call__copy"
+                copiedClassName="tool-call__copy--copied"
+                title="Copy"
+              >
+                <i className="codicon codicon-copy" />
+              </CopyButton>
               <pre className="message-list__tool-call-code">{inputStr}</pre>
             </div>
           )}
@@ -133,7 +105,14 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
                     collapse
                   </button>
                 )}
-                <CopyButton text={resultStr ?? ""} />
+                <CopyButton
+                  text={resultStr ?? ""}
+                  className="tool-call__copy"
+                  copiedClassName="tool-call__copy--copied"
+                  title="Copy"
+                >
+                  <i className="codicon codicon-copy" />
+                </CopyButton>
                 <pre className="message-list__tool-call-code">{displayedResult}</pre>
               </div>
             </>

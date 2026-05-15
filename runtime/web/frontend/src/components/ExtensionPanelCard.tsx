@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { renderThinkingMarkdown } from "../utils/markdown-pipeline";
+import { copyToClipboard } from "../utils/clipboard";
 
 // ---------------------------------------------------------------------------
 // ExtensionPanel type
@@ -62,21 +63,6 @@ function formatElapsed(isoTimestamp: string, nowMs: number): string {
   return `${hours}h ${remMins}m`;
 }
 
-/** Copy text to clipboard, falling back to execCommand. */
-async function copyToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-  } else {
-    const el = document.createElement("textarea");
-    el.value = text;
-    el.style.cssText = "position:fixed;top:-9999px;left:-9999px";
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand("copy");
-    document.body.removeChild(el);
-  }
-}
-
 // Copy icon SVG (matches upstream COPY_ICON_SVG)
 const CopyIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -118,8 +104,8 @@ export function ExtensionPanelCard({ panel, nowMs, onAction, onDismiss }: Extens
 
   const handleCopy = async () => {
     if (!panel.tmuxCommand) return;
-    try {
-      await copyToClipboard(panel.tmuxCommand);
+    const ok = await copyToClipboard(panel.tmuxCommand);
+    if (ok) {
       setCopyState("copied");
       setTimeout(() => setCopyState("idle"), 2000);
       window.dispatchEvent(
@@ -127,7 +113,7 @@ export function ExtensionPanelCard({ panel, nowMs, onAction, onDismiss }: Extens
           detail: { message: "tmux command copied", type: "success" },
         })
       );
-    } catch {
+    } else {
       window.dispatchEvent(
         new CustomEvent("piclaw:status-flash", {
           detail: { message: "Copy failed — clipboard unavailable", type: "error" },
