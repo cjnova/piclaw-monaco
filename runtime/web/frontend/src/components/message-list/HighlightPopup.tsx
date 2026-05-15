@@ -40,7 +40,7 @@ export function HighlightPopup({
   // Offset so popup doesn't go off-screen
   const popupWidth = HIGHLIGHT_COLORS.length * 28 + 60;
   const left = Math.min(x, window.innerWidth - popupWidth - 8);
-  const top = y - 44;
+  const top = Math.max(8, y - 44);
 
   return (
     <div

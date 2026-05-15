@@ -239,7 +239,7 @@ export function MessageItem({
       // Position above the selection, not at pointer (avoids system menu overlap)
       const range = sel.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      setPopup({ x: rect.left + rect.width / 2 - 60, y: rect.top - 32 });
+      setPopup({ x: rect.left + rect.width / 2 - 60, y: rect.top });
     }, 300);
   };
 
