@@ -7198,3 +7198,6 @@ mark[data-highlight] { border-radius: 2px; padding: 0 1px; }
 .delimited-table__grid th { font-weight: 600; background: var(--bg-sidebar); position: sticky; top: 0; }
 .delimited-table__grid td { color: var(--text); }
 .delimited-table__footer { padding: 4px 8px; font-size: 11px; color: var(--text-muted); background: var(--bg-sidebar); border-top: 1px solid var(--border); }
+
+/* Utility: text ellipsis overflow */
+.text-ellipsis { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
