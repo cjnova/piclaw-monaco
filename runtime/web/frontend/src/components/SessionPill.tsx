@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { getChatJid } from "../api/chat-jid";
+import { getChatJid, persistChatJid } from "../api/chat-jid";
 import { useDialog } from "../hooks/useDialog";
 import { useDismissableLayer } from "../hooks/useDismissableLayer";
 import {
@@ -57,6 +57,7 @@ export function SessionPill() {
   );
 
   const goToChat = (chatJid: string) => {
+    persistChatJid(chatJid);
     window.location.href = `/?chat_jid=${encodeURIComponent(chatJid)}`;
   };
 
