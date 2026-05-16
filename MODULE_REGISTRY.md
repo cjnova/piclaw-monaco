@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16T07:39Z
+Generated: 2026-05-16T07:50Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -73,6 +73,8 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
 ## Utilities (utils/)
 
+- `agent-status.ts` — Tool kind resolution, title parsing, retry countdown, SVG sanitization. Exports: `resolveToolKind`, `TOOL_KIND_LABELS`, `resolveTitleFromArgs`, `parseRetryAt`, `formatRetryCountdown`, `sanitizeSvg`, `ParsedTitle`.
+- `attachments.ts` — User content attachment parsing. Exports: `parseUserContent`, `ParsedAttachment`.
 - `bicep-mode.ts` — CodeMirror-style Bicep tokenizer mode. Exports: `StreamState`, `bicepMode`.
 - `bundled-themes.ts` — Bundled VS Code theme metadata. Exports: `BundledTheme`, `BUNDLED_THEMES`.
 - `clipboard.ts` — Copy-to-clipboard helper with textarea fallback. Exports: `copyToClipboard`.
@@ -175,7 +177,7 @@ Local imports only; external libraries (`preact`, `@preact/signals`, etc.) omitt
 - `ActivityBar.tsx` → `components/Icon`.
 - `AddonHealthBadge.tsx` → `components/model-context-bar/addonHealthSignal`.
 - `AgentRequestModal.tsx` → `api/chat-jid`, `components/OverlayShell`.
-- `AgentStatusPanel.tsx` → `api/chat-jid`, `utils/storage`, `utils/tool-git-context`, `components/AgentRequestModal`, `components/CollapsibleContent`, `components/PanelHeader`.
+- `AgentStatusPanel.tsx` → `api/chat-jid`, `utils/storage`, `utils/tool-git-context`, `utils/agent-status`, `components/AgentRequestModal`, `components/CollapsibleContent`, `components/PanelHeader`.
 - `AttachmentChip.tsx` → `components/ImageLightbox`.
 - `AvatarPopover.tsx` → `hooks/useDismissableLayer`, `api/identity`.
 - `CollapsibleContent.tsx` → `utils/markdown-pipeline`.
