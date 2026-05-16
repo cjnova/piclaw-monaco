@@ -1,7 +1,8 @@
 /**
  * VS Code theme importer — maps VS Code color keys to our CSS custom properties
- * and handles persistence via localStorage.
+ * and handles persistence via safe storage wrappers.
  */
+import { safeRemoveItem, safeParseJSON, safeSetItem } from "./storage";
 
 const LS_KEY = "piclaw_custom_theme";
 
@@ -220,18 +221,12 @@ export function applyTheme(vars: Record<string, string>): void {
 export function resetTheme(): void {
   const existing = document.getElementById('piclaw-theme-override');
   if (existing) existing.remove();
-  localStorage.removeItem(LS_KEY);
+  safeRemoveItem(LS_KEY);
 }
 
 /** Read saved theme vars from localStorage (returns empty object if none) */
 function loadSavedThemeVars(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Record<string, string>;
-  } catch {
-    return {};
-  }
+  return safeParseJSON<Record<string, string>>(LS_KEY, {});
 }
 
 /** Load and apply the persisted theme from localStorage */
@@ -244,7 +239,7 @@ export function loadSavedTheme(): void {
 
 /** Persist a CSS var map to localStorage and apply it */
 export function saveTheme(vars: Record<string, string>): void {
-  localStorage.setItem(LS_KEY, JSON.stringify(vars));
+  safeSetItem(LS_KEY, JSON.stringify(vars));
   applyTheme(vars);
 }
 

@@ -13,6 +13,7 @@ import {
   getSavedThemeVars,
   type VSCodeThemeJSON,
 } from "../../utils/theme-importer";
+import { safeGetItem, safeSetItem, safeRemoveItem } from "../../utils/storage";
 
 function ThemeCard({
   theme,
@@ -62,7 +63,7 @@ export function AppearanceSection({
   // Current active custom theme name (stored in localStorage key piclaw_custom_theme_name)
   const LS_NAME_KEY = "piclaw_custom_theme_name";
   const activeThemeName = useSignal<string | null>(
-    (() => { try { return localStorage.getItem(LS_NAME_KEY); } catch { return null; } })()
+    safeGetItem(LS_NAME_KEY)
   );
 
   // Pending import state
@@ -73,7 +74,7 @@ export function AppearanceSection({
 
   function applyBundled(theme: BundledTheme) {
     saveTheme(theme.vars);
-    try { localStorage.setItem(LS_NAME_KEY, theme.name); } catch { /* ignore */ }
+    safeSetItem(LS_NAME_KEY, theme.name);
     activeThemeName.value = theme.name;
     importStatus.value = `Applied "${theme.name}" ✓`;
     pendingVars.value = null;
@@ -82,7 +83,7 @@ export function AppearanceSection({
 
   function handleReset() {
     resetTheme();
-    try { localStorage.removeItem(LS_NAME_KEY); } catch { /* ignore */ }
+    safeRemoveItem(LS_NAME_KEY);
     activeThemeName.value = null;
     importStatus.value = "Reset to default ✓";
     setTimeout(() => { importStatus.value = null; }, 2500);
@@ -119,7 +120,7 @@ export function AppearanceSection({
   function confirmImport() {
     if (!pendingVars.value) return;
     saveTheme(pendingVars.value);
-    try { localStorage.setItem(LS_NAME_KEY, pendingName.value); } catch { /* ignore */ }
+    safeSetItem(LS_NAME_KEY, pendingName.value);
     activeThemeName.value = pendingName.value;
     importStatus.value = `Saved "${pendingName.value}" ✓`;
     pendingVars.value = null;

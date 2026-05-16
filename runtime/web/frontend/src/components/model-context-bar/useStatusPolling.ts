@@ -5,6 +5,7 @@ import type { AgentStatus, AgentContext, ModelInfo, ProviderUsage } from "./type
 import { fmtTokens } from "./types";
 import { addonHealthSignal } from "./addonHealthSignal";
 import { providerConfigured } from "../../app/providerState";
+import { safeGetItem, safeSetItem } from "../../utils/storage";
 
 export interface UseStatusPollingResult {
   agentStatus: ReturnType<typeof useSignal<AgentStatus | null>>;
@@ -22,12 +23,10 @@ export interface UseStatusPollingResult {
 }
 
 function loadCachedContext(): AgentContext | null {
-  try {
-    const jid = getChatJid();
-    const cached = localStorage.getItem(`piclaw:context-cache:${jid}`) || localStorage.getItem("piclaw:context-cache");
-    if (cached) return JSON.parse(cached) as AgentContext;
-  } catch {}
-  return null;
+  const jid = getChatJid();
+  const cached = safeGetItem(`piclaw:context-cache:${jid}`) || safeGetItem("piclaw:context-cache");
+  if (!cached) return null;
+  try { return JSON.parse(cached) as AgentContext; } catch { return null; }
 }
 
 export function useStatusPolling(): UseStatusPollingResult {
@@ -142,13 +141,13 @@ export function useStatusPolling(): UseStatusPollingResult {
         // Only update if backend returned real data (not all-null)
         if (data.tokens !== null) {
           agentContext.value = data;
-          try { localStorage.setItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(data)); } catch {}
+          safeSetItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(data));
         } else if (!agentContext.value) {
           // Load from cache on first null response
-          try {
-            const cached = localStorage.getItem(`piclaw:context-cache:${getChatJid()}`);
-            if (cached) agentContext.value = JSON.parse(cached) as AgentContext;
-          } catch {}
+          const cached = safeGetItem(`piclaw:context-cache:${getChatJid()}`);
+          if (cached) {
+            try { agentContext.value = JSON.parse(cached) as AgentContext; } catch {}
+          }
         }
       }
     } catch (err) {
@@ -193,7 +192,7 @@ export function useStatusPolling(): UseStatusPollingResult {
       if (detail?.context_usage && detail.context_usage.tokens !== null && detail.context_usage.tokens !== undefined) {
         const cu = detail.context_usage;
         agentContext.value = { tokens: cu.tokens, contextWindow: cu.contextWindow ?? 0, percent: cu.percent ?? 0 };
-        try { localStorage.setItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(agentContext.value)); } catch {}
+        safeSetItem(`piclaw:context-cache:${getChatJid()}`, JSON.stringify(agentContext.value));
       }
       // Always refresh context after a turn completes
       if (detail?.type === "done" || detail?.type === "error" || detail?.status === "idle") {

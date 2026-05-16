@@ -4,6 +4,7 @@ import { getMessageUrl } from "../api/chat-jid";
 import { useRef, useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { MessageList } from "../components/MessageList";
+import { safeGetItem, safeSetItem } from "../utils/storage";
 
 
 interface ChatPanelProps {
@@ -45,7 +46,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
-    try { return localStorage.getItem("piclaw:notifications") === "on"; } catch { return false; }
+    return safeGetItem("piclaw:notifications") === "on";
   });
 
   // Command history (ArrowUp/Down)
@@ -54,10 +55,10 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const historyDraftRef = useRef("");
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      if (raw) historyRef.current = JSON.parse(raw);
-    } catch {}
+    const raw = safeGetItem(HISTORY_KEY);
+    if (raw) {
+      try { historyRef.current = JSON.parse(raw); } catch {}
+    }
   }, []);
 
 
@@ -323,14 +324,14 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
   const toggleNotifications = async () => {
     if (notificationsEnabled) {
       setNotificationsEnabled(false);
-      try { localStorage.setItem("piclaw:notifications", "off"); } catch {}
+      safeSetItem("piclaw:notifications", "off");
       window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Notifications disabled", type: "success" } }));
       return;
     }
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
       setNotificationsEnabled(true);
-      try { localStorage.setItem("piclaw:notifications", "on"); } catch {}
+      safeSetItem("piclaw:notifications", "on");
       window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Notifications enabled", type: "success" } }));
     } else {
       window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Notification permission denied", type: "error" } }));
@@ -435,7 +436,7 @@ export function ChatPanel({ onOpenPalette }: ChatPanelProps = {}) {
         if (history[history.length - 1] !== content) {
           history.push(content);
           if (history.length > MAX_HISTORY) history.shift();
-          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+          safeSetItem(HISTORY_KEY, JSON.stringify(history));
         }
         historyIndexRef.current = -1;
       }
