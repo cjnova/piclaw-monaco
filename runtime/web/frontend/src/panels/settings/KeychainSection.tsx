@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { useDialog } from "../../hooks/useDialog";
 import { registerSettingsPane } from "./pane-registry";
+import { CustomSelect } from "../../components/CustomSelect";
 
 interface KeychainEntry {
   name: string;
@@ -161,12 +162,17 @@ export function KeychainSection() {
           </div>
           <div className="settings-panel__field">
             <label className="settings-panel__label">Type</label>
-            <select className="settings-panel__select" value={newType.value} onChange={(e) => (newType.value = (e.target as HTMLSelectElement).value)}>
-              <option value="secret">Secret</option>
-              <option value="token">Token</option>
-              <option value="password">Password</option>
-              <option value="basic">Basic</option>
-            </select>
+            <CustomSelect
+              className="settings-panel__select"
+              options={[
+                { value: "secret", label: "Secret" },
+                { value: "token", label: "Token" },
+                { value: "password", label: "Password" },
+                { value: "basic", label: "Basic" },
+              ]}
+              value={newType.value}
+              onChange={(v) => { newType.value = v; }}
+            />
           </div>
           <div className="settings-panel__actions-row">
             <button type="button" className="settings-panel__provider-btn" onClick={addEntry}>Save</button>
