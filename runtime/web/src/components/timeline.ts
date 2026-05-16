@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useRef, useState } from '../vendor/preact-htm.js';
 import { Post } from './post.js';
 import { getAgentAvatarUrl, getAgentName } from '../ui/agent-utils.js';

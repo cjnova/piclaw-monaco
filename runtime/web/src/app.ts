@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Main authenticated web UI entry point.
 import { html, render, useState, useEffect, useMemo, useCallback } from './vendor/preact-htm.js';
 import { paneRegistry, TERMINAL_TAB_PATH, VNC_TAB_PREFIX, tabStore } from './panes/index.js';

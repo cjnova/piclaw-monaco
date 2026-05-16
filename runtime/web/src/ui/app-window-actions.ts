@@ -1,3 +1,4 @@
+import { createRootChatSession as defaultCreateRootChatSession } from '../api.js';
 import {
   buildBranchLoaderUrl,
   buildChatWindowUrl,
@@ -91,7 +92,7 @@ export async function createSessionFromCompose(options: CreateSessionFromCompose
 export interface CreateRootSessionFromComposeOptions {
   rootName: string;
   chatOnlyMode?: boolean;
-  createRootChatSession: (agentName: string) => Promise<{ branch?: BranchRecord | null }>;
+  createRootChatSession?: (agentName: string) => Promise<{ branch?: BranchRecord | null }>;
   refreshActiveChatAgents?: () => Promise<unknown> | unknown;
   refreshCurrentChatBranches?: () => Promise<unknown> | unknown;
   showIntentToast?: ToastFn;
@@ -116,7 +117,10 @@ export async function createRootSessionFromCompose(options: CreateRootSessionFro
   if (!trimmed) return false;
 
   try {
-    const response = await createRootChatSession(trimmed);
+    const createRoot = typeof createRootChatSession === 'function'
+      ? createRootChatSession
+      : defaultCreateRootChatSession;
+    const response = await createRoot(trimmed);
     const branch = response?.branch;
     const nextChatJid = typeof branch?.chat_jid === 'string' && branch.chat_jid.trim() ? branch.chat_jid.trim() : null;
     if (!nextChatJid) {

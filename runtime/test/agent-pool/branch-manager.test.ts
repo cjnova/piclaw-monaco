@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "fs";
 
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { join } from "path";
-import { ensureSessionDir } from "../../src/agent-pool/session.js";
+import { ensureSessionDir, sanitiseJid } from "../../src/agent-pool/session.js";
+import { SESSIONS_DIR } from "../../src/core/config.js";
 import { AgentBranchManager } from "../../src/agent-pool/branch-manager.js";
 import { hasDeferredBranchSeed, readDeferredBranchSeed } from "../../src/agent-pool/branch-seeding.js";
 import { createTempWorkspace, importFresh, setEnv } from "../helpers.js";
@@ -368,6 +369,13 @@ test("AgentBranchManager renameChatJid migrates hierarchical descendants and ses
   fixture.pool.set(oldUnrelated, { runtime: createRuntime(inactiveSession), lastUsed: Date.now() });
   fixture.sidePool.set(oldChild, { runtime: createRuntime(inactiveSession), lastUsed: Date.now() });
 
+  // Clean up any stale session dirs from prior tests before creating new ones
+  for (const prefix of ["web_default_research", "web_default_research-notes"]) {
+    for (const entry of readdirSync(SESSIONS_DIR).filter(e => e.startsWith(prefix))) {
+      rmSync(join(SESSIONS_DIR, entry), { recursive: true, force: true });
+    }
+  }
+
   const oldParentDir = ensureSessionDir(oldParent);
   const oldParentSideDir = `${oldParentDir}__btw-side`;
   mkdirSync(oldParentSideDir, { recursive: true });
@@ -391,9 +399,9 @@ test("AgentBranchManager renameChatJid migrates hierarchical descendants and ses
   expect(db.getChatBranchByChatJid(oldChild)).toBeNull();
   expect(db.getChatBranchByChatJid(oldUnrelated)?.chat_jid).toBe(oldUnrelated);
 
-  const newParentDir = ensureSessionDir(newParent);
+  const newParentDir = join(SESSIONS_DIR, sanitiseJid(newParent));
   const newParentSideDir = `${newParentDir}__btw-side`;
-  const newChildDir = ensureSessionDir(newChild);
+  const newChildDir = join(SESSIONS_DIR, sanitiseJid(newChild));
   const newChildVariant = `${newChildDir}__variant`;
 
   expect(existsSync(newParentDir)).toBe(true);
@@ -404,6 +412,11 @@ test("AgentBranchManager renameChatJid migrates hierarchical descendants and ses
   expect(existsSync(oldParentSideDir)).toBe(false);
   expect(existsSync(oldChildDir)).toBe(false);
   expect(existsSync(oldChildVariant)).toBe(false);
+
+  // Clean up session dirs created in the static SESSIONS_DIR (not covered by ws.cleanup)
+  for (const dir of [newParentDir, newParentSideDir, newChildDir, newChildVariant]) {
+    rmSync(dir, { recursive: true, force: true });
+  }
 
   ws.cleanup();
 });

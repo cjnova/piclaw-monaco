@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useMemo, useRef, useState } from '../vendor/preact-htm.js';
 import { addToWhitelist, getWorkspaceBranch, respondToAgentRequest } from '../api.js';
 import { renderThinkingMarkdown } from '../markdown.js';
@@ -7,6 +6,7 @@ import { buildTurnDotClass, resolveRunningStatusIndicator, shouldShowRunningStat
 import { getStatusElapsedLabel, getStatusRetryCountdownLabel, isCompactionStatus, parseStatusLastEventAt, parseStatusStartedAt, resolveStatusPanelTitle } from '../ui/status-duration.js';
 import { extractToolContextPath } from '../ui/tool-git-context.js';
 import { useConnectionStatusPresentation } from '../ui/connection-status.js';
+import { renderDisclosureTriangle } from '../ui/disclosure-triangle.js';
 
 const COPY_ICON_SVG = html`
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -32,6 +32,17 @@ const CLOCK_ICON_SVG = html`
 `;
 
 const STATUS_TIME_HINT_THRESHOLD_MS = 10_000;
+export const TOOL_OUTPUT_COLLAPSED_MAX_CHARS_PER_LINE = 132;
+
+export function truncateCollapsedToolOutputLines(text, maxChars = TOOL_OUTPUT_COLLAPSED_MAX_CHARS_PER_LINE) {
+    const limit = Number.isFinite(maxChars) && maxChars > 0 ? Math.floor(maxChars) : TOOL_OUTPUT_COLLAPSED_MAX_CHARS_PER_LINE;
+    return String(text || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map((line) => line.length > limit ? `${line.slice(0, limit)}…` : line)
+        .join('\n');
+}
 
 export function normalizeStatusHints(value) {
     const source = Array.isArray(value)
@@ -117,9 +128,63 @@ export function resolveIntentElapsedLabel(status, nowMs = Date.now()) {
     return getStatusElapsedLabel(status, nowMs);
 }
 
+function isRedundantToolStatusText(statusText) {
+    return typeof statusText === 'string' && /^streaming output\.{3}$/i.test(statusText.trim());
+}
+
+function normalizeToolStatusPillLabel(statusText) {
+    if (typeof statusText !== 'string') return '';
+    return statusText
+        .replace(/[…]+/g, '.')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[\s:;,.!?-]+$/g, '')
+        .toLowerCase();
+}
+
+function isToolIntentPayload(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    const type = typeof payload.type === 'string' ? payload.type : '';
+    return type === 'tool_call'
+        || type === 'tool_status'
+        || Boolean(payload.tool_name || payload.toolName || payload.tool_args || payload.toolArgs);
+}
+
+function resolveToolStatusPillLabel(payload) {
+    if (!isToolIntentPayload(payload)) return '';
+    const statusText = payload?.status || payload?.tool_status || payload?.toolStatus;
+    if (isRedundantToolStatusText(statusText)) return '';
+    return normalizeToolStatusPillLabel(statusText);
+}
+
+function stripTrailingToolStatusText(text, statusText) {
+    const value = typeof text === 'string' ? text : '';
+    const rawStatus = typeof statusText === 'string' ? statusText.trim() : '';
+    if (!value || !rawStatus) return value;
+    const escapedStatus = rawStatus.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return value.replace(new RegExp(`\\s*[:—-]\\s*${escapedStatus}\\s*$`, 'i'), '');
+}
+
+function renderToolStatusPill(label) {
+    return label ? html`<span class="agent-tool-status-pill">${label}</span>` : null;
+}
+
+function resolveAuditableStatusTitle(status) {
+    const title = typeof status?.title === 'string' && status.title.trim() ? status.title.trim() : '';
+    if (title) return title;
+
+    const toolName = typeof (status?.tool_name || status?.toolName) === 'string'
+        ? String(status.tool_name || status.toolName).trim()
+        : '';
+    if (!toolName) return '';
+
+    const [argument] = getStatusToolTitleArgumentCandidates(status);
+    return argument ? `${toolName}: ${argument}` : toolName;
+}
+
 export function resolveAgentStatusContent(status, options = {}) {
     const isLastActivity = options?.isLastActivity ?? Boolean(status?.last_activity || status?.lastActivity);
-    const title = status?.title;
+    const title = resolveAuditableStatusTitle(status);
     const statusText = status?.status;
     let content = '';
     if (status?.type === 'plan') {
@@ -127,7 +192,7 @@ export function resolveAgentStatusContent(status, options = {}) {
     } else if (status?.type === 'tool_call') {
         content = title ? `Running: ${title}` : 'Running tool...';
     } else if (status?.type === 'tool_status') {
-        content = title ? `${title}: ${statusText || 'Working...'}` : (statusText || 'Working...');
+        content = title && isRedundantToolStatusText(statusText) ? title : (title ? `${title}: ${statusText || 'Working...'}` : (statusText || 'Working...'));
     } else if (status?.type === 'error') {
         content = title || 'Agent error';
     } else {
@@ -138,6 +203,125 @@ export function resolveAgentStatusContent(status, options = {}) {
         return `Recent activity: ${content}`;
     }
     return 'Last activity';
+}
+
+function normalizeToolName(payload) {
+    const raw = payload?.tool_name || payload?.toolName || '';
+    return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+}
+
+function normalizeToolTitleArgument(value) {
+    const normalized = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+    if (!normalized) return '';
+    const maxLen = 120;
+    return normalized.length > maxLen ? `${normalized.slice(0, maxLen)}…` : normalized;
+}
+
+function extractStatusToolArgs(args) {
+    if (!args) return null;
+    if (typeof args === 'string') {
+        try {
+            const parsed = JSON.parse(args);
+            return extractStatusToolArgs(parsed);
+        } catch {
+            return null;
+        }
+    }
+    if (typeof args === 'object') {
+        const record = args;
+        const nested = record.arguments || record.input || record.params || record.parameters || record.args || record.payload;
+        return nested && typeof nested === 'object' ? nested : record;
+    }
+    return null;
+}
+
+function getStatusToolTitleArgumentCandidates(payload) {
+    const args = extractStatusToolArgs(payload?.tool_args || payload?.toolArgs);
+    if (!args) return [];
+    const candidates = [];
+    const add = (value) => {
+        const normalized = normalizeToolTitleArgument(value);
+        if (normalized && !candidates.includes(normalized)) candidates.push(normalized);
+    };
+
+    add(args.command);
+
+    if (Array.isArray(args.commands)) {
+        add(args.commands.filter((item) => typeof item === 'string').join(' && '));
+    }
+
+    add(args.path || args.filePath || args.target);
+
+    if (Array.isArray(args.paths)) {
+        add(args.paths.filter((item) => typeof item === 'string').join(', '));
+    }
+
+    add(args.fileName || args.filename || args.file);
+    add(args.url);
+    add(args.query);
+
+    return candidates.sort((left, right) => right.length - left.length);
+}
+
+export function resolveToolTitleArgumentParts(titleText, payload) {
+    const title = typeof titleText === 'string' ? titleText : '';
+    if (!title) return null;
+
+    const candidates = getStatusToolTitleArgumentCandidates(payload);
+    for (const argument of candidates) {
+        const argumentStart = title.indexOf(argument);
+        if (argumentStart >= 0) {
+            return {
+                prefix: title.slice(0, argumentStart),
+                argument,
+                suffix: title.slice(argumentStart + argument.length),
+            };
+        }
+    }
+
+    const toolName = normalizeToolName(payload);
+    if (!toolName) return null;
+    const titleMatch = title.match(/^([^:]+:\s*)(.+)$/is);
+    if (!titleMatch || titleMatch[1].trim().replace(/:$/, '').toLowerCase() !== toolName) return null;
+    return { prefix: titleMatch[1], argument: titleMatch[2], suffix: '' };
+}
+
+export function resolveBashToolTitleParts(titleText, payload) {
+    const parts = resolveToolTitleArgumentParts(titleText, payload);
+    if (!parts?.argument) return null;
+    return { prefix: parts.prefix, command: parts.argument, suffix: parts.suffix };
+}
+
+function renderToolArgumentInText(text, payload) {
+    const statusText = payload?.status || payload?.tool_status || payload?.toolStatus;
+    const pillLabel = resolveToolStatusPillLabel(payload);
+    const value = pillLabel ? stripTrailingToolStatusText(text, statusText) : (typeof text === 'string' ? text : '');
+    const title = resolveAuditableStatusTitle(payload);
+    const parts = resolveToolTitleArgumentParts(title, payload);
+
+    if (!parts?.argument) {
+        return pillLabel ? html`${value} ${renderToolStatusPill(pillLabel)}` : value;
+    }
+
+    const argumentStart = value.lastIndexOf(parts.argument);
+    if (argumentStart < 0) {
+        return pillLabel ? html`${value} ${renderToolStatusPill(pillLabel)}` : value;
+    }
+    const argumentEnd = argumentStart + parts.argument.length;
+    return html`
+        ${value.slice(0, argumentStart)}<span class="agent-tool-argument">${parts.argument}</span>${value.slice(argumentEnd)}${pillLabel ? html` ${renderToolStatusPill(pillLabel)}` : ''}
+    `;
+}
+
+function renderToolTitle(titleText, payload) {
+    const parts = resolveToolTitleArgumentParts(titleText, payload);
+    if (!parts?.argument) return titleText;
+    const statusText = payload?.status || payload?.tool_status || payload?.toolStatus;
+    const pillLabel = resolveToolStatusPillLabel(payload);
+    const suffix = pillLabel ? stripTrailingToolStatusText(parts.suffix || '', statusText) : (parts.suffix || '');
+    return html`
+        ${parts.prefix}<span class="agent-tool-argument">${parts.argument}</span>${suffix}${pillLabel ? html` ${renderToolStatusPill(pillLabel)}` : ''}
+    `;
 }
 
 /** Preact component: agent status bar with draft/thought/plan panels. */
@@ -155,8 +339,9 @@ function formatElapsed(isoString, nowMs = Date.now()) {
 }
 
 export function AgentStatus({ status, draft, plan, thought, pendingRequest, intent, extensionPanels = [], pendingPanelActions = new Set(), onExtensionPanelAction, turnId, steerQueued, onPanelToggle, showCorePanels = true, showExtensionPanels = true }) {
-    const THOUGHT_MAX_LINES = 8;
-    const DRAFT_MAX_LINES = 8;
+    const THOUGHT_MAX_LINES = 9;
+    const DRAFT_MAX_LINES = 9;
+    const TOOL_OUTPUT_MAX_LINES = 6;
 
     const normalizePreview = (value) => {
         if (!value) return { text: '', totalLines: 0, fullText: '' };
@@ -182,14 +367,17 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
         return Math.max(1, Math.ceil(line.length / PREVIEW_MAX_CHARS_PER_LINE));
     };
 
-    const truncateLines = (text, maxLines, totalLinesOverride) => {
+    const truncateLines = (text, maxLines, totalLinesOverride, options = {}) => {
         const value = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         if (!value) {
             const totalLines = Number.isFinite(totalLinesOverride) ? totalLinesOverride : 0;
             return { text: '', omitted: 0, totalLines, visibleLines: 0 };
         }
         const lines = value.split('\n');
-        const clipped = lines.length > maxLines ? lines.slice(0, maxLines).join('\n') : value;
+        const fromTail = options.direction === 'tail';
+        const clipped = lines.length > maxLines
+            ? (fromTail ? lines.slice(-maxLines) : lines.slice(0, maxLines)).join('\n')
+            : value;
         const totalLines = Number.isFinite(totalLinesOverride) ? totalLinesOverride : lines.reduce((acc, line) => acc + countSoftLines(line), 0);
         const visibleLines = clipped
             ? clipped.split('\n').reduce((acc, line) => acc + countSoftLines(line), 0)
@@ -201,15 +389,23 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
     const planInfo = normalizePreview(plan);
     const thoughtInfo = normalizePreview(thought);
     const draftInfo = normalizePreview(draft);
+    const toolOutputInfo = normalizePreview({
+        text: status?.output_preview || status?.outputPreview || '',
+        fullText: status?.output_preview || status?.outputPreview || '',
+        totalLines: status?.output_total_lines || status?.outputTotalLines,
+    });
     const hasPlan = Boolean(planInfo.text) || planInfo.totalLines > 0;
     const hasThought = Boolean(thoughtInfo.text) || thoughtInfo.totalLines > 0;
     const hasDraft = Boolean(draftInfo.fullText?.trim() || draftInfo.text?.trim());
+    const hasToolOutput = Boolean(toolOutputInfo.fullText?.trim() || toolOutputInfo.text?.trim());
 
-    const hasCorePanels = Boolean(status || hasDraft || hasPlan || hasThought || pendingRequest || intent);
+    const hasCorePanels = Boolean(status || hasDraft || hasPlan || hasThought || hasToolOutput || pendingRequest || intent);
     const hasExtensionPanels = Array.isArray(extensionPanels) && extensionPanels.length > 0;
 
     const [expandedPanels, setExpandedPanels] = useState(new Set());
     const [hoveredSeriesPoint, setHoveredSeriesPoint] = useState(null);
+    const [overflowingPanels, setOverflowingPanels] = useState({});
+    const panelBodyRefs = useRef(new Map());
     const [nowMs, setNowMs] = useState(() => Date.now());
     const toggleExpand = (key) =>
         setExpandedPanels(prev => {
@@ -229,6 +425,29 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
     }, [turnId]);
 
     // Tick nowMs every second when visible extension panels expose timestamps.
+    useEffect(() => {
+        const nextOverflowingPanels = {};
+        const bottomPinnedPanelKeys = new Set(['thought', 'draft']);
+        for (const [panelKey, node] of panelBodyRefs.current.entries()) {
+            if (!node || typeof node !== 'object') continue;
+            const scrollHeight = Number(node.scrollHeight);
+            const clientHeight = Number(node.clientHeight);
+            if (!Number.isFinite(scrollHeight) || !Number.isFinite(clientHeight) || clientHeight <= 0) continue;
+            const isOverflowing = scrollHeight > clientHeight + 1;
+            if (isOverflowing) nextOverflowingPanels[panelKey] = true;
+            if (bottomPinnedPanelKeys.has(panelKey)) {
+                node.scrollTop = Math.max(0, scrollHeight - clientHeight);
+            }
+        }
+
+        setOverflowingPanels((previous) => {
+            const previousKeys = Object.keys(previous || {}).filter((key) => previous[key]).sort();
+            const nextKeys = Object.keys(nextOverflowingPanels).sort();
+            if (previousKeys.length === nextKeys.length && previousKeys.every((key, index) => key === nextKeys[index])) return previous;
+            return nextOverflowingPanels;
+        });
+    }, [draftInfo.fullText, draftInfo.text, thoughtInfo.fullText, thoughtInfo.text, toolOutputInfo.fullText, toolOutputInfo.text, expandedPanels]);
+
     useEffect(() => {
         const hasVisibleTimestampPanel = Array.isArray(extensionPanels) && extensionPanels.some(
             (p) => p?.started_at || p?.last_activity_at,
@@ -334,10 +553,13 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
 
     const activeTurn = status?.turn_id || turnId;
     const turnColor = getTurnColor(activeTurn);
-    const dotClass = buildTurnDotClass({ steerQueued });
     const panelTitle = (label) => label;
     const showRunningStatusDot = shouldShowRunningStatusDot(status, { isLastActivity });
     const runningIndicatorMode = resolveRunningStatusIndicator(status, { isLastActivity });
+    const dotClass = buildTurnDotClass({
+        steerQueued,
+        pulsing: showRunningStatusDot && runningIndicatorMode === 'dot' && !isLastActivity,
+    });
     const pendingIndicatorMode = resolveRunningStatusIndicator(null, { pendingRequest: true });
     const resolveIntentColor = (kind) => kind === 'warning'
         ? '#f59e0b'
@@ -380,13 +602,30 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
             ? stripInternalTags(rawSourceText)
             : rawSourceText;
         const isCollapsible = typeof maxLines === 'number';
-        const showClose = isExpanded && isCollapsible;
+        const collapseFromTail = panelKey === 'tool-output';
         const truncated = isCollapsible
-            ? truncateLines(sourceText, maxLines, totalLines)
+            ? truncateLines(sourceText, maxLines, totalLines, { direction: collapseFromTail ? 'tail' : 'head' })
             : { text: sourceText || '', omitted: 0, totalLines: Number.isFinite(totalLines) ? totalLines : 0 };
+        const displayText = collapseFromTail && !isExpanded
+            ? truncateCollapsedToolOutputLines(truncated.text)
+            : sourceText;
         if (!sourceText && !(Number.isFinite(truncated.totalLines) && truncated.totalLines > 0)) return null;
         const bodyClass = `agent-thinking-body${isCollapsible ? ' agent-thinking-body-collapsible' : ''}`;
         const bodyStyle = isCollapsible ? `--agent-thinking-collapsed-lines: ${maxLines};` : '';
+        const estimatedOverflow = isCollapsible && truncated.omitted > 0;
+        const measuredOverflow = Boolean(panelKey && overflowingPanels[panelKey]);
+        const hasOverflow = estimatedOverflow || measuredOverflow;
+        const showCollapsedTruncation = !isExpanded && hasOverflow;
+        const truncationToggleButton = (showCollapsedTruncation || (isExpanded && hasOverflow)) && html`
+            <button
+                class="agent-thinking-truncation"
+                onClick=${() => toggleExpand(panelKey)}
+                title=${isExpanded ? `Show fewer ${panelTitle} lines` : `Show more ${panelTitle}`}
+            >
+                <span class="agent-thinking-truncation-arrow" aria-hidden="true">${renderDisclosureTriangle(isExpanded ? 'up' : 'down')}</span>
+                <span>${isExpanded ? 'less' : 'more…'}</span>
+            </button>
+        `;
         return html`
             <div
                 class="agent-thinking"
@@ -398,31 +637,18 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                 <div class="agent-thinking-title ${titleClass || ''}">
                     ${turnColor && html`<span class=${dotClass} aria-hidden="true"></span>`}
                     ${panelTitle}
-                    ${showClose && html`
-                        <button
-                            class="agent-thinking-close"
-                            aria-label=${`Close ${panelTitle} panel`}
-                            onClick=${() => toggleExpand(panelKey)}
-                        >
-                            ×
-                        </button>
-                    `}
+                    ${truncationToggleButton}
                 </div>
                 <div
                     class=${bodyClass}
                     style=${bodyStyle}
-                    dangerouslySetInnerHTML=${{ __html: renderThinkingMarkdown(sourceText) }}
+                    ref=${(node) => {
+                        if (!panelKey) return;
+                        if (node) panelBodyRefs.current.set(panelKey, node);
+                        else panelBodyRefs.current.delete(panelKey);
+                    }}
+                    dangerouslySetInnerHTML=${{ __html: renderThinkingMarkdown(displayText) }}
                 />
-                ${!isExpanded && truncated.omitted > 0 && html`
-                    <button class="agent-thinking-truncation" onClick=${() => toggleExpand(panelKey)}>
-                        ▸ ${truncated.omitted} more lines
-                    </button>
-                `}
-                ${isExpanded && truncated.omitted > 0 && html`
-                    <button class="agent-thinking-truncation" onClick=${() => toggleExpand(panelKey)}>
-                        ▴ show less
-                    </button>
-                `}
             </div>
         `;
     };
@@ -438,6 +664,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
             steerQueued,
             pulsing: isCompactionStatus(payload) || Boolean(retryCountdownLabel),
         });
+        const intentIndicatorMode = resolveRunningStatusIndicator(payload);
 
         return html`
             <div
@@ -447,8 +674,9 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                 title=${payload?.detail || ''}
             >
                 <div class="agent-thinking-title intent">
-                    ${color && html`<span class=${pulsingDotClass} aria-hidden="true"></span>`}
-                    <span class="agent-thinking-title-text">${titleText}</span>
+                    ${color && intentIndicatorMode === 'dot' && html`<span class=${pulsingDotClass} aria-hidden="true"></span>`}
+                    ${intentIndicatorMode === 'spinner' && html`<div class="agent-status-spinner" aria-hidden="true"></div>`}
+                    <span class="agent-thinking-title-text">${renderToolTitle(titleText, payload)}</span>
                     ${metaLabel && html`<span class="agent-status-elapsed">${metaLabel}</span>`}
                 </div>
                 ${payload.detail && html`<div class="agent-thinking-body">${payload.detail}</div>`}
@@ -704,11 +932,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                                     title=${isExpanded ? 'Collapse details' : 'Expand details'}
                                     onClick=${() => toggleExpand(panelKey)}
                                 >
-                                    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        ${isExpanded
-                                            ? html`<polyline points="4 6 8 10 12 6"></polyline>`
-                                            : html`<polyline points="4 10 8 6 12 10"></polyline>`}
-                                    </svg>
+                                    ${renderDisclosureTriangle(isExpanded ? 'down' : 'up')}
                                 </button>
                             `}
                         </div>
@@ -802,6 +1026,15 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                 titleClass: 'thought',
                 panelKey: 'thought',
             })}
+            ${showCorePanels && hasToolOutput && renderThinkingPanel({
+                panelTitle: panelTitle('Output'),
+                text: toolOutputInfo.text,
+                fullText: toolOutputInfo.fullText,
+                totalLines: toolOutputInfo.totalLines,
+                maxLines: TOOL_OUTPUT_MAX_LINES,
+                titleClass: 'tool-output',
+                panelKey: 'tool-output',
+            })}
             ${showCorePanels && status && status?.type !== 'intent' && html`
                 <div class=${`agent-status${isLastActivity ? ' agent-status-last-activity' : ''}${status?.type === 'error' ? ' agent-status-error' : ''}${toolRepoLabel || statusHints.length > 0 || statusActivityAgeLabel ? ' agent-status-multiline' : ''}`} aria-live="polite" style=${turnColor ? `--turn-color: ${turnColor};` : ''}>
                     ${turnColor && showRunningStatusDot && html`<span class=${dotClass} aria-hidden="true"></span>`}
@@ -809,7 +1042,7 @@ export function AgentStatus({ status, draft, plan, thought, pendingRequest, inte
                         ? html`<span class="agent-status-error-icon" aria-hidden="true">⚠</span>`
                         : (runningIndicatorMode === 'spinner' && html`<div class="agent-status-spinner"></div>`)}
                     <div class="agent-status-copy">
-                        <span class="agent-status-text">${content}</span>
+                        <span class="agent-status-text">${renderToolArgumentInText(content, status)}</span>
                         ${(toolRepoLabel || orderedStatusHints.length > 0 || statusActivityAgeLabel) && html`
                             <span class="agent-status-meta-row">
                                 ${leadingStatusHints.map((hint) => html`

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * markdown-preview.ts — Live markdown preview panel for the editor.
  *

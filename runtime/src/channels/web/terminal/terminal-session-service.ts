@@ -235,9 +235,25 @@ function findExecutable(name: string): string {
 
 const SCRIPT_BIN = findExecutable("script");
 const BASH_BIN = findExecutable("bash");
+const EXPECT_BIN = IS_LINUX ? "" : findExecutable("expect");
+const USER_SHELL = process.env.SHELL || BASH_BIN;
+const IS_ZSH = USER_SHELL.endsWith("/zsh");
+
+/** Build shell arguments: zsh gets PROMPT_SP disabled to avoid blank lines in the web terminal. */
+function buildShellArgs(): string[] {
+  return IS_ZSH ? ["+o", "PROMPT_SP", "-i"] : ["-i"];
+}
 
 function defaultSpawnProcess(cwd: string): TerminalProcessLike {
-  return spawn(SCRIPT_BIN, ["-qf", "-c", `${BASH_BIN} -i`, "/dev/null"], {
+  // Linux: use `script` with GNU flags to allocate a PTY.
+  // macOS: `script` fails with piped stdio (tcgetattr error). Use `expect`
+  // to allocate a real PTY instead — it's pre-installed on macOS.
+  // Both paths spawn the user's default shell ($SHELL) instead of hardcoding bash.
+  const shellArgs = buildShellArgs();
+  const command = IS_LINUX
+    ? { bin: SCRIPT_BIN, args: ["-qf", "-c", [USER_SHELL, ...shellArgs].join(" "), "/dev/null"] }
+    : { bin: EXPECT_BIN, args: ["-c", `log_user 0; spawn -noecho ${USER_SHELL} ${shellArgs.join(" ")}; log_user 1; interact`] };
+  return spawn(command.bin, command.args, {
     cwd,
     env: {
       ...process.env,
@@ -248,6 +264,8 @@ function defaultSpawnProcess(cwd: string): TerminalProcessLike {
       HOME: process.env.HOME || "/home/agent",
       COLUMNS: String(DEFAULT_COLS),
       LINES: String(DEFAULT_ROWS),
+      PROMPT_EOL_MARK: "",
+      SHELL_SESSION_DID_INIT: "1",
     },
     stdio: ["pipe", "pipe", "pipe"],
   }) as ChildProcessWithoutNullStreams;

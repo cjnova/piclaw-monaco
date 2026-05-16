@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * timeline-menu.ts — Single hamburger menu, position:fixed.
  * Tracks .container/.workspace-sidebar for positioning.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useRef, useState, useEffect, useCallback, useMemo } from '../vendor/preact-htm.js';
 import { findPopupTypeaheadMatch, isPopupTypeaheadKey, resolvePopupTypeaheadMatch, updatePopupTypeaheadBuffer } from '../ui/popup-typeahead.js';
 import { getAgentModels, sendAgentMessage, uploadMedia } from '../api.js';
@@ -238,6 +237,7 @@ export function resolveComposeExtensionWorkingDisplay(workingState, frameIndex =
             title: '',
             indicatorText: null,
             animateDot: false,
+            animateSpinner: false,
         };
     }
 
@@ -254,6 +254,7 @@ export function resolveComposeExtensionWorkingDisplay(workingState, frameIndex =
             title: '',
             indicatorText: null,
             animateDot: false,
+            animateSpinner: false,
         };
     }
 
@@ -263,6 +264,7 @@ export function resolveComposeExtensionWorkingDisplay(workingState, frameIndex =
             title: message || 'Working…',
             indicatorText: null,
             animateDot: false,
+            animateSpinner: false,
         };
     }
 
@@ -274,6 +276,7 @@ export function resolveComposeExtensionWorkingDisplay(workingState, frameIndex =
             title: message || 'Working…',
             indicatorText: frames[safeIndex],
             animateDot: false,
+            animateSpinner: false,
         };
     }
 
@@ -281,7 +284,8 @@ export function resolveComposeExtensionWorkingDisplay(workingState, frameIndex =
         visible: true,
         title: message || 'Working…',
         indicatorText: null,
-        animateDot: true,
+        animateDot: false,
+        animateSpinner: true,
     };
 }
 
@@ -558,7 +562,7 @@ function unwrapQueuedTranscriptContent(value) {
             index += 1;
             continue;
         }
-        if (trimmed === 'Messages:' || trimmed.startsWith('Channel:')) {
+        if (trimmed === 'Messages:' || trimmed.startsWith('Channel:') || trimmed.startsWith('Chat:')) {
             sawTranscript = true;
             index += 1;
             continue;
@@ -571,7 +575,7 @@ function unwrapQueuedTranscriptContent(value) {
                 const current = lines[index];
                 const currentTrimmed = current.trim();
                 if (/^[^\n]+\s@\s[^\n]+:$/.test(currentTrimmed)) break;
-                if (currentTrimmed.startsWith('Channel:') || currentTrimmed === 'Messages:') break;
+                if (currentTrimmed.startsWith('Channel:') || currentTrimmed.startsWith('Chat:') || currentTrimmed === 'Messages:') break;
                 bodyLines.push(current.startsWith('  ') ? current.slice(2) : current);
                 index += 1;
             }
@@ -2798,9 +2802,11 @@ export function ComposeBox({
                     <div class="compose-inline-status-row">
                         ${extensionWorkingDisplay.indicatorText
                             ? html`<span class="compose-inline-status-glyph" aria-hidden="true">${extensionWorkingDisplay.indicatorText}</span>`
-                            : extensionWorkingDisplay.animateDot
-                                ? html`<span class=${buildComposeStatusDotClass({ pulsing: true })} aria-hidden="true"></span>`
-                                : null}
+                            : extensionWorkingDisplay.animateSpinner
+                                ? html`<div class="compose-inline-status-spinner" aria-hidden="true"></div>`
+                                : extensionWorkingDisplay.animateDot
+                                    ? html`<span class=${buildComposeStatusDotClass({ pulsing: true })} aria-hidden="true"></span>`
+                                    : null}
                         <span class="compose-inline-status-title">${extensionWorkingDisplay.title}</span>
                     </div>
                 </div>
@@ -2813,7 +2819,7 @@ export function ComposeBox({
                     title=${statusNoticeDetail || ''}
                 >
                     <div class="compose-inline-status-row">
-                        <span class=${buildComposeStatusDotClass({ pulsing: false })} aria-hidden="true"></span>
+                        <div class="compose-inline-status-spinner" aria-hidden="true"></div>
                         <span class="compose-inline-status-title">${statusNoticeTitle}</span>
                         ${statusNoticeElapsedLabel && html`<span class="compose-inline-status-elapsed">${statusNoticeElapsedLabel}</span>`}
                     </div>

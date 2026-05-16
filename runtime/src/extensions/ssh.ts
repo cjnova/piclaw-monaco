@@ -118,8 +118,8 @@ export const sshTool: ExtensionFactory = (pi: ExtensionAPI) => {
   pi.registerTool({
     name: "ssh",
     label: "ssh",
-    description: "Get, set, or clear the session-scoped SSH config used for remote core tools (read/grep/find/ls/bash/edit/write).",
-    promptSnippet: "ssh: inspect or update the current session SSH remote-tools profile; active profiles redirect read/grep/find/ls/bash/edit/write.",
+    description: "Get, set, or clear the session-scoped SSH profile that redirects core tools to a remote host. When active, read/grep/find/ls/bash/edit/write execute on the remote host via the configured keychain-backed SSH connection.",
+    promptSnippet: "ssh: set up or inspect an SSH profile to redirect read/grep/find/ls/bash/edit/write to a remote host via keychain-backed SSH.",
     parameters: SshToolSchema,
     async execute(_toolCallId, params): Promise<SshToolResult> {
       const handlers = registeredHandlers;

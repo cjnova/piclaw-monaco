@@ -1,5 +1,5 @@
 import { html } from '../vendor/preact-htm.js';
-import { ComposeBox, QueuedFollowupStack } from '../components/compose-box.js';
+import { ComposeBox } from '../components/compose-box.js';
 import { OobePanel } from '../components/oobe-panel.js';
 import { BtwPanel } from '../components/btw-panel.js';
 import { FloatingWidgetPane } from '../components/floating-widget-pane.js';
@@ -545,13 +545,6 @@ export function renderMainShell(options: MainShellRenderOptions): any {
           onPanelToggle=${handlePanelToggle}
           showCorePanels=${false}
         />
-        <${QueuedFollowupStack}
-          items=${searchOpen ? [] : followupQueueItems}
-          onInjectQueuedFollowup=${handleInjectQueuedFollowup}
-          onRemoveQueuedFollowup=${handleRemoveQueuedFollowup}
-          onMoveQueuedFollowup=${handleMoveQueuedFollowup}
-          onOpenFilePill=${openFileFromPill}
-        />
         <${ComposeBox}
           onPost=${(response) => {
             handleComposePost({
@@ -592,7 +585,6 @@ export function renderMainShell(options: MainShellRenderOptions): any {
           onOpenFilePill=${openFileFromPill}
           followupQueueCount=${followupQueueCount}
           followupQueueItems=${followupQueueItems}
-          showQueueStack=${false}
           onInjectQueuedFollowup=${handleInjectQueuedFollowup}
           onRemoveQueuedFollowup=${handleRemoveQueuedFollowup}
           onMoveQueuedFollowup=${handleMoveQueuedFollowup}

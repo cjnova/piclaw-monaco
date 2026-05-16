@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * use-editor-state.ts — Tab orchestration hook for the editor pane.
  *

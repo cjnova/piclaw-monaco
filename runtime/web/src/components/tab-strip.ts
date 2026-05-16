@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * tab-strip.ts — Tab strip UI component for the pane system.
  *

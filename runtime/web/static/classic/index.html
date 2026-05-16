@@ -77,8 +77,8 @@
             } catch(e) {}
         })();
     </script>
-    <link rel="stylesheet" href="/static/classic/dist/app.bundle.css?v=781111edd095">
-    <link id="dynamic-manifest" rel="manifest" href="/manifest.json?v=781111edd095">
+    <link rel="stylesheet" href="/static/classic/dist/app.bundle.css?v=4dcfa52f00c3">
+    <link id="dynamic-manifest" rel="manifest" href="/manifest.json?v=4dcfa52f00c3">
     <link id="dynamic-favicon" rel="icon" href="/favicon.ico">
     <link id="dynamic-apple-touch-icon" rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link id="dynamic-apple-touch-icon-180" rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png">
@@ -165,8 +165,29 @@
         };
     </script>
     <script src="/static/common/js/marked.min.js" defer></script>
-    <script src="/static/common/js/vendor/katex.min.js" defer></script>
-    <script src="/static/common/js/vendor/beautiful-mermaid.js" defer></script>
+    <script>
+      // Lazy-load katex and mermaid after the app has rendered its first frame.
+      // These are heavy vendor scripts (266KB + 1.5MB) only needed when rendering
+      // math blocks or mermaid diagrams. The markdown renderer guards with
+      // window.katex / window.beautifulMermaid checks, so posts rendered before
+      // load complete simply skip those features until a re-render.
+      function loadDeferredVendorScripts() {
+        var s1 = document.createElement('script');
+        s1.src = '/static/common/js/vendor/katex.min.js';
+        document.head.appendChild(s1);
+        var s2 = document.createElement('script');
+        s2.src = '/static/common/js/vendor/beautiful-mermaid.js';
+        document.head.appendChild(s2);
+      }
+      // Wait for the app to paint, then load after a short delay
+      if (document.readyState === 'complete') {
+        setTimeout(loadDeferredVendorScripts, 2000);
+      } else {
+        window.addEventListener('load', function() {
+          setTimeout(loadDeferredVendorScripts, 1500);
+        }, { once: true });
+      }
+    </script>
     <script type="importmap">
     {
       "imports": {
@@ -174,6 +195,6 @@
       }
     }
     </script>
-    <script type="module" src="/static/classic/dist/app.bundle.js?v=781111edd095"></script>
+    <script type="module" src="/static/classic/dist/app.bundle.js?v=4dcfa52f00c3"></script>
 </body>
 </html>

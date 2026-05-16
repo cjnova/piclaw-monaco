@@ -98,6 +98,22 @@ export function applyExtensionUiWorkingState(
     };
   }
 
+  if (eventType === 'extension_ui_status') {
+    // ctx.ui.setStatus(key, text) is the standard Pi extension progress path.
+    // Keep structured status payloads such as context_usage out of the working
+    // row, but let ordinary extension status text replace the generic
+    // "Working…" fallback while an extension/tool is active.
+    // CRITICAL: preserve the existing working indicator exactly as-is. Many
+    // extensions set the indicator separately from status text, and losing it
+    // makes active tool/extension progress look stalled or invisible.
+    if (payload?.key === 'context_usage') return undefined;
+    return {
+      message: typeof payload?.text === 'string' && payload.text.trim() ? payload.text.trim() : null,
+      indicator: previous.indicator,
+      visible: previous.visible,
+    };
+  }
+
   const indicator = resolveExtensionUiWorkingIndicator(eventType, payload);
   if (indicator === undefined) return undefined;
   return {
@@ -105,6 +121,34 @@ export function applyExtensionUiWorkingState(
     indicator,
     visible: previous.visible,
   };
+}
+
+export function resolveExtensionUiContextUsage(
+  eventType: string | null | undefined,
+  payload: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (eventType !== 'extension_ui_status') return null;
+  if (payload?.key !== 'context_usage') return null;
+  const raw = typeof payload?.text === 'string' ? payload.text.trim() : '';
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const data = parsed as Record<string, unknown>;
+    const tokens = data.tokens == null ? null : Number(data.tokens);
+    const contextWindow = data.contextWindow == null ? null : Number(data.contextWindow);
+    const percent = data.percent == null ? null : Number(data.percent);
+    return {
+      tokens: Number.isFinite(tokens) ? tokens : null,
+      contextWindow: Number.isFinite(contextWindow) ? contextWindow : null,
+      percent: Number.isFinite(percent) ? percent : null,
+      estimated: data.estimated === true,
+      source: typeof data.source === 'string' ? data.source : null,
+      phase: typeof data.phase === 'string' ? data.phase : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function resolveExtensionUiToast(

@@ -186,8 +186,9 @@ export function getGeneratedWidgetIframeSandbox(widget: any): string {
   // `allow-same-origin` is critical for dynamic widgets: they need a real
   // same-origin document to load vendored/workspace assets and make local
   // authenticated fetches (for example /workspace/raw) from the widget frame.
+  // `allow-forms` lets interactive widgets submit native forms inside the frame.
   return isInteractiveGeneratedWidget(widget)
-    ? 'allow-downloads allow-scripts allow-same-origin'
+    ? 'allow-downloads allow-scripts allow-same-origin allow-forms'
     : 'allow-downloads';
 }
 

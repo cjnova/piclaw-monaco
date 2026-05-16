@@ -556,8 +556,8 @@ export const scheduledTasks: ExtensionFactory = (pi: ExtensionAPI) => {
   pi.registerTool({
     name: "scheduled_tasks",
     label: "scheduled_tasks",
-    description: "Unified scheduled task management: create, list, inspect, pause, resume, and delete scheduled tasks.",
-    promptSnippet: "scheduled_tasks: create/list/get/pause/resume/delete structured scheduled task records.",
+    description: "Unified scheduled task management: create, list, inspect, pause, resume, and delete scheduled tasks. For recurring or deferred local work only — not for remote command execution (use ssh + bash for that).",
+    promptSnippet: "scheduled_tasks: create/list/get/pause/resume/delete structured scheduled task records. Not for remote execution — use ssh + bash instead.",
     parameters: ScheduledTaskToolSchema,
     async execute(_toolCallId, params): Promise<AgentToolResult<Record<string, unknown>>> {
       return executeScheduledTasks(params as ScheduledTaskToolParams);

@@ -10,6 +10,26 @@ const API_BASE = '';
 type ApiOptions = Record<string, any>;
 type ApiError = Error & { status?: number; code?: string; payload?: unknown };
 
+// ── In-flight GET deduplication ───────────────────────────────────────
+// When multiple components request the same GET URL before the first
+// response arrives, reuse the same in-flight promise instead of firing
+// duplicate network requests.
+const inflightGets = new Map<string, Promise<any>>();
+
+function deduplicatedGet(url: string, options: RequestInit & ApiOptions = {}): Promise<any> {
+  const method = String(options.method || 'GET').toUpperCase();
+  if (method !== 'GET') return request(url, options);
+
+  const existing = inflightGets.get(url);
+  if (existing) return existing;
+
+  const promise = request(url, options).finally(() => {
+    inflightGets.delete(url);
+  });
+  inflightGets.set(url, promise);
+  return promise;
+}
+
 /**
  * Fetch wrapper with error handling
  */
@@ -112,7 +132,7 @@ export async function getTimeline(limit = 10, beforeId = null, chatJid = null) {
     if (chatJid) {
         url += `&chat_jid=${encodeURIComponent(chatJid)}`;
     }
-    return request(url);
+    return deduplicatedGet(url);
 }
 
 /**
@@ -271,7 +291,7 @@ export async function sendAgentMessage(agentId, content, threadId = null, mediaI
 
 export async function getAgentCommands(chatJid = 'web:default') {
     const normalized = typeof chatJid === 'string' && chatJid.trim() ? chatJid.trim() : 'web:default';
-    return request(`/agent/commands?chat_jid=${encodeURIComponent(normalized)}`);
+    return deduplicatedGet(`/agent/commands?chat_jid=${encodeURIComponent(normalized)}`);
 }
 
 export async function getQuickActionsSettings() {
@@ -318,7 +338,7 @@ export async function getChatBranches(rootChatJid = null, options: ApiOptions = 
     if (rootChatJid) params.set('root_chat_jid', String(rootChatJid));
     if (options?.includeArchived) params.set('include_archived', '1');
     const query = params.toString() ? `?${params.toString()}` : '';
-    return request(`/agent/branches${query}`);
+    return deduplicatedGet(`/agent/branches${query}`);
 }
 
 /**
@@ -459,7 +479,7 @@ export async function deleteWebPushSubscription(subscription, options: ApiOption
  * Get available agents / current agent roster.
  */
 export async function getAgents() {
-    return request('/agent/roster');
+    return deduplicatedGet("/agent/roster");
 }
 
 /**
@@ -467,7 +487,7 @@ export async function getAgents() {
  */
 export async function getAgentStatus(chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    return request(`/agent/status${query}`);
+    return deduplicatedGet(`/agent/status${query}`);
 }
 
 /**
@@ -476,7 +496,7 @@ export async function getAgentStatus(chatJid = null) {
  */
 export async function getAgentContext(chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    return request(`/agent/context${query}`);
+    return deduplicatedGet(`/agent/context${query}`);
 }
 
 /**
@@ -484,7 +504,7 @@ export async function getAgentContext(chatJid = null) {
  */
 export async function getAutoresearchStatus(chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    return request(`/agent/autoresearch/status${query}`);
+    return deduplicatedGet(`/agent/autoresearch/status${query}`);
 }
 
 /**
@@ -514,7 +534,7 @@ export async function dismissAutoresearch(chatJid = null) {
  */
 export async function getAgentQueueState(chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    return request(`/agent/queue-state${query}`);
+    return deduplicatedGet(`/agent/queue-state${query}`);
 }
 
 /**
@@ -574,7 +594,7 @@ export async function reorderAgentQueueItem(fromIndex, toIndex, chatJid = null) 
  */
 export async function getAgentModels(chatJid = null) {
     const query = chatJid ? `?chat_jid=${encodeURIComponent(chatJid)}` : '';
-    return request(`/agent/models${query}`);
+    return deduplicatedGet(`/agent/models${query}`);
 }
 
 export async function completeInstanceOobe(kind = 'provider-ready') {

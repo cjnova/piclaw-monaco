@@ -1,6 +1,8 @@
-// @ts-nocheck
 
-export function isStandaloneWebAppMode(runtime = {}) {
+type ChatWindowRuntime = { window?: any; navigator?: any };
+type ChatWindowOptions = Record<string, any>;
+
+export function isStandaloneWebAppMode(runtime: ChatWindowRuntime = {}) {
     const win = runtime.window ?? (typeof window !== 'undefined' ? window : null);
     const nav = runtime.navigator ?? (typeof navigator !== 'undefined' ? navigator : null);
 
@@ -27,7 +29,7 @@ export function isStandaloneWebAppMode(runtime = {}) {
     });
 }
 
-export function isMobileBrowserMode(runtime = {}) {
+export function isMobileBrowserMode(runtime: ChatWindowRuntime = {}) {
     const win = runtime.window ?? (typeof window !== 'undefined' ? window : null);
     const nav = runtime.navigator ?? (typeof navigator !== 'undefined' ? navigator : null);
     if (!win && !nav) return false;
@@ -47,7 +49,7 @@ export function isMobileBrowserMode(runtime = {}) {
     return Boolean(mobileUa || maxTouchPoints > 1 || coarsePointer);
 }
 
-export function getChatWindowOpenOptions(chatJid, runtime = {}) {
+export function getChatWindowOpenOptions(chatJid, runtime: ChatWindowRuntime = {}) {
     if (isStandaloneWebAppMode(runtime)) {
         return null;
     }
@@ -65,7 +67,7 @@ export function getChatWindowOpenOptions(chatJid, runtime = {}) {
     };
 }
 
-export function openProvisionalChatWindow(openOptions, runtime = {}) {
+export function openProvisionalChatWindow(openOptions, runtime: ChatWindowRuntime = {}) {
     const win = runtime.window ?? (typeof window !== 'undefined' ? window : null);
     if (!win || !openOptions) return null;
     try {
@@ -78,7 +80,7 @@ export function openProvisionalChatWindow(openOptions, runtime = {}) {
     }
 }
 
-export function primeProvisionalChatWindow(handle, options = {}) {
+export function primeProvisionalChatWindow(handle, options: ChatWindowOptions = {}) {
     if (!handle || !handle.document) return;
     try {
         const title = String(options.title || 'Opening branch…');
@@ -138,7 +140,7 @@ export function closeProvisionalChatWindow(handle) {
     }
 }
 
-export function buildChatWindowUrl(baseHref, chatJid, options = {}) {
+export function buildChatWindowUrl(baseHref, chatJid, options: ChatWindowOptions = {}) {
     const url = new URL(String(baseHref || 'http://localhost/'));
     const normalizedChatJid = String(chatJid || '').trim() || 'web:default';
     url.searchParams.set('chat_jid', normalizedChatJid);
@@ -153,7 +155,7 @@ export function buildChatWindowUrl(baseHref, chatJid, options = {}) {
     return url.toString();
 }
 
-export function buildBranchLoaderUrl(baseHref, sourceChatJid, options = {}) {
+export function buildBranchLoaderUrl(baseHref, sourceChatJid, options: ChatWindowOptions = {}) {
     const url = new URL(String(baseHref || 'http://localhost/'));
     const normalizedChatJid = String(sourceChatJid || '').trim() || 'web:default';
     url.searchParams.set('branch_loader', '1');
@@ -168,7 +170,7 @@ export function buildBranchLoaderUrl(baseHref, sourceChatJid, options = {}) {
     return url.toString();
 }
 
-export function buildPanePopoutUrl(baseHref, panePath, options = {}) {
+export function buildPanePopoutUrl(baseHref, panePath, options: ChatWindowOptions = {}) {
     const url = new URL(String(baseHref || 'http://localhost/'));
     const normalizedPanePath = String(panePath || '').trim();
     if (!normalizedPanePath) return url.toString();
@@ -216,7 +218,7 @@ export function getPaneWindowTarget(panePath) {
     return `piclaw-pane-${normalized || 'default'}`;
 }
 
-export function getPaneWindowOpenOptions(panePath, runtime = {}) {
+export function getPaneWindowOpenOptions(panePath, runtime: ChatWindowRuntime = {}) {
     if (isStandaloneWebAppMode(runtime)) {
         return null;
     }

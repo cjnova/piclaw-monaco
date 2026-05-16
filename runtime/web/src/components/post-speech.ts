@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { buildPostMarkdownCopyPayload } from '../utils/post-copy-markdown.js';
 
