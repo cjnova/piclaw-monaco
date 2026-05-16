@@ -107,7 +107,6 @@ export function ModelContextBar() {
         </span>
       )}
       <ContextRing
-        percent={contextPercent.value}
         tokens={contextTokens.value}
         contextWindow={contextWindow.value}
         onClick={(e) => handleCompact(e, fetchContext)}
