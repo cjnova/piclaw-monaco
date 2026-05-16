@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16
+Generated: 2026-05-16T07:11Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -15,7 +15,7 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 - `CollapsibleContent.tsx` — Collapse/expand for text/markdown and item lists. Exports: `truncateByLines`, `MarkdownContent`, `CollapsibleContent`.
 - `CommandPalette.tsx` — Slash-command palette shell. Exports: `CommandPalette`.
 - `CopyButton.tsx` — Clipboard button with copied feedback and optional flash event. Exports: `CopyButton`.
-- `CustomSelect.tsx` — Dark-themed dropdown replacing native `<select>`. Exports: `CustomSelect`.
+- `CustomSelect.tsx` — Dark-themed dropdown replacing native `<select>`. Props: `options`, `value`, `onChange`, `className`, `placeholder`, `id`. Exports: `CustomSelect`.
 - `ExtensionPanelCard.tsx` — Extension-provided status/panel card renderer. Exports: `ExtensionPanelAction`, `ExtensionPanelSeries`, `ExtensionPanel`, `ExtensionPanelCard`, `normalizeExtensionPanelPayload`.
 - `FileIcon.tsx` — File/folder icon wrapper. Exports: `FileIcon`.
 - `FileTree.tsx` — Workspace file tree with persisted expanded/selected paths. Exports: `FileTree`, `TreeNode`.
@@ -154,8 +154,9 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
 - All overlays/modals should use `OverlayShell` for focus trap, scroll lock, Escape/backdrop behavior, and z-index tiering.
 - All popovers/dropdowns should use `useDismissableLayer` for outside-click + Escape dismiss.
-- Clipboard operations should use `utils/clipboard.ts` (`copyToClipboard`) rather than direct `navigator.clipboard`; current direct exceptions exist in code-copy/path-copy paths and should be migrated when touched.
-- localStorage access should use `utils/storage.ts` safe wrappers where practical; current direct exceptions exist in legacy/persistence paths and should be migrated when touched.
+- Clipboard operations should use `utils/clipboard.ts` (`copyToClipboard`) — no raw `navigator.clipboard` calls anywhere.
+- localStorage access should use `utils/storage.ts` safe wrappers where practical; remaining direct exceptions tracked in #434.
+- Scrollbar styling uses CSS variables (`--scrollbar-thumb`, `--scrollbar-track`) and utility classes (`.scrollable`, `.scrollable-x`, `.scroll-hidden`). No hardcoded scrollbar colors.
 - Shared formatting should use `utils/format.ts`; `utils/formatBytes.ts` is a legacy byte formatter still imported by workspace/file-tree code.
 - Dropdowns should use `CustomSelect` instead of native `<select>` for consistent dark popup styling.
 - Agent/panel cards should use `PanelHeader` and `CollapsibleContent` for headers/truncation instead of bespoke implementations.
