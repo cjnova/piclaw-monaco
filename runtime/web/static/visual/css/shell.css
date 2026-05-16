@@ -50,6 +50,8 @@
   --overlay-black-40: rgba(0, 0, 0, 0.4);
   --overlay-black-50: rgba(0, 0, 0, 0.5);
   --overlay-black-85: rgba(0, 0, 0, 0.85);
+  --scrollbar-thumb: var(--overlay-white-15);
+  --scrollbar-track: transparent;
   --modal-z-index: 10020;
   /* OverlayShell z-index tiers */
   --z-popup: 1000;
@@ -346,24 +348,7 @@ body {
   padding: 6px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
-}
-
-.command-palette__results::-webkit-scrollbar {
-  width: 6px;
-}
-
-.command-palette__results::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.command-palette__results::-webkit-scrollbar-thumb {
-  background: var(--overlay-white-15);
-  border-radius: 3px;
-}
-
-.command-palette__results::-webkit-scrollbar-thumb:hover {
-  background: var(--overlay-white-25);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .command-palette__row {
@@ -1157,7 +1142,7 @@ body {
   min-width: 200px;
   max-width: 320px;
   scrollbar-width: thin;
-  scrollbar-color: #45475a transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .model-picker__item {
@@ -1573,7 +1558,7 @@ body {
   overflow-y: auto;
   font-family: inherit;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .chat__input:focus {
@@ -2042,7 +2027,7 @@ body {
   flex-direction: column-reverse;
   gap: 10px;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-12) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .message-list--disconnected {
@@ -2608,33 +2593,7 @@ body {
 .workspace__preview-content,
 .file-tree {
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-18) transparent;
-}
-
-.workspace__pane-bottom::-webkit-scrollbar,
-.workspace__preview-content::-webkit-scrollbar,
-.file-tree::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.workspace__pane-bottom::-webkit-scrollbar-track,
-.workspace__preview-content::-webkit-scrollbar-track,
-.file-tree::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.workspace__pane-bottom::-webkit-scrollbar-thumb,
-.workspace__preview-content::-webkit-scrollbar-thumb,
-.file-tree::-webkit-scrollbar-thumb {
-  background: var(--overlay-white-18);
-  border-radius: 999px;
-}
-
-.workspace__pane-bottom::-webkit-scrollbar-thumb:hover,
-.workspace__preview-content::-webkit-scrollbar-thumb:hover,
-.file-tree::-webkit-scrollbar-thumb:hover {
-  background: var(--overlay-white-28);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .workspace__preview-header {
@@ -3283,24 +3242,7 @@ body {
   flex: 1;
   min-height: 0;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
-}
-
-.search-panel__results::-webkit-scrollbar {
-  width: 6px;
-}
-
-.search-panel__results::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.search-panel__results::-webkit-scrollbar-thumb {
-  background: var(--overlay-white-15);
-  border-radius: 3px;
-}
-
-.search-panel__results::-webkit-scrollbar-thumb:hover {
-  background: var(--overlay-white-25);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .search-panel__item {
@@ -3416,19 +3358,8 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 4px 10px 10px;
-}
-
-.addons-panel__list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.addons-panel__list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.addons-panel__list::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb, rgba(128,128,128,0.4));
-  border-radius: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .addons-panel__card {
@@ -3707,24 +3638,7 @@ body {
   font-size: 14px;
   line-height: 1.7;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
-}
-
-.extension-frame__markdown::-webkit-scrollbar {
-  width: 6px;
-}
-
-.extension-frame__markdown::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.extension-frame__markdown::-webkit-scrollbar-thumb {
-  background: var(--overlay-white-15);
-  border-radius: 3px;
-}
-
-.extension-frame__markdown::-webkit-scrollbar-thumb:hover {
-  background: var(--overlay-white-25);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .compaction-badge {
@@ -3810,11 +3724,7 @@ body {
   flex-shrink: 0;
 }
 
-.settings-panel__content { flex: 1; overflow-y: auto; padding: 16px 20px; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; position: relative; }
-
-.settings-panel__content::-webkit-scrollbar { width: 6px; }
-
-.settings-panel__content::-webkit-scrollbar-thumb { background: var(--overlay-white-15); border-radius: 3px; }
+.settings-panel__content { flex: 1; overflow-y: auto; padding: 16px 20px; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); position: relative; }
 
 .settings-panel__section { }
 
@@ -3864,7 +3774,7 @@ body {
   gap: 8px;
   padding: 24px;
 }
-.tasks-panel__list { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
+.tasks-panel__list { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
 
 .tasks-panel__action-icon {
   background: none;
@@ -4116,7 +4026,7 @@ body {
 .tasks-panel__filter-tab--active { background: var(--overlay-white-10); color: var(--text); font-weight: 600; }
 
 /* ── Task cards ── */
-.tasks-panel__tasks { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
+.tasks-panel__tasks { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
 .tasks-panel__tasks .tasks-panel__list { display: flex; flex-direction: column; gap: 8px; }
 .tasks-panel__card {
   background: var(--overlay-white-03);
@@ -4265,7 +4175,7 @@ body {
 .env-section__add-btn:hover { background: var(--accent); color: #fff; }
 .env-section__add-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .env-section__stats { font-size: 10px; color: var(--text-muted); }
-.env-section__list { display: flex; flex-direction: column; gap: 2px; max-height: 400px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--overlay-white-15) transparent; }
+.env-section__list { display: flex; flex-direction: column; gap: 2px; max-height: 400px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
 .env-section__row {
   display: flex;
   align-items: center;
@@ -4737,7 +4647,7 @@ body {
 .settings-panel__model-table-wrapper {
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   border: 1px solid var(--border);
   border-radius: 6px;
 }
@@ -4896,7 +4806,7 @@ body {
   overflow-y: auto;
   padding: 4px 0;
   scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 .scratchpad-panel__empty {
   display: flex;
@@ -7154,7 +7064,7 @@ pre.frontmatter-block {
   border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   z-index: 10000; max-height: 280px; overflow-y: auto;
   padding: 4px; scrollbar-width: thin;
-  scrollbar-color: var(--overlay-white-15) transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 .custom-select__option {
   display: block; width: 100%; padding: 5px 10px;
@@ -7201,3 +7111,12 @@ mark[data-highlight] { border-radius: 2px; padding: 0 1px; }
 
 /* Utility: text ellipsis overflow */
 .text-ellipsis { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Scrollbar utilities ── */
+.scrollable { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+.scrollable::-webkit-scrollbar { width: 6px; }
+.scrollable::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+.scrollable::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.scrollable-x { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+.scroll-hidden { overflow-y: auto; scrollbar-width: none; }
+.scroll-hidden::-webkit-scrollbar { display: none; }
