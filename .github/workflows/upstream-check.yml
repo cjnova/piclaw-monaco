@@ -1,70 +1,104 @@
 name: Check upstream releases
 on:
   schedule:
-    - cron: '0 8 * * 1'  # Every Monday 8am UTC
+    - cron: '0 6 * * *'  # Daily at 06:00 UTC (08:00 CET)
   workflow_dispatch:
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Get latest upstream container version
+      - name: Fetch upstream tags
         id: check
         run: |
-          SYNCED=$(cat .piclaw-monaco-upstream-tag 2>/dev/null || echo "v0.0.0")
-          # Query ghcr.io for the latest container image version
-          # The API returns tags sorted by most recent; pick the first semver tag
-          LATEST=$(curl -s "https://ghcr.io/v2/rcarmo/piclaw/tags/list" \
-            -H "Accept: application/json" \
-            | jq -r '.tags // [] | map(select(test("^v[0-9]"))) | sort_by(split(".") | map(ltrimstr("v") | tonumber? // 0)) | reverse | .[0] // empty' 2>/dev/null || echo "")
-          
-          # Fallback: use GitHub API to get package versions
-          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
-            LATEST=$(curl -s "https://api.github.com/users/rcarmo/packages/container/piclaw/versions" \
-              -H "Accept: application/vnd.github+json" \
-              | jq -r '.[0].metadata.container.tags[] | select(test("^v[0-9]"))' 2>/dev/null | head -1 || echo "")
-          fi
+          git remote add upstream https://github.com/rcarmo/piclaw.git 2>/dev/null || true
+          git fetch upstream --tags
 
-          # Final fallback: git tags
-          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
-            git remote add upstream https://github.com/rcarmo/piclaw.git 2>/dev/null || true
-            git fetch upstream --tags 2>/dev/null
-            LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
-          fi
+          SYNCED=$(cat .piclaw-monaco-upstream-tag 2>/dev/null || echo "v0.0.0")
+          LATEST=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v -- '-ux' | grep -v -- '-prerelease' | head -1)
 
           echo "synced=$SYNCED" >> $GITHUB_OUTPUT
           echo "latest=${LATEST:-unknown}" >> $GITHUB_OUTPUT
+
           if [ -n "$LATEST" ] && [ "$LATEST" != "null" ] && [ "$LATEST" != "$SYNCED" ]; then
-            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "new_tag=true" >> $GITHUB_OUTPUT
           else
-            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "new_tag=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create issue for new release
-        if: steps.check.outputs.new_release == 'true'
-        uses: actions/github-script@v9
+      - name: Create sync branch and PR
+        if: steps.check.outputs.new_tag == 'true'
+        uses: actions/github-script@v7
+        env:
+          LATEST_TAG: ${{ steps.check.outputs.latest }}
+          SYNCED_TAG: ${{ steps.check.outputs.synced }}
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const synced = '${{ steps.check.outputs.synced }}';
-            const latest = '${{ steps.check.outputs.latest }}';
-            // Check if issue already exists
-            const existing = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'upstream-sync',
-            });
-            const alreadyExists = existing.data.some(i => i.title.includes(latest));
-            if (alreadyExists) {
-              console.log(`Issue for ${latest} already exists, skipping.`);
+            const { owner, repo } = context.repo;
+            const latestTag = process.env.LATEST_TAG;
+            const syncedTag = process.env.SYNCED_TAG;
+            const branchName = `sync/upstream-${latestTag}`;
+
+            // Check if branch already exists
+            let branchExists = false;
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branchName}` });
+              branchExists = true;
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
+
+            if (branchExists) {
+              core.info(`Branch ${branchName} already exists, skipping.`);
               return;
             }
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Upstream release ${latest} available (currently synced: ${synced})`,
-              body: `A new upstream container image \`${latest}\` is available from \`ghcr.io/rcarmo/piclaw\`.\n\nCurrent synced tag: \`${synced}\`\n\nSource: https://github.com/rcarmo/piclaw/pkgs/container/piclaw\n\nFollow the sync strategy in \`docs/UPSTREAM-SYNC.md\` to merge.`,
-              labels: ['upstream-sync']
+
+            // Check if PR already exists
+            const prs = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${branchName}` });
+            if (prs.data.length > 0) {
+              core.info(`PR for ${branchName} already exists, skipping.`);
+              return;
+            }
+
+            // Get the SHA of the upstream tag
+            const tagRef = await github.rest.git.getRef({
+              owner: 'rcarmo',
+              repo: 'piclaw',
+              ref: `tags/${latestTag}`,
             });
+            const tagSha = tagRef.data.object.sha;
+
+            // Get our main branch SHA as base
+            const mainRef = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            const mainSha = mainRef.data.object.sha;
+
+            // Create the sync branch from main
+            await github.rest.git.createRef({
+              owner,
+              repo,
+              ref: `refs/heads/${branchName}`,
+              sha: mainSha,
+            });
+
+            core.info(`Created branch ${branchName} at ${mainSha}`);
+
+            // Open a PR (no auto-merge)
+            const pr = await github.rest.pulls.create({
+              owner,
+              repo,
+              title: `chore: sync upstream ${latestTag}`,
+              head: branchName,
+              base: 'main',
+              body: `## Upstream sync: ${latestTag}\n\nA new upstream release \`${latestTag}\` is available from [rcarmo/piclaw](https://github.com/rcarmo/piclaw).\n\n**Currently synced:** \`${syncedTag}\`\n**New upstream tag:** \`${latestTag}\`\n\n### Next steps\n1. Cherry-pick or merge relevant upstream commits into this branch.\n2. Update \`.piclaw-monaco-upstream-tag\` to \`${latestTag}\`.\n3. Review and request approval — **no auto-merge**.\n\nSee \`docs/UPSTREAM-SYNC.md\` for the full sync strategy.`,
+              labels: ['upstream-sync'],
+            });
+
+            core.info(`Opened PR #${pr.data.number}: ${pr.data.html_url}`);
