@@ -1,7 +1,7 @@
 import { isSafeExtensionUrl } from "./utils/isSafeExtensionUrl";
 import { useCallback, useRef, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { getChatJid } from "./api/chat-jid";
+import { getChatJid, persistChatJid } from "./api/chat-jid";
 import { ActivityBar } from "./components/ActivityBar";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
@@ -161,6 +161,7 @@ function AppContent() {
   // Redirect away from archived or non-existent sessions on load
   useEffect(() => {
     const chatJid = getChatJid();
+    persistChatJid(chatJid); // Save current session on initial load
     if (chatJid === "web:default") return;
     fetch(`/agent/branches?include_archived=1`, { credentials: "same-origin" })
       .then(res => res.ok ? res.json() : null)
