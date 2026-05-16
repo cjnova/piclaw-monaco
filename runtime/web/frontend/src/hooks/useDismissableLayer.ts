@@ -1,4 +1,4 @@
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { RefObject } from "preact";
 
 interface UseDismissableLayerOptions {
@@ -16,15 +16,18 @@ export function useDismissableLayer({
   outsideEvent = "pointerdown",
   escape = true,
 }: UseDismissableLayerOptions) {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
   useEffect(() => {
     if (!open) return;
     const handleOutside = (e: Event) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        onDismiss();
+        onDismissRef.current();
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
+      if (e.key === "Escape") onDismissRef.current();
     };
     document.addEventListener(outsideEvent, handleOutside);
     if (escape) document.addEventListener("keydown", handleKey);
@@ -32,5 +35,5 @@ export function useDismissableLayer({
       document.removeEventListener(outsideEvent, handleOutside);
       if (escape) document.removeEventListener("keydown", handleKey);
     };
-  }, [open, ref, onDismiss, outsideEvent, escape]);
+  }, [open, ref, outsideEvent, escape]);
 }
