@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16T07:50Z
+Generated: 2026-05-16T09:34Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -110,6 +110,7 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
 ### Settings panels (`panels/settings/`)
 - `AppearanceSection.tsx` — Theme/avatar/settings appearance section. Exports: `AppearanceSection`.
+- `AuthenticationSection.tsx` — TOTP setup/status + passkey management (enrol/list/delete). Exports: `AuthenticationSection`. Uses: `CopyButton`, `useDialog`, `sanitizeSvg`.
 - `AvatarSection.tsx` — Avatar upload/reset settings. Exports: `AvatarSection`.
 - `CompactionSection.tsx` — Compaction/watchdog settings. Exports: `CompactionSection`.
 - `EnvironmentSection.tsx` — Environment variables/settings section. Exports: `EnvironmentSection`.
@@ -134,7 +135,7 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
 ## API Layer (api/)
 
-- `chat-jid.ts` — Chat-scoped URL builders. Exports: `getChatJid`, `getMessageUrl`, `buildChatUrl`, `buildChatScopedUrl`.
+- `chat-jid.ts` — Chat-scoped URL builders + session persistence. Exports: `getChatJid`, `persistChatJid`, `getMessageUrl`, `buildChatUrl`, `buildChatScopedUrl`.
 - `identity.ts` — User/assistant avatar URL signals. Exports: `userAvatarUrl`, `assistantAvatarUrl`.
 - `types.ts` — Generic API response/status types. Exports: `ApiErrorResponse`, `ApiSuccessResponse`, `ApiResponse`, `ConnectionStatus`.
 
@@ -235,6 +236,7 @@ Local imports only; external libraries (`preact`, `@preact/signals`, etc.) omitt
 - `TasksPanel.tsx` → `api/chat-jid`, `hooks/useDialog`.
 - `WorkspacePanel.tsx` → `components/FileTree`, `utils/formatBytes`, `utils/storage`, `panels/workspace/FolderPreview`, `useWorkspacePreview`, `WorkspaceActions`, `WorkspacePreview`, `hooks/useDialog`.
 - `settings/AppearanceSection.tsx` → `settings/types`, `AvatarSection`, `pane-registry`, `utils/bundled-themes`, `components/CustomSelect`.
+- `settings/AuthenticationSection.tsx` → `hooks/useDialog`, `components/CopyButton`, `utils/agent-status`, `pane-registry`.
 - `settings/CompactionSection.tsx` → `settings/types`, `NumberStepper`, `pane-registry`.
 - `settings/EnvironmentSection.tsx` → `pane-registry`.
 - `settings/GeneralSection.tsx` → `settings/types`, `NumberStepper`, `pane-registry`.
