@@ -1,5 +1,6 @@
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { useComputed } from "@preact/signals";
+import { useDismissableLayer } from "../hooks/useDismissableLayer";
 import { useStatusPolling } from "./model-context-bar/useStatusPolling";
 import { useCompaction } from "./model-context-bar/useCompaction";
 import { useModelPicker } from "./model-context-bar/useModelPicker";
@@ -34,24 +35,14 @@ export function ModelContextBar() {
   const thinkingLevel = agentStatus.value?.data?.thinking_level || currentThinkingLevel.value || "";
   const activeModel = currentModel.value ?? modelName;
 
-  // Close pickers on outside click or Escape
-  useEffect(() => {
-    if (!showPicker.value && !showThinkingPicker.value) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { showPicker.value = false; showThinkingPicker.value = false; }
-    };
-    const onClick = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest("[data-model-picker]")) {
-        showPicker.value = false; showThinkingPicker.value = false;
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("click", onClick);
-    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("click", onClick); };
-  }, [showPicker.value, showThinkingPicker.value]);
+  const pickerOpen = showPicker.value || showThinkingPicker.value;
+  const pickerWrapRef = useRef<HTMLSpanElement>(null);
+  const dismissPickers = () => { showPicker.value = false; showThinkingPicker.value = false; };
+  useDismissableLayer({ ref: pickerWrapRef, open: pickerOpen, onDismiss: dismissPickers, outsideEvent: "click" });
 
   return (
     <span
+      ref={pickerWrapRef}
       data-model-picker
       className={`model-badge-wrapper${isStale.value ? " model-badge-wrapper--stale" : ""}`}
     >

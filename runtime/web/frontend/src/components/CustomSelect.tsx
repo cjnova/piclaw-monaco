@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from "preact/hooks";
+import { useState, useRef, useMemo } from "preact/hooks";
+import { useDismissableLayer } from "../hooks/useDismissableLayer";
 
 interface Option {
   value: string;
@@ -26,27 +27,7 @@ export function CustomSelect({ options, value, onChange, className, placeholder 
   const selected = options.find((o) => o.value === value);
   const displayLabel = selected?.label ?? placeholder ?? "Select...";
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open]);
+  useDismissableLayer({ ref, open, onDismiss: () => setOpen(false), outsideEvent: "mousedown" });
 
   return (
     <div className={`custom-select ${className ?? ""}`} ref={ref}>
