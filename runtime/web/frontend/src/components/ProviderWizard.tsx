@@ -17,6 +17,7 @@ import { useSignal } from "@preact/signals";
 import { getMessageUrl } from "../api/chat-jid";
 import type { Provider } from "../panels/settings/types";
 import { CustomSelect } from "./CustomSelect";
+import { safeSetItem } from "../utils/storage";
 
 interface ProviderWizardProps {
   onDismiss: () => void;
@@ -326,7 +327,7 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
   }, [step, errorMsg, oauthUrl, apiKeyInput, activeProvider, providerId]);
 
   const handleSkip = useCallback(() => {
-    localStorage.setItem("piclaw_wizard_dismissed", "1");
+    safeSetItem("piclaw_wizard_dismissed", "1");
     onDismiss();
   }, [onDismiss]);
 

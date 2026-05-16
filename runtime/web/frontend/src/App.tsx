@@ -24,6 +24,7 @@ import { ExtensionFrame } from "./app/ExtensionFrame";
 import { useDialog } from "./hooks/useDialog";
 import { ProviderWizard } from "./components/ProviderWizard";
 import { providerConfigured } from "./app/providerState";
+import { safeGetItem } from "./utils/storage";
 
 const PANEL_NAMES: Record<string, string> = {
   explorer: "Workspace", search: "Search", extensions: "Addons",
@@ -43,7 +44,7 @@ function AppContent() {
   } = layout;
   const paletteVisible = useSignal(false);
   const statusFlash = useStatusFlash();
-  const wizardDismissed = useSignal<boolean>(!!localStorage.getItem("piclaw_wizard_dismissed"));
+  const wizardDismissed = useSignal<boolean>(!!safeGetItem("piclaw_wizard_dismissed"));
   const extensionPageUrl = useSignal<string | null>(null);
   const extensionPageName = useSignal<string | null>(null);
   const extensionPageHtml = useSignal<string | null>(null);

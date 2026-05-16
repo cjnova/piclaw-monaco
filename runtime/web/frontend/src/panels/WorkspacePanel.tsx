@@ -95,10 +95,8 @@ function FilePreview({ node, onMutate }: FilePreviewProps) {
 const SHOW_HIDDEN_KEY = "workspaceShowHidden";
 
 function loadShowHidden(): boolean {
-  try {
-    const raw = localStorage.getItem(SHOW_HIDDEN_KEY);
-    if (raw !== null) return raw !== "false";
-  } catch {}
+  const raw = safeGetItem(SHOW_HIDDEN_KEY);
+  if (raw !== null) return raw !== "false";
   return true;
 }
 
@@ -127,7 +125,7 @@ export function WorkspacePanel() {
   const handleToggleHidden = useCallback(() => {
     setShowHidden((prev) => {
       const next = !prev;
-      try { localStorage.setItem(SHOW_HIDDEN_KEY, String(next)); } catch {}
+      safeSetItem(SHOW_HIDDEN_KEY, String(next));
       return next;
     });
   }, []);
