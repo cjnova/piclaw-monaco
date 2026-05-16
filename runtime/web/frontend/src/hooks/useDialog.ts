@@ -2,112 +2,50 @@ import { h, type JSX } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { ModalDialog } from "../components/ModalDialog";
 
-interface PromptOptions {
-  title: string;
-  description?: string;
-  placeholder?: string;
-  defaultValue?: string;
+export interface PromptOptions { title: string; description?: string; placeholder?: string; defaultValue?: string; }
+export interface ConfirmOptions { title: string; description?: string; confirmLabel?: string; destructive?: boolean; }
+export interface AlertOptions { title: string; description?: string; }
+
+type DialogRequest =
+  | { kind: "prompt"; opts: PromptOptions; resolve: (v: string | null) => void; settled: boolean }
+  | { kind: "confirm"; opts: ConfirmOptions; resolve: (v: boolean) => void; settled: boolean }
+  | { kind: "alert"; opts: AlertOptions; resolve: () => void; settled: boolean };
+
+const queue: DialogRequest[] = [];
+let active: DialogRequest | null = null;
+const subs = new Set<() => void>();
+const notify = () => subs.forEach((s) => s());
+
+function enqueue(d: DialogRequest) {
+  if (!active) { active = d; notify(); } else queue.push(d);
 }
 
-interface ConfirmOptions {
-  title: string;
-  description?: string;
-  confirmLabel?: string;
-  destructive?: boolean;
-}
-
-interface AlertOptions {
-  title: string;
-  description?: string;
-}
-
-interface BaseDialogRequest {
-  settled: boolean;
-}
-
-type PromptDialogRequest = BaseDialogRequest & {
-  kind: "prompt";
-  opts: PromptOptions;
-  resolve: (value: string | null) => void;
-};
-
-type ConfirmDialogRequest = BaseDialogRequest & {
-  kind: "confirm";
-  opts: ConfirmOptions;
-  resolve: (value: boolean) => void;
-};
-
-type AlertDialogRequest = BaseDialogRequest & {
-  kind: "alert";
-  opts: AlertOptions;
-  resolve: () => void;
-};
-
-type DialogRequest = PromptDialogRequest | ConfirmDialogRequest | AlertDialogRequest;
-
-const dialogQueue: DialogRequest[] = [];
-let activeDialog: DialogRequest | null = null;
-const subscribers = new Set<() => void>();
-
-function notifySubscribers() {
-  subscribers.forEach((subscriber) => subscriber());
-}
-
-function enqueueDialog(dialog: DialogRequest) {
-  if (!activeDialog) {
-    activeDialog = dialog;
-    notifySubscribers();
-    return;
-  }
-  dialogQueue.push(dialog);
-}
-
-function resolveActiveDialog() {
-  activeDialog = dialogQueue.shift() ?? null;
-  notifySubscribers();
-}
-
-function settleDialog(dialog: DialogRequest, settle: () => void) {
-  if (dialog.settled) return;
-  dialog.settled = true;
-  settle();
-  resolveActiveDialog();
-}
-
-function getActiveDialog() {
-  return activeDialog;
-}
-
-function subscribeDialog(listener: () => void) {
-  subscribers.add(listener);
-  return () => {
-    subscribers.delete(listener);
-  };
+function settle(d: DialogRequest, fn: () => void) {
+  if (d.settled) return;
+  d.settled = true;
+  fn();
+  active = queue.shift() ?? null;
+  notify();
 }
 
 function showPrompt(opts: PromptOptions): Promise<string | null> {
-  return new Promise((resolve) => {
-    enqueueDialog({ kind: "prompt", opts, resolve, settled: false });
-  });
+  return new Promise((resolve) => enqueue({ kind: "prompt", opts, resolve, settled: false }));
 }
 
 function showConfirm(opts: ConfirmOptions): Promise<boolean> {
-  return new Promise((resolve) => {
-    enqueueDialog({ kind: "confirm", opts, resolve, settled: false });
-  });
+  return new Promise((resolve) => enqueue({ kind: "confirm", opts, resolve, settled: false }));
 }
 
 function showAlert(opts: AlertOptions): Promise<void> {
-  return new Promise((resolve) => {
-    enqueueDialog({ kind: "alert", opts, resolve, settled: false });
-  });
+  return new Promise((resolve) => enqueue({ kind: "alert", opts, resolve, settled: false }));
 }
 
 function DialogHost(): JSX.Element {
-  const [dialog, setDialog] = useState<DialogRequest | null>(getActiveDialog());
-
+  const [dialog, setDialog] = useState<DialogRequest | null>(active);
   useEffect(() => {
-    return subscribeDialog(() => setDialog(getActiveDialog()));
+    const handler = () => setDialog(active);
+    subs.add(handler);
+    return () => { subs.delete(handler); };
   }, []);
 
   if (!dialog) return null;
@@ -120,16 +58,8 @@ function DialogHost(): JSX.Element {
       placeholder: dialog.opts.placeholder,
       defaultValue: dialog.opts.defaultValue,
       confirmLabel: "Save",
-      onConfirm: (value) => {
-        settleDialog(dialog, () => {
-          dialog.resolve(value?.trim() ? value : null);
-        });
-      },
-      onCancel: () => {
-        settleDialog(dialog, () => {
-          dialog.resolve(null);
-        });
-      },
+      onConfirm: (value) => settle(dialog, () => dialog.resolve(value?.trim() ? value : null)),
+      onCancel: () => settle(dialog, () => dialog.resolve(null)),
     });
   }
 
@@ -140,16 +70,8 @@ function DialogHost(): JSX.Element {
       description: dialog.opts.description,
       confirmLabel: dialog.opts.confirmLabel ?? "Confirm",
       destructive: dialog.opts.destructive,
-      onConfirm: () => {
-        settleDialog(dialog, () => {
-          dialog.resolve(true);
-        });
-      },
-      onCancel: () => {
-        settleDialog(dialog, () => {
-          dialog.resolve(false);
-        });
-      },
+      onConfirm: () => settle(dialog, () => dialog.resolve(true)),
+      onCancel: () => settle(dialog, () => dialog.resolve(false)),
     });
   }
 
@@ -158,16 +80,8 @@ function DialogHost(): JSX.Element {
     title: dialog.opts.title,
     description: dialog.opts.description,
     confirmLabel: "OK",
-    onConfirm: () => {
-      settleDialog(dialog, () => {
-        dialog.resolve();
-      });
-    },
-    onCancel: () => {
-      settleDialog(dialog, () => {
-        dialog.resolve();
-      });
-    },
+    onConfirm: () => settle(dialog, () => dialog.resolve()),
+    onCancel: () => settle(dialog, () => dialog.resolve()),
   });
 }
 
@@ -177,10 +91,5 @@ export function useDialog(): {
   showAlert: (opts: AlertOptions) => Promise<void>;
   DialogHost: () => JSX.Element;
 } {
-  return {
-    showPrompt,
-    showConfirm,
-    showAlert,
-    DialogHost,
-  };
+  return { showPrompt, showConfirm, showAlert, DialogHost };
 }
