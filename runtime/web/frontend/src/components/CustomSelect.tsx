@@ -12,13 +12,14 @@ interface CustomSelectProps {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  id?: string;
 }
 
 /**
  * Custom styled dropdown that respects dark theme.
  * Replaces native <select> which has browser-dependent popup styling.
  */
-export function CustomSelect({ options, value, onChange, className, placeholder }: CustomSelectProps) {
+export function CustomSelect({ options, value, onChange, className, placeholder, id }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -33,6 +34,7 @@ export function CustomSelect({ options, value, onChange, className, placeholder 
     <div className={`custom-select ${className ?? ""}`} ref={ref}>
       <button
         type="button"
+        id={id}
         className="custom-select__trigger"
         ref={triggerRef}
         onClick={() => {

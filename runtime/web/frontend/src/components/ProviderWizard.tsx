@@ -445,6 +445,7 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
                   Provider
                 </label>
                 <CustomSelect
+                  id="api-provider-select"
                   className="provider-wizard__select"
                   options={apiKeyProviders.map((p) => ({ value: p.id, label: p.name }))}
                   value={selectedApiProvider.value}
