@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useRef } from '../vendor/preact-htm.js';
 import { SSEClient } from '../api.js';
 import { isIOSDevice } from './app-helpers.js';

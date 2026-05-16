@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useEffect } from '../vendor/preact-htm.js';
 import { BodyPortal } from './body-portal.js';
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useEffect, useRef } from '../vendor/preact-htm.js';
 import { renderMarkdown, renderMermaidDiagrams, renderThinkingMarkdown } from '../markdown.js';
 import { shouldShowBtwAnswer, shouldShowBtwControls } from '../ui/btw.js';

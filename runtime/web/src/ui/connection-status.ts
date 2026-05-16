@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useMemo, useState } from '../vendor/preact-htm.js';
 
 export const RECONNECTING_HINT_DELAY_MS = 350;

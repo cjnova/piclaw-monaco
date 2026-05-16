@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html, useEffect, useState } from '../vendor/preact-htm.js';
 import { consumeRequestedSettingsOpenState, normalizeSettingsSectionId, requestOpenSettingsDialog } from './settings-dialog-events.js';
 

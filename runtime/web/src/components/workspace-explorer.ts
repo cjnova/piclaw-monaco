@@ -1,5 +1,5 @@
-// @ts-nocheck
 import { html, useCallback, useEffect, useMemo, useRef, useState } from '../vendor/preact-htm.js';
+import { renderDisclosureTriangle } from '../ui/disclosure-triangle.js';
 import { getLocalStorageBoolean, getLocalStorageItem, getLocalStorageNumber, setLocalStorageItem } from '../utils/storage.js';
 import {
     createWorkspaceFile,
@@ -2516,11 +2516,7 @@ export function WorkspaceExplorer({
                                     onMouseDown=${handleRowMouseDown}
                                 >
                                     <span class="workspace-caret" aria-hidden="true">
-                                        ${isDir
-                                            ? (isOpen
-                                                ? html`<svg viewBox="0 0 12 12"><polygon points="1,2 11,2 6,11"/></svg>`
-                                                : html`<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>`)
-                                            : null}
+                                        ${isDir ? renderDisclosureTriangle(isOpen ? 'down' : 'right') : null}
                                     </span>
                                     <svg class=${`workspace-node-icon${isDir ? ' folder' : ''}`}
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor"

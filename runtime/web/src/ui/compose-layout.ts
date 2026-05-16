@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 /**
  * Decide whether the inline AGENTS affordance should be shown in the compose footer.

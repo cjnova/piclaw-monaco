@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { getLocalStorageItem, setLocalStorageItem } from '../utils/storage.js';
 
 const THEME_STORAGE_KEY = 'piclaw_theme';
@@ -530,7 +529,7 @@ function clearCssVariables() {
     THEME_VAR_KEYS.forEach((key) => root.style.removeProperty(key));
 }
 
-function ensureMetaTag(name, options = {}) {
+function ensureMetaTag(name, options: { id?: string } = {}) {
     if (typeof document === 'undefined') return null;
     const id = typeof options.id === 'string' && options.id.trim() ? options.id.trim() : null;
     let tag = id
@@ -604,7 +603,14 @@ function resolveCurrentChatJid() {
     }
 }
 
-function applyThemeState(nextTheme, options = {}) {
+function syncDocumentBackground(color) {
+    if (typeof document === 'undefined' || !color) return;
+    const root = document.documentElement;
+    if (root?.style) root.style.background = color;
+    if (document.body?.style) document.body.style.background = color;
+}
+
+function applyThemeState(nextTheme, options: { persist?: boolean } = {}) {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const themeName = normalizeThemeName(nextTheme?.theme || 'default');
     const tint = nextTheme?.tint ? String(nextTheme.tint).trim() : null;
@@ -632,6 +638,7 @@ function applyThemeState(nextTheme, options = {}) {
         applyCssVariables(palette, mode);
     }
 
+    syncDocumentBackground(palette.bgPrimary);
     updateMetaColor(palette.bgPrimary, mode);
     emitThemeChange();
 
@@ -648,13 +655,19 @@ function handleSystemThemeChange() {
     applyThemeState(currentTheme, { persist: false });
 }
 
-export function initTheme() {
-    if (typeof window === 'undefined') return () => {};
+export function reapplyStoredTheme() {
+    if (typeof window === 'undefined') return;
 
     const storedTheme = normalizeThemeName(getLocalStorageItem(THEME_STORAGE_KEY) || 'default');
     const storedTint = (() => { const raw = getLocalStorageItem(TINT_STORAGE_KEY); return raw ? raw.trim() : null; })();
 
     applyThemeState({ theme: storedTheme, tint: storedTint }, { persist: false });
+}
+
+export function initTheme() {
+    if (typeof window === 'undefined') return () => {};
+
+    reapplyStoredTheme();
 
     if (window.matchMedia && !mediaListenerAttached) {
         const media = window.matchMedia('(prefers-color-scheme: dark)');

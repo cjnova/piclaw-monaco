@@ -1,11 +1,10 @@
-// @ts-nocheck
 
 /** Format a timestamp as a human-readable relative or absolute time string. */
 export function formatTime(timestamp) {
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return timestamp;
     const now = new Date();
-    const diffMs = now - date;
+    const diffMs = now.getTime() - date.getTime();
     const diffSec = diffMs / 1000;
     const dayMs = 24 * 60 * 60 * 1000;
 

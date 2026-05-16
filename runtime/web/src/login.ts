@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * login.ts – Web login page behavior (TOTP + optional passkey login).
  *

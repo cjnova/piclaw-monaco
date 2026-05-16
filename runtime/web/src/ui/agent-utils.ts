@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 /** Default display name when no agent name is configured. */
 export const DEFAULT_AGENT_NAME = 'PiClaw';

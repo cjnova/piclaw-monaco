@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const dedupePosts = (items) => {
   const seen = new Set();
   return (items || []).filter((post) => {

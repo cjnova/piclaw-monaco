@@ -81,10 +81,9 @@ export function resizeTerminalRuntimeBestEffort(options: {
   runBestEffort(() => {
     options.fitAddon?.fit?.();
   });
-  runBestEffort(() => {
-    options.terminal?.refresh?.();
-  });
-  options.syncHostLayout();
+  // Do NOT call syncHostLayout again here — fit() sets pixel-accurate
+  // canvas dimensions via terminal.resize(); re-running syncHostLayout
+  // would overwrite those and create a resize feedback loop.
   options.sendResize();
 }
 

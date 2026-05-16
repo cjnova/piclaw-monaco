@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 export function buildTurnDotClass({ steerQueued = false, pulsing = false } = {}) {
     const classes = ['turn-dot'];
@@ -17,7 +16,6 @@ export function resolveRunningStatusIndicator(status, { isLastActivity = false, 
     if (pendingRequest) return 'dot';
     if (isLastActivity) return 'none';
     if (status?.type === 'error') return 'none';
-    if (status?.type === 'intent') return 'dot';
 
     const type = typeof status?.type === 'string' ? status.type : '';
     const hasToolMetadata = Boolean(
@@ -25,6 +23,7 @@ export function resolveRunningStatusIndicator(status, { isLastActivity = false, 
         || status?.tool_args,
     );
     if (hasToolMetadata) return 'spinner';
+    if (status?.type === 'intent') return 'dot';
     if (type === 'tool_call' || type === 'tool_status' || type === 'thinking' || type === 'waiting') {
         return 'spinner';
     }

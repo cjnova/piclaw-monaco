@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 export function normalizeHandle(value) {
     const normalized = normalizeHandleName(value);

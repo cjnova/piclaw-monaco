@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 /**
  * Return a stable async fallback for an optional API export and warn once it is missing.

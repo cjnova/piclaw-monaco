@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { html, useEffect, useMemo, useState } from '../vendor/preact-htm.js';
 import { getSystemMetrics } from '../api.js';
 import { METERS_COLLAPSED_EVENT_NAME, METERS_EVENT_NAME, applyMetersCollapsed, readStoredMetersCollapsed, readStoredMetersEnabled } from '../ui/meters.js';
+import { renderDisclosureTriangle } from '../ui/disclosure-triangle.js';
 
 function sanitizeSeries(input, maxPoints = 30) {
     const series = Array.isArray(input)
@@ -68,6 +68,9 @@ export function buildCompactMetersSummary(metrics) {
     if (Number(metrics?.buffer_cache_bytes) > 0) {
         parts.push(`BUF ${formatBytesCompact(metrics?.buffer_cache_bytes)}`);
     }
+    if (shouldShowVram(metrics)) {
+        parts.push(`VRAM ${formatPercent(metrics?.vram_percent)}`);
+    }
     if (Number.isFinite(Number(metrics?.swap_percent)) && Number(metrics?.swap_total_bytes) > 0) {
         parts.push(`SWP ${formatPercent(metrics?.swap_percent)}`);
     }
@@ -82,6 +85,15 @@ export function resolveCurrentRssBytes(metrics) {
 
 export function shouldShowRss(metrics) {
     return resolveCurrentRssBytes(metrics) > 0 && sanitizeSeries(metrics?.process_rss_series_bytes).length > 0;
+}
+
+export function shouldShowVram(metrics) {
+    return metrics?.vram_percent !== null
+        && metrics?.vram_percent !== undefined
+        && Number.isFinite(Number(metrics?.vram_percent))
+        && Number(metrics?.vram_total_bytes) > 0
+        && Number(metrics?.vram_used_bytes) >= 0
+        && sanitizeSeries(metrics?.vram_series).length > 0;
 }
 
 function readIsNarrowLayout() {
@@ -100,6 +112,11 @@ export function SystemMetersHud({ mode = 'overlay' }) {
         cpu_series: [],
         ram_series: [],
         swap_series: [],
+        vram_percent: null,
+        vram_series: [],
+        vram_total_bytes: 0,
+        vram_used_bytes: 0,
+        gpu_provider: null,
         buffer_cache_bytes: null,
         buffer_cache_series_bytes: [],
         process_rss_series_bytes: [],
@@ -159,9 +176,14 @@ export function SystemMetersHud({ mode = 'overlay' }) {
                     cpu_percent: Number(next?.cpu_percent) || 0,
                     ram_percent: Number(next?.ram_percent) || 0,
                     swap_percent: Number.isFinite(Number(next?.swap_percent)) ? Number(next?.swap_percent) : null,
+                    vram_percent: Number.isFinite(Number(next?.vram_percent)) ? Number(next?.vram_percent) : null,
                     cpu_series: clampPercentSeries(next?.cpu_series),
                     ram_series: clampPercentSeries(next?.ram_series),
                     swap_series: clampPercentSeries(next?.swap_series),
+                    vram_series: clampPercentSeries(next?.vram_series),
+                    vram_total_bytes: Number(next?.vram_total_bytes) || 0,
+                    vram_used_bytes: Number(next?.vram_used_bytes) || 0,
+                    gpu_provider: typeof next?.gpu_provider === 'string' && next.gpu_provider.trim() ? next.gpu_provider.trim() : null,
                     buffer_cache_bytes: Number.isFinite(Number(next?.buffer_cache_bytes)) ? Number(next?.buffer_cache_bytes) : null,
                     buffer_cache_series_bytes: sanitizeSeries(next?.buffer_cache_series_bytes),
                     process_rss_series_bytes: sanitizeSeries(next?.process_rss_series_bytes),
@@ -196,10 +218,12 @@ export function SystemMetersHud({ mode = 'overlay' }) {
     const cpuPath = useMemo(() => buildSparklinePath(metrics.cpu_series, 56, 16, { min: 0, max: 100 }), [metrics.cpu_series]);
     const ramPath = useMemo(() => buildSparklinePath(metrics.ram_series, 56, 16, { min: 0, max: 100 }), [metrics.ram_series]);
     const swapPath = useMemo(() => buildSparklinePath(metrics.swap_series, 56, 16, { min: 0, max: 100 }), [metrics.swap_series]);
+    const vramPath = useMemo(() => buildSparklinePath(metrics.vram_series, 56, 16, { min: 0, max: 100 }), [metrics.vram_series]);
     const bufferCachePath = useMemo(() => buildSparklinePath(metrics.buffer_cache_series_bytes), [metrics.buffer_cache_series_bytes]);
     const rssPath = useMemo(() => buildSparklinePath(metrics.process_rss_series_bytes), [metrics.process_rss_series_bytes]);
     const showBufferCache = Number(metrics.buffer_cache_bytes) > 0 && sanitizeSeries(metrics.buffer_cache_series_bytes).length > 0;
     const showSwap = Number.isFinite(Number(metrics.swap_percent)) && metrics.swap_total_bytes > 0;
+    const showVram = shouldShowVram(metrics);
     const currentRssBytes = resolveCurrentRssBytes(metrics);
     const showRss = shouldShowRss(metrics);
     const compactSummary = useMemo(() => buildCompactMetersSummary(metrics), [metrics]);
@@ -228,7 +252,7 @@ export function SystemMetersHud({ mode = 'overlay' }) {
                 onClick=${handleToggleCollapsed}
             >
                 ${collapsed
-                    ? html`<span class="system-meters-collapse-tab" aria-hidden="true">◂</span>`
+                    ? html`<span class="system-meters-collapse-tab" aria-hidden="true">${renderDisclosureTriangle('left')}</span>`
                     : isNarrowLayout
                         ? html`<span class="system-meters-compact-summary">${compactSummary}</span>`
                         : html`
@@ -253,6 +277,15 @@ export function SystemMetersHud({ mode = 'overlay' }) {
                                         <path d=${rssPath}></path>
                                     </svg>
                                     <span class="system-meters-value">${formatBytesCompact(currentRssBytes)}</span>
+                                </div>
+                            `}
+                            ${showVram && html`
+                                <div class="system-meters-row vram" title=${metrics.gpu_provider ? `GPU telemetry: ${metrics.gpu_provider}` : 'GPU memory telemetry'}>
+                                    <span class="system-meters-label">VRAM</span>
+                                    <svg class="system-meters-spark" viewBox="0 0 56 16" preserveAspectRatio="none" aria-hidden="true">
+                                        <path d=${vramPath}></path>
+                                    </svg>
+                                    <span class="system-meters-value">${formatPercent(metrics.vram_percent)}</span>
                                 </div>
                             `}
                             ${showBufferCache && html`

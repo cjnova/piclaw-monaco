@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { render, useEffect, useLayoutEffect, useState } from '../vendor/preact-htm.js';
 
 export function BodyPortal({ children, className = '' }) {

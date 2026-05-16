@@ -5,7 +5,7 @@ import {
   persistWorkspaceOpenPreference,
   resolveWorkspaceLayoutBucket,
 } from './workspace-visibility.js';
-import { initTheme } from './theme.js';
+import { initTheme, reapplyStoredTheme } from './theme.js';
 import { useTimestampRefresh } from './app-helpers.js';
 import { watchReturnToApp, watchStandaloneWebAppMode } from './app-resume.js';
 import { installStandaloneMobileViewportFix } from './mobile-viewport.js';
@@ -164,6 +164,7 @@ export function useAppShellEnvironmentEffects(options: UseAppShellEnvironmentEff
   useEffect(() => {
     let disposeSettling = () => {};
     const stopWatching = watchReturnToApp(() => {
+      reapplyStoredTheme();
       disposeSettling();
       disposeSettling = scheduleResumeLayoutSettling(appShellRef.current);
     });

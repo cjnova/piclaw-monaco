@@ -42,7 +42,10 @@ export function resolveFloatingWidgetHostRefreshContext(
   currentRefreshCount: unknown,
 ): FloatingWidgetHostRefreshContext {
   return {
-    shouldBuildDashboard: Boolean(payload?.buildDashboard || payload?.dashboardKind === 'internal-state'),
+    // requestRefresh() should actually send useful host state by default. Keep
+    // buildDashboard:false as the explicit lightweight acknowledgement path for
+    // widgets that only want a liveness ping.
+    shouldBuildDashboard: payload?.buildDashboard !== false,
     nextRefreshCount: Number(currentRefreshCount || 0) + 1,
   };
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 export function resolveQueueActionChatJid(chatJid) {
     const normalized = String(chatJid || '').trim();

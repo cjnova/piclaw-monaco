@@ -19,7 +19,7 @@ const TOOLSET_ICONS = {
 const TOOL_EXTENSION = {
     read: 'pi-core', write: 'pi-core', edit: 'pi-core', bash: 'pi-core', powershell: 'pi-core',
     find: 'pi-core', grep: 'pi-core', ls: 'pi-core',
-    list_tools: 'internal-tools', list_internal_tools: 'internal-tools',
+    list_tools: 'internal-tools',
     activate_tools: 'tool-activation', reset_active_tools: 'tool-activation',
     list_scripts: 'runtime-scripts',
     attach_file: 'file-attachments', read_attachment: 'file-attachments', export_attachment: 'file-attachments',

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { html } from '../vendor/preact-htm.js';
 
 export function OobePanel({

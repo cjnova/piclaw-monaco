@@ -51,6 +51,60 @@ const DARK_TERMINAL_PALETTE = {
 let ghosttyInitPromise = null;
 let terminalFontsReadyPromise = null;
 
+function normalizeShortcutCode(event: { code?: string | null; key?: string | null } | null | undefined): string {
+    if (!event) return '';
+    const code = String(event.code || '').trim().toLowerCase();
+    if (code) return code;
+    const key = String(event.key || '').trim().toLowerCase();
+    if (!key) return '';
+    if (key.length === 1 && /[a-z]/.test(key)) return `key${key}`;
+    if (key === 'insert') return 'insert';
+    return key;
+}
+
+export function isTerminalClipboardCopyShortcut(event: {
+    code?: string | null;
+    key?: string | null;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    shiftKey?: boolean;
+    altKey?: boolean;
+} | null | undefined): boolean {
+    if (!event) return false;
+    if (!event.shiftKey || event.altKey) return false;
+    if (!(event.ctrlKey || event.metaKey)) return false;
+    return normalizeShortcutCode(event) === 'keyc';
+}
+
+export function isTerminalClipboardPasteShortcut(event: {
+    code?: string | null;
+    key?: string | null;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    shiftKey?: boolean;
+    altKey?: boolean;
+} | null | undefined): boolean {
+    if (!event) return false;
+    if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && normalizeShortcutCode(event) === 'insert') {
+        return true;
+    }
+    if (!event.shiftKey || event.altKey) return false;
+    if (!(event.ctrlKey || event.metaKey)) return false;
+    return normalizeShortcutCode(event) === 'keyv';
+}
+
+export async function readClipboardTextBestEffort(runtimeNavigator: Navigator | null | undefined = typeof navigator !== 'undefined' ? navigator : null): Promise<string | null> {
+    const readText = runtimeNavigator?.clipboard?.readText;
+    if (typeof readText !== 'function') return null;
+    try {
+        const text = await readText.call(runtimeNavigator.clipboard);
+        return typeof text === 'string' ? text : null;
+    } catch (error) {
+        console.debug('[terminal-pane] Clipboard read failed.', error);
+        return null;
+    }
+}
+
 function shouldRewriteGhosttyWasmRequest(url) {
     if (!url) return false;
     return url.startsWith('data:application/wasm') || /(^|\/)ghostty-vt\.wasm(?:[?#].*)?$/.test(url);
@@ -495,22 +549,12 @@ class TerminalPaneInstance implements PaneInstance {
         host.style.minHeight = '0';
         host.style.overflow = 'hidden';
 
-        const primaryChild = host.firstElementChild;
-        if (primaryChild instanceof HTMLElement) {
-            primaryChild.style.width = '100%';
-            primaryChild.style.height = '100%';
-            primaryChild.style.maxWidth = '100%';
-            primaryChild.style.minWidth = '0';
-            primaryChild.style.minHeight = '0';
-            primaryChild.style.flex = '1 1 auto';
-            primaryChild.style.display = 'block';
-        }
-
+        // Do NOT set width/height/flex on the canvas — ghostty manages its own
+        // pixel-accurate canvas sizing via terminal.resize(). Overriding with
+        // CSS percentage values creates a resize feedback loop that freezes the UI.
         const canvas = host.querySelector('canvas');
         if (canvas instanceof HTMLElement) {
             canvas.style.display = 'block';
-            canvas.style.maxWidth = 'none';
-            canvas.style.maxHeight = 'none';
         }
     }
 
@@ -600,6 +644,7 @@ class TerminalPaneInstance implements PaneInstance {
 
             this.terminal = terminal;
             this.fitAddon = fitAddon;
+            this.installClipboardShortcutBridge();
             this.installThemeSync();
             this.installResizeSync();
             this.scheduleResize(true);
@@ -612,6 +657,49 @@ class TerminalPaneInstance implements PaneInstance {
             this.bodyEl.innerHTML = '<div class="terminal-placeholder">Terminal failed to load. Check vendored assets and backend wiring.</div>';
             this.setStatus('Load failed');
         }
+    }
+
+    private installClipboardShortcutBridge(): void {
+        const terminal = this.terminal as any;
+        if (!terminal || typeof terminal.attachCustomKeyEventHandler !== 'function') {
+            return;
+        }
+
+        terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+            if (isTerminalClipboardCopyShortcut(event)) {
+                try {
+                    const copied = terminal.copySelection?.();
+                    if (!copied) {
+                        const selected = typeof terminal.getSelection === 'function' ? String(terminal.getSelection() || '') : '';
+                        if (selected) {
+                            void this.ownerWindow?.navigator?.clipboard?.writeText?.(selected).catch((error: unknown) => {
+                                console.debug('[terminal-pane] Clipboard write fallback failed.', error);
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.debug('[terminal-pane] Clipboard copy shortcut failed.', error);
+                }
+                return true;
+            }
+
+            if (isTerminalClipboardPasteShortcut(event)) {
+                if (typeof this.ownerWindow?.navigator?.clipboard?.readText !== 'function') {
+                    // Clipboard API unavailable — fall through to ghostty default handling.
+                    return undefined as unknown as boolean;
+                }
+                void readClipboardTextBestEffort(this.ownerWindow?.navigator).then((text) => {
+                    if (typeof text !== 'string' || !text.length || this.disposed) return;
+                    terminal.paste?.(text);
+                });
+                return true;
+            }
+
+            // Fall through to ghostty's default key processing.
+            // ghostty contract: true = handled (preventDefault), false = skip processing,
+            // undefined/other = continue with default terminal handling.
+            return undefined as unknown as boolean;
+        });
     }
 
     private applyTheme() {

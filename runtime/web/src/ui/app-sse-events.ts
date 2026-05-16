@@ -32,6 +32,7 @@ import {
 } from './app-extension-status.js';
 import {
   applyExtensionUiWorkingState,
+  resolveExtensionUiContextUsage,
   resolveExtensionUiToast,
   resolveStatusPanelWidgetEventContext,
 } from './app-extension-ui-sse.js';
@@ -328,6 +329,15 @@ export function handleAppSseEvent(
       return;
     }
 
+    const liveContextUsage = normalizeContextUsage(data.context_usage);
+    if (liveContextUsage && liveContextUsage.percent != null) {
+      setContextUsage((prev) => haveSameContextUsage(prev, liveContextUsage) ? prev : liveContextUsage);
+      persistContextUsage(currentChatJid, liveContextUsage);
+    }
+    if (data.type === 'context_usage') {
+      return;
+    }
+
     if (data.type === 'done' || data.type === 'error') {
       if (shouldIgnoreMismatchedTurn(turnId, currentTurnIdRef.current)) {
         return;
@@ -336,11 +346,6 @@ export function handleAppSseEvent(
         notifyForFinalResponse(turnId || currentTurnIdRef.current);
         if (isMainTimelineView(viewStateRef.current)) {
           void refreshTimeline();
-        }
-        const contextUsage = normalizeContextUsage(data.context_usage);
-        if (contextUsage && contextUsage.percent != null) {
-          setContextUsage((prev) => haveSameContextUsage(prev, contextUsage) ? prev : contextUsage);
-          persistContextUsage(currentChatJid, contextUsage);
         }
       }
       void refreshContextUsage();
@@ -558,6 +563,11 @@ export function handleAppSseEvent(
     }
 
     if (!isCurrentChatEvent) return;
+
+    const extensionContextUsage = resolveExtensionUiContextUsage(eventType, data);
+    if (extensionContextUsage && extensionContextUsage.percent != null) {
+      setContextUsage((prev) => haveSameContextUsage(prev, extensionContextUsage) ? prev : extensionContextUsage);
+    }
 
     setExtensionWorkingState((previous) => {
       const next = applyExtensionUiWorkingState(previous, eventType, data);

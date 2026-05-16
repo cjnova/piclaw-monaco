@@ -55,6 +55,42 @@ function normalizeGeneralSettings(data: Record<string, any> = {}) {
     };
 }
 
+export async function writeSettingsClipboardText(value, runtime: any = {}) {
+    const text = typeof value === 'string' ? value : '';
+    if (!text) return false;
+
+    const nav = runtime.navigator ?? (typeof navigator !== 'undefined' ? navigator : null);
+    const doc = runtime.document ?? (typeof document !== 'undefined' ? document : null);
+
+    if (nav?.clipboard?.writeText) {
+        try {
+            await nav.clipboard.writeText(text);
+            return true;
+        } catch (_error) {
+            // Fall through to execCommand for HTTP/tunneled/non-secure contexts.
+        }
+    }
+
+    try {
+        if (!doc?.body || typeof doc.createElement !== 'function' || typeof doc.execCommand !== 'function') return false;
+        const textarea = doc.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute?.('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '0';
+        textarea.style.opacity = '0';
+        doc.body.appendChild(textarea);
+        textarea.focus?.();
+        textarea.select?.();
+        const copied = Boolean(doc.execCommand('copy'));
+        doc.body.removeChild(textarea);
+        return copied;
+    } catch (_error) {
+        return false;
+    }
+}
+
 export function GeneralSection({ settingsData, setStatus, mergeSettingsData }) {
     const [userName, setUserName] = useState('');
     const [userAvatar, setUserAvatar] = useState('');
@@ -63,6 +99,7 @@ export function GeneralSection({ settingsData, setStatus, mergeSettingsData }) {
     const [composeUploadLimitMb, setComposeUploadLimitMb] = useState(32);
     const [workspaceUploadLimitMb, setWorkspaceUploadLimitMb] = useState(256);
     const [widgetToken, setWidgetToken] = useState('');
+    const [widgetTokenRevealed, setWidgetTokenRevealed] = useState(false);
     const [widgetTokenCopied, setWidgetTokenCopied] = useState(false);
     const [widgetTokenBusy, setWidgetTokenBusy] = useState(false);
     const [metersEnabled, setMetersEnabled] = useState(() => readStoredMetersEnabled(false));
@@ -146,14 +183,15 @@ export function GeneralSection({ settingsData, setStatus, mergeSettingsData }) {
 
     const copyWidgetToken = useCallback(async () => {
         if (!widgetToken) return;
-        try {
-            await navigator.clipboard?.writeText(widgetToken);
+        const copied = await writeSettingsClipboardText(widgetToken);
+        if (copied) {
             setWidgetTokenCopied(true);
             setTimeout(() => { if (mountedRef.current) setWidgetTokenCopied(false); }, 3000);
-        } catch (error) {
-            console.warn('[settings/general] Failed to copy widget token.', error);
+        } else {
+            setStatus?.('Could not copy widget token. Select the token field and copy manually.');
+            console.warn('[settings/general] Failed to copy widget token. Clipboard APIs unavailable or blocked.');
         }
-    }, [widgetToken]);
+    }, [widgetToken, setStatus]);
 
     const regenerateWidgetToken = useCallback(async () => {
         if (widgetTokenBusy) return;
@@ -175,6 +213,8 @@ export function GeneralSection({ settingsData, setStatus, mergeSettingsData }) {
     }, [widgetTokenBusy, mergeSettingsData]);
 
     const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
+    const maskedWidgetToken = widgetToken ? '•'.repeat(Math.min(Math.max(widgetToken.length, 16), 48)) : '—';
+    const widgetTokenDisplay = widgetTokenRevealed ? (widgetToken || '—') : maskedWidgetToken;
 
     return html`
         <div class="settings-section">
@@ -260,12 +300,30 @@ export function GeneralSection({ settingsData, setStatus, mergeSettingsData }) {
             </div>
 
             <h3 style="margin-top:20px">Authentication</h3>
-            <div class="settings-row settings-row-vertical">
+            <div class="settings-row settings-row-vertical settings-widget-token-row">
                 <label>Widget bearer token</label>
-                <div style="display:flex; gap:8px; align-items:center; width:100%;">
-                    <input type="password" readonly value=${widgetToken || ''} style="flex:1; min-width:0; font-family: var(--mono-font, monospace);" />
-                    <button type="button" onClick=${copyWidgetToken} disabled=${!widgetToken}>${widgetTokenCopied ? 'Copied' : 'Copy'}</button>
-                    <button type="button" onClick=${regenerateWidgetToken} disabled=${widgetTokenBusy}>${widgetTokenBusy ? 'Regenerating…' : 'Regenerate'}</button>
+                <div class="settings-keychain-reveal-panel settings-widget-token-panel">
+                    <div class="settings-keychain-reveal-field settings-widget-token-field">
+                        <span class="settings-keychain-reveal-label">Token</span>
+                        <code class="settings-keychain-reveal-value settings-widget-token-value">${widgetTokenDisplay}</code>
+                        <button class=${`settings-keychain-reveal-btn${widgetTokenRevealed ? ' active' : ''}`}
+                            type="button"
+                            onClick=${() => setWidgetTokenRevealed(value => !value)}
+                            disabled=${!widgetToken}
+                            title=${widgetTokenRevealed ? 'Hide token' : 'Reveal token'}>
+                            ${widgetTokenRevealed
+                                ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+                                : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+                            }
+                        </button>
+                        <button class="settings-keychain-copy-btn" type="button" onClick=${copyWidgetToken} disabled=${!widgetToken} title="Copy token">
+                            ${widgetTokenCopied
+                                ? html`<span class="settings-widget-token-copied">Copied</span>`
+                                : html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
+                            }
+                        </button>
+                        <button class="settings-keychain-prompt-submit settings-widget-token-regenerate" type="button" onClick=${regenerateWidgetToken} disabled=${widgetTokenBusy}>${widgetTokenBusy ? 'Regenerating…' : 'Regenerate'}</button>
+                    </div>
                 </div>
                 <span class="settings-hint" style="margin:6px 0 0 0;">
                     Read-only token for <code>GET /api/state</code> and <code>GET /api/state/events</code>. Use as <code>Authorization: Bearer …</code>.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 export function parseBtwCommand(input) {
     const trimmed = String(input || '').trim();

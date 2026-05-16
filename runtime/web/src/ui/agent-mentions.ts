@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 function normalizeAgentName(value) {
     return String(value || '').trim().toLowerCase();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useCallback, useEffect, useRef, useState } from '../vendor/preact-htm.js';
 import { getTimeline, getPostsByHashtag } from '../api.js';
 import { cacheTimelineSnapshot, getCachedTimelineSnapshot } from './app-timeline-cache.js';
