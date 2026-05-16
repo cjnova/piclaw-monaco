@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16T07:11Z
+Generated: 2026-05-16T07:23Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -155,7 +155,7 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 - All overlays/modals should use `OverlayShell` for focus trap, scroll lock, Escape/backdrop behavior, and z-index tiering.
 - All popovers/dropdowns should use `useDismissableLayer` for outside-click + Escape dismiss.
 - Clipboard operations should use `utils/clipboard.ts` (`copyToClipboard`) — no raw `navigator.clipboard` calls anywhere.
-- localStorage access should use `utils/storage.ts` safe wrappers where practical; remaining direct exceptions tracked in #434.
+- localStorage access should use `utils/storage.ts` safe wrappers — fully migrated, zero raw calls remain.
 - Scrollbar styling uses CSS variables (`--scrollbar-thumb`, `--scrollbar-track`) and utility classes (`.scrollable`, `.scrollable-x`, `.scroll-hidden`). No hardcoded scrollbar colors.
 - Shared formatting should use `utils/format.ts`; `utils/formatBytes.ts` is a legacy byte formatter still imported by workspace/file-tree code.
 - Dropdowns should use `CustomSelect` instead of native `<select>` for consistent dark popup styling.
