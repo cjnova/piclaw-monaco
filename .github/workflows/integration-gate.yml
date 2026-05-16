@@ -6,7 +6,6 @@ on:
       - '*'
       - '!*-ux'
       - '!*-prerelease'
-  workflow_dispatch:
 
 permissions:
   contents: read
