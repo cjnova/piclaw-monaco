@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
+import { CustomSelect } from "../components/CustomSelect";
 
 interface SearchResult {
   id: string | number;
@@ -197,15 +198,16 @@ export function SearchPanel() {
 
       {/* Filter bar */}
       <div className="search-panel__filters">
-        <select
+        <CustomSelect
           className="search-panel__scope-select"
+          options={[
+            { value: "current", label: "Current chat" },
+            { value: "root", label: "Branch family" },
+            { value: "all", label: "All chats" },
+          ]}
           value={scope}
-          onChange={(e) => setScope((e.target as HTMLSelectElement).value as SearchScope)}
-        >
-          <option value="current">Current chat</option>
-          <option value="root">Branch family</option>
-          <option value="all">All chats</option>
-        </select>
+          onChange={(v) => setScope(v as SearchScope)}
+        />
         <label className="search-panel__filter-toggle">
           <input
             type="checkbox"

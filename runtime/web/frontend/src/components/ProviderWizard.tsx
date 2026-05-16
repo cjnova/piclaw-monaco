@@ -16,6 +16,7 @@ import { useCallback, useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { getMessageUrl } from "../api/chat-jid";
 import type { Provider } from "../panels/settings/types";
+import { CustomSelect } from "./CustomSelect";
 
 interface ProviderWizardProps {
   onDismiss: () => void;
@@ -443,18 +444,13 @@ export function ProviderWizard({ onDismiss, providerId }: ProviderWizardProps) {
                 <label className="provider-wizard__label" htmlFor="api-provider-select">
                   Provider
                 </label>
-                <select
+                <CustomSelect
                   id="api-provider-select"
                   className="provider-wizard__select"
+                  options={apiKeyProviders.map((p) => ({ value: p.id, label: p.name }))}
                   value={selectedApiProvider.value}
-                  onChange={(e) => {
-                    selectedApiProvider.value = (e.target as HTMLSelectElement).value;
-                  }}
-                >
-                  {apiKeyProviders.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                  onChange={(v) => { selectedApiProvider.value = v; }}
+                />
               </div>
             )}
             {apiKeyProviders.length === 0 && activeProvider.value && (
