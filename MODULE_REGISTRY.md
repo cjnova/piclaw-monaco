@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16T07:29Z
+Generated: 2026-05-16T07:39Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -57,8 +57,8 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 - `useTimelineStream.ts` — Stream timeline updates. Exports: `useTimelineStream`.
 
 ### Model context bar components (`components/model-context-bar/`)
-- `ContextRing.tsx` — Context usage ring button. Exports: `ContextRing`.
-- `ModelPicker.tsx` — Model picker menu. Exports: `ModelPicker`.
+- `ContextRing.tsx` — Context usage ring with safety-adjusted percentage (green/yellow/red thresholds). Exports: `ContextRing`. Depends on `utils/context-budget`.
+- `ModelPicker.tsx` — Model picker menu showing effective context window. Exports: `ModelPicker`. Depends on `utils/context-budget`, `utils/format`.
 - `ThinkingPicker.tsx` — Thinking-level picker menu. Exports: `ThinkingPicker`.
 - `addonHealthSignal.ts` — Shared add-on health signal. Exports: `addonHealthSignal`.
 - `types.ts` — Model/context/health contracts and fallbacks. Exports: `AddonApiStatus`, `AgentStatus`, `AgentContext`, `OobeStatus`, `ModelInfo`, `ProviderUsage`, `ModelEntry`, `FALLBACK_MODELS`, `FALLBACK_THINKING_LEVELS`, `fmtTokens`.
@@ -77,6 +77,7 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 - `bundled-themes.ts` — Bundled VS Code theme metadata. Exports: `BundledTheme`, `BUNDLED_THEMES`.
 - `clipboard.ts` — Copy-to-clipboard helper with textarea fallback. Exports: `copyToClipboard`.
 - `code-highlighting.ts` — Code fence language normalization, parser lookup, syntax highlighting. Exports: `normalizeCodeLanguageLabel`, `parserForCodeFenceLanguage`, `highlightCodeToHtml`, `applySyntaxHighlighting`.
+- `context-budget.ts` — Context window safety margins (4000 token overhead, 1.1× multiplier). Exports: `getEffectiveContextWindow`, `getSafetyAdjustedTokens`, `getContextUsagePercent`.
 - `delimited-preview.ts` — Delimited-file detection and parser. Exports: `Delimiter`, `DelimitedPreviewResult`, `isDelimitedFile`, `parseDelimited`.
 - `extractDisplayName.ts` — Display-name extraction from extension path. Exports: `extractDisplayName`.
 - `file-icons.ts` — Filename-to-icon class resolver. Exports: `getFileIconClass`.
@@ -205,8 +206,8 @@ Local imports only; external libraries (`preact`, `@preact/signals`, etc.) omitt
 - `message-list/useScrollManager.ts` → `api/chat-jid`, `utils/mermaid-render`, `message-list/helpers`, `message-list/types`.
 - `message-list/useTimelineFetch.ts` → `api/chat-jid`, `message-list/helpers`, `message-list/types`.
 - `message-list/useTimelineStream.ts` → `api/chat-jid`, `message-list/helpers`, `message-list/types`.
-- `model-context-bar/ContextRing.tsx` → `model-context-bar/types`.
-- `model-context-bar/ModelPicker.tsx` → `model-context-bar/types`, `utils/format`.
+- `model-context-bar/ContextRing.tsx` → `model-context-bar/types`, `utils/context-budget`.
+- `model-context-bar/ModelPicker.tsx` → `model-context-bar/types`, `utils/format`, `utils/context-budget`.
 - `model-context-bar/ThinkingPicker.tsx` → `model-context-bar/types`.
 - `model-context-bar/addonHealthSignal.ts` → `model-context-bar/types`.
 - `model-context-bar/useCompaction.ts` → `api/chat-jid`.
