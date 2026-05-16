@@ -7120,3 +7120,41 @@ mark[data-highlight] { border-radius: 2px; padding: 0 1px; }
 .scrollable-x { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
 .scroll-hidden { overflow-y: auto; scrollbar-width: none; }
 .scroll-hidden::-webkit-scrollbar { display: none; }
+
+/* ── Authentication section ── */
+.auth-section__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.auth-section__badge--enabled {
+  background: rgba(166, 227, 161, 0.18);
+  color: #a6e3a1;
+  border: 1px solid rgba(166, 227, 161, 0.35);
+}
+.auth-section__qr {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 220px;
+}
+.auth-section__qr svg {
+  max-width: 200px;
+  height: auto;
+  display: block;
+}
+.auth-section__otpauth {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}

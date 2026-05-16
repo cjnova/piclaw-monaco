@@ -16,6 +16,7 @@ import "./settings/ProvidersSection";
 import "./settings/ModelsSection";
 import "./settings/AppearanceSection";
 import "./settings/KeychainSection";
+import "./settings/AuthenticationSection";
 import "./settings/ToolsSection";
 
 /** Safely render any pane component (built-in or addon); shows an error state if it throws. */

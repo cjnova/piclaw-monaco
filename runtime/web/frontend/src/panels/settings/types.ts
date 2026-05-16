@@ -65,7 +65,14 @@ export interface SettingsData {
   searchMatchMode?: "or" | "and";
   composeUploadLimitMb?: number;
   workspaceUploadLimitMb?: number;
-  instanceTotp?: { configured?: boolean };
+  instanceTotp?: {
+    configured?: boolean;
+    issuer?: string;
+    label?: string;
+    secret?: string;
+    otpauth?: string;
+    qrSvg?: string;
+  };
   /* appearance */
   uiTheme?: string;
   uiTint?: string | null;
