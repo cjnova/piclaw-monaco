@@ -4,6 +4,7 @@ import { useDialog } from "../../hooks/useDialog";
 import { CopyButton } from "../../components/CopyButton";
 import { registerSettingsPane } from "./pane-registry";
 import type { SettingsSectionProps } from "./types";
+import { sanitizeSvg } from "../../utils/agent-status";
 
 interface PasskeyEntry {
   id: string;
@@ -35,7 +36,7 @@ function AuthenticationSection({ data, saveSetting }: SettingsSectionProps) {
   async function disableTotp() {
     const confirmed = await showConfirm({
       title: "Disable TOTP?",
-      message: "You will no longer need an authenticator code to log in.",
+      message: "Disabling TOTP removes a layer of security. Anyone with your password will be able to log in without a second factor.",
       confirmLabel: "Disable",
       destructive: true,
     });
@@ -52,18 +53,16 @@ function AuthenticationSection({ data, saveSetting }: SettingsSectionProps) {
     passkeysLoading.value = true;
     passkeysError.value = null;
     try {
-      const res = await fetch("/agent/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch("/agent/passkeys", {
+        method: "GET",
         credentials: "same-origin",
-        body: JSON.stringify({ message: "/passkey list" }),
       });
       if (!res.ok) {
         passkeysError.value = `Failed to load passkeys (HTTP ${res.status})`;
         return;
       }
-      const json = await res.json() as { passkeys?: PasskeyEntry[] };
-      passkeys.value = json.passkeys ?? [];
+      const json = await res.json() as PasskeyEntry[];
+      passkeys.value = Array.isArray(json) ? json : [];
     } catch {
       passkeysError.value = "Failed to load passkeys";
     } finally {
@@ -82,11 +81,11 @@ function AuthenticationSection({ data, saveSetting }: SettingsSectionProps) {
     });
     if (!confirmed) return;
     try {
-      await fetch("/agent/message", {
+      await fetch("/agent/passkeys/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ message: `/passkey delete ${id}` }),
+        body: JSON.stringify({ id }),
       });
       fetchPasskeys();
     } catch {
@@ -133,7 +132,7 @@ function AuthenticationSection({ data, saveSetting }: SettingsSectionProps) {
             <div
               className="auth-section__qr"
               // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: totp.qrSvg }}
+              dangerouslySetInnerHTML={{ __html: sanitizeSvg(totp.qrSvg) }}
             />
           )}
 

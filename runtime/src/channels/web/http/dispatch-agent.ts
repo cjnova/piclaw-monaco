@@ -45,6 +45,7 @@ import {
   handleWebPushSubscriptionUpsert,
   handleWebPushVapidPublicKey,
 } from "../push/web-push-routes.js";
+import { handlePasskeysList, handlePasskeysDelete } from "../handlers/passkeys.js";
 
 interface ExactAgentRoute {
   method: string;
@@ -656,6 +657,16 @@ const EXACT_AGENT_ROUTES: ExactAgentRoute[] = [
         return channel.json({ ok: true });
       }
     },
+  },
+  {
+    method: "GET",
+    path: "/agent/passkeys",
+    handle: () => handlePasskeysList(),
+  },
+  {
+    method: "POST",
+    path: "/agent/passkeys/delete",
+    handle: (_channel, req) => handlePasskeysDelete(req),
   },
 ];
 
