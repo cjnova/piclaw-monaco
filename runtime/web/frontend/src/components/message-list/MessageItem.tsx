@@ -14,6 +14,7 @@ import { AdaptiveCardRenderer, extractCardBlocks } from "./AdaptiveCardRenderer"
 import { CopyButton } from "../CopyButton";
 import type { ContentBlock, Interaction } from "./types";
 import { safeParseJSON, safeSetItem } from "../../utils/storage";
+import { parseUserContent } from "../../utils/attachments";
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────
 
@@ -125,47 +126,6 @@ export function ToolCallBlock({ useBlock, resultBlock }: ToolCallBlockProps) {
 }
 
 // ── MessageItem ────────────────────────────────────────────────────────────
-
-interface ParsedAttachment {
-  mediaId: number;
-  filename: string;
-}
-
-function parseUserContent(content: string): {
-  cleanedContent: string;
-  attachments: ParsedAttachment[];
-} {
-  const lines = content.split(/\r?\n/);
-  const textLines: string[] = [];
-  const attachments: ParsedAttachment[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (/^attachments:\s*$/i.test(trimmed)) {
-      continue;
-    }
-
-    const normalized = trimmed.replace(/^[-*]\s*/, "");
-    const match = normalized.match(/^attachment:(\d+)\s*\(([^)]+)\)\s*$/i);
-    if (match) {
-      attachments.push({
-        mediaId: Number.parseInt(match[1], 10),
-        filename: match[2].trim(),
-      });
-      continue;
-    }
-
-    textLines.push(line);
-  }
-
-  const cleanedContent = textLines
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return { cleanedContent, attachments };
-}
 
 interface MessageItemProps {
   interaction: Interaction;
