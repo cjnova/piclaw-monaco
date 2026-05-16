@@ -1,4 +1,5 @@
 import { fmtTokens } from "./types";
+import { getContextUsagePercent } from "../../utils/context-budget";
 
 interface ContextRingProps {
   percent: number;
@@ -7,9 +8,9 @@ interface ContextRingProps {
   onClick: (e: Event) => void;
 }
 
-export function ContextRing({ percent, tokens, contextWindow, onClick }: ContextRingProps) {
-  const p = percent;
-  const color = p > 95 ? "var(--error)" : p > 80 ? "var(--warning)" : "var(--success)";
+export function ContextRing({ tokens, contextWindow, onClick }: ContextRingProps) {
+  const p = getContextUsagePercent(tokens, contextWindow);
+  const color = p >= 90 ? "var(--error)" : p >= 70 ? "var(--warning)" : "var(--success)";
   const tokensK = fmtTokens(tokens);
   const totalK = contextWindow > 0 ? fmtTokens(contextWindow) : "--";
 

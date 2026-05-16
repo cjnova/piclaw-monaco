@@ -1,5 +1,6 @@
 import type { ModelEntry } from "./types";
 import { formatTokenWindow } from "../../utils/format";
+import { getEffectiveContextWindow } from "../../utils/context-budget";
 
 interface ModelPickerProps {
   models: ModelEntry[];
@@ -15,7 +16,8 @@ export function ModelPicker({ models, activeModel, onSelectModel }: ModelPickerP
     >
       {models.map((entry) => {
         const isCurrent = entry.id === activeModel;
-        const ctxK = entry.context_window ? formatTokenWindow(entry.context_window) : "";
+        const effectiveCtx = entry.context_window ? getEffectiveContextWindow(entry.context_window) : null;
+        const ctxK = effectiveCtx ? formatTokenWindow(effectiveCtx) : "";
         return (
           <div
             key={entry.id}
