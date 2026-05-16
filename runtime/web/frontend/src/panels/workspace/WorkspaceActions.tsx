@@ -1,5 +1,6 @@
 import { useCallback } from "preact/hooks";
 import type { TreeNode } from "../../components/FileTree";
+import { copyToClipboard } from "../../utils/clipboard";
 import { renderMarkdown } from "../../utils/markdown-pipeline";
 
 const OPENABLE_EXTS = new Set([
@@ -21,10 +22,8 @@ export function WorkspaceActions({ node, downloadUrl, isDeleting, onDelete }: Wo
   const ext = node.path.split('.').pop()?.toLowerCase() ?? '';
 
   const copyPath = useCallback(() => {
-    navigator.clipboard.writeText(node.path).then(() => {
-      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Path copied", type: "success" } }));
-    }).catch(() => {
-      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: "Copy failed — clipboard unavailable", type: "error" } }));
+    copyToClipboard(node.path).then((ok) => {
+      window.dispatchEvent(new CustomEvent("piclaw:status-flash", { detail: { message: ok ? "Path copied" : "Copy failed", type: ok ? "success" : "error" } }));
     });
   }, [node.path]);
 

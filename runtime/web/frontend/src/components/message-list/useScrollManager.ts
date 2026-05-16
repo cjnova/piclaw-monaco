@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from "preact/hooks";
 import { buildChatUrl } from "../../api/chat-jid";
+import { copyToClipboard } from "../../utils/clipboard";
 import { renderMermaidDiagrams } from "../../utils/mermaid-render";
 import { normalizePost } from "./helpers";
 import type { Interaction } from "./types";
@@ -126,19 +127,8 @@ export function useScrollManager(
       const encoded = btn.dataset.code;
       if (!encoded) return;
       const code = decodeURIComponent(escape(atob(encoded)));
-      try {
-        await navigator.clipboard.writeText(code);
-        btn.dataset.copyState = "copied";
-        setTimeout(() => { btn.dataset.copyState = ""; }, 2000);
-      } catch {
-        const textarea = document.createElement("textarea");
-        textarea.value = code;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+      const ok = await copyToClipboard(code);
+      if (ok) {
         btn.dataset.copyState = "copied";
         setTimeout(() => { btn.dataset.copyState = ""; }, 2000);
       }
