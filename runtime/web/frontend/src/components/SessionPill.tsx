@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { getChatJid } from "../api/chat-jid";
 import { useDialog } from "../hooks/useDialog";
+import { useDismissableLayer } from "../hooks/useDismissableLayer";
 import {
   chatName,
   extractChatJidFromAction,
@@ -48,23 +49,7 @@ export function SessionPill() {
     void loadSessions();
   }, [loadSessions]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-    };
-    const onClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onClick);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onClick);
-    };
-  }, [isOpen]);
+  useDismissableLayer({ ref: rootRef, open: isOpen, onDismiss: () => setIsOpen(false), outsideEvent: "mousedown" });
 
   const activeSession = useMemo(
     () => sessions.find((entry) => entry.jid === activeChatJid),

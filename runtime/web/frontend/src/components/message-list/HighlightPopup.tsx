@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useRef } from "preact/hooks";
+import { useDismissableLayer } from "../../hooks/useDismissableLayer";
 import { HIGHLIGHT_COLORS } from "../../utils/highlight-serializer";
 
 interface HighlightPopupProps {
@@ -18,24 +19,7 @@ export function HighlightPopup({
 }: HighlightPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        onDismiss();
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onDismiss();
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onDismiss]);
+  useDismissableLayer({ ref: popupRef, open: true, onDismiss, outsideEvent: "mousedown" });
 
   // Offset so popup doesn't go off-screen
   const popupWidth = HIGHLIGHT_COLORS.length * 28 + 60;

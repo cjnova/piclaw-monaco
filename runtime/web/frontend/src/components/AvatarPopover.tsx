@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "preact/hooks";
+import { useState, useRef, useCallback } from "preact/hooks";
+import { useDismissableLayer } from "../hooks/useDismissableLayer";
 import { userAvatarUrl, assistantAvatarUrl } from "../api/identity";
 
 interface AvatarPopoverProps {
@@ -21,21 +22,7 @@ export function AvatarPopover({ type, x, y, onDismiss }: AvatarPopoverProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Dismiss on click outside or Escape
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onDismiss(); };
-    const onClick = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) onDismiss();
-    };
-    setTimeout(() => {
-      document.addEventListener("keydown", onKey);
-      document.addEventListener("pointerdown", onClick);
-    }, 50);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onClick);
-    };
-  }, [onDismiss]);
+  useDismissableLayer({ ref: popoverRef, open: true, onDismiss });
 
   const handleGithubSync = useCallback(async () => {
     if (!githubHandle.trim()) return;
