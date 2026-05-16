@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16T07:23Z
+Generated: 2026-05-16T07:29Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -69,7 +69,7 @@ Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
 ## Hooks (hooks/)
 
 - `useDismissableLayer.ts` — Outside-click + Escape dismiss for popovers/dropdowns. Exports: `useDismissableLayer`.
-- `useDialog.ts` — Queue-backed prompt/confirm/alert API and host component. Exports: `useDialog`.
+- `useDialog.ts` — Queue-backed prompt/confirm/alert API (95 lines, trimmed from 186). Exports: `useDialog` → `{ showPrompt, showConfirm, showAlert, DialogHost }`.
 
 ## Utilities (utils/)
 
