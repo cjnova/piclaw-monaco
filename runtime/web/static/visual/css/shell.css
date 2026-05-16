@@ -7185,3 +7185,18 @@ mark[data-highlight] { border-radius: 2px; padding: 0 1px; }
 .avatar-popover__github { display: flex; gap: 6px; align-items: center; }
 .avatar-popover__input { flex: 1; padding: 4px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); }
 .avatar-popover__status { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+/* Agent status request state (pending approval highlight) */
+.agent-status.agent-status-request { background: rgba(29, 155, 240, 0.12); border-color: rgba(29, 155, 240, 0.35); color: var(--text); }
+.agent-status-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-status-error .agent-status-text { color: var(--danger-color, #dc2626); font-weight: 500; }
+
+/* Delimited table (CSV/TSV inline preview) */
+.delimited-table { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; font-size: 12px; }
+.delimited-table__header { padding: 4px 8px; font-size: 11px; color: var(--text-muted); background: var(--bg-sidebar); border-bottom: 1px solid var(--border); }
+.delimited-table__scroll { overflow-x: auto; max-height: 300px; overflow-y: auto; }
+.delimited-table__grid { width: 100%; border-collapse: collapse; }
+.delimited-table__grid th, .delimited-table__grid td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.delimited-table__grid th { font-weight: 600; background: var(--bg-sidebar); position: sticky; top: 0; }
+.delimited-table__grid td { color: var(--text); }
+.delimited-table__footer { padding: 4px 8px; font-size: 11px; color: var(--text-muted); background: var(--bg-sidebar); border-top: 1px solid var(--border); }
