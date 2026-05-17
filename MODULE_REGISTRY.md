@@ -1,6 +1,6 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-17T07:20Z
+Generated: 2026-05-17T09:44Z
 Language: TypeScript (Preact)
 Scope: `runtime/web/static/visual/frontend/src/{components,hooks,utils,panels,api,app}`
 
@@ -12,7 +12,7 @@ Scope: `runtime/web/static/visual/frontend/src/{components,hooks,utils,panels,ap
 - `AgentStatusPanel.tsx` — Live agent/tool status cards with panel headers, collapsible content, approvals, git context. Exports: `resolveStatusIndicator`, `resolveToolKind`, `resolveTitleFromArgs`, `AgentStatusPanel`.
 - `AttachmentChip.tsx` — Message attachment chip with image lightbox behavior. Exports: `AttachmentChip`.
 - `AvatarPopover.tsx` — User/assistant avatar popover. Exports: `AvatarPopover`.
-- `CollapsibleContent.tsx` — Collapse/expand for text/markdown and item lists. Exports: `truncateByLines`, `MarkdownContent`, `CollapsibleContent`.
+- `CollapsibleContent.tsx` — Collapse/expand for text/markdown and item lists. Props: `expanded`, `onToggle`, `text`/`maxLines`/`direction` (text mode), `items`/`maxItems` (items mode), `renderContent`. Exports: `truncateByLines`, `MarkdownContent`, `CollapsibleContent`.
 - `CommandPalette.tsx` — Slash-command palette shell. Exports: `CommandPalette`.
 - `CopyButton.tsx` — Clipboard button with copied feedback and optional flash event. Exports: `CopyButton`.
 - `CustomSelect.tsx` — Dark-themed dropdown replacing native `<select>`. Props: `options`, `value`, `onChange`, `className`, `placeholder`, `id`. Exports: `CustomSelect`.
