@@ -17,6 +17,10 @@ import {
     unregisterSettingsPane,
     notifySettingsPanesChanged,
 } from '../panels/settings/pane-registry';
+import {
+    registerActivityBarPanel,
+    unregisterActivityBarPanel,
+} from '../components/activity-bar-registry';
 
 const html: unknown = htmHtml;
 
@@ -55,6 +59,8 @@ export function installAddonGlobals(): void {
     // __piclaw_web surface (settings pane registration + more)
     (globalThis as Record<string, unknown>).__piclaw_web = {
         registerSettingsPane: settingsPaneRegistry.registerSettingsPane,
+        registerActivityBarPanel,
+        unregisterActivityBarPanel,
     };
 
     // Preact + htm globals for addon web bundles that use HTM syntax
