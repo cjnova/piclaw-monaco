@@ -17,13 +17,13 @@
     - /static/visual/dist/app.bundle.js
     - /static/visual/dist/app.bundle.css
   Login is a separate minimal bundle set:
-    - /static/common/dist/login.bundle.js (loaded only by login.html)
-    - /static/common/dist/login.bundle.css (loaded only by login.html)
+    - /static/visual/vendor/login.bundle.js (loaded only by login.html)
+    - /static/visual/vendor/login.bundle.css (loaded only by login.html)
 
   Vendor JS globals (marked, KaTeX, Mermaid) remain separate prebuilt files.
-  App CSS is bundled into /static/visual/dist/*.bundle.css; login CSS uses /static/common/dist/.
+  App CSS is bundled into /static/visual/dist/*.bundle.css; login CSS uses /static/visual/vendor/.
   request-router-service.ts auth-gates /static/visual/dist/app.bundle.{js,css} and only
-  exposes /static/common/dist/login.bundle.{js,css} to unauthenticated visitors.
+  exposes /static/visual/vendor/login.bundle.{js,css} to unauthenticated visitors.
 -->
 <head>
     <meta charset="UTF-8">
@@ -165,9 +165,9 @@
             return false;
         };
     </script>
-    <script src="/static/common/js/marked.min.js" defer></script>
-    <script src="/static/common/js/vendor/katex.min.js" defer></script>
-    <script src="/static/common/js/vendor/beautiful-mermaid.js" defer></script>
+    <script src="/static/visual/vendor/js/marked.min.js" defer></script>
+    <script src="/static/visual/vendor/js/katex.min.js" defer></script>
+    <script src="/static/visual/vendor/js/beautiful-mermaid.js" defer></script>
     <script type="importmap">
     {
       "imports": {
