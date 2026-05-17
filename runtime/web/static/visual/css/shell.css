@@ -1642,6 +1642,8 @@ body {
   gap: 4px;
   padding: 6px 14px;
   flex-shrink: 0;
+  max-height: 30vh;
+  overflow-y: auto;
 }
 
 .queue-stack__item {
@@ -5243,6 +5245,8 @@ pre.frontmatter-block {
   flex-direction: column;
   gap: 4px;
   flex-shrink: 0;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .agent-status-panel__status {
