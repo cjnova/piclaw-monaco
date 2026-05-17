@@ -1,8 +1,8 @@
 # Module Registry — piclaw-monaco frontend
 
-Generated: 2026-05-16T09:34Z
+Generated: 2026-05-17T07:20Z
 Language: TypeScript (Preact)
-Scope: `runtime/web/frontend/src/{components,hooks,utils,panels,api,app}`
+Scope: `runtime/web/static/visual/frontend/src/{components,hooks,utils,panels,api,app}`
 
 ## Shared Components (components/)
 
