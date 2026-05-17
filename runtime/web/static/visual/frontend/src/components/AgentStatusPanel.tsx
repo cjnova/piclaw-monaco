@@ -101,6 +101,7 @@ export function AgentStatusPanel() {
   const [statusText, setStatusText] = useState("");
   const [tools, setTools] = useState<ToolCall[]>([]);
   const [toolsExpanded, setToolsExpanded] = useState(false);
+  const [toolsDismissed, setToolsDismissed] = useState(false);
   const [elapsed, setElapsed] = useState({ draft: 0, thought: 0, tools: 0 });
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -345,6 +346,7 @@ export function AgentStatusPanel() {
       setTurnColor(null);
       setTools([]);
       setToolsExpanded(false);
+      setToolsDismissed(false);
       // Reset recovery and watchdog state
       setRecoveryState(null);
       setRecoveryDetail("");
@@ -574,15 +576,15 @@ export function AgentStatusPanel() {
         );
       })()}
 
-      {tools.length > 0 && (
+      {tools.length > 0 && !toolsDismissed && (
         <div className="agent-status-card agent-status-card--tools">
-          <div className="agent-status-card__header" onClick={() => setToolsExpanded(prev => !prev)}>
-            <span className="agent-status-card__dot agent-status-card__dot--tools" />
-            <span className="agent-status-card__title">Tools ({tools.length})</span>
-            {elapsed.tools > 0 && (
-              <span className="agent-status-card__timer">{elapsed.tools}s</span>
-            )}
-          </div>
+          <PanelHeader
+            title={`Tools (${tools.length})`}
+            dotColor="tools"
+            elapsed={elapsed.tools}
+            onToggle={() => setToolsExpanded(prev => !prev)}
+            onDismiss={(e) => { e.stopPropagation(); setToolsDismissed(true); }}
+          />
           <CollapsibleContent
             expanded={toolsExpanded}
             onToggle={() => setToolsExpanded(prev => !prev)}
