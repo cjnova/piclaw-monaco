@@ -5,8 +5,7 @@ import { build, context, type BuildOptions } from "esbuild";
 
 const watchMode = process.argv.includes("--watch");
 const frontendDir = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(frontendDir, "../../..");
-const outputDir = path.join(rootDir, "runtime/web/static/visual/dist");
+const outputDir = path.resolve(frontendDir, "../dist");
 
 const options: BuildOptions = {
   entryPoints: [path.join(frontendDir, "src/index.tsx")],
