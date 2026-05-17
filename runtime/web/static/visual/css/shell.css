@@ -5412,14 +5412,15 @@ pre.frontmatter-block {
 .agent-status-panel__more {
   display: block;
   width: 100%;
-  padding: 2px 0 0;
+  padding: 4px 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   text-align: left;
-  opacity: 0.7;
+  opacity: 1;
   transition: opacity 0.15s, color 0.15s;
 }
 
